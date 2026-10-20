@@ -6,6 +6,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+// Catalog endpoints are public, but a signed-in caller's token identifies them for search rate limiting.
+builder.AddDefaultAuthentication();
+
 // Catalog.API owns the catalogdb schema; the sync worker waits for this service to be healthy.
 builder.AddNpgsqlDbContext<CatalogContext>("catalogdb");
 builder.Services.AddDatabaseInitializer<CatalogContext>();
@@ -21,12 +24,16 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
     .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
+builder.Services.AddSearchRateLimiting(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+
+app.UseAuthentication();
+app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
 {

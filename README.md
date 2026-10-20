@@ -36,6 +36,11 @@ Search finds any show on TVmaze, not just imported ones. Before searching, Catal
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
 longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
 
+Search is rate limited (429 with `Retry-After` when over), per signed-in user, or per client IP for the mobile app
+(the last `X-Forwarded-For` entry, which the gateway adds). The web app calls from its own server, so anonymous web visitors
+share one larger limit. Separately, at most 30 new search terms a minute go to TVmaze across all callers; past that, search
+answers from the catalog. Limits are under `SearchRateLimit` in Catalog.API's configuration (see `SearchRateLimitOptions`).
+
 To work offline, set `Catalog:Provider` to `mock` to use `MockCatalogProvider`: 12 invented shows whose air dates are relative
 to the current week, so there are always episodes that aired recently and episodes coming up. Shows are stored per provider,
 so switching leaves the other provider's shows in the database without refreshing them.
