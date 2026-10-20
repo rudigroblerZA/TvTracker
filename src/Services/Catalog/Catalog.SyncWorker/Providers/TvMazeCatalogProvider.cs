@@ -74,6 +74,20 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default)
+    {
+        // Returns up to 10 shows, best match first.
+        var results = await http.GetFromJsonAsync<List<TvMazeSearchResult>>(
+            $"search/shows?q={Uri.EscapeDataString(query)}", cancellationToken) ?? [];
+
+        return results
+            .Select(r => r.Show)
+            .OfType<TvMazeShow>()
+            .Take(limit)
+            .Select(s => s.Id.ToString())
+            .ToList();
+    }
+
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync(
@@ -245,6 +259,8 @@ internal sealed record TvMazeScheduleItem
 }
 
 internal sealed record TvMazeScheduleEmbedded(TvMazeShow? Show);
+
+internal sealed record TvMazeSearchResult(double Score, TvMazeShow? Show);
 
 internal sealed record TvMazeShow
 {

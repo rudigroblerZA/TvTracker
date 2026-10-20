@@ -1,3 +1,4 @@
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -30,8 +31,20 @@ public static class CatalogApi
     }
 
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> SearchShowsAsync(
-        CatalogContext db, string? search, string? genre, ShowStatus? status,
+        CatalogContext db, CatalogImportClient importer, string? search, string? genre, ShowStatus? status,
         int page = 1, int pageSize = 20, CancellationToken ct = default)
+    {
+        if (page <= 1 && !string.IsNullOrWhiteSpace(search))
+        {
+            // Pulls in matching shows the catalog doesn't have yet, so they appear in the results.
+            await importer.ImportSearchMatchesAsync(search, ct);
+        }
+
+        return await QueryShowsAsync(db, search, genre, status, page, pageSize, ct);
+    }
+
+    private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(
+        CatalogContext db, string? search, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct)
     {
         (page, pageSize) = Normalize(page, pageSize);
 
@@ -239,7 +252,7 @@ public static class CatalogApi
 
     private static Task<Ok<PagedResult<ShowSummaryDto>>> GetShowsByGenreAsync(
         string genre, CatalogContext db, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
-        SearchShowsAsync(db, search: null, genre, status: null, page, pageSize, ct);
+        QueryShowsAsync(db, search: null, genre, status: null, page, pageSize, ct);
 
     private static (int Page, int PageSize) Normalize(int page, int pageSize) =>
         (Math.Max(1, page), Math.Clamp(pageSize, 1, 100));

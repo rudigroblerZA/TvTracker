@@ -15,12 +15,17 @@
             <option value="@g">@g</option>
         }
     </select>
-    <button class="btn" type="submit">Search</button>
+    <button class="btn" type="submit" disabled="@searching">Search</button>
 </form>
 
 <ErrorNotice Message="@error" OnRetry="SearchAsync" />
 
-@if (results is not null)
+@if (searching)
+{
+    @* A new search term can take a few seconds: matching shows are imported from TVmaze first. *@
+    <p class="muted">Searching…</p>
+}
+else if (results is not null)
 {
     <p class="muted">@(results.TotalCount == 1 ? "1 result" : $"{results.TotalCount} results")</p>
     <div class="card-grid">
@@ -47,6 +52,7 @@
     private PagedResult<ShowSummary>? results;
     private List<ShowSummary> loaded = [];
     private string? error;
+    private bool searching;
 
     protected override async Task OnInitializedAsync()
     {
@@ -66,6 +72,7 @@
     private async Task SearchAsync()
     {
         error = null;
+        searching = true;
         try
         {
             results = await Catalog.SearchAsync(query, genre);
@@ -79,6 +86,10 @@
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            searching = false;
         }
     }
 
