@@ -379,7 +379,7 @@ public sealed class CatalogSynchronizer(
         var showEvents = new List<IntegrationEvent>();
         if (isNew)
         {
-            showEvents.Add(ShowAdded(show, p));
+            showEvents.Add(ShowAdded(show));
         }
         else
         {
@@ -565,23 +565,19 @@ public sealed class CatalogSynchronizer(
             .ToList();
     }
 
-    private static ShowAddedIntegrationEvent ShowAdded(Show s, ProviderShow p) =>
-        new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, p.Cast.Select(c => c.Name).ToList(), s.SimilarShowIds, s.Popularity,
-            s.ExternalRating, p.Cast.Select(c => new CastCredit(c.Name, c.Character, c.CharacterExternalIds)).ToList());
-
-    /// <summary>ShowAdded from stored data, for a replay.</summary>
+    /// <summary>ShowAdded from stored data (after the cast is synced, so credits carry person ids); also used for a replay.</summary>
     private static ShowAddedIntegrationEvent ShowAdded(Show s)
     {
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
-            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds)).ToList());
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList());
     }
 
     private static ShowUpdatedIntegrationEvent ShowUpdated(Show s)
     {
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
-            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds)).ToList());
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList());
     }
 
     private static EpisodesScheduledIntegrationEvent EpisodesScheduled(Show s, IEnumerable<Episode> episodes) =>

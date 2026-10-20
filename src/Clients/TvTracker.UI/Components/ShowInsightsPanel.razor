@@ -206,7 +206,14 @@
                 @foreach (var shared in insights.SharedCast)
                 {
                     <li>
-                        <strong>@shared.PersonName</strong>
+                        @if (shared.PersonId is { } personId)
+                        {
+                            <a href="people/@personId"><strong>@shared.PersonName</strong></a>
+                        }
+                        else
+                        {
+                            <strong>@shared.PersonName</strong>
+                        }
                         @(shared.SameCharacter ? "also appears as" : "is also in")
                         <a href="shows/@shared.OtherShowId">@shared.OtherShowTitle</a>
                         @if (!string.IsNullOrEmpty(shared.CharacterThere))

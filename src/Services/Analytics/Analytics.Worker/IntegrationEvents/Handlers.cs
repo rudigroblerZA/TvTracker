@@ -103,6 +103,7 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
                 {
                     ShowId = showId,
                     PersonName = c.Name,
+                    PersonId = c.PersonId,
                     Character = c.Character,
                     CharacterExternalIds = c.CharacterExternalIds.ToList(),
                     Order = order

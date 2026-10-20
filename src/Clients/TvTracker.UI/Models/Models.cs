@@ -134,8 +134,9 @@ public record RunFacts(int Seasons, int AiredEpisodes, int RuntimeMinutes, DateT
 
 public record Premiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, int? DaysSincePreviousSeason, int CatchUpEpisodes, int CatchUpRuntimeMinutes);
 
+/// <param name="PersonId">The actor's page; null in insights computed before it was known.</param>
 public record SharedCast(string PersonName, string? CharacterHere, Guid OtherShowId, string OtherShowTitle, string? OtherShowPosterUrl,
-    string? CharacterThere, bool SameCharacter);
+    string? CharacterThere, bool SameCharacter, Guid? PersonId);
 
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,

@@ -46,7 +46,8 @@ public record ShowUpdatedIntegrationEvent(
 /// <param name="CharacterExternalIds">
 /// The provider's ids for the characters played (empty if it has none). The same id in two shows means a shared character.
 /// </param>
-public record CastCredit(string Name, string? Character, IReadOnlyList<string> CharacterExternalIds);
+/// <param name="PersonId">The catalog's id for the person (their actor page); null in events published before it was added.</param>
+public record CastCredit(string Name, string? Character, IReadOnlyList<string> CharacterExternalIds, Guid? PersonId = null);
 
 /// <summary>
 /// Episodes of one show were scheduled, or their details or air times changed. Times are UTC.

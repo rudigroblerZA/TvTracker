@@ -46,7 +46,7 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
         var shows = await db.Shows.AsNoTracking().ToDictionaryAsync(s => s.ShowId, ct);
         var cast = await db.Cast.AsNoTracking().ToListAsync(ct);
         var castByShow = cast.ToLookup(c => c.ShowId);
-        var showsByPerson = cast.ToLookup(c => c.PersonName);
+        var showsByPerson = cast.ToLookup(PersonKey);
         var showsByCharacter = cast
             .SelectMany(c => c.CharacterExternalIds.Select(id => (Id: id, Credit: c)))
             .ToLookup(x => x.Id, x => x.Credit);
@@ -406,7 +406,7 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
         foreach (var credit in credits.OrderBy(c => c.Order))
         {
             var sameCharacter = credit.CharacterExternalIds.SelectMany(id => byCharacter[id]).Where(o => o.ShowId != show.ShowId);
-            var sameActor = byPerson[credit.PersonName].Where(o => o.ShowId != show.ShowId);
+            var sameActor = byPerson[PersonKey(credit)].Where(o => o.ShowId != show.ShowId);
 
             foreach (var other in sameCharacter.Concat(sameActor).DistinctBy(o => (o.ShowId, o.PersonName)))
             {
@@ -417,7 +417,7 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
 
                 var isSameCharacter = other.CharacterExternalIds.Intersect(credit.CharacterExternalIds).Any();
                 found.Add((new SharedCast(credit.PersonName, credit.Character, other.ShowId, otherShow.Title, otherShow.PosterUrl,
-                    other.Character, isSameCharacter), credit.Order, otherShow.Popularity));
+                    other.Character, isSameCharacter, credit.PersonId), credit.Order, otherShow.Popularity));
             }
         }
 
@@ -430,6 +430,12 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             .Select(f => f.Shared)
             .ToList();
     }
+
+    /// <summary>
+    /// Who a credit is: the catalog's person id, so two actors who share a name aren't shown as shared cast; the name
+    /// for credits stored before ids were sent (the next catalog replay fills those in).
+    /// </summary>
+    private static string PersonKey(CastCopy credit) => credit.PersonId?.ToString() ?? $"name:{credit.PersonName}";
 
     /// <summary>
     /// Top episodes overall (genre "") and per genre. The provider gives no vote counts, so raw episode ratings from

@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Analytics.Worker;
 
 /// <summary>
-/// Backfill: when Analytics has no shows yet (first deployment, or a new database), asks the catalog sync worker
-/// to republish every show and its episodes. Shows imported before Analytics existed then reach it like new ones.
-/// Our users' earlier ratings aren't replayed; they accumulate from new ratings.
+/// Backfill: when Analytics has no shows yet (first deployment, or a new database), or holds cast credits from before
+/// catalog events carried person ids, asks the catalog sync worker to republish every show and its episodes.
+/// Shows imported before then reach it like new ones. Our users' earlier ratings aren't replayed; they accumulate.
 /// </summary>
 public sealed class CatalogReplayRequester(
     IServiceScopeFactory scopeFactory, HttpClient http, ILogger<CatalogReplayRequester> logger) : BackgroundService
@@ -19,7 +19,10 @@ public sealed class CatalogReplayRequester(
     {
         await using (var scope = scopeFactory.CreateAsyncScope())
         {
-            if (await scope.ServiceProvider.GetRequiredService<AnalyticsContext>().Shows.AnyAsync(stoppingToken))
+            var db = scope.ServiceProvider.GetRequiredService<AnalyticsContext>();
+            var hasShows = await db.Shows.AnyAsync(stoppingToken);
+            var castWithoutPersonIds = await db.Cast.AnyAsync(c => c.PersonId == null, stoppingToken);
+            if (hasShows && !castWithoutPersonIds)
             {
                 return;
             }
