@@ -23,7 +23,38 @@ public static class ImportApi
         // Used by a service that starts after shows were imported (Analytics on first start) to build its copy.
         api.MapPost("/replay", Replay);
 
+        // The bulk import CLI (src/Tools/Catalog.ImportCli): start a job, follow it, cancel it.
+        api.MapPost("/bulk", StartBulkImport);
+        api.MapGet("/bulk/current", (BulkImportRunner runner) =>
+            runner.Current is { } status ? Results.Ok(status) : Results.NotFound());
+        api.MapGet("/bulk/{id:guid}", (Guid id, BulkImportRunner runner) =>
+            runner.Current is { } status && status.Id == id ? Results.Ok(status) : Results.NotFound());
+        api.MapDelete("/bulk/{id:guid}", (Guid id, BulkImportRunner runner) =>
+            runner.TryCancel(id) ? Results.Accepted() : Results.NotFound());
+
         return api;
+    }
+
+    /// <summary>202 with the new job, 409 with the running one if a job is already running, 400 for a bad request.</summary>
+    private static IResult StartBulkImport(BulkImportRequest request, BulkImportRunner runner)
+    {
+        var titles = request.Titles?.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var ids = request.Ids?.Select(i => i.Trim()).Where(i => i.Length > 0).Distinct().ToList();
+
+        var given = new[] { titles is { Count: > 0 }, ids is { Count: > 0 }, request.Top is not null }.Count(x => x);
+        if (given != 1)
+        {
+            return Results.Problem("Give exactly one of titles, ids or top.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        if (request.Top is < 1 or > BulkImportRunner.MaxItems || titles?.Count > BulkImportRunner.MaxItems || ids?.Count > BulkImportRunner.MaxItems)
+        {
+            return Results.Problem($"A bulk import can include at most {BulkImportRunner.MaxItems} shows.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var (started, status) = runner.TryStart(new BulkImportRequest(titles is { Count: > 0 } ? titles : null, ids is { Count: > 0 } ? ids : null, request.Top));
+        return started
+            ? Results.Accepted($"/api/v1/imports/bulk/{status.Id}", status)
+            : Results.Conflict(status);
     }
 
     /// <summary>Starts the replay in the background and answers straight away (202), so a client retry can't start another.</summary>

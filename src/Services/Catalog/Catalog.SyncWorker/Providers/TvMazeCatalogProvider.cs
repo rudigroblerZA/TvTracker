@@ -74,6 +74,40 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
+    /// <summary>
+    /// TVmaze has no "most popular" list, so this reads its whole show index (about 380 pages of 250, ordered by id;
+    /// a few minutes under the rate limit) and ranks by weight, TVmaze's popularity score, then rating.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default)
+    {
+        var shows = new List<TvMazeShow>();
+        for (var page = 0; ; page++)
+        {
+            using var response = await http.GetAsync($"shows?page={page}", cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                break; // Past the last page.
+            }
+
+            response.EnsureSuccessStatusCode();
+            var items = await response.Content.ReadFromJsonAsync<List<TvMazeShow>>(cancellationToken) ?? [];
+            if (items.Count == 0)
+            {
+                break;
+            }
+
+            shows.AddRange(items);
+            onPage?.Invoke(page + 1);
+        }
+
+        return shows
+            .OrderByDescending(s => s.Weight)
+            .ThenByDescending(s => s.Rating?.Average ?? 0)
+            .Take(count)
+            .Select(s => s.Id.ToString())
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default)
     {
         // Returns up to 10 shows, best match first.

@@ -41,6 +41,7 @@ else
 
 builder.Services.AddScoped<CatalogSynchronizer>();
 builder.Services.AddSingleton<CatalogReplayRunner>();
+builder.Services.AddSingleton<BulkImportRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.

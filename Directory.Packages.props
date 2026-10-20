@@ -55,6 +55,10 @@
     <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Tools">
+    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Messaging and delivery">
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
     <PackageVersion Include="Microsoft.Azure.NotificationHubs" Version="4.2.0" />
