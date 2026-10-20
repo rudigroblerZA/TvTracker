@@ -81,7 +81,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | TvTracker.Persistence | `src/TvTracker.Persistence` | EF Core outbox, inbox (idempotent consumers), database initialisation |
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
-| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast, where to watch, search, schedule |
+| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search, schedule |
 | Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |

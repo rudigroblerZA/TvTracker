@@ -106,6 +106,18 @@ public class Person
     public required string Name { get; set; }
 
     public string? PhotoUrl { get; set; }
+
+    /// <summary>The provider's id for the person (TVmaze's), so two actors with the same name stay apart.</summary>
+    public string? ExternalId { get; set; }
+
+    public DateOnly? Birthday { get; set; }
+
+    public DateOnly? Deathday { get; set; }
+
+    public string? Gender { get; set; }
+
+    /// <summary>Country name, e.g. "United States".</summary>
+    public string? Country { get; set; }
 }
 
 public class CastMember

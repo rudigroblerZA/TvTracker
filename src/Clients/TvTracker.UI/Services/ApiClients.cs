@@ -56,6 +56,9 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<ShowDetail?> GetShowAsync(Guid id, string? region = null, CancellationToken ct = default) =>
         GetAsync<ShowDetail>(ApiClients.Catalog, $"api/v1/shows/{id}?region={Uri.EscapeDataString(region ?? "US")}", ct, cacheForOffline: true);
 
+    public Task<PersonDetail?> GetPersonAsync(Guid id, CancellationToken ct = default) =>
+        GetAsync<PersonDetail>(ApiClients.Catalog, $"api/v1/people/{id}", ct, cacheForOffline: true);
+
     public Task<SeasonDetail?> GetSeasonAsync(Guid showId, int number, CancellationToken ct = default) =>
         GetAsync<SeasonDetail>(ApiClients.Catalog, $"api/v1/shows/{showId}/seasons/{number}", ct, cacheForOffline: true);
 

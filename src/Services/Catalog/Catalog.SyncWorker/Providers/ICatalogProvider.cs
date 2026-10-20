@@ -59,6 +59,10 @@ public record ProviderEpisode(
     double? Rating);
 
 /// <param name="CharacterExternalIds">The provider's ids for the characters played; empty when it has none.</param>
-public record ProviderCastMember(string Name, string? Character, string? PhotoUrl, IReadOnlyList<string> CharacterExternalIds);
+/// <param name="Person">Details about the actor; null when the provider has none.</param>
+public record ProviderCastMember(string Name, string? Character, string? PhotoUrl, IReadOnlyList<string> CharacterExternalIds,
+    ProviderPerson? Person = null);
+
+public record ProviderPerson(string ExternalId, DateOnly? Birthday, DateOnly? Deathday, string? Gender, string? Country);
 
 public record ProviderWatchOption(string Region, string ProviderName, WatchProviderType Type, string? Url);

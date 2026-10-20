@@ -23,6 +23,7 @@ public static class CatalogApi
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
+        api.MapGet("/people/{id:guid}", GetPersonAsync);
         api.MapGet("/schedule", GetScheduleAsync);
         api.MapGet("/genres", GetGenresAsync);
         api.MapGet("/genres/{genre}/shows", GetShowsByGenreAsync);
@@ -169,7 +170,7 @@ public static class CatalogApi
                 .ToList(),
             show.Cast
                 .OrderBy(c => c.Order)
-                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl))
+                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl, c.PersonId))
                 .ToList(),
             region,
             show.WatchProviders
@@ -197,6 +198,34 @@ public static class CatalogApi
         return TypedResults.Ok(new SeasonDetailDto(
             id, season.Number, season.Name, season.Overview, season.PremieresAtUtc,
             episodes.Select(e => e.ToDto(CatalogMappings.LabelFor(e, episodes))).ToList()));
+    }
+
+    private static async Task<Results<Ok<PersonDetailDto>, NotFound>> GetPersonAsync(Guid id, CatalogContext db, CancellationToken ct)
+    {
+        var person = await db.People.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, ct);
+        if (person is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var credits = await db.Cast.AsNoTracking()
+            .Where(c => c.PersonId == id)
+            .Join(db.Shows.AsNoTracking(), c => c.ShowId, s => s.Id, (c, s) => new { Show = s, c.Character })
+            .ToListAsync(ct);
+
+        return TypedResults.Ok(new PersonDetailDto(
+            person.Id,
+            person.Name,
+            person.PhotoUrl,
+            person.Birthday,
+            person.Deathday,
+            person.Gender,
+            person.Country,
+            credits
+                .OrderByDescending(c => c.Show.FirstAirDate)
+                .ThenBy(c => c.Show.Title)
+                .Select(c => new PersonCreditDto(c.Show.ToSummary(), c.Character))
+                .ToList()));
     }
 
     private static async Task<Results<Ok<EpisodeDto>, NotFound>> GetEpisodeAsync(Guid id, CatalogContext db, CancellationToken ct)

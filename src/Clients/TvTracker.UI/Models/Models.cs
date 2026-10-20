@@ -29,7 +29,13 @@ public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, S
 
 public record SeasonSummary(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
-public record CastMember(string Name, string? Character, string? PhotoUrl);
+/// <param name="PersonId">Empty in responses cached before people had pages (e.g. offline on mobile); don't link then.</param>
+public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId);
+
+public record PersonCredit(ShowSummary Show, string? Character);
+
+public record PersonDetail(Guid Id, string Name, string? PhotoUrl, DateOnly? Birthday, DateOnly? Deathday, string? Gender, string? Country,
+    IReadOnlyList<PersonCredit> Credits);
 
 public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url);
 
