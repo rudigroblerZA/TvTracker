@@ -11,6 +11,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<Person> People => Set<Person>();
     public DbSet<CastMember> Cast => Set<CastMember>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
+    public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -79,6 +80,19 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasIndex(w => new { w.ShowId, w.Region });
             entity.Property(w => w.Region).HasMaxLength(2);
             entity.Property(w => w.ProviderName).HasMaxLength(128);
+        });
+
+        modelBuilder.HasPostgresExtension("vector");
+        modelBuilder.Entity<ShowEmbedding>(entity =>
+        {
+            entity.ToTable("show_embeddings");
+            entity.HasKey(e => e.ShowId);
+            entity.HasOne<Show>().WithOne().HasForeignKey<ShowEmbedding>(e => e.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Model).HasMaxLength(64);
+            entity.Property(e => e.SourceHash).HasMaxLength(64);
+            entity.Property(e => e.Embedding).HasColumnType("vector(384)");
+            // Approximate nearest-neighbour index for cosine distance (the vectors are normalized).
+            entity.HasIndex(e => e.Embedding).HasMethod("hnsw").HasOperators("vector_cosine_ops");
         });
 
         modelBuilder.UseIntegrationEventLogs();

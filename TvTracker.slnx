@@ -18,6 +18,7 @@
   <Folder Name="/Services/">
     <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
     <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
     <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
     <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
     <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />

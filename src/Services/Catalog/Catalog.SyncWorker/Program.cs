@@ -1,4 +1,5 @@
 using Catalog.Data;
+using Catalog.Embeddings;
 using Catalog.SyncWorker;
 using Catalog.SyncWorker.Providers;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // The schema is created by Catalog.API; the AppHost starts this worker once that service is healthy.
-builder.AddNpgsqlDbContext<CatalogContext>("catalogdb");
+builder.AddCatalogDbContext();
 
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
@@ -41,6 +42,10 @@ else
 builder.Services.AddScoped<CatalogSynchronizer>();
 builder.Services.AddSingleton<CatalogReplayRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();
+
+// Vectors of each show's text, for semantic search in Catalog.API.
+builder.Services.AddLocalEmbeddings(builder.Configuration);
+builder.Services.AddHostedService<ShowEmbeddingIndexer>();
 
 var app = builder.Build();
 

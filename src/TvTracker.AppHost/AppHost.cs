@@ -1,12 +1,19 @@
+using Aspire.Hosting.Utils;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
 // Infrastructure (containers; Docker or Podman must be running)
 // ---------------------------------------------------------------------------
 
+// The pgvector image is Postgres plus the vector extension, for semantic search. Same major version and Debian release
+// (trixie, whose collation version existing databases were created with) as Aspire's default postgres image.
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume()
+    .WithImage("pgvector/pgvector", "0.8.7-pg18-trixie")
     .WithLifetime(ContainerLifetime.Persistent);
+// Same volume WithDataVolume would create, but mounted where Postgres 18 keeps its data: WithDataVolume picks the path
+// from the image tag, and doesn't recognise pgvector's tags as Postgres 18.
+postgres.WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql");
 
 // One database per service: no service reads another's tables.
 var identityDb = postgres.AddDatabase("identitydb");

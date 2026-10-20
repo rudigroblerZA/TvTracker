@@ -36,6 +36,15 @@ Search finds any show on TVmaze, not just imported ones. Before searching, Catal
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
 longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
 
+Search also matches by meaning. Results start with shows whose title contains the term (most popular first), followed
+by up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
+"cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
+Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The model (about 90 MB) is downloaded from
+Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
+to change it). Until it loads, search matches titles only. The sync worker embeds new and refreshed shows every 30 seconds
+and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
+`pgvector/pgvector` image for that.
+
 Search is rate limited (429 with `Retry-After` when over), per signed-in user, or per client IP for anonymous visitors
 (the last `X-Forwarded-For` entry: the mobile gateway adds it, and the web app forwards each browser's address, captured
 when the page loads). Calls with neither, from other services, share one larger limit. The web app doesn't retry 429s or
@@ -81,8 +90,9 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | TvTracker.Persistence | `src/TvTracker.Persistence` | EF Core outbox, inbox (idempotent consumers), database initialisation |
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
-| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search, schedule |
-| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), detects changes, publishes events, detects aired episodes |
+| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |
+| Catalog.Embeddings | `src/Services/Catalog` | Local text embeddings (all-MiniLM-L6-v2 via ONNX Runtime) for semantic search |
+| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |

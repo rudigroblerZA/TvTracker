@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
   </ItemGroup>
 
 </Project>

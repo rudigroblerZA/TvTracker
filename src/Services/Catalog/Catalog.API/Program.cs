@@ -1,6 +1,9 @@
 using Catalog.API.Apis;
 using Catalog.API.Services;
 using Catalog.Data;
+using Catalog.Embeddings;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,8 +13,14 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 
 // Catalog.API owns the catalogdb schema; the sync worker waits for this service to be healthy.
-builder.AddNpgsqlDbContext<CatalogContext>("catalogdb");
-builder.Services.AddDatabaseInitializer<CatalogContext>();
+builder.AddCatalogDbContext();
+builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, _, ct) =>
+{
+    // A migration may have just created the pgvector extension; connections opened earlier didn't know its types.
+    var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+    await connection.OpenAsync(ct);
+    await connection.ReloadTypesAsync(ct);
+});
 
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
@@ -25,6 +34,10 @@ builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = n
     .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 builder.Services.AddSearchRateLimiting(builder.Configuration);
+
+// Search also lists shows similar in meaning to the term, by comparing its vector with the sync worker's show vectors.
+builder.Services.AddLocalEmbeddings(builder.Configuration);
+builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 
 #nullable disable
 
@@ -21,6 +22,7 @@ namespace Catalog.Data.Migrations
                 .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Catalog.Data.CastMember", b =>
@@ -262,6 +264,38 @@ namespace Catalog.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowEmbedding", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EmbeddedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Vector>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("vector(384)");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("ShowId");
+
+                    b.HasIndex("Embedding");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Embedding"), "hnsw");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Embedding"), new[] { "vector_cosine_ops" });
+
+                    b.ToTable("show_embeddings", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.WatchProvider", b =>
                 {
                     b.Property<Guid>("Id")
@@ -373,6 +407,15 @@ namespace Catalog.Data.Migrations
                     b.HasOne("Catalog.Data.Show", null)
                         .WithMany("Seasons")
                         .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowEmbedding", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithOne()
+                        .HasForeignKey("Catalog.Data.ShowEmbedding", "ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

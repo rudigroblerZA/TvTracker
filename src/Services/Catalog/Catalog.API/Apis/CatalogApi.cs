@@ -31,8 +31,12 @@ public static class CatalogApi
         return api;
     }
 
+    /// <summary>
+    /// Shows whose title contains the search term (most popular first), followed by shows similar in meaning
+    /// (closest first; see <see cref="SemanticSearch"/>). Genre and status filter both.
+    /// </summary>
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> SearchShowsAsync(
-        CatalogContext db, CatalogImportClient importer, string? search, string? genre, ShowStatus? status,
+        CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, string? search, string? genre, ShowStatus? status,
         int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
         if (page <= 1 && !string.IsNullOrWhiteSpace(search))
@@ -41,39 +45,57 @@ public static class CatalogApi
             await importer.ImportSearchMatchesAsync(search, ct);
         }
 
-        return await QueryShowsAsync(db, search, genre, status, page, pageSize, ct);
+        return await QueryShowsAsync(db, semantic, search, genre, status, page, pageSize, ct);
     }
 
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(
-        CatalogContext db, string? search, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct)
+        CatalogContext db, SemanticSearch? semantic, string? search, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct)
     {
         (page, pageSize) = Normalize(page, pageSize);
 
-        var query = db.Shows.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var pattern = $"%{search.Trim()}%";
-            query = query.Where(s => EF.Functions.ILike(s.Title, pattern));
-        }
+        var filtered = db.Shows.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(genre))
         {
-            query = query.Where(s => s.Genres.Contains(genre));
+            filtered = filtered.Where(s => s.Genres.Contains(genre));
         }
         if (status is not null)
         {
-            query = query.Where(s => s.Status == status);
+            filtered = filtered.Where(s => s.Status == status);
         }
 
-        var total = await query.CountAsync(ct);
-        var shows = await query
-            .OrderByDescending(s => s.Popularity)
-            .ThenBy(s => s.Title)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var titleMatches = filtered;
+        List<Guid> similar = [];
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+            titleMatches = filtered.Where(s => EF.Functions.ILike(s.Title, pattern));
+            if (semantic is not null)
+            {
+                similar = await semantic.FindSimilarAsync(filtered.Where(s => !EF.Functions.ILike(s.Title, pattern)), db, search, ct);
+            }
+        }
 
-        return TypedResults.Ok(new PagedResult<ShowSummaryDto>(shows.Select(s => s.ToSummary()).ToList(), page, pageSize, total));
+        // Title matches fill the first pages; the similar shows come after the last of them.
+        var titleTotal = await titleMatches.CountAsync(ct);
+        var skip = (page - 1) * pageSize;
+        var shows = skip < titleTotal
+            ? await titleMatches
+                .OrderByDescending(s => s.Popularity)
+                .ThenBy(s => s.Title)
+                .Skip(skip)
+                .Take(pageSize)
+                .ToListAsync(ct)
+            : [];
+
+        var similarIds = similar.Skip(Math.Max(0, skip - titleTotal)).Take(pageSize - shows.Count).ToList();
+        if (similarIds.Count > 0)
+        {
+            var found = await db.Shows.AsNoTracking().Where(s => similarIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+            shows.AddRange(similarIds.Where(found.ContainsKey).Select(id => found[id]));
+        }
+
+        return TypedResults.Ok(new PagedResult<ShowSummaryDto>(
+            shows.Select(s => s.ToSummary()).ToList(), page, pageSize, titleTotal + similar.Count));
     }
 
     private static async Task<Ok<List<ShowSummaryDto>>> GetTrendingAsync(CatalogContext db, HybridCache cache, CancellationToken ct)
@@ -281,7 +303,7 @@ public static class CatalogApi
 
     private static Task<Ok<PagedResult<ShowSummaryDto>>> GetShowsByGenreAsync(
         string genre, CatalogContext db, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
-        QueryShowsAsync(db, search: null, genre, status: null, page, pageSize, ct);
+        QueryShowsAsync(db, semantic: null, search: null, genre, status: null, page, pageSize, ct);
 
     private static (int Page, int PageSize) Normalize(int page, int pageSize) =>
         (Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
