@@ -59,6 +59,9 @@ namespace Analytics.Data.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("ShowId", "PersonName");
 
                     b.HasIndex("PersonName");

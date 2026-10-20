@@ -43,6 +43,10 @@ public class CastCopy
 {
     public Guid ShowId { get; set; }
     public required string PersonName { get; set; }
+
+    /// <summary>The catalog's id for the person (their actor page); null for credits stored before it was sent.</summary>
+    public Guid? PersonId { get; set; }
+
     public string? Character { get; set; }
     public List<string> CharacterExternalIds { get; set; } = [];
     public int Order { get; set; }

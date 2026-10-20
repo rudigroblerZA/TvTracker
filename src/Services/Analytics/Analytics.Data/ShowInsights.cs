@@ -95,6 +95,7 @@ public record Premiere(
 
 /// <summary>An actor (or character) this show shares with another show in the catalog.</summary>
 /// <param name="SameCharacter">True when the provider lists the same character in both, not just the same actor.</param>
+/// <param name="PersonId">The catalog's id for the person, for linking to their page; null when not known yet.</param>
 public record SharedCast(
     string PersonName,
     string? CharacterHere,
@@ -102,7 +103,8 @@ public record SharedCast(
     string OtherShowTitle,
     string? OtherShowPosterUrl,
     string? CharacterThere,
-    bool SameCharacter);
+    bool SameCharacter,
+    Guid? PersonId = null);
 
 public static class InsightRules
 {
