@@ -2,7 +2,7 @@
 
   <!--
     Catalog.SyncWorker: imports and refreshes shows from the catalog provider, detects changes,
-    and publishes catalog events. Uses MockCatalogProvider until TMDB or TVmaze is chosen.
+    and publishes catalog events. Data comes from TVmaze (or MockCatalogProvider when Catalog:Provider is "mock").
   -->
 
   <ItemGroup>

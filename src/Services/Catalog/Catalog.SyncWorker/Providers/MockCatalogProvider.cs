@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Catalog.SyncWorker.Providers;
 
 /// <summary>
-/// Fake catalog used until a real provider is chosen. All shows, people and services are invented.
+/// Fake catalog for offline development (set Catalog:Provider to "mock"). All shows, people and services are invented.
 /// Air times are relative to the start of the current week (Monday 00:00 UTC), so there are always
 /// episodes that aired recently and episodes airing in the coming days. The anchor only moves once a
 /// week, so refreshes don't report spurious air-time changes.
@@ -13,8 +13,8 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
 {
     public string Name => "mock";
 
-    public Task<IReadOnlyList<ProviderShow>> GetFeaturedShowsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(BuildCatalog());
+    public Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>(BuildCatalog().Select(s => s.ExternalId).ToList());
 
     public Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default) =>
         Task.FromResult(BuildCatalog().FirstOrDefault(s => s.ExternalId == externalId));

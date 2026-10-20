@@ -25,8 +25,7 @@ public sealed class CatalogSynchronizer(
     /// <summary>Imports featured shows that aren't in the catalog yet.</summary>
     public async Task<int> ImportFeaturedAsync(CancellationToken ct)
     {
-        var featured = await provider.GetFeaturedShowsAsync(ct);
-        var externalIds = featured.Select(s => s.ExternalId).ToList();
+        var externalIds = (await provider.GetFeaturedShowIdsAsync(ct)).ToList();
 
         var existing = await db.Shows
             .Where(s => s.Source == provider.Name && externalIds.Contains(s.ExternalId))
@@ -34,8 +33,14 @@ public sealed class CatalogSynchronizer(
             .ToListAsync(ct);
 
         var imported = 0;
-        foreach (var show in featured.Where(s => !existing.Contains(s.ExternalId)))
+        foreach (var externalId in externalIds.Except(existing))
         {
+            var show = await provider.GetShowAsync(externalId, ct);
+            if (show is null)
+            {
+                continue;
+            }
+
             await SyncShowAsync(show, ct);
             imported++;
         }

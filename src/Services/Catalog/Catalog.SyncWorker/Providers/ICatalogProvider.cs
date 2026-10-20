@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Catalog.SyncWorker.Providers;
 
 /// <summary>
-/// Source of show data. Implementations: MockCatalogProvider now; TMDB and/or TVmaze later.
+/// Source of show data. Implementations: TvMazeCatalogProvider (default) and MockCatalogProvider.
 /// A real provider should also respect the provider's rate limits.
 /// </summary>
 public interface ICatalogProvider
@@ -12,8 +12,11 @@ public interface ICatalogProvider
     /// <summary>Stored as <see cref="Show.Source"/>.</summary>
     string Name { get; }
 
-    /// <summary>Shows to import proactively (for a real provider: popular and currently airing shows).</summary>
-    Task<IReadOnlyList<ProviderShow>> GetFeaturedShowsAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// External ids of shows to import proactively (for a real provider: popular and currently airing shows).
+    /// Only ids, so the synchronizer fetches full details just for the ones it doesn't have yet.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
