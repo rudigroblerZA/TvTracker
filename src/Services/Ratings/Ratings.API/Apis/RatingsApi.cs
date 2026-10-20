@@ -96,16 +96,20 @@ public static class RatingsApi
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteShowRatingAsync(Guid showId, ClaimsPrincipal user, RatingsContext db, HybridCache cache, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> DeleteShowRatingAsync(
+        Guid showId, ClaimsPrincipal user, RatingsContext db, IIntegrationEventOutbox outbox, HybridCache cache, CancellationToken ct)
     {
-        var rating = await db.ShowRatings.FindAsync([user.GetUserId(), showId], ct);
+        var userId = user.GetUserId();
+        var rating = await db.ShowRatings.FindAsync([userId, showId], ct);
         if (rating is null)
         {
             return TypedResults.NotFound();
         }
 
         db.ShowRatings.Remove(rating);
+        outbox.Add(new ShowRatingRemovedIntegrationEvent(userId, showId));
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
         await cache.RemoveAsync(ShowSummaryKey(showId), ct);
         return TypedResults.NoContent();
     }
@@ -142,16 +146,20 @@ public static class RatingsApi
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteEpisodeRatingAsync(Guid episodeId, ClaimsPrincipal user, RatingsContext db, HybridCache cache, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> DeleteEpisodeRatingAsync(
+        Guid episodeId, ClaimsPrincipal user, RatingsContext db, IIntegrationEventOutbox outbox, HybridCache cache, CancellationToken ct)
     {
-        var rating = await db.EpisodeRatings.FindAsync([user.GetUserId(), episodeId], ct);
+        var userId = user.GetUserId();
+        var rating = await db.EpisodeRatings.FindAsync([userId, episodeId], ct);
         if (rating is null)
         {
             return TypedResults.NotFound();
         }
 
         db.EpisodeRatings.Remove(rating);
+        outbox.Add(new EpisodeRatingRemovedIntegrationEvent(userId, rating.ShowId, episodeId));
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
         await cache.RemoveAsync(EpisodeSummaryKey(episodeId), ct);
         return TypedResults.NoContent();
     }
