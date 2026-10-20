@@ -1,6 +1,7 @@
 using Catalog.Data;
 using Catalog.SyncWorker;
 using Catalog.SyncWorker.Providers;
+using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -19,8 +20,23 @@ builder.Services.AddIntegrationEventOutbox<CatalogContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Swap for a TMDB or TVmaze provider once the catalog source is decided.
-builder.Services.AddSingleton<ICatalogProvider, MockCatalogProvider>();
+// Catalog:Provider picks the data source: "tvmaze" (default) or "mock" for invented offline data.
+if (string.Equals(builder.Configuration["Catalog:Provider"], "mock", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<ICatalogProvider, MockCatalogProvider>();
+}
+else
+{
+    builder.Services.Configure<TvMazeOptions>(builder.Configuration.GetSection("TvMaze"));
+    builder.Services.AddSingleton<TvMazeRateLimiter>();
+    builder.Services.AddTransient<TvMazeRateLimitHandler>();
+    builder.Services.AddHttpClient<ICatalogProvider, TvMazeCatalogProvider>((sp, http) =>
+        {
+            http.BaseAddress = new Uri(sp.GetRequiredService<IOptions<TvMazeOptions>>().Value.BaseUrl);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker/1.0");
+        })
+        .AddHttpMessageHandler<TvMazeRateLimitHandler>();
+}
 
 builder.Services.AddScoped<CatalogSynchronizer>();
 builder.Services.AddHostedService<CatalogSyncService>();

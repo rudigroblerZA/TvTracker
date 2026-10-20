@@ -4,8 +4,8 @@ A TV Time–style app for tracking shows: what you follow, what you've watched, 
 Built as eShop-style microservices on .NET 10 and Aspire, with a Blazor web app and a MAUI Blazor Hybrid mobile app
 that share one Razor component library. The design behind it is in the "TV Tracker – Service Design" doc.
 
-> **First build:** this code was written without access to a .NET SDK, so it has never been compiled.
-> Expect a round of build errors to fix (package versions, API signatures). Start with `dotnet build` and work through them.
+> **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
+> The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
 ## Prerequisites
 
@@ -25,9 +25,19 @@ When everything is running, open the `webapp` link and sign in:
 - Demo user: **demo / demo**
 - Or create an account from the sign-in page (Keycloak handles sign-up and password reset)
 
-The catalog is filled from **mock data** (`MockCatalogProvider`): 12 invented shows whose air dates are relative to the current week,
-so there are always episodes that aired recently and episodes coming up. Follow a few shows, mark episodes watched,
-and check Up Next, the calendar, recommendations and the inbox.
+The catalog is filled from **[TVmaze](https://www.tvmaze.com/api)** (free, no API key). Every hour the sync worker imports the 40 most
+popular shows airing today: the US and GB broadcast schedules plus streaming, without news, talk, sports and daily soaps.
+The catalog grows as the schedule changes. Imported shows are refreshed daily (ended shows weekly), and a show
+is refreshed promptly when someone follows it. The first sync takes a minute or two, because calls are throttled to stay under
+TVmaze's limit of 20 calls every 10 seconds. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
+
+To work offline, set `Catalog:Provider` to `mock` to use `MockCatalogProvider`: 12 invented shows whose air dates are relative
+to the current week, so there are always episodes that aired recently and episodes coming up. Shows are stored per provider,
+so switching leaves the other provider's shows in the database without refreshing them.
+
+TVmaze data is licensed CC BY-SA; the app footer carries the required credit. TVmaze has no keywords, "similar shows" or
+per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
+streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
 Useful local addresses:
 
@@ -83,7 +93,7 @@ How events flow:
 
 | Feature | What to set | Where |
 | --- | --- | --- |
-| Real catalog data | Implement `ICatalogProvider` for TMDB or TVmaze and register it instead of `MockCatalogProvider` | `Catalog.SyncWorker/Program.cs` |
+| Search beyond the catalog | Search only covers imported shows. To find any show, have Catalog.API fall back to TVmaze search (`/search/shows?q=`) and ask the sync worker to import picks | `Catalog.API/Apis/CatalogApi.cs`, `Catalog.SyncWorker` |
 | Mobile push | Azure Notification Hubs connection string, plus an `IPushTokenProvider` that gets FCM/APNs tokens (e.g. Plugin.Firebase) | Notifications.API user secrets `NotificationHubs:ConnectionString`; `MobileApp/Services/MobilePlatformServices.cs` |
 | Browser push | VAPID keys (e.g. `npx web-push generate-vapid-keys`) | Notifications.API user secrets `WebPush:PublicKey`, `WebPush:PrivateKey` |
 | Email | Azure Communication Services connection string and sender | Notifications.API user secrets `Email:ConnectionString`, `Email:SenderAddress` |
