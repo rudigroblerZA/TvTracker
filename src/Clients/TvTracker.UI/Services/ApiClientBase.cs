@@ -13,7 +13,8 @@ public sealed class SignInRequiredException() : Exception("Please sign in again.
 /// Shared HTTP plumbing for the typed API clients: bearer tokens, JSON, 404-as-null,
 /// and (on mobile) serving cached responses and queueing changes while offline.
 /// </summary>
-public abstract class ApiClientBase(IHttpClientFactory httpClientFactory, IAccessTokenProvider tokens, IOfflineStore offline, ConnectionState connection)
+public abstract class ApiClientBase(
+    IHttpClientFactory httpClientFactory, IAccessTokenProvider tokens, IOfflineStore offline, ConnectionState connection, ClientInfo client)
 {
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -112,6 +113,10 @@ public abstract class ApiClientBase(IHttpClientFactory httpClientFactory, IAcces
         if (!string.IsNullOrEmpty(token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        if (client.Address is { } address)
+        {
+            request.Headers.TryAddWithoutValidation("X-Forwarded-For", address);
         }
         if (json is not null)
         {

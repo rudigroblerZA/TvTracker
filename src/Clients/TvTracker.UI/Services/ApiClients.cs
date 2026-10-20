@@ -22,7 +22,7 @@ public static class ApiClients
         [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics];
 }
 
-public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<Profile?> GetProfileAsync(CancellationToken ct = default) =>
         GetAsync<Profile>(ApiClients.Identity, "api/v1/profile", ct, cacheForOffline: true);
@@ -40,7 +40,7 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     }
 }
 
-public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, CancellationToken ct = default)
     {
@@ -66,7 +66,7 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<List<string>>(ApiClients.Catalog, "api/v1/genres", ct, cacheForOffline: true);
 }
 
-public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<List<Follow>?> GetFollowsAsync(WatchStatus? status = null, CancellationToken ct = default) =>
         GetAsync<List<Follow>>(ApiClients.Tracking, status is null ? "api/v1/follows" : $"api/v1/follows?status={status}", ct, cacheForOffline: true);
@@ -128,7 +128,7 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
         SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{listId}/items/{showId}", null, ct, queueIfOffline: true);
 }
 
-public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<RatingSummary?> GetShowSummaryAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<RatingSummary>(ApiClients.Ratings, $"api/v1/shows/{showId}/ratings/summary", ct);
@@ -168,7 +168,7 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
         SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/reaction", null, ct, queueIfOffline: true);
 }
 
-public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<List<RecommendedShow>?> GetSimilarAsync(Guid showId, int limit = 10, CancellationToken ct = default) =>
         GetAsync<List<RecommendedShow>>(ApiClients.Recommendations, $"api/v1/shows/{showId}/similar?limit={limit}", ct, cacheForOffline: true);
@@ -181,7 +181,7 @@ public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProv
 }
 
 /// <summary>Insights for signed-in users (the API requires a token).</summary>
-public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<ShowInsights?> GetShowInsightsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowInsights>(ApiClients.Analytics, $"api/v1/shows/{showId}/insights", ct, cacheForOffline: true);
@@ -197,7 +197,7 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     }
 }
 
-public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     public Task<NotificationPreferences?> GetPreferencesAsync(CancellationToken ct = default) =>
         GetAsync<NotificationPreferences>(ApiClients.Notifications, "api/v1/preferences", ct);
