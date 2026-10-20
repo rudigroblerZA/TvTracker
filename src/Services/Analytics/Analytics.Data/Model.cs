@@ -63,6 +63,25 @@ public class UserEpisodeRating
     public int Stars { get; set; }
 }
 
+/// <summary>A user's watched mark (from EpisodeWatched; removed by EpisodeUnwatched).</summary>
+public class UserEpisodeWatch
+{
+    public required string UserId { get; set; }
+    public Guid EpisodeId { get; set; }
+    public Guid ShowId { get; set; }
+
+    /// <summary>When the mark was made (the event's time), for telling stopped viewers from ones mid-binge.</summary>
+    public DateTime WatchedAtUtc { get; set; }
+}
+
+/// <summary>A user following a show (from ShowFollowed; removed by ShowUnfollowed).</summary>
+public class UserFollow
+{
+    public required string UserId { get; set; }
+    public Guid ShowId { get; set; }
+    public DateTime FollowedAtUtc { get; set; }
+}
+
 // Computed every hour by Analytics.Worker; Analytics.API only reads these.
 
 /// <summary>One show's insights as a JSON <see cref="ShowInsights"/> document.</summary>
@@ -86,6 +105,9 @@ public class PremiereRow
     public int? DaysSincePreviousSeason { get; set; }
     public int CatchUpEpisodes { get; set; }
     public int CatchUpRuntimeMinutes { get; set; }
+
+    /// <summary>Follows in the last four weeks, for "most anticipated"; null below the minimum number of followers.</summary>
+    public int? RecentFollows { get; set; }
 }
 
 /// <summary>A top-rated episode, ranked overall (<see cref="Genre"/> empty) and within each genre.</summary>

@@ -37,6 +37,27 @@
                     <div class="muted">to watch it all · @insights.Run.AiredEpisodes episodes</div>
                 </div>
             }
+            @if (insights.Momentum is { } momentum)
+            {
+                <div class="stat">
+                    <div class="stat-value">@momentum.Followers</div>
+                    <div class="muted">following · @Format.Growth(momentum.RecentFollows, momentum.PreviousFollows)</div>
+                    @{ var peak = Math.Max(1, momentum.NewFollowsByWeek.Max()); }
+                    <div class="sparkline" aria-label="New follows per week over the last 8 weeks">
+                        @foreach (var week in momentum.NewFollowsByWeek)
+                        {
+                            <span style="height:@(10 + 90 * week / peak)%" title="@week"></span>
+                        }
+                    </div>
+                </div>
+            }
+            @if (insights.Viewing is { CompletionRate: { } completion } viewingTile)
+            {
+                <div class="stat">
+                    <div class="stat-value">@Format.Percent(completion)</div>
+                    <div class="muted">of @viewingTile.Viewers viewers are up to date</div>
+                </div>
+            }
         </div>
 
         @if (insights.NextPremiere is { } premiere)
@@ -86,6 +107,73 @@
                     </li>
                 }
             </ul>
+        }
+
+        @if (insights.Histograms is { } histograms && (histograms.OurStars is not null || histograms.ExternalEpisodes.Count > 1))
+        {
+            <h3>How it's rated</h3>
+            <div class="histograms">
+                @if (histograms.OurStars is { } stars)
+                {
+                    var most = Math.Max(1, stars.Max());
+                    <div>
+                        <div class="muted small">TV Tracker users (@stars.Sum() ratings)</div>
+                        <ul class="bars">
+                            @for (var star = 5; star >= 1; star--)
+                            {
+                                <li>
+                                    <span class="bar-label">@star ★</span>
+                                    <span class="bar" style="width:@(100 * stars[star - 1] / most)%"></span>
+                                    <span class="muted small">@stars[star - 1]</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                @if (histograms.ExternalEpisodes.Count > 1)
+                {
+                    var most = Math.Max(1, histograms.ExternalEpisodes.Max(b => b.Count));
+                    <div>
+                        <div class="muted small">Episodes by TVmaze rating</div>
+                        <div class="columns" aria-label="Episodes by TVmaze rating">
+                            @foreach (var bucket in histograms.ExternalEpisodes)
+                            {
+                                <div class="column" title="@bucket.Count episodes rated @bucket.From.ToString("0.0")–@((bucket.From + 0.5).ToString("0.0"))">
+                                    <span style="height:@(100 * bucket.Count / most)%"></span>
+                                    <span class="column-label">@bucket.From.ToString("0.#")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (insights.Viewing is { } viewing && (viewing.Seasons.Count > 0 || viewing.DropOff is not null))
+        {
+            <h3>Who's watching</h3>
+            @if (viewing.DropOff is { } drop)
+            {
+                <p>
+                    Most viewers who stop do so after
+                    <strong>@Format.EpisodeCode(drop.SeasonNumber, drop.EpisodeNumber) @drop.Title</strong>
+                    <span class="muted">(@Format.Percent(drop.Share) of viewers)</span>.
+                </p>
+            }
+            @if (viewing.Seasons.Count > 1)
+            {
+                var most = Math.Max(1, viewing.Seasons.Max(s => s.Viewers));
+                <ul class="bars">
+                    @foreach (var season in viewing.Seasons)
+                    {
+                        <li>
+                            <span class="bar-label">Season @season.Number</span>
+                            <span class="bar" style="width:@(100 * season.Viewers / most)%"></span>
+                            <span class="muted small">@season.Viewers viewers</span>
+                        </li>
+                    }
+                </ul>
+            }
         }
 
         @if (insights.TopEpisodes.Count > 0)

@@ -11,6 +11,8 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<CastCopy> Cast => Set<CastCopy>();
     public DbSet<UserShowRating> ShowRatings => Set<UserShowRating>();
     public DbSet<UserEpisodeRating> EpisodeRatings => Set<UserEpisodeRating>();
+    public DbSet<UserEpisodeWatch> Watches => Set<UserEpisodeWatch>();
+    public DbSet<UserFollow> Follows => Set<UserFollow>();
 
     public DbSet<ShowInsightsRow> ShowInsights => Set<ShowInsightsRow>();
     public DbSet<PremiereRow> Premieres => Set<PremiereRow>();
@@ -65,6 +67,22 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.HasKey(r => new { r.UserId, r.EpisodeId });
             entity.HasIndex(r => r.ShowId);
             entity.Property(r => r.UserId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<UserEpisodeWatch>(entity =>
+        {
+            entity.ToTable("user_episode_watches");
+            entity.HasKey(w => new { w.UserId, w.EpisodeId });
+            entity.HasIndex(w => w.ShowId);
+            entity.Property(w => w.UserId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<UserFollow>(entity =>
+        {
+            entity.ToTable("user_follows");
+            entity.HasKey(f => new { f.UserId, f.ShowId });
+            entity.HasIndex(f => f.ShowId);
+            entity.Property(f => f.UserId).HasMaxLength(64);
         });
 
         modelBuilder.Entity<ShowInsightsRow>(entity =>
