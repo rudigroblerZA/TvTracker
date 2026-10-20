@@ -122,7 +122,8 @@ public sealed partial class TvMazeCatalogProvider(
                 Title: Truncate(string.IsNullOrWhiteSpace(e.Name) ? $"Episode {e.Number}" : e.Name, 256),
                 Overview: StripHtml(e.Summary),
                 AirsAtUtc: e.Airstamp?.ToUniversalTime(),
-                RuntimeMinutes: e.Runtime))
+                RuntimeMinutes: e.Runtime,
+                Rating: e.Rating?.Average))
             .ToList();
 
         var seasons = embedded.Seasons
@@ -143,7 +144,8 @@ public sealed partial class TvMazeCatalogProvider(
             .Select(g => new ProviderCastMember(
                 Truncate(g.Key, 256),
                 Truncate(string.Join(" / ", g.Select(c => c.Character?.Name).OfType<string>().Distinct()), 256) is { Length: > 0 } character ? character : null,
-                g.First().Person!.Image?.Medium))
+                g.First().Person!.Image?.Medium,
+                g.Select(c => c.Character?.Id).OfType<int>().Distinct().Select(id => id.ToString()).ToList()))
             .ToList();
 
         var backdrop = embedded.Images
@@ -169,7 +171,8 @@ public sealed partial class TvMazeCatalogProvider(
             Episodes: episodes,
             Cast: cast,
             WatchOptions: WatchOptions(s),
-            SimilarExternalIds: []);
+            SimilarExternalIds: [],
+            Rating: s.Rating?.Average);
     }
 
     /// <summary>
@@ -277,6 +280,7 @@ internal sealed record TvMazeShow
     public TvMazeChannel? WebChannel { get; init; }
     public TvMazeImage? Image { get; init; }
     public string? Summary { get; init; }
+    public TvMazeRating? Rating { get; init; }
     public TvMazeSchedule? Schedule { get; init; }
 
     [JsonPropertyName("_embedded")]
@@ -302,7 +306,7 @@ internal sealed record TvMazeEmbedded
     public List<TvMazeShowImage> Images { get; init; } = [];
 }
 
-internal sealed record TvMazeEpisode(int Id, string? Name, int? Season, int? Number, DateTimeOffset? Airstamp, int? Runtime, string? Summary);
+internal sealed record TvMazeEpisode(int Id, string? Name, int? Season, int? Number, DateTimeOffset? Airstamp, int? Runtime, string? Summary, TvMazeRating? Rating);
 
 internal sealed record TvMazeSeason(int Number, string? Name, DateOnly? PremiereDate, string? Summary);
 
@@ -310,7 +314,9 @@ internal sealed record TvMazeCastCredit(TvMazePerson? Person, TvMazeCharacter? C
 
 internal sealed record TvMazePerson(string? Name, TvMazeImage? Image);
 
-internal sealed record TvMazeCharacter(string? Name);
+internal sealed record TvMazeCharacter(int? Id, string? Name);
+
+internal sealed record TvMazeRating(double? Average);
 
 internal sealed record TvMazeShowImage(string? Type, bool Main, TvMazeImageResolutions? Resolutions);
 

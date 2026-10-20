@@ -65,6 +65,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasKey(c => new { c.ShowId, c.PersonId });
             entity.HasOne(c => c.Person).WithMany().HasForeignKey(c => c.PersonId);
             entity.Property(c => c.Character).HasMaxLength(256);
+            entity.Property(c => c.CharacterExternalIds).HasDefaultValueSql("'{}'");
         });
 
         modelBuilder.Entity<WatchProvider>(entity =>

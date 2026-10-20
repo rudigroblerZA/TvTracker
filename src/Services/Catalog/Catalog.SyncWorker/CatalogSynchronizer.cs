@@ -234,6 +234,7 @@ public sealed class CatalogSynchronizer(
             || !show.Genres.SequenceEqual(p.Genres)
             || !show.Keywords.SequenceEqual(p.Keywords)
             || !show.SimilarExternalIds.SequenceEqual(p.SimilarExternalIds)
+            || show.ExternalRating != p.Rating
             || Math.Abs(show.Popularity - p.Popularity) >= 5;
 
         show.Title = p.Title;
@@ -245,6 +246,7 @@ public sealed class CatalogSynchronizer(
         show.Genres = p.Genres.ToList();
         show.Keywords = p.Keywords.ToList();
         show.Popularity = p.Popularity;
+        show.ExternalRating = p.Rating;
         show.SimilarExternalIds = p.SimilarExternalIds.ToList();
         show.SimilarShowIds = await ResolveSimilarAsync(p.SimilarExternalIds, ct);
         show.Status = p.Status;
@@ -298,6 +300,7 @@ public sealed class CatalogSynchronizer(
                     Overview = pe.Overview,
                     AirsAtUtc = pe.AirsAtUtc,
                     RuntimeMinutes = pe.RuntimeMinutes,
+                    ExternalRating = pe.Rating,
                     // Episodes that had already aired when imported never trigger "new episode" alerts.
                     AiredPublished = pe.AirsAtUtc <= now
                 };
@@ -310,6 +313,7 @@ public sealed class CatalogSynchronizer(
                 || episode.Overview != pe.Overview
                 || episode.AirsAtUtc != pe.AirsAtUtc
                 || episode.RuntimeMinutes != pe.RuntimeMinutes
+                || episode.ExternalRating != pe.Rating
                 || episode.SeasonNumber != pe.SeasonNumber
                 || episode.EpisodeNumber != pe.EpisodeNumber;
 
@@ -328,6 +332,7 @@ public sealed class CatalogSynchronizer(
             episode.Overview = pe.Overview;
             episode.AirsAtUtc = pe.AirsAtUtc;
             episode.RuntimeMinutes = pe.RuntimeMinutes;
+            episode.ExternalRating = pe.Rating;
             episode.SeasonNumber = pe.SeasonNumber;
             episode.EpisodeNumber = pe.EpisodeNumber;
             scheduled.Add(episode);
@@ -397,12 +402,23 @@ public sealed class CatalogSynchronizer(
             if (existing is null)
             {
                 var person = await GetOrCreatePersonAsync(member, ct);
-                show.Cast.Add(new CastMember { ShowId = show.Id, PersonId = person.Id, Person = person, Character = member.Character, Order = order });
+                show.Cast.Add(new CastMember
+                {
+                    ShowId = show.Id,
+                    PersonId = person.Id,
+                    Person = person,
+                    Character = member.Character,
+                    CharacterExternalIds = member.CharacterExternalIds.ToList(),
+                    Order = order
+                });
                 changed = true;
             }
-            else if (existing.Character != member.Character || existing.Order != order)
+            else if (existing.Character != member.Character
+                || existing.Order != order
+                || !existing.CharacterExternalIds.SequenceEqual(member.CharacterExternalIds))
             {
                 existing.Character = member.Character;
+                existing.CharacterExternalIds = member.CharacterExternalIds.ToList();
                 existing.Order = order;
                 changed = true;
             }
@@ -467,14 +483,18 @@ public sealed class CatalogSynchronizer(
     }
 
     private static ShowAddedIntegrationEvent ShowAdded(Show s, ProviderShow p) =>
-        new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, p.Cast.Select(c => c.Name).ToList(), s.SimilarShowIds, s.Popularity);
+        new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, p.Cast.Select(c => c.Name).ToList(), s.SimilarShowIds, s.Popularity,
+            s.ExternalRating, p.Cast.Select(c => new CastCredit(c.Name, c.Character, c.CharacterExternalIds)).ToList());
 
-    private static ShowUpdatedIntegrationEvent ShowUpdated(Show s) =>
-        new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords,
-            s.Cast.OrderBy(c => c.Order).Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity);
+    private static ShowUpdatedIntegrationEvent ShowUpdated(Show s)
+    {
+        var cast = s.Cast.OrderBy(c => c.Order).ToList();
+        return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds)).ToList());
+    }
 
     private static EpisodesScheduledIntegrationEvent EpisodesScheduled(Show s, IEnumerable<Episode> episodes) =>
         new(s.Id, s.Title, episodes
-            .Select(e => new ScheduledEpisode(e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes))
+            .Select(e => new ScheduledEpisode(e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes, e.ExternalRating))
             .ToList());
 }

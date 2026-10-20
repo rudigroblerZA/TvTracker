@@ -99,6 +99,23 @@ How events flow:
 - Consumers record processed event ids, so redelivered events are ignored.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 
+## Database schema
+
+Catalog uses EF Core migrations (`Catalog.Data/Migrations`); Catalog.API applies them at startup. The other services
+still use `EnsureCreated`, which creates a missing database but never changes an existing one.
+
+After changing the Catalog model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
+
+```bash
+dotnet tool restore
+dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
+```
+
+**Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database
+can't be upgraded in place. Stop the AppHost, delete the Postgres data volume (`docker volume ls | grep postgres`,
+then `docker volume rm <name>`) and start it again; every database is recreated and the catalog re-imported.
+Keycloak users are kept, since Keycloak has its own volume.
+
 ## Configuration still to do
 
 | Feature | What to set | Where |
@@ -112,7 +129,7 @@ Until configured, each notification channel logs what it would have sent (visibl
 
 ## Before production
 
-- Replace `EnsureCreated` with EF Core migrations (`DatabaseInitializer` in TvTracker.Persistence).
+- Move the remaining services from `EnsureCreated` to EF Core migrations, as Catalog has (see Database schema).
 - Change the development secrets in `AppHost.cs` and `Realms/tvtracker-realm.json`, and turn on HTTPS for Keycloak.
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
 - Add a dead-letter queue for events that fail twice, and tests.

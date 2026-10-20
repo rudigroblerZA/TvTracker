@@ -34,7 +34,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
 
         return
         [
-            Build(anchor, "mock-lighthouse", "The Lighthouse Keepers",
+            Build(anchor, now, "mock-lighthouse", "The Lighthouse Keepers",
                 "Three siblings inherit a remote lighthouse and the secrets buried beneath it.",
                 ShowStatus.Airing, "Northwind", 2025, 92.5,
                 genres: ["Drama", "Mystery"], keywords: ["family", "island", "secrets", "coastal"],
@@ -43,7 +43,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-hollow", "mock-harbour", "mock-tides"],
                 watch: [("US", "Northwind+", WatchProviderType.Stream), ("GB", "Northwind+", WatchProviderType.Stream), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-orbit", "Orbit Street",
+            Build(anchor, now, "mock-orbit", "Orbit Street",
                 "Life, love and lease disputes in the only apartment block on a lunar colony.",
                 ShowStatus.Airing, "Comet TV", 2026, 81.2,
                 genres: ["Comedy", "Sci-Fi"], keywords: ["space", "neighbours", "workplace", "sitcom"],
@@ -52,7 +52,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-byte", "mock-precinct"],
                 watch: [("US", "Comet+", WatchProviderType.Stream), ("GB", "PrimeView", WatchProviderType.Buy), ("ZA", "PrimeView", WatchProviderType.Buy)]),
 
-            Build(anchor, "mock-harbour", "Cold Harbour",
+            Build(anchor, now, "mock-harbour", "Cold Harbour",
                 "A disgraced detective returns to the fishing town where her career collapsed.",
                 ShowStatus.Ended, "Northwind", 2023, 64.0,
                 genres: ["Crime", "Thriller"], keywords: ["detective", "coastal", "small town", "murder"],
@@ -61,7 +61,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-lighthouse", "mock-precinct", "mock-hollow"],
                 watch: [("US", "Northwind+", WatchProviderType.Stream), ("GB", "FreeTV", WatchProviderType.Free), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-frontiers", "Wild Frontiers",
+            Build(anchor, now, "mock-frontiers", "Wild Frontiers",
                 "Filmmakers spend a year in the planet's least explored places.",
                 ShowStatus.Airing, "Terra", 2024, 58.3,
                 genres: ["Documentary"], keywords: ["nature", "wildlife", "travel", "planet"],
@@ -70,7 +70,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-deepfield"],
                 watch: [("US", "Terra Go", WatchProviderType.Stream), ("GB", "Terra Go", WatchProviderType.Stream), ("ZA", "Terra Go", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-signal", "Signal Lost",
+            Build(anchor, now, "mock-signal", "Signal Lost",
                 "When a deep-space probe starts answering back, a small team must decide who to tell.",
                 ShowStatus.Renewed, "Comet TV", 2026, 88.9,
                 genres: ["Sci-Fi", "Thriller"], keywords: ["space", "conspiracy", "first contact", "science"],
@@ -79,7 +79,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-deepfield", "mock-orbit", "mock-crown"],
                 watch: [("US", "Comet+", WatchProviderType.Stream), ("GB", "StreamFlix", WatchProviderType.Stream), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-kitchen", "Midnight Kitchen",
+            Build(anchor, now, "mock-kitchen", "Midnight Kitchen",
                 "Home cooks compete overnight in a pop-up restaurant that opens at midnight.",
                 ShowStatus.Airing, "Plate", 2022, 47.1,
                 genres: ["Reality", "Food"], keywords: ["cooking", "competition", "restaurant"],
@@ -88,7 +88,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-frontiers"],
                 watch: [("US", "FreeTV", WatchProviderType.Free), ("ZA", "Plate Now", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-crown", "The Ashen Crown",
+            Build(anchor, now, "mock-crown", "The Ashen Crown",
                 "Rival heirs fight for a throne that burns whoever sits on it.",
                 ShowStatus.Upcoming, "StreamFlix", 2026, 95.4,
                 genres: ["Fantasy", "Drama"], keywords: ["kingdom", "magic", "war", "succession"],
@@ -97,7 +97,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-signal", "mock-lighthouse"],
                 watch: [("US", "StreamFlix", WatchProviderType.Stream), ("GB", "StreamFlix", WatchProviderType.Stream), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-precinct", "Precinct 9",
+            Build(anchor, now, "mock-precinct", "Precinct 9",
                 "The least ambitious police precinct in the city keeps accidentally solving big cases.",
                 ShowStatus.Cancelled, "Comet TV", 2024, 52.7,
                 genres: ["Comedy", "Crime"], keywords: ["police", "workplace", "sitcom"],
@@ -106,7 +106,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-orbit", "mock-byte", "mock-harbour"],
                 watch: [("US", "Comet+", WatchProviderType.Stream), ("GB", "PrimeView", WatchProviderType.Rent)]),
 
-            Build(anchor, "mock-tides", "Between Tides",
+            Build(anchor, now, "mock-tides", "Between Tides",
                 "Two marine biologists, one research station, and a decade of almosts.",
                 ShowStatus.Airing, "Northwind", 2026, 61.8,
                 genres: ["Drama", "Romance"], keywords: ["ocean", "science", "love", "coastal"],
@@ -115,7 +115,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-lighthouse"],
                 watch: [("US", "Northwind+", WatchProviderType.Stream), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-byte", "Byte Club",
+            Build(anchor, now, "mock-byte", "Byte Club",
                 "A failing start-up's staff will do anything to avoid shipping their product.",
                 ShowStatus.Ended, "StreamFlix", 2022, 70.4,
                 genres: ["Comedy"], keywords: ["start-up", "technology", "workplace", "sitcom"],
@@ -124,7 +124,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-orbit", "mock-precinct"],
                 watch: [("US", "StreamFlix", WatchProviderType.Stream), ("GB", "StreamFlix", WatchProviderType.Stream), ("ZA", "StreamFlix", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-deepfield", "Deep Field",
+            Build(anchor, now, "mock-deepfield", "Deep Field",
                 "Astronomers explain what the newest telescopes are seeing, week by week.",
                 ShowStatus.Airing, "Terra", 2026, 39.6,
                 genres: ["Documentary", "Sci-Fi"], keywords: ["space", "science", "astronomy"],
@@ -133,7 +133,7 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                 similar: ["mock-frontiers", "mock-signal"],
                 watch: [("US", "Terra Go", WatchProviderType.Stream), ("ZA", "Terra Go", WatchProviderType.Stream)]),
 
-            Build(anchor, "mock-hollow", "Hollow Pines",
+            Build(anchor, now, "mock-hollow", "Hollow Pines",
                 "A summer camp reopens thirty years after the night that closed it.",
                 ShowStatus.Airing, "StreamFlix", 2026, 77.0,
                 genres: ["Horror", "Mystery"], keywords: ["small town", "secrets", "teen", "forest"],
@@ -144,17 +144,30 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
         ];
     }
 
+    /// <summary>
+    /// A made-up rating that's the same on every run (string.GetHashCode isn't), so refreshes don't
+    /// report changes: the show's base rating plus or minus up to 0.7 per episode.
+    /// </summary>
+    private static double MockRating(double baseRating, string key)
+    {
+        var hash = key.Aggregate(17, (h, c) => unchecked(h * 31 + c));
+        return Math.Round(Math.Clamp(baseRating + (Math.Abs(hash % 15) - 7) / 10.0, 1, 10), 1);
+    }
+
     /// <param name="EpisodeCount">0 for a season that has been announced but has no episodes scheduled yet.</param>
     /// <param name="FirstAirsDay">Days from the anchor to the first episode (or premiere); episodes are weekly.</param>
     private record SeasonSpec(int Number, int EpisodeCount, int FirstAirsDay, int HourUtc, int RuntimeMinutes);
 
     private static ProviderShow Build(
-        DateTimeOffset anchor, string id, string title, string overview, ShowStatus status, string network,
+        DateTimeOffset anchor, DateTimeOffset now, string id, string title, string overview, ShowStatus status, string network,
         int startYear, double popularity, string[] genres, string[] keywords, SeasonSpec[] seasons,
         (string Name, string Character)[] cast, string[] similar, (string Region, string Provider, WatchProviderType Type)[] watch)
     {
         var providerSeasons = new List<ProviderSeason>();
         var episodes = new List<ProviderEpisode>();
+
+        // Popularity 39-95 maps to a 6.3-9.2 base rating.
+        var baseRating = Math.Round(5 + popularity / 22.5, 1);
 
         foreach (var season in seasons)
         {
@@ -170,7 +183,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
                     Title: n == 1 ? (season.Number == 1 ? "Pilot" : "Return") : $"Chapter {n}",
                     Overview: null,
                     AirsAtUtc: premiere.AddDays(7 * (n - 1)),
-                    RuntimeMinutes: season.RuntimeMinutes));
+                    RuntimeMinutes: season.RuntimeMinutes,
+                    // Like a real provider, only aired episodes have ratings.
+                    Rating: premiere.AddDays(7 * (n - 1)) <= now ? MockRating(baseRating, $"{id}-s{season.Number}e{n}") : null));
             }
         }
 
@@ -191,8 +206,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
             Popularity: popularity,
             Seasons: providerSeasons,
             Episodes: episodes,
-            Cast: cast.Select(c => new ProviderCastMember(c.Name, c.Character, null)).ToList(),
+            Cast: cast.Select(c => new ProviderCastMember(c.Name, c.Character, null, [])).ToList(),
             WatchOptions: watch.Select(w => new ProviderWatchOption(w.Region, w.Provider, w.Type, null)).ToList(),
-            SimilarExternalIds: similar);
+            SimilarExternalIds: similar,
+            Rating: episodes.Any(e => e.Rating is not null) ? baseRating : null);
     }
 }
