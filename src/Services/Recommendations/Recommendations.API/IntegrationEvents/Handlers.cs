@@ -56,6 +56,7 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
     IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
     IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>,
     IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>,
+    IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>,
     IIntegrationEventHandler<ShowRatedIntegrationEvent>,
     IIntegrationEventHandler<ShowRatingRemovedIntegrationEvent>
 {
@@ -67,6 +68,9 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
 
     public Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct) =>
         UpdateAsync(e, e.UserId, e.ShowId, s => s.EpisodesWatched += e.EpisodeIds.Count, ct);
+
+    public Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct) =>
+        UpdateAsync(e, e.UserId, e.ShowId, s => s.EpisodesWatched = Math.Max(0, s.EpisodesWatched - 1), ct);
 
     public Task HandleAsync(ShowRatedIntegrationEvent e, CancellationToken ct) =>
         UpdateAsync(e, e.UserId, e.ShowId, s => s.Rating = e.Stars, ct);

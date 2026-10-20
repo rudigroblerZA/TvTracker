@@ -21,6 +21,7 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowFollowedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<EpisodeWatchedIntegrationEvent, UserSignalHandler>()
+    .AddSubscription<EpisodeUnwatchedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowRatedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowRatingRemovedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();

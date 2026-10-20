@@ -153,6 +153,7 @@ public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox 
         }
 
         db.WatchedEpisodes.Remove(watched);
+        outbox.Add(new EpisodeUnwatchedIntegrationEvent(userId, watched.ShowId, episodeId));
 
         var follow = await db.Follows.FindAsync([userId, watched.ShowId], ct);
         if (follow?.Status == WatchStatus.Completed)
