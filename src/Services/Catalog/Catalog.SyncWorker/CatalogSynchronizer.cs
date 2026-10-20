@@ -25,15 +25,30 @@ public sealed class CatalogSynchronizer(
     /// <summary>Imports featured shows that aren't in the catalog yet.</summary>
     public async Task<int> ImportFeaturedAsync(CancellationToken ct)
     {
-        var externalIds = (await provider.GetFeaturedShowIdsAsync(ct)).ToList();
+        var externalIds = await provider.GetFeaturedShowIdsAsync(ct);
+        return await ImportMissingAsync(externalIds, ct);
+    }
 
+    /// <summary>
+    /// Imports the provider's best matches for a title search that aren't in the catalog yet,
+    /// so Catalog.API's search can find them. Returns how many shows were imported.
+    /// </summary>
+    public async Task<int> ImportSearchResultsAsync(string query, int limit, CancellationToken ct)
+    {
+        var externalIds = await provider.SearchShowIdsAsync(query, limit, ct);
+        return await ImportMissingAsync(externalIds, ct);
+    }
+
+    private async Task<int> ImportMissingAsync(IReadOnlyList<string> externalIds, CancellationToken ct)
+    {
+        var ids = externalIds.ToList();
         var existing = await db.Shows
-            .Where(s => s.Source == provider.Name && externalIds.Contains(s.ExternalId))
+            .Where(s => s.Source == provider.Name && ids.Contains(s.ExternalId))
             .Select(s => s.ExternalId)
             .ToListAsync(ct);
 
         var imported = 0;
-        foreach (var externalId in externalIds.Except(existing))
+        foreach (var externalId in ids.Except(existing))
         {
             var show = await provider.GetShowAsync(externalId, ct);
             if (show is null)
@@ -41,11 +56,31 @@ public sealed class CatalogSynchronizer(
                 continue;
             }
 
-            await SyncShowAsync(show, ct);
-            imported++;
+            try
+            {
+                await SyncShowAsync(show, ct);
+                imported++;
+            }
+            catch (DbUpdateException ex)
+            {
+                if (!await ShowExistsAsync(externalId, ct))
+                {
+                    throw;
+                }
+
+                // A concurrent import (the hourly sync or another search) added it first; nothing to do.
+                logger.LogDebug(ex, "Show {ExternalId} was imported concurrently", externalId);
+            }
         }
 
         return imported;
+    }
+
+    private async Task<bool> ShowExistsAsync(string externalId, CancellationToken ct)
+    {
+        // The failed SaveChanges left the show's entities tracked; drop them before querying again.
+        db.ChangeTracker.Clear();
+        return await db.Shows.AnyAsync(s => s.Source == provider.Name && s.ExternalId == externalId, ct);
     }
 
     /// <summary>Refreshes shows whose refresh time has come (airing shows daily, ended shows weekly, followed shows promptly).</summary>

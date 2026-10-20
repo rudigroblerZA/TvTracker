@@ -1,8 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!--
     Catalog.SyncWorker: imports and refreshes shows from the catalog provider, detects changes,
     and publishes catalog events. Data comes from TVmaze (or MockCatalogProvider when Catalog:Provider is "mock").
+    Also serves an internal endpoint Catalog.API uses to import search matches, so all provider calls and writes stay here.
   -->
 
   <ItemGroup>

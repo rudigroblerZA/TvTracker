@@ -4,7 +4,7 @@ using Catalog.SyncWorker.Providers;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
@@ -41,5 +41,11 @@ else
 builder.Services.AddScoped<CatalogSynchronizer>();
 builder.Services.AddHostedService<CatalogSyncService>();
 
-var host = builder.Build();
-host.Run();
+var app = builder.Build();
+
+app.MapDefaultEndpoints();
+
+// Internal only: Catalog.API calls this before searching. Not exposed outside the Aspire network.
+app.MapImportApi();
+
+app.Run();

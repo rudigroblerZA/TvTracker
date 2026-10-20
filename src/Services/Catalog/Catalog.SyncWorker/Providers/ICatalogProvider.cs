@@ -18,6 +18,9 @@ public interface ICatalogProvider
     /// </summary>
     Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>External ids of shows matching a title search, best match first.</summary>
+    Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default);
+
     /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
 }

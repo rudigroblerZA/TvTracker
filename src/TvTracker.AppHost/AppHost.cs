@@ -98,14 +98,18 @@ identityApi
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.
-builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync")
+var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync")
     .WithReference(catalogDb)
     .WithReference(eventBus)
     .WithReference(redis)
     .WaitFor(catalogApi)
     .WaitFor(trackingApi)
     .WaitFor(recommendationsApi)
-    .WaitFor(notificationsApi);
+    .WaitFor(notificationsApi)
+    .WithHttpHealthCheck("/health");
+
+// Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
+catalogApi.WithReference(catalogSync);
 
 // ---------------------------------------------------------------------------
 // Gateways and clients

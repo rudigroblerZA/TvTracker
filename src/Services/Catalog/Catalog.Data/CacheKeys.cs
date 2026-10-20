@@ -8,4 +8,7 @@ public static class CacheKeys
     public static string Show(Guid showId, string region) => $"catalog:show:{showId}:{region}";
 
     public static string ShowTag(Guid showId) => $"catalog:show:{showId}";
+
+    /// <summary>Marks a search term whose provider matches were imported recently (normalised: trimmed, lower case).</summary>
+    public static string SearchImport(string query) => $"catalog:search-import:{query}";
 }

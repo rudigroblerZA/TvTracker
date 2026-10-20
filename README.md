@@ -31,6 +31,11 @@ The catalog grows as the schedule changes. Imported shows are refreshed daily (e
 is refreshed promptly when someone follows it. The first sync takes a minute or two, because calls are throttled to stay under
 TVmaze's limit of 20 calls every 10 seconds. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
 
+Search finds any show on TVmaze, not just imported ones. Before searching, Catalog.API asks the sync worker
+(`POST /api/v1/imports/search`, internal only) to import TVmaze's top 5 matches it doesn't have yet, then searches the catalog.
+A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
+longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
+
 To work offline, set `Catalog:Provider` to `mock` to use `MockCatalogProvider`: 12 invented shows whose air dates are relative
 to the current week, so there are always episodes that aired recently and episodes coming up. Shows are stored per provider,
 so switching leaves the other provider's shows in the database without refreshing them.
@@ -70,7 +75,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
 | Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast, where to watch, search, schedule |
-| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider, detects changes, publishes events, detects aired episodes |
+| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |
@@ -93,7 +98,6 @@ How events flow:
 
 | Feature | What to set | Where |
 | --- | --- | --- |
-| Search beyond the catalog | Search only covers imported shows. To find any show, have Catalog.API fall back to TVmaze search (`/search/shows?q=`) and ask the sync worker to import picks | `Catalog.API/Apis/CatalogApi.cs`, `Catalog.SyncWorker` |
 | Mobile push | Azure Notification Hubs connection string, plus an `IPushTokenProvider` that gets FCM/APNs tokens (e.g. Plugin.Firebase) | Notifications.API user secrets `NotificationHubs:ConnectionString`; `MobileApp/Services/MobilePlatformServices.cs` |
 | Browser push | VAPID keys (e.g. `npx web-push generate-vapid-keys`) | Notifications.API user secrets `WebPush:PublicKey`, `WebPush:PrivateKey` |
 | Email | Azure Communication Services connection string and sender | Notifications.API user secrets `Email:ConnectionString`, `Email:SenderAddress` |

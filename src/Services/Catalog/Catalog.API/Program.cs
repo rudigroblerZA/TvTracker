@@ -1,4 +1,5 @@
 using Catalog.API.Apis;
+using Catalog.API.Services;
 using Catalog.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +14,13 @@ builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
 
 builder.Services.AddSingleton(TimeProvider.System);
+
+// Search asks the sync worker to import provider matches first; the worker owns provider calls and writes.
+// No retries: when the worker is down, search should answer from the catalog straight away.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
