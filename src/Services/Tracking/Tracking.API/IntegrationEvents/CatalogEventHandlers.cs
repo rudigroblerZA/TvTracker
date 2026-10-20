@@ -11,6 +11,7 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
     IIntegrationEventHandler<ShowStatusChangedIntegrationEvent>,
+    IIntegrationEventHandler<EpisodesScheduledIntegrationEvent>,
     IIntegrationEventHandler<EpisodeScheduledIntegrationEvent>
 {
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
@@ -30,20 +31,33 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
             }
         });
 
-    public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
-        HandleOnceAsync(e, ct, async () =>
-        {
-            // The episode may arrive before its show (for example after a missed ShowAdded).
-            if (await db.Shows.FindAsync([e.ShowId], ct) is null)
-            {
-                db.Shows.Add(new ShowCopy { ShowId = e.ShowId, Title = e.ShowTitle, UpdatedAtUtc = time.GetUtcNow().UtcDateTime });
-            }
+    public Task HandleAsync(EpisodesScheduledIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, () => UpsertEpisodesAsync(e.ShowId, e.ShowTitle, e.Episodes, ct));
 
-            var episode = await db.Episodes.FindAsync([e.EpisodeId], ct);
-            if (episode is null)
+    /// <summary>Per-episode event published before batching; handled so messages still pending at upgrade apply.</summary>
+    public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, () => UpsertEpisodesAsync(e.ShowId, e.ShowTitle,
+            [new ScheduledEpisode(e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes)], ct));
+
+    private async Task UpsertEpisodesAsync(Guid showId, string showTitle, IReadOnlyList<ScheduledEpisode> episodes, CancellationToken ct)
+    {
+        // The episodes may arrive before their show (for example after a missed ShowAdded).
+        if (await db.Shows.FindAsync([showId], ct) is null)
+        {
+            db.Shows.Add(new ShowCopy { ShowId = showId, Title = showTitle, UpdatedAtUtc = time.GetUtcNow().UtcDateTime });
+        }
+
+        // One query for the whole batch instead of one per episode.
+        var ids = episodes.Select(e => e.EpisodeId).ToList();
+        var existing = await db.Episodes.Where(e => ids.Contains(e.EpisodeId)).ToDictionaryAsync(e => e.EpisodeId, ct);
+
+        foreach (var e in episodes)
+        {
+            if (!existing.TryGetValue(e.EpisodeId, out var episode))
             {
-                episode = new EpisodeCopy { EpisodeId = e.EpisodeId, ShowId = e.ShowId, Title = e.Title };
+                episode = new EpisodeCopy { EpisodeId = e.EpisodeId, ShowId = showId, Title = e.Title };
                 db.Episodes.Add(episode);
+                existing[e.EpisodeId] = episode;
             }
 
             episode.SeasonNumber = e.SeasonNumber;
@@ -51,7 +65,8 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
             episode.Title = e.Title;
             episode.AirsAtUtc = e.AirsAtUtc;
             episode.RuntimeMinutes = e.RuntimeMinutes;
-        });
+        }
+    }
 
     private async Task UpsertShowAsync(Guid showId, string title, string? posterUrl, ShowStatus status, IReadOnlyList<string> genres, CancellationToken ct)
     {

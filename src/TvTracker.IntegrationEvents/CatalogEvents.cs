@@ -37,7 +37,31 @@ public record ShowUpdatedIntegrationEvent(
     IReadOnlyList<Guid> SimilarShowIds,
     double Popularity) : IntegrationEvent;
 
-/// <summary>A new episode was scheduled, or an existing episode's details or air time changed. Times are UTC.</summary>
+/// <summary>
+/// Episodes of one show were scheduled, or their details or air times changed. Times are UTC.
+/// One event per sync of a show, split into batches of at most <see cref="MaxEpisodes"/>,
+/// so importing a show with thousands of episodes publishes a handful of events rather than thousands.
+/// </summary>
+public record EpisodesScheduledIntegrationEvent(
+    Guid ShowId,
+    string ShowTitle,
+    IReadOnlyList<ScheduledEpisode> Episodes) : IntegrationEvent
+{
+    public const int MaxEpisodes = 500;
+}
+
+public record ScheduledEpisode(
+    Guid EpisodeId,
+    int SeasonNumber,
+    int EpisodeNumber,
+    string Title,
+    DateTimeOffset? AirsAtUtc,
+    int? RuntimeMinutes);
+
+/// <summary>
+/// One episode scheduled or changed. No longer published (replaced by <see cref="EpisodesScheduledIntegrationEvent"/>);
+/// consumers keep handling it so messages published before the change still apply. Remove once none can be pending.
+/// </summary>
 public record EpisodeScheduledIntegrationEvent(
     Guid ShowId,
     string ShowTitle,
