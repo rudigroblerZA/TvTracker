@@ -21,6 +21,7 @@ public static class UiServiceCollectionExtensions
 
         services.TryAddScoped<IOfflineStore, OnlineOnly>();
         services.AddScoped<ConnectionState>();
+        services.TryAddScoped<ClientInfo>();
         services.AddScoped<UserSession>();
 
         services.AddScoped<IdentityClient>();

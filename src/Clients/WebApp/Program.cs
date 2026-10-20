@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Http.Resilience;
 using TvTracker.UI.Services;
 using WebApp.Components;
 using WebApp.Services;
@@ -77,6 +78,18 @@ builder.Services.AddRazorComponents()
 
 // The web app calls each service directly; "https+http://<name>" is resolved by Aspire service discovery.
 builder.Services.AddTvTrackerUi(name => new Uri($"https+http://{name}-api/"));
+
+// Services rate limit per visitor (the UI forwards each browser's IP), so a 429 is one visitor's answer, not a sign the
+// service is down. Don't retry it (every retry spends another of their requests) and don't let it trip the circuit
+// breaker, which this process shares across all visitors and which, once open, fails everyone's calls.
+builder.Services.PostConfigureAll<HttpStandardResilienceOptions>(options =>
+{
+    options.Retry.ShouldHandle = args => ValueTask.FromResult(IsTransientExceptTooManyRequests(args.Outcome));
+    options.CircuitBreaker.ShouldHandle = args => ValueTask.FromResult(IsTransientExceptTooManyRequests(args.Outcome));
+});
+
+static bool IsTransientExceptTooManyRequests(Polly.Outcome<HttpResponseMessage> outcome) =>
+    outcome.Result?.StatusCode != System.Net.HttpStatusCode.TooManyRequests && HttpClientResiliencePredicates.IsTransient(outcome);
 builder.Services.AddScoped<IAccessTokenProvider, WebAccessTokenProvider>();
 builder.Services.AddScoped<IAuthActions, WebAuthActions>();
 builder.Services.AddScoped<IPlatformServices, WebPlatformServices>();

@@ -8,15 +8,15 @@ namespace Catalog.API.Services;
 /// <summary>Limits for <see cref="SearchRateLimiting"/>; bound from the "SearchRateLimit" configuration section.</summary>
 public sealed class SearchRateLimitOptions
 {
-    /// <summary>Searches a signed-in user, or one client IP behind the mobile gateway, may make in a burst.</summary>
+    /// <summary>Searches a signed-in user, or one client IP (from the mobile gateway or the web app), may make in a burst.</summary>
     public int PerClientBurst { get; set; } = 20;
 
     /// <summary>Searches per minute a signed-in user or client IP gets back after a burst.</summary>
     public int PerClientPerMinute { get; set; } = 30;
 
     /// <summary>
-    /// Burst for callers that send neither a token nor X-Forwarded-For: the web app, on behalf of every anonymous
-    /// web visitor (it calls from its own server, so they can't be told apart). Shared, so it's larger.
+    /// Burst for callers that send neither a token nor X-Forwarded-For: other services rather than people (the web app
+    /// forwards each browser's address). Shared by those callers, so it's larger.
     /// </summary>
     public int SharedBurst { get; set; } = 200;
 
@@ -28,7 +28,7 @@ public sealed class SearchRateLimitOptions
 
 /// <summary>
 /// Rate limiting for the search endpoint. Callers are told apart, in order, by the signed-in user (a validated
-/// Keycloak token), the client IP the mobile gateway adds as X-Forwarded-For, or the calling service's address.
+/// Keycloak token), the client IP the mobile gateway or web app adds as X-Forwarded-For, or the calling service's address.
 /// Over the limit, search returns 429 with Retry-After.
 /// </summary>
 public static class SearchRateLimiting
@@ -81,8 +81,9 @@ public static class SearchRateLimiting
             return ($"user:{userId}", false);
         }
 
-        // The mobile gateway (YARP) sets X-Forwarded-For. Use the last entry: it's the one the gateway added,
-        // while earlier entries come from the client and could be anything.
+        // The mobile gateway (YARP) and the web app (each browser's address) set X-Forwarded-For. Use the last entry:
+        // it's the one they added, while earlier entries come from the client and could be anything.
+        // Only internal callers can reach this service, so the header can't be set by someone else.
         var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
         var lastHop = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
         if (lastHop is not null && IPAddress.TryParse(lastHop, out var clientIp))

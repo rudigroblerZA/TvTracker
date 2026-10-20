@@ -1,3 +1,5 @@
+@inject ClientInfo Client
+
 <CascadingAuthenticationState>
     <Router AppAssembly="typeof(Routes).Assembly">
         <Found Context="routeData">
@@ -12,3 +14,13 @@
         </NotFound>
     </Router>
 </CascadingAuthenticationState>
+
+@code {
+    /// <summary>
+    /// The browser's IP address, passed in by the web app's host page; Blazor protects component parameters, so the
+    /// browser can't change it. The mobile app leaves it unset.
+    /// </summary>
+    [Parameter] public string? ClientAddress { get; set; }
+
+    protected override void OnInitialized() => Client.Address ??= ClientAddress;
+}

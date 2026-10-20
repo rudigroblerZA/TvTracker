@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <Routes @rendermode="RenderMode" />
+    <Routes @rendermode="RenderMode" ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()" />
     <script src="@Assets["js/tvtracker.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
@@ -19,6 +19,10 @@
 </html>
 
 @code {
+    // Static render of the host page: the browser's own request, so its address is real. Behind a reverse proxy,
+    // configure ForwardedHeaders so this is the client's address rather than the proxy's.
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
     // No prerendering: pages load their data once, after the circuit (and the user's token) is available.
     private static readonly IComponentRenderMode RenderMode = new InteractiveServerRenderMode(prerender: false);
 }
