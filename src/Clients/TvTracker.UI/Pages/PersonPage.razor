@@ -1,0 +1,92 @@
+@page "/people/{Id:guid}"
+@inject CatalogClient Catalog
+
+<PageTitle>@(person?.Name ?? "Person") · TV Tracker</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (person is null)
+{
+    if (error is null)
+    {
+        <p class="muted">@(notFound ? "This person isn't in the catalog." : "Loading…")</p>
+    }
+}
+else
+{
+    <section class="show-hero person-hero">
+        <Poster Title="@person.Name" Url="@person.PhotoUrl" Size="large" />
+        <div class="show-hero-body">
+            <h1>@person.Name</h1>
+            @if (Facts() is { Length: > 0 } facts)
+            {
+                <p class="muted">@facts</p>
+            }
+            <p class="muted small">
+                In @person.Credits.Count @(person.Credits.Count == 1 ? "show" : "shows") in the catalog.
+                Details from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.
+            </p>
+        </div>
+    </section>
+
+    @if (person.Credits.Count > 0)
+    {
+        <section>
+            <h2>Shows</h2>
+            <div class="card-grid">
+                @foreach (var credit in person.Credits)
+                {
+                    <ShowCard ShowId="credit.Show.Id" Title="@credit.Show.Title" PosterUrl="@credit.Show.PosterUrl"
+                              Subtitle="@(string.Join(" · ", new[] { credit.Character, credit.Show.Year?.ToString() }.Where(s => !string.IsNullOrEmpty(s))))" />
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PersonDetail? person;
+    private bool notFound;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            person = await Catalog.GetPersonAsync(Id);
+            notFound = person is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>"Born 17 Jul 1979 (age 47) · United States", or "17 Jul 1931 – 3 Feb 2020 (88)" for someone who has died.</summary>
+    private string Facts()
+    {
+        var parts = new List<string>();
+        if (person!.Birthday is { } born)
+        {
+            var end = person.Deathday ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var age = end.Year - born.Year - (end < born.AddYears(end.Year - born.Year) ? 1 : 0);
+            parts.Add(person.Deathday is { } died
+                ? $"{born:d MMM yyyy} – {died:d MMM yyyy} ({age})"
+                : $"Born {born:d MMM yyyy} (age {age})");
+        }
+        else if (person.Deathday is { } died)
+        {
+            parts.Add($"Died {died:d MMM yyyy}");
+        }
+        if (!string.IsNullOrEmpty(person.Country))
+        {
+            parts.Add(person.Country);
+        }
+        return string.Join(" · ", parts);
+    }
+}

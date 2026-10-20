@@ -436,9 +436,21 @@ public sealed class CatalogSynchronizer(
         foreach (var (name, (member, order)) in wanted)
         {
             var existing = show.Cast.FirstOrDefault(c => c.Person.Name == name);
+
+            // People stored before the provider's id was kept were matched by name, so one row may hold two actors
+            // who share a name. When the stored person isn't this provider id, resolve the right one; if that's a
+            // different row, re-point the credit to it.
+            var person = existing is not null && (member.Person is null || existing.Person.ExternalId == member.Person.ExternalId)
+                ? existing.Person
+                : await GetOrCreatePersonAsync(member, ct);
+            if (existing is not null && existing.PersonId != person.Id)
+            {
+                show.Cast.Remove(existing);
+                existing = null;
+            }
+
             if (existing is null)
             {
-                var person = await GetOrCreatePersonAsync(member, ct);
                 show.Cast.Add(new CastMember
                 {
                     ShowId = show.Id,
@@ -449,8 +461,13 @@ public sealed class CatalogSynchronizer(
                     Order = order
                 });
                 changed = true;
+                continue;
             }
-            else if (existing.Character != member.Character
+
+            // Existing cast too, so details added later (or corrected) reach people already in the catalog.
+            UpdatePerson(person, member);
+
+            if (existing.Character != member.Character
                 || existing.Order != order
                 || !existing.CharacterExternalIds.SequenceEqual(member.CharacterExternalIds))
             {
@@ -464,22 +481,51 @@ public sealed class CatalogSynchronizer(
         return changed;
     }
 
+    /// <summary>
+    /// Finds the person by the provider's id; else by name among people without one (adopting it), so earlier rows
+    /// keyed by name gain the id; else creates them. Without a provider id, matches by name only.
+    /// </summary>
     private async Task<Person> GetOrCreatePersonAsync(ProviderCastMember member, CancellationToken ct)
     {
-        var person = db.People.Local.FirstOrDefault(p => p.Name == member.Name)
-            ?? await db.People.SingleOrDefaultAsync(p => p.Name == member.Name, ct);
+        Person? person;
+        if (member.Person?.ExternalId is { } externalId)
+        {
+            person = db.People.Local.FirstOrDefault(p => p.ExternalId == externalId)
+                ?? await db.People.FirstOrDefaultAsync(p => p.ExternalId == externalId, ct)
+                ?? db.People.Local.FirstOrDefault(p => p.Name == member.Name && p.ExternalId == null)
+                ?? await db.People.FirstOrDefaultAsync(p => p.Name == member.Name && p.ExternalId == null, ct);
+        }
+        else
+        {
+            person = db.People.Local.FirstOrDefault(p => p.Name == member.Name)
+                ?? await db.People.FirstOrDefaultAsync(p => p.Name == member.Name, ct);
+        }
 
         if (person is null)
         {
-            person = new Person { Id = Guid.CreateVersion7(), Name = member.Name, PhotoUrl = member.PhotoUrl };
+            person = new Person { Id = Guid.CreateVersion7(), Name = member.Name };
             db.People.Add(person);
         }
-        else if (member.PhotoUrl is not null)
+
+        UpdatePerson(person, member);
+        return person;
+    }
+
+    private static void UpdatePerson(Person person, ProviderCastMember member)
+    {
+        if (member.PhotoUrl is not null)
         {
             person.PhotoUrl = member.PhotoUrl;
         }
 
-        return person;
+        if (member.Person is { } details)
+        {
+            person.ExternalId = details.ExternalId;
+            person.Birthday = details.Birthday;
+            person.Deathday = details.Deathday;
+            person.Gender = details.Gender;
+            person.Country = details.Country;
+        }
     }
 
     private static void SyncWatchProviders(Show show, IReadOnlyList<ProviderWatchOption> options)

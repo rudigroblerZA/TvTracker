@@ -16,7 +16,21 @@ public record ShowSummaryDto(
 
 public record SeasonSummaryDto(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
-public record CastMemberDto(string Name, string? Character, string? PhotoUrl);
+public record CastMemberDto(string Name, string? Character, string? PhotoUrl, Guid PersonId);
+
+/// <summary>A show someone appears in, with the character they play.</summary>
+public record PersonCreditDto(ShowSummaryDto Show, string? Character);
+
+/// <param name="Credits">Their shows in the catalog, newest first.</param>
+public record PersonDetailDto(
+    Guid Id,
+    string Name,
+    string? PhotoUrl,
+    DateOnly? Birthday,
+    DateOnly? Deathday,
+    string? Gender,
+    string? Country,
+    IReadOnlyList<PersonCreditDto> Credits);
 
 public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url);
 

@@ -145,7 +145,10 @@ public sealed partial class TvMazeCatalogProvider(
                 Truncate(g.Key, 256),
                 Truncate(string.Join(" / ", g.Select(c => c.Character?.Name).OfType<string>().Distinct()), 256) is { Length: > 0 } character ? character : null,
                 g.First().Person!.Image?.Medium,
-                g.Select(c => c.Character?.Id).OfType<int>().Distinct().Select(id => id.ToString()).ToList()))
+                g.Select(c => c.Character?.Id).OfType<int>().Distinct().Select(id => id.ToString()).ToList(),
+                g.First().Person is { Id: { } personId } p
+                    ? new ProviderPerson(personId.ToString(), p.Birthday, p.Deathday, p.Gender, p.Country?.Name)
+                    : null))
             .ToList();
 
         var backdrop = embedded.Images
@@ -294,7 +297,7 @@ internal sealed record TvMazeSchedule
 
 internal sealed record TvMazeChannel(string? Name, TvMazeCountry? Country, string? OfficialSite);
 
-internal sealed record TvMazeCountry(string? Code);
+internal sealed record TvMazeCountry(string? Code, string? Name);
 
 internal sealed record TvMazeImage(string? Medium, string? Original);
 
@@ -312,7 +315,7 @@ internal sealed record TvMazeSeason(int Number, string? Name, DateOnly? Premiere
 
 internal sealed record TvMazeCastCredit(TvMazePerson? Person, TvMazeCharacter? Character);
 
-internal sealed record TvMazePerson(string? Name, TvMazeImage? Image);
+internal sealed record TvMazePerson(int? Id, string? Name, TvMazeImage? Image, DateOnly? Birthday, DateOnly? Deathday, string? Gender, TvMazeCountry? Country);
 
 internal sealed record TvMazeCharacter(int? Id, string? Name);
 

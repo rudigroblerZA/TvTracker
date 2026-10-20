@@ -224,7 +224,17 @@ else
             <ul class="cast">
                 @foreach (var member in show.Cast)
                 {
-                    <li><strong>@member.Name</strong> <span class="muted">@member.Character</span></li>
+                    <li>
+                        @if (member.PersonId != Guid.Empty)
+                        {
+                            <a href="people/@member.PersonId"><strong>@member.Name</strong></a>
+                        }
+                        else
+                        {
+                            <strong>@member.Name</strong>
+                        }
+                        <span class="muted">@member.Character</span>
+                    </li>
                 }
             </ul>
         </section>

@@ -55,8 +55,13 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
         modelBuilder.Entity<Person>(entity =>
         {
             entity.ToTable("people");
-            entity.HasIndex(p => p.Name).IsUnique();
+            // Not unique: different actors can share a name. The provider's id tells them apart.
+            entity.HasIndex(p => p.Name);
+            entity.HasIndex(p => p.ExternalId).IsUnique().HasFilter("\"ExternalId\" IS NOT NULL");
             entity.Property(p => p.Name).HasMaxLength(256);
+            entity.Property(p => p.ExternalId).HasMaxLength(64);
+            entity.Property(p => p.Gender).HasMaxLength(32);
+            entity.Property(p => p.Country).HasMaxLength(128);
         });
 
         modelBuilder.Entity<CastMember>(entity =>
