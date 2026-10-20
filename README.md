@@ -4,8 +4,8 @@ A TV Time–style app for tracking shows: what you follow, what you've watched, 
 Built as eShop-style microservices on .NET 10 and Aspire, with a Blazor web app and a MAUI Blazor Hybrid mobile app
 that share one Razor component library. The design behind it is in the "TV Tracker – Service Design" doc.
 
-> **First build:** this code was written without access to a .NET SDK, so it has never been compiled.
-> Expect a round of build errors to fix (package versions, API signatures). Start with `dotnet build` and work through them.
+> **Build status:** everything except the MAUI app builds cleanly with `dotnet build` on the .NET 10 SDK.
+> The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
 ## Prerequisites
 

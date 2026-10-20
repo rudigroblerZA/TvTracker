@@ -13,7 +13,7 @@ public interface IIntegrationEventHandler<in TEvent> where TEvent : IntegrationE
     Task HandleAsync(TEvent @event, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Non-generic handler the bus dispatches to; created by <see cref="EventBusBuilderExtensions.AddSubscription{TEvent, THandler}"/>.</summary>
+/// <summary>Non-generic handler the bus dispatches to; created by <see cref="Microsoft.Extensions.DependencyInjection.EventBusBuilderExtensions.AddSubscription{TEvent, THandler}"/>.</summary>
 public interface IIntegrationEventHandler
 {
     Task HandleAsync(IntegrationEvent @event, CancellationToken cancellationToken = default);
