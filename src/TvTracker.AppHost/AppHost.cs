@@ -133,6 +133,9 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
 
+// The ops dashboard (/ops on Catalog.API) includes Analytics' stats.
+catalogApi.WithReference(analyticsApi);
+
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);
 

@@ -32,6 +32,19 @@ builder.Services.AddSingleton(TimeProvider.System);
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
 builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
     .RemoveAllResilienceHandlers();
+// For the ops dashboard (Development only): the other services' stats, skipped quickly when a service is down.
+builder.Services.AddHttpClient("analytics", http =>
+    {
+        http.BaseAddress = new Uri("https+http://analytics-api/");
+        http.Timeout = TimeSpan.FromSeconds(3);
+    })
+    .RemoveAllResilienceHandlers();
+builder.Services.AddHttpClient("catalog-sync", http =>
+    {
+        http.BaseAddress = new Uri("https+http://catalog-sync/");
+        http.Timeout = TimeSpan.FromSeconds(3);
+    })
+    .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 builder.Services.AddSearchRateLimiting(builder.Configuration);
 
@@ -51,6 +64,8 @@ app.UseRateLimiter();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Developer dashboard at /ops; not signed in, so Development only.
+    app.MapOpsApi();
 }
 
 app.MapGet("/api/v1/status", () => new { Service = "catalog-api", Status = "ok" });

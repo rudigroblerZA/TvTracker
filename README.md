@@ -91,6 +91,20 @@ at all). The tool talks to `http://localhost:5107` (`--url` or `TVTRACKER_SYNC_U
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
 
+### Ops dashboard
+
+http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
+- **Catalog:** what it holds (shows by status, episodes, people and credits), and the semantic index (current, stale, missing).
+- **Sync:** shows due for refresh and when the last sync ran.
+- **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
+  and the shows with the most shared cast.
+- **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
+- **Bulk import:** the latest bulk import job.
+
+Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
+`/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
+isn't signed in, it and the Analytics stats endpoint are only mapped in Development.
+
 ### Mobile app
 
 The mobile app isn't started by the AppHost. With the AppHost running, run `src/Clients/MobileApp` from Visual Studio,

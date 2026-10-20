@@ -21,6 +21,8 @@ app.MapDefaultEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // For Catalog.API's ops dashboard (/ops); not signed in, so Development only.
+    app.MapOpsApi();
 }
 
 app.UseAuthentication();
