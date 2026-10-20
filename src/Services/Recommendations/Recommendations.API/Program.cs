@@ -22,6 +22,7 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<EpisodeWatchedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowRatedIntegrationEvent, UserSignalHandler>()
+    .AddSubscription<ShowRatingRemovedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 builder.Services.AddIntegrationEventOutbox<RecommendationsContext>();
 

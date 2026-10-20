@@ -56,7 +56,8 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
     IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
     IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>,
     IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>,
-    IIntegrationEventHandler<ShowRatedIntegrationEvent>
+    IIntegrationEventHandler<ShowRatedIntegrationEvent>,
+    IIntegrationEventHandler<ShowRatingRemovedIntegrationEvent>
 {
     public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
         UpdateAsync(e, e.UserId, e.ShowId, s => s.Followed = true, ct);
@@ -69,6 +70,9 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
 
     public Task HandleAsync(ShowRatedIntegrationEvent e, CancellationToken ct) =>
         UpdateAsync(e, e.UserId, e.ShowId, s => s.Rating = e.Stars, ct);
+
+    public Task HandleAsync(ShowRatingRemovedIntegrationEvent e, CancellationToken ct) =>
+        UpdateAsync(e, e.UserId, e.ShowId, s => s.Rating = null, ct);
 
     private async Task UpdateAsync(IntegrationEvent e, string userId, Guid showId, Action<UserShowSignal> apply, CancellationToken ct)
     {
