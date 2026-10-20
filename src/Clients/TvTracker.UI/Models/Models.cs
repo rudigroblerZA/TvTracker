@@ -107,3 +107,36 @@ public record RegisteredDevice(Guid Id, DevicePlatform Platform, DateTime Create
 public record InboxItem(Guid Id, NotificationKind Kind, string Title, string Body, string? Link, Guid ShowId, Guid? EpisodeId, DateTime CreatedAtUtc, bool IsRead);
 
 public record InboxPage(IReadOnlyList<InboxItem> Items, int UnreadCount);
+
+// Analytics
+
+/// <param name="External">The catalog provider's rating (0-10, TVmaze's).</param>
+/// <param name="Ours">Our users' average stars (1-5); null until enough of them have rated.</param>
+public record RatingPair(double? External, double? Ours, int OurCount);
+
+public record SeasonStats(int Number, int EpisodeCount, int AiredCount, DateTimeOffset? FirstAirsAtUtc, DateTimeOffset? LastAirsAtUtc,
+    int RuntimeMinutes, RatingPair Rating);
+
+public record SeasonHighlight(int Number, double Rating, string Source);
+
+public record TopEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset? AirsAtUtc, RatingPair Rating);
+
+public record SeasonBreak(int AfterSeason, int BeforeSeason, int Days);
+
+public record RunFacts(int Seasons, int AiredEpisodes, int RuntimeMinutes, DateTimeOffset? FirstAiredUtc, DateTimeOffset? LastAiredUtc,
+    SeasonBreak? LongestBreak);
+
+public record Premiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, int? DaysSincePreviousSeason, int CatchUpEpisodes, int CatchUpRuntimeMinutes);
+
+public record SharedCast(string PersonName, string? CharacterHere, Guid OtherShowId, string OtherShowTitle, string? OtherShowPosterUrl,
+    string? CharacterThere, bool SameCharacter);
+
+public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
+    SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
+    Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast);
+
+public record PremiereItem(Guid ShowId, string ShowTitle, string? PosterUrl, IReadOnlyList<string> Genres, int SeasonNumber,
+    DateTimeOffset PremieresAtUtc, double? ShowExternalRating, int? DaysSincePreviousSeason, int CatchUpEpisodes, int CatchUpRuntimeMinutes);
+
+public record TopEpisodeItem(Guid EpisodeId, Guid ShowId, string ShowTitle, string? PosterUrl, int SeasonNumber, int EpisodeNumber,
+    string Title, DateTimeOffset? AirsAtUtc, RatingPair Rating);

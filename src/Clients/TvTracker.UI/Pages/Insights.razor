@@ -1,0 +1,140 @@
+@page "/insights"
+@inject AnalyticsClient Analytics
+@inject CatalogClient Catalog
+
+<PageTitle>Insights · TV Tracker</PageTitle>
+
+<h1>Insights</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        <section>
+            <div class="section-header">
+                <h2>Premieres coming up</h2>
+                <select @bind="premiereSort" @bind:after="LoadPremieresAsync" aria-label="Sort premieres">
+                    <option value="date">Soonest first</option>
+                    <option value="rating">Highest rated first</option>
+                </select>
+            </div>
+            @if (premieres is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (premieres.Count == 0)
+            {
+                <p class="muted">No season premieres in the next 60 days.</p>
+            }
+            else
+            {
+                <ul class="premieres">
+                    @foreach (var p in premieres)
+                    {
+                        <li class="panel">
+                            <Poster Title="@p.ShowTitle" Url="@p.PosterUrl" Size="small" />
+                            <div>
+                                <a href="shows/@p.ShowId"><strong>@p.ShowTitle</strong></a>
+                                <span class="muted">season @p.SeasonNumber</span>
+                                @if (p.ShowExternalRating is { } rating)
+                                {
+                                    <span class="tag">@Format.Rating(rating)</span>
+                                }
+                                <div>@Format.Relative(p.PremieresAtUtc) · <LocalTime Utc="p.PremieresAtUtc" /></div>
+                                @if (p.CatchUpEpisodes > 0)
+                                {
+                                    <div class="muted small">Catch up: @p.CatchUpEpisodes episodes, @Format.Duration(p.CatchUpRuntimeMinutes)</div>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section>
+            <div class="section-header">
+                <h2>Top episodes</h2>
+                <select @bind="genre" @bind:after="LoadTopEpisodesAsync" aria-label="Genre">
+                    <option value="">All genres</option>
+                    @foreach (var g in genres)
+                    {
+                        <option value="@g">@g</option>
+                    }
+                </select>
+            </div>
+            @if (topEpisodes is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (topEpisodes.Count == 0)
+            {
+                <p class="muted">No rated episodes yet.</p>
+            }
+            else
+            {
+                <ol class="top-episodes">
+                    @foreach (var e in topEpisodes)
+                    {
+                        <li>
+                            <a href="shows/@e.ShowId">@e.ShowTitle</a>
+                            <span class="code">@Format.EpisodeCode(e.SeasonNumber, e.EpisodeNumber)</span>
+                            <a href="episodes/@e.EpisodeId">@e.Title</a>
+                            <span class="muted small">
+                                @if (e.Rating.External is { } r) { <text>@Format.Rating(r)</text> }
+                                @if (e.Rating.Ours is { } o) { <text> · @Format.Stars(o, e.Rating.OurCount)</text> }
+                            </span>
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+
+        <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see insights: upcoming premieres, top episodes and more." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<PremiereItem>? premieres;
+    private List<TopEpisodeItem>? topEpisodes;
+    private List<string> genres = [];
+    private string premiereSort = "date";
+    private string genre = "";
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            genres = await Catalog.GetGenresAsync() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            // The genre filter is optional.
+        }
+        await LoadPremieresAsync();
+        await LoadTopEpisodesAsync();
+    }
+
+    private Task LoadPremieresAsync() => RunAsync(async () => premieres = await Analytics.GetPremieresAsync(60, premiereSort) ?? []);
+
+    private Task LoadTopEpisodesAsync() => RunAsync(async () => topEpisodes = await Analytics.GetTopEpisodesAsync(genre, 20) ?? []);
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

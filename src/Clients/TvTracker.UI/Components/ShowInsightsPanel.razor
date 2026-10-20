@@ -1,0 +1,169 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+@* Insights for signed-in users; computed hourly, so a newly added show shows nothing until the next run. *@
+@if (insights is not null)
+{
+    <section class="insights">
+        <h2>Insights</h2>
+
+        <div class="stat-tiles">
+            @if (insights.Rating.External is { } external)
+            {
+                <div class="stat"><div class="stat-value">@Format.Rating(external)</div><div class="muted">TVmaze rating</div></div>
+            }
+            @if (insights.Rating.Ours is { } ours)
+            {
+                <div class="stat"><div class="stat-value">@Format.Stars(ours, insights.Rating.OurCount)</div><div class="muted">TV Tracker users</div></div>
+            }
+            @if (insights.BestSeason is { } best)
+            {
+                <div class="stat">
+                    <div class="stat-value">Season @best.Number</div>
+                    <div class="muted">best rated · @RatingText(best)</div>
+                </div>
+            }
+            @if (insights.WorstSeason is { } worst)
+            {
+                <div class="stat">
+                    <div class="stat-value">Season @worst.Number</div>
+                    <div class="muted">lowest rated · @RatingText(worst)</div>
+                </div>
+            }
+            @if (insights.Run.AiredEpisodes > 0)
+            {
+                <div class="stat">
+                    <div class="stat-value">@Format.Duration(insights.Run.RuntimeMinutes)</div>
+                    <div class="muted">to watch it all · @insights.Run.AiredEpisodes episodes</div>
+                </div>
+            }
+        </div>
+
+        @if (insights.NextPremiere is { } premiere)
+        {
+            <div class="panel premiere">
+                <div class="muted small">Season @premiere.SeasonNumber premieres</div>
+                <div class="stat-value">@Format.Relative(premiere.PremieresAtUtc)</div>
+                <div><LocalTime Utc="premiere.PremieresAtUtc" /></div>
+                @if (premiere.DaysSincePreviousSeason is { } gap)
+                {
+                    <div class="muted">@Gap(gap) after the last season</div>
+                }
+                @if (premiere.CatchUpEpisodes > 0)
+                {
+                    <div>
+                        Catch up before it starts: @premiere.CatchUpEpisodes episodes, @Format.Duration(premiere.CatchUpRuntimeMinutes)
+                    </div>
+                }
+            </div>
+        }
+
+        @{ var ratedSeasons = insights.Seasons.Where(s => s.Rating.External is not null).ToList(); }
+        @if (ratedSeasons.Count > 1)
+        {
+            <h3>Season by season</h3>
+            @if (insights.Trend is { } trend)
+            {
+                <p class="muted">@Format.Trend(trend)</p>
+            }
+            // Scaled across this show's range (not 0-10), so a one-point difference between seasons is visible.
+            var low = ratedSeasons.Min(s => s.Rating.External!.Value) - 0.5;
+            var high = ratedSeasons.Max(s => s.Rating.External!.Value);
+            <ul class="bars">
+                @foreach (var season in ratedSeasons)
+                {
+                    var rating = season.Rating.External!.Value;
+                    <li>
+                        <span class="bar-label">Season @season.Number</span>
+                        <span class="bar @(season.Number == insights.BestSeason?.Number ? "best" : "")" style="width:@BarWidth(rating, low, high)%"></span>
+                        <span class="muted small">
+                            @Format.Rating(rating)
+                            @if (season.Rating.Ours is { } seasonOurs)
+                            {
+                                <text> · @Format.Stars(seasonOurs, season.Rating.OurCount)</text>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (insights.TopEpisodes.Count > 0)
+        {
+            <h3>Top episodes</h3>
+            <ol class="top-episodes">
+                @foreach (var episode in insights.TopEpisodes)
+                {
+                    <li>
+                        <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                        <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                        <span class="muted small">
+                            @if (episode.Rating.External is { } r) { <text>@Format.Rating(r)</text> }
+                            @if (episode.Rating.Ours is { } o) { <text> · @Format.Stars(o, episode.Rating.OurCount)</text> }
+                        </span>
+                    </li>
+                }
+            </ol>
+        }
+
+        @if (insights.Run.LongestBreak is { Days: > 180 } pause)
+        {
+            <p class="muted">Longest break: @Gap(pause.Days) between seasons @pause.AfterSeason and @pause.BeforeSeason.</p>
+        }
+
+        @if (insights.SharedCast.Count > 0)
+        {
+            <h3>Shared cast</h3>
+            <ul class="shared-cast">
+                @foreach (var shared in insights.SharedCast)
+                {
+                    <li>
+                        <strong>@shared.PersonName</strong>
+                        @(shared.SameCharacter ? "also appears as" : "is also in")
+                        <a href="shows/@shared.OtherShowId">@shared.OtherShowTitle</a>
+                        @if (!string.IsNullOrEmpty(shared.CharacterThere))
+                        {
+                            @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
+                            <span class="muted"> (@shared.CharacterThere)</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowInsights? insights;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        insights = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (!Session.IsSignedIn)
+            {
+                return;
+            }
+
+            insights = await Analytics.GetShowInsightsAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Insights are extra: the rest of the show page works without them.
+        }
+    }
+
+    private static string RatingText(SeasonHighlight highlight) =>
+        highlight.Source == "external" ? Format.Rating(highlight.Rating) : $"★ {highlight.Rating:0.0}";
+
+    private static int BarWidth(double rating, double low, double high) =>
+        high <= low ? 100 : (int)Math.Round(10 + 90 * (rating - low) / (high - low));
+
+    private static string Gap(int days) => days >= 365 ? $"{days / 365.0:0.#} years" : days >= 60 ? $"{days / 30} months" : $"{days} days";
+}

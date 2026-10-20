@@ -1,0 +1,32 @@
+using Analytics.API.Apis;
+using Analytics.Data;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.AddDefaultAuthentication();
+
+// Analytics.API owns the analyticsdb schema (EF Core migrations); the worker waits for this service to be healthy.
+builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb");
+builder.Services.AddDatabaseInitializer<AnalyticsContext>();
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+
+app.MapDefaultEndpoints();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/api/v1/status", () => new { Service = "analytics-api", Status = "ok" });
+app.MapInsightsApi();
+
+app.Run();

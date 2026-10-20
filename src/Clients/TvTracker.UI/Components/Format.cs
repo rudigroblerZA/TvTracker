@@ -48,6 +48,20 @@ public static class Format
         : minutes < 60 * 24 ? $"{minutes / 60} h {minutes % 60} min"
         : $"{minutes / (60 * 24)} days {minutes % (60 * 24) / 60} h";
 
+    /// <summary>A provider rating (0-10), e.g. "7.9".</summary>
+    public static string Rating(double rating) => rating.ToString("0.0");
+
+    /// <summary>Our users' average stars with how many rated, e.g. "★ 4.2 (12)".</summary>
+    public static string Stars(double average, int count) => $"★ {average:0.0} ({count})";
+
+    public static string Trend(string trend) => trend switch
+    {
+        "rising" => "Getting better season by season",
+        "falling" => "Rated lower season by season",
+        "steady" => "Consistently rated across seasons",
+        _ => trend
+    };
+
     /// <summary>"in 3 days", "2 hours ago", relative to now.</summary>
     public static string Relative(DateTimeOffset when)
     {

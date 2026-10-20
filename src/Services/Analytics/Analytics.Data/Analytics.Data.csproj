@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Analytics model, DbContext and insight documents, shared by Analytics.API (reads, owns the schema) and Analytics.Worker (writes). -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- For `dotnet ef migrations add`; not shipped. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

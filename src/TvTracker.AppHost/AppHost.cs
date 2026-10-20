@@ -15,6 +15,7 @@ var trackingDb = postgres.AddDatabase("trackingdb");
 var ratingsDb = postgres.AddDatabase("ratingsdb");
 var recommendationsDb = postgres.AddDatabase("recommendationsdb");
 var notificationsDb = postgres.AddDatabase("notificationsdb");
+var analyticsDb = postgres.AddDatabase("analyticsdb");
 
 var redis = builder.AddRedis("redis");
 
@@ -90,6 +91,18 @@ var notificationsApi = builder.AddProject<Projects.Notifications_API>("notificat
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
+// Analytics.API owns analyticsdb; the worker consumes catalog and rating events and computes insights hourly.
+var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
+    .WithReference(analyticsDb).WaitFor(analyticsDb)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithHttpHealthCheck("/health");
+
+var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-worker")
+    .WithReference(analyticsDb)
+    .WithReference(eventBus).WaitFor(eventBus)
+    .WaitFor(analyticsApi)
+    .WithHttpHealthCheck("/health");
+
 // The data export collects each service's data for the user.
 identityApi
     .WithReference(trackingApi)
@@ -107,10 +120,14 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WaitFor(trackingApi)
     .WaitFor(recommendationsApi)
     .WaitFor(notificationsApi)
+    .WaitFor(analyticsWorker)
     .WithHttpHealthCheck("/health");
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
+
+// On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
+analyticsWorker.WithReference(catalogSync);
 
 // ---------------------------------------------------------------------------
 // Gateways and clients
@@ -124,7 +141,8 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(trackingApi)
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
-    .WithReference(notificationsApi);
+    .WithReference(notificationsApi)
+    .WithReference(analyticsApi);
 
 builder.AddProject<Projects.WebApp>("webapp")
     .WithExternalHttpEndpoints()
@@ -137,6 +155,7 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(trackingApi).WaitFor(trackingApi)
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
-    .WithReference(notificationsApi);
+    .WithReference(notificationsApi)
+    .WithReference(analyticsApi);
 
 builder.Build().Run();
