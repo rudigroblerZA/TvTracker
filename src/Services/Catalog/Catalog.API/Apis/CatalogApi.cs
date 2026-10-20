@@ -17,7 +17,7 @@ public static class CatalogApi
     {
         var api = app.MapGroup("/api/v1");
 
-        api.MapGet("/shows", SearchShowsAsync);
+        api.MapGet("/shows", SearchShowsAsync).RequireRateLimiting(SearchRateLimiting.Policy);
         api.MapGet("/shows/trending", GetTrendingAsync);
         api.MapGet("/shows/batch", GetShowsByIdsAsync);
         api.MapGet("/shows/{id:guid}", GetShowAsync);

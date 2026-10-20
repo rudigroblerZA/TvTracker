@@ -60,6 +60,7 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(catalogDb).WaitFor(catalogDb)
     .WithReference(redis).WaitFor(redis)
+    .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
 var trackingApi = builder.AddProject<Projects.Tracking_API>("tracking-api")
