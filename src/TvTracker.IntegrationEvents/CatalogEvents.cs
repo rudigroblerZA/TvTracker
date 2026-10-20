@@ -14,6 +14,8 @@ public enum ShowStatus
 }
 
 /// <summary>A show was imported into the catalog for the first time.</summary>
+/// <param name="ExternalRating">The provider's average rating (0-10), if any.</param>
+/// <param name="Cast">The cast with character ids, in billing order. Null in events published before it was added.</param>
 public record ShowAddedIntegrationEvent(
     Guid ShowId,
     string Title,
@@ -23,9 +25,11 @@ public record ShowAddedIntegrationEvent(
     IReadOnlyList<string> Keywords,
     IReadOnlyList<string> CastNames,
     IReadOnlyList<Guid> SimilarShowIds,
-    double Popularity) : IntegrationEvent;
+    double Popularity,
+    double? ExternalRating = null,
+    IReadOnlyList<CastCredit>? Cast = null) : IntegrationEvent;
 
-/// <summary>A show's details changed (title, poster, genres, keywords, cast, similar shows).</summary>
+/// <summary>A show's details changed (title, poster, genres, keywords, cast, similar shows, rating).</summary>
 public record ShowUpdatedIntegrationEvent(
     Guid ShowId,
     string Title,
@@ -35,7 +39,14 @@ public record ShowUpdatedIntegrationEvent(
     IReadOnlyList<string> Keywords,
     IReadOnlyList<string> CastNames,
     IReadOnlyList<Guid> SimilarShowIds,
-    double Popularity) : IntegrationEvent;
+    double Popularity,
+    double? ExternalRating = null,
+    IReadOnlyList<CastCredit>? Cast = null) : IntegrationEvent;
+
+/// <param name="CharacterExternalIds">
+/// The provider's ids for the characters played (empty if it has none). The same id in two shows means a shared character.
+/// </param>
+public record CastCredit(string Name, string? Character, IReadOnlyList<string> CharacterExternalIds);
 
 /// <summary>
 /// Episodes of one show were scheduled, or their details or air times changed. Times are UTC.
@@ -56,7 +67,8 @@ public record ScheduledEpisode(
     int EpisodeNumber,
     string Title,
     DateTimeOffset? AirsAtUtc,
-    int? RuntimeMinutes);
+    int? RuntimeMinutes,
+    double? ExternalRating = null);
 
 /// <summary>
 /// One episode scheduled or changed. No longer published (replaced by <see cref="EpisodesScheduledIntegrationEvent"/>);

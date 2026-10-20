@@ -41,11 +41,13 @@ public record ProviderShow(
     IReadOnlyList<ProviderEpisode> Episodes,
     IReadOnlyList<ProviderCastMember> Cast,
     IReadOnlyList<ProviderWatchOption> WatchOptions,
-    IReadOnlyList<string> SimilarExternalIds);
+    IReadOnlyList<string> SimilarExternalIds,
+    double? Rating);
 
 public record ProviderSeason(int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc);
 
 /// <param name="AirsAtUtc">Air time in UTC; null when not yet scheduled.</param>
+/// <param name="Rating">The provider's average rating (0-10); null when it has none.</param>
 public record ProviderEpisode(
     string ExternalId,
     int SeasonNumber,
@@ -53,8 +55,10 @@ public record ProviderEpisode(
     string Title,
     string? Overview,
     DateTimeOffset? AirsAtUtc,
-    int? RuntimeMinutes);
+    int? RuntimeMinutes,
+    double? Rating);
 
-public record ProviderCastMember(string Name, string? Character, string? PhotoUrl);
+/// <param name="CharacterExternalIds">The provider's ids for the characters played; empty when it has none.</param>
+public record ProviderCastMember(string Name, string? Character, string? PhotoUrl, IReadOnlyList<string> CharacterExternalIds);
 
 public record ProviderWatchOption(string Region, string ProviderName, WatchProviderType Type, string? Url);

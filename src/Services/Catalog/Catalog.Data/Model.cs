@@ -31,6 +31,9 @@ public class Show
 
     public double Popularity { get; set; }
 
+    /// <summary>The provider's average rating (0-10, e.g. TVmaze's), or null if it has none.</summary>
+    public double? ExternalRating { get; set; }
+
     /// <summary>The provider's "similar shows", as provider ids.</summary>
     public List<string> SimilarExternalIds { get; set; } = [];
 
@@ -89,6 +92,9 @@ public class Episode
 
     public int? RuntimeMinutes { get; set; }
 
+    /// <summary>The provider's average rating (0-10), or null if it has none (e.g. not aired yet).</summary>
+    public double? ExternalRating { get; set; }
+
     /// <summary>Set once EpisodeAired has been published, so it is sent only once.</summary>
     public bool AiredPublished { get; set; }
 }
@@ -111,6 +117,12 @@ public class CastMember
     public Person Person { get; set; } = null!;
 
     public string? Character { get; set; }
+
+    /// <summary>
+    /// The provider's ids for the characters this person plays in the show. The same character id in
+    /// two shows' casts is a crossover or spin-off.
+    /// </summary>
+    public List<string> CharacterExternalIds { get; set; } = [];
 
     public int Order { get; set; }
 }
