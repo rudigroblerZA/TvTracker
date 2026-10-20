@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TV Tracker ops</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #65707c; --line: #e3e6ea;
+    --accent: #3b6fd8; --good: #2f8a4c; --warn: #b7791f; --bad: #c0392b; --track: #e9edf2;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a; --panel: #1a1e25; --text: #e6e9ee; --muted: #9aa4b0; --line: #2a303a;
+      --accent: #6f9bf0; --good: #5cbf7a; --warn: #e0a64a; --bad: #e46a5d; --track: #2a303a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 20px 24px 8px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  main { padding: 8px 24px 32px; display: grid; gap: 16px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .value { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .grid2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .grid3 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .meter { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; margin: 8px 0 6px; display: flex; }
+  .meter span { display: block; height: 100%; }
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  ul.rows li { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); min-width: 0; }
+  ul.rows li:first-child { border-top: 0; padding-top: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  img.thumb { width: 36px; height: 50px; object-fit: cover; border-radius: 4px; background: var(--track); flex: none; }
+  img.face { width: 36px; height: 36px; object-fit: cover; border-radius: 50%; background: var(--track); flex: none; }
+  .ph { display: inline-block; flex: none; background: var(--track); }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .badge.good { color: var(--good); border-color: currentColor; }
+  .badge.warn { color: var(--warn); border-color: currentColor; }
+  .bar { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
+  .barrow { display: grid; grid-template-columns: minmax(80px, 140px) 1fr 36px; gap: 8px; align-items: center; padding: 3px 0; }
+  .down { color: var(--bad); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--good); margin-right: 6px; }
+  .dot.off { background: var(--bad); }
+  @media (max-width: 600px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>TV Tracker ops</h1>
+  <span class="muted small" id="updated">Loading…</span>
+</header>
+<main>
+  <section class="tiles" id="tiles"></section>
+  <section class="grid2">
+    <div class="panel"><h2>Most-credited actors</h2><ul class="rows" id="actors"></ul></div>
+    <div class="panel"><h2>Recently added shows</h2><ul class="rows" id="recent"></ul></div>
+  </section>
+  <section class="grid3">
+    <div class="panel"><h2>Top episodes</h2><ul class="rows" id="top-episodes"></ul></div>
+    <div class="panel"><h2>Upcoming premieres</h2><ul class="rows" id="premieres"></ul></div>
+    <div class="panel"><h2>Most shared cast</h2><ul class="rows" id="connected"></ul></div>
+  </section>
+  <section class="grid2">
+    <div class="panel"><h2>Genres</h2><div id="genres"></div></div>
+    <div class="panel"><h2>Bulk import</h2><div id="bulk"></div></div>
+  </section>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const n = v => (v ?? 0).toLocaleString();
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+const code = (s, e) => `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
+
+function ago(iso) {
+  if (!iso) return "never";
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s < 0) return until(iso);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} d ago`;
+}
+function until(iso) {
+  const d = Math.round((new Date(iso) - Date.now()) / 86400000);
+  return d <= 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+}
+const img = (url, cls) => url ? `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy">` : `<span class="ph ${cls}"></span>`;
+const empty = (text) => `<li class="muted">${esc(text)}</li>`;
+const tile = (label, value, detail = "", extra = "") =>
+  `<div class="panel"><div class="muted small">${esc(label)}</div><div class="value">${value}</div>${extra}<div class="muted small">${detail}</div></div>`;
+const meter = parts => `<div class="meter">${parts.map(([v, total, color]) => `<span style="width:${pct(v, total)}%;background:${color}"></span>`).join("")}</div>`;
+
+function render(data) {
+  const c = data.catalog, a = data.analytics, b = data.bulkImport, ix = c.semanticIndex;
+  const statuses = Object.entries(c.showsByStatus).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${n(v)} ${esc(k.toLowerCase())}`).join(" · ");
+
+  $("tiles").innerHTML = [
+    tile("Shows", n(c.shows), statuses),
+    tile("Episodes", n(c.episodes), `${n(c.seasons)} seasons · ${n(c.upcomingEpisodes)} upcoming`),
+    tile("People", n(c.people), `${n(c.castCredits)} credits · ${pct(c.peopleWithDetails, c.people)}% with details`),
+    tile("Semantic index", `${pct(ix.current, c.shows)}%`,
+      `${n(ix.current)} current · ${n(ix.stale)} stale · ${n(ix.missing)} missing<br>${esc(ix.model)} · last ${ago(ix.lastEmbeddedAtUtc)}`,
+      meter([[ix.current, c.shows, "var(--good)"], [ix.stale, c.shows, "var(--warn)"]])),
+    tile("Sync", n(c.showsDueForRefresh), `due for refresh · last sync ${ago(c.lastSyncedAtUtc)}`),
+    a ? tile("Insights", `${n(a.showsWithInsights)}<span class="muted small"> / ${n(a.shows)}</span>`,
+          `shows computed · ${ago(a.lastComputedAtUtc)}<br>${n(a.sharedCastLinks)} shared-cast links`,
+          meter([[a.showsWithInsights, a.shows, "var(--accent)"]]))
+      : tile("Insights", `<span class="down">—</span>`, "Analytics.API unavailable"),
+    a ? tile("Activity", n(a.activeUsers), `users · ${n(a.follows)} follows · ${n(a.watches)} watches<br>${n(a.showRatings + a.episodeRatings)} ratings`)
+      : tile("Activity", `<span class="down">—</span>`, "Analytics.API unavailable"),
+  ].join("");
+
+  $("actors").innerHTML = c.topActors.length ? c.topActors.map(p => `
+    <li>${img(p.photoUrl, "face")}
+      <div class="grow"><div class="clip">${esc(p.name)}</div><div class="muted small clip">${p.showTitles.map(esc).join(" · ")}</div></div>
+      <span class="num">${n(p.shows)} shows</span></li>`).join("") : empty("No cast yet");
+
+  $("recent").innerHTML = c.recentShows.length ? c.recentShows.map(s => `
+    <li>${img(s.posterUrl, "thumb")}
+      <div class="grow"><div class="clip">${esc(s.title)}</div><div class="muted small clip">${esc([s.network, s.status].filter(Boolean).join(" · "))} · added ${ago(s.addedAtUtc)}</div></div>
+      <span class="badge ${s.indexed ? "good" : "warn"}">${s.indexed ? "indexed" : "not indexed"}</span></li>`).join("") : empty("No shows yet");
+
+  const unavailable = empty("Analytics.API unavailable");
+  $("top-episodes").innerHTML = !a ? unavailable : a.topEpisodes.length ? a.topEpisodes.map(e => `
+    <li><span class="num muted small">${code(e.seasonNumber, e.episodeNumber)}</span>
+      <div class="grow"><div class="clip">${esc(e.title)}</div><div class="muted small clip">${esc(e.showTitle)}</div></div>
+      <span class="num">${e.externalRating.toFixed(1)}</span></li>`).join("") : empty("Not computed yet");
+  $("premieres").innerHTML = !a ? unavailable : a.upcomingPremieres.length ? a.upcomingPremieres.map(p => `
+    <li><div class="grow"><div class="clip">${esc(p.showTitle)}</div><div class="muted small">Season ${p.seasonNumber}</div></div>
+      <span class="num small">${until(p.premieresAtUtc)}</span></li>`).join("") : empty("None announced");
+  $("connected").innerHTML = !a ? unavailable : a.mostConnected.length ? a.mostConnected.map(s => `
+    <li><div class="grow clip">${esc(s.title)}</div><span class="num">${n(s.sharedCast)} links</span></li>`).join("") : empty("No shared cast yet");
+
+  const most = Math.max(1, ...c.topGenres.map(g => g.shows));
+  $("genres").innerHTML = c.topGenres.length ? c.topGenres.map(g => `
+    <div class="barrow"><span class="clip">${esc(g.genre)}</span><span class="bar" style="width:${pct(g.shows, most)}%"></span><span class="num small muted">${n(g.shows)}</span></div>`).join("")
+    : `<div class="muted">No genres yet</div>`;
+
+  $("bulk").innerHTML = !b ? `<div class="muted">No bulk import since the sync worker started (or it's down). Start one with <code>tvtracker-import</code>.</div>` : `
+    <div><span class="badge ${b.state === "running" ? "warn" : b.state === "completed" ? "good" : ""}">${esc(b.state)}</span>
+      <span class="muted small">started ${ago(b.startedAtUtc)}${b.finishedAtUtc ? `, finished ${ago(b.finishedAtUtc)}` : ""}</span></div>
+    ${b.stage && b.stage !== "Importing" ? `<div class="small" style="margin-top:8px">${esc(b.stage)}…</div>` : ""}
+    ${meter([[b.processed, b.total, "var(--accent)"]])}
+    <div class="small num">${n(b.processed)} / ${n(b.total)} · ${n(b.imported)} imported · ${n(b.alreadyInCatalog)} already there · ${n(b.notFound + b.failed)} skipped</div>
+    ${b.lastImported ? `<div class="muted small clip">Last: ${esc(b.lastImported)}</div>` : ""}
+    ${b.error ? `<div class="down small">${esc(b.error)}</div>` : ""}`;
+}
+
+async function refresh() {
+  try {
+    const response = await fetch("ops/stats", { cache: "no-store" });
+    if (!response.ok) throw new Error(`${response.status}`);
+    const data = await response.json();
+    render(data);
+    $("updated").innerHTML = `<span class="dot"></span>Updated ${new Date(data.generatedAtUtc).toLocaleTimeString()} · refreshes every 10 s`;
+  } catch (e) {
+    $("updated").innerHTML = `<span class="dot off"></span>Catalog.API unreachable (${esc(e.message)}); retrying`;
+  }
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

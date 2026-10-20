@@ -36,6 +36,15 @@ Search finds any show on TVmaze, not just imported ones. Before searching, Catal
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
 longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
 
+Search also matches by meaning. Results start with shows whose title contains the term (most popular first), followed
+by up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
+"cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
+Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The model (about 90 MB) is downloaded from
+Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
+to change it). Until it loads, search matches titles only. The sync worker embeds new and refreshed shows every 30 seconds
+and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
+`pgvector/pgvector` image for that.
+
 Search is rate limited (429 with `Retry-After` when over), per signed-in user, or per client IP for anonymous visitors
 (the last `X-Forwarded-For` entry: the mobile gateway adds it, and the web app forwards each browser's address, captured
 when the page loads). Calls with neither, from other services, share one larger limit. The web app doesn't retry 429s or
@@ -60,6 +69,42 @@ Useful local addresses:
 | Keycloak admin console | http://localhost:8080 (admin / admin) |
 | RabbitMQ management | link on the Aspire dashboard |
 
+### Bulk import
+
+`tvtracker-import` (`src/Tools/Catalog.ImportCli`) fills the catalog in bulk while the AppHost is running. It starts a job
+on the sync worker (`/api/v1/imports/bulk`, internal only), which imports the shows through the same synchronizer
+and TVmaze rate limit as everything else, about two shows a second, and the tool shows the job's progress:
+
+```bash
+cd src/Tools/Catalog.ImportCli
+dotnet run -- titles shows.txt     # the best TVmaze match for each line (# comments and blank lines skipped; - for stdin)
+dotnet run -- ids 82 431 169       # TVmaze show ids (or --file ids.txt)
+dotnet run -- top 500              # TVmaze's most popular shows; reads TVmaze's whole index first (about 4 minutes)
+dotnet run -- status               # follow the running import, or show the last one
+dotnet run -- cancel               # stop after the current show
+```
+
+Shows already in the catalog are skipped, so running a job again picks up where a cancelled or interrupted one stopped.
+One job runs at a time, at most 5000 shows each. Ctrl+C stops following, not the import (`--detach` doesn't follow
+at all). The tool talks to `http://localhost:5107` (`--url` or `TVTRACKER_SYNC_URL` to change it). Exit codes: 0 done,
+2 done with some shows failing, 1 cancelled, failed or unreachable. Job state lives in the worker's memory, so a
+worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
+within a minute.
+
+### Ops dashboard
+
+http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
+- **Catalog:** what it holds (shows by status, episodes, people and credits), and the semantic index (current, stale, missing).
+- **Sync:** shows due for refresh and when the last sync ran.
+- **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
+  and the shows with the most shared cast.
+- **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
+- **Bulk import:** the latest bulk import job.
+
+Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
+`/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
+isn't signed in, it and the Analytics stats endpoint are only mapped in Development.
+
 ### Mobile app
 
 The mobile app isn't started by the AppHost. With the AppHost running, run `src/Clients/MobileApp` from Visual Studio,
@@ -81,8 +126,10 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | TvTracker.Persistence | `src/TvTracker.Persistence` | EF Core outbox, inbox (idempotent consumers), database initialisation |
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
-| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search, schedule |
-| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), detects changes, publishes events, detects aired episodes |
+| Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |
+| Catalog.ImportCli | `src/Tools` | `tvtracker-import`: bulk import by titles, TVmaze ids or top N, through the sync worker |
+| Catalog.Embeddings | `src/Services/Catalog` | Local text embeddings (all-MiniLM-L6-v2 via ONNX Runtime) for semantic search |
+| Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |

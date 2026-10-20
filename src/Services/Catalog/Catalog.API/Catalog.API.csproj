@@ -9,8 +9,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Ops\ops.html" LogicalName="Catalog.API.Ops.ops.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
   </ItemGroup>
 
 </Project>

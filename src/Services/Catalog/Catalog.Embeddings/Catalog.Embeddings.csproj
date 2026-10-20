@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Text embeddings for semantic search, computed locally with all-MiniLM-L6-v2 (ONNX Runtime; no API key or extra container).
+    Used by Catalog.SyncWorker (embeds shows) and Catalog.API (embeds search terms). The model is downloaded on first use.
+  -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+  </ItemGroup>
+
+</Project>

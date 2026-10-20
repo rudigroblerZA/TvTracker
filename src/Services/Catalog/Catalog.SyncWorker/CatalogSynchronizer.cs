@@ -50,30 +50,45 @@ public sealed class CatalogSynchronizer(
         var imported = 0;
         foreach (var externalId in ids.Except(existing))
         {
-            var show = await provider.GetShowAsync(externalId, ct);
-            if (show is null)
+            if ((await ImportNewAsync(externalId, ct)).Outcome == ImportOutcome.Imported)
             {
-                continue;
-            }
-
-            try
-            {
-                await SyncShowAsync(show, ct);
                 imported++;
-            }
-            catch (DbUpdateException ex)
-            {
-                if (!await ShowExistsAsync(externalId, ct))
-                {
-                    throw;
-                }
-
-                // A concurrent import (the hourly sync or another search) added it first; nothing to do.
-                logger.LogDebug(ex, "Show {ExternalId} was imported concurrently", externalId);
             }
         }
 
         return imported;
+    }
+
+    /// <summary>Imports one show by the provider's id, unless the catalog already has it.</summary>
+    public async Task<ImportResult> ImportShowAsync(string externalId, CancellationToken ct) =>
+        await db.Shows.Where(s => s.Source == provider.Name && s.ExternalId == externalId).Select(s => s.Title).FirstOrDefaultAsync(ct) is { } title
+            ? new ImportResult(ImportOutcome.AlreadyInCatalog, title)
+            : await ImportNewAsync(externalId, ct);
+
+    private async Task<ImportResult> ImportNewAsync(string externalId, CancellationToken ct)
+    {
+        var show = await provider.GetShowAsync(externalId, ct);
+        if (show is null)
+        {
+            return new ImportResult(ImportOutcome.NotFound, null);
+        }
+
+        try
+        {
+            await SyncShowAsync(show, ct);
+            return new ImportResult(ImportOutcome.Imported, show.Title);
+        }
+        catch (DbUpdateException ex)
+        {
+            if (!await ShowExistsAsync(externalId, ct))
+            {
+                throw;
+            }
+
+            // A concurrent import (the hourly sync or another search) added it first; nothing to do.
+            logger.LogDebug(ex, "Show {ExternalId} was imported concurrently", externalId);
+            return new ImportResult(ImportOutcome.AlreadyInCatalog, show.Title);
+        }
     }
 
     private async Task<bool> ShowExistsAsync(string externalId, CancellationToken ct)
@@ -584,4 +599,16 @@ public sealed class CatalogSynchronizer(
         new(s.Id, s.Title, episodes
             .Select(e => new ScheduledEpisode(e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes, e.ExternalRating))
             .ToList());
+}
+
+/// <param name="Title">The show's title; null when the provider has no such show.</param>
+public readonly record struct ImportResult(ImportOutcome Outcome, string? Title);
+
+public enum ImportOutcome
+{
+    Imported,
+    AlreadyInCatalog,
+
+    /// <summary>The provider has no show with that id.</summary>
+    NotFound
 }

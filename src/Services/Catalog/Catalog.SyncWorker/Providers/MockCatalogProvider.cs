@@ -16,6 +16,16 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
     public Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>(BuildCatalog().Select(s => s.ExternalId).ToList());
 
+    public Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default)
+    {
+        onPage?.Invoke(1);
+        return Task.FromResult<IReadOnlyList<string>>(BuildCatalog()
+            .OrderByDescending(s => s.Popularity)
+            .Take(count)
+            .Select(s => s.ExternalId)
+            .ToList());
+    }
+
     public Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>(BuildCatalog()
             .Where(s => s.Title.Contains(query, StringComparison.OrdinalIgnoreCase))

@@ -1,6 +1,9 @@
 using Catalog.API.Apis;
 using Catalog.API.Services;
 using Catalog.Data;
+using Catalog.Embeddings;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,8 +13,14 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 
 // Catalog.API owns the catalogdb schema; the sync worker waits for this service to be healthy.
-builder.AddNpgsqlDbContext<CatalogContext>("catalogdb");
-builder.Services.AddDatabaseInitializer<CatalogContext>();
+builder.AddCatalogDbContext();
+builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, _, ct) =>
+{
+    // A migration may have just created the pgvector extension; connections opened earlier didn't know its types.
+    var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+    await connection.OpenAsync(ct);
+    await connection.ReloadTypesAsync(ct);
+});
 
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
@@ -23,8 +32,25 @@ builder.Services.AddSingleton(TimeProvider.System);
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
 builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
     .RemoveAllResilienceHandlers();
+// For the ops dashboard (Development only): the other services' stats, skipped quickly when a service is down.
+builder.Services.AddHttpClient("analytics", http =>
+    {
+        http.BaseAddress = new Uri("https+http://analytics-api/");
+        http.Timeout = TimeSpan.FromSeconds(3);
+    })
+    .RemoveAllResilienceHandlers();
+builder.Services.AddHttpClient("catalog-sync", http =>
+    {
+        http.BaseAddress = new Uri("https+http://catalog-sync/");
+        http.Timeout = TimeSpan.FromSeconds(3);
+    })
+    .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 builder.Services.AddSearchRateLimiting(builder.Configuration);
+
+// Search also lists shows similar in meaning to the term, by comparing its vector with the sync worker's show vectors.
+builder.Services.AddLocalEmbeddings(builder.Configuration);
+builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
@@ -38,6 +64,8 @@ app.UseRateLimiter();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    // Developer dashboard at /ops; not signed in, so Development only.
+    app.MapOpsApi();
 }
 
 app.MapGet("/api/v1/status", () => new { Service = "catalog-api", Status = "ok" });

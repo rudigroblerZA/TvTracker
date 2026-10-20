@@ -1,12 +1,19 @@
+using Aspire.Hosting.Utils;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
 // Infrastructure (containers; Docker or Podman must be running)
 // ---------------------------------------------------------------------------
 
+// The pgvector image is Postgres plus the vector extension, for semantic search. Same major version and Debian release
+// (trixie, whose collation version existing databases were created with) as Aspire's default postgres image.
 var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume()
+    .WithImage("pgvector/pgvector", "0.8.7-pg18-trixie")
     .WithLifetime(ContainerLifetime.Persistent);
+// Same volume WithDataVolume would create, but mounted where Postgres 18 keeps its data: WithDataVolume picks the path
+// from the image tag, and doesn't recognise pgvector's tags as Postgres 18.
+postgres.WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql");
 
 // One database per service: no service reads another's tables.
 var identityDb = postgres.AddDatabase("identitydb");
@@ -125,6 +132,9 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
+
+// The ops dashboard (/ops on Catalog.API) includes Analytics' stats.
+catalogApi.WithReference(analyticsApi);
 
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);

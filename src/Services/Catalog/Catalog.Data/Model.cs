@@ -1,3 +1,4 @@
+using Pgvector;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.Data;
@@ -54,6 +55,25 @@ public class Show
     public List<CastMember> Cast { get; set; } = [];
 
     public List<WatchProvider> WatchProviders { get; set; } = [];
+}
+
+/// <summary>
+/// A show's text (title, genres, network, summary) as a vector, for semantic search. Written by the sync worker,
+/// which re-embeds a show when the text changes or the model does.
+/// </summary>
+public class ShowEmbedding
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>The embedding model that produced <see cref="Embedding"/>; vectors from different models can't be compared.</summary>
+    public required string Model { get; set; }
+
+    public required Vector Embedding { get; set; }
+
+    /// <summary>A hash of the text that was embedded, so a refresh that changes nothing doesn't re-embed.</summary>
+    public required string SourceHash { get; set; }
+
+    public DateTime EmbeddedAtUtc { get; set; }
 }
 
 public class Season

@@ -48,6 +48,17 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Search (vectors)">
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
+    <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tools">
+    <PackageVersion Include="System.CommandLine" Version="2.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Messaging and delivery">
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
     <PackageVersion Include="Microsoft.Azure.NotificationHubs" Version="4.2.0" />

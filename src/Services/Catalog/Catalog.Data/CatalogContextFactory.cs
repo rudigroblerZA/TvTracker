@@ -10,5 +10,5 @@ namespace Catalog.Data;
 public sealed class CatalogContextFactory : IDesignTimeDbContextFactory<CatalogContext>
 {
     public CatalogContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<CatalogContext>().UseNpgsql("Host=localhost;Database=catalogdb").Options);
+        new(new DbContextOptionsBuilder<CatalogContext>().UseNpgsql("Host=localhost;Database=catalogdb", npgsql => npgsql.UseVector()).Options);
 }
