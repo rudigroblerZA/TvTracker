@@ -221,6 +221,7 @@ public sealed class CatalogSynchronizer(
 
         var oldStatus = show.Status;
         var events = new List<IntegrationEvent>();
+        var scheduled = new List<Episode>();
 
         // Details
         var detailsChanged = isNew
@@ -301,7 +302,7 @@ public sealed class CatalogSynchronizer(
                     AiredPublished = pe.AirsAtUtc <= now
                 };
                 show.Episodes.Add(episode);
-                events.Add(EpisodeScheduled(show, episode));
+                scheduled.Add(episode);
                 continue;
             }
 
@@ -329,7 +330,7 @@ public sealed class CatalogSynchronizer(
             episode.RuntimeMinutes = pe.RuntimeMinutes;
             episode.SeasonNumber = pe.SeasonNumber;
             episode.EpisodeNumber = pe.EpisodeNumber;
-            events.Add(EpisodeScheduled(show, episode));
+            scheduled.Add(episode);
         }
 
         // Show-level events go first so consumers know the show before its episodes.
@@ -349,6 +350,8 @@ public sealed class CatalogSynchronizer(
                 showEvents.Add(new ShowStatusChangedIntegrationEvent(show.Id, show.Title, oldStatus, show.Status));
             }
         }
+
+        events.AddRange(scheduled.Chunk(EpisodesScheduledIntegrationEvent.MaxEpisodes).Select(batch => EpisodesScheduled(show, batch)));
 
         foreach (var e in showEvents.Concat(events))
         {
@@ -470,6 +473,8 @@ public sealed class CatalogSynchronizer(
         new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords,
             s.Cast.OrderBy(c => c.Order).Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity);
 
-    private static EpisodeScheduledIntegrationEvent EpisodeScheduled(Show s, Episode e) =>
-        new(s.Id, s.Title, e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes);
+    private static EpisodesScheduledIntegrationEvent EpisodesScheduled(Show s, IEnumerable<Episode> episodes) =>
+        new(s.Id, s.Title, episodes
+            .Select(e => new ScheduledEpisode(e.Id, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes))
+            .ToList());
 }
