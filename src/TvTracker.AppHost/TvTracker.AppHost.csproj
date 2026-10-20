@@ -19,6 +19,8 @@
     <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />
     <ProjectReference Include="..\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
     <ProjectReference Include="..\Services\Notifications\Notifications.API\Notifications.API.csproj" />
+    <ProjectReference Include="..\Services\Analytics\Analytics.API\Analytics.API.csproj" />
+    <ProjectReference Include="..\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
     <ProjectReference Include="..\ApiGateways\Mobile.Bff\Mobile.Bff.csproj" />
     <ProjectReference Include="..\Clients\WebApp\WebApp.csproj" />
   </ItemGroup>

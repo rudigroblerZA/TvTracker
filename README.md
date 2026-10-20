@@ -85,6 +85,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
+| Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, run facts, premiere build-up, shared cast |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
 | WebApp | `src/Clients/WebApp` | Blazor web app; OIDC sign-in, tokens kept server-side in Redis, browser push |
@@ -97,18 +98,24 @@ How events flow:
 - **Ratings.API** publishes `ShowRated`, `EpisodeRated`, `ShowRatingRemoved`, `EpisodeRatingRemoved`. **Identity.API** publishes `UserRegistered`, `UserProfileUpdated`, `UserDeleted`.
 - Events are saved in each service's outbox table in the same transaction as the change, then published; a background publisher retries anything left behind.
 - Consumers record processed event ids, so redelivered events are ignored.
+- **Analytics.Worker** keeps its own copy of the catalog and of our users' ratings from these events and recomputes
+  insights hourly (Analytics.API only reads the results). On its first start it asks the sync worker to replay the
+  catalog (`POST /api/v1/imports/replay`, internal), so shows imported before it existed reach it too.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 
 ## Database schema
 
-Catalog uses EF Core migrations (`Catalog.Data/Migrations`); Catalog.API applies them at startup. The other services
+Catalog and Analytics use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`); Catalog.API and
+Analytics.API apply them at startup. The other services
 still use `EnsureCreated`, which creates a missing database but never changes an existing one.
 
-After changing the Catalog model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
+After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
 ```bash
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
+# or, for Analytics:
+dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 ```
 
 **Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database

@@ -39,6 +39,7 @@ else
 }
 
 builder.Services.AddScoped<CatalogSynchronizer>();
+builder.Services.AddSingleton<CatalogReplayRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();
 
 var app = builder.Build();

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Analytics.Worker: keeps a copy of the catalog and of our users' ratings from events, and computes
+    show insights, upcoming premieres and top episodes every hour for Analytics.API to serve.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
+    <ProjectReference Include="..\Analytics.Data\Analytics.Data.csproj" />
+  </ItemGroup>
+
+</Project>

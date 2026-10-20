@@ -16,9 +16,10 @@ public static class ApiClients
     public const string Ratings = "ratings";
     public const string Recommendations = "recommendations";
     public const string Notifications = "notifications";
+    public const string Analytics = "analytics";
 
     public static readonly IReadOnlyList<string> All =
-        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications];
+        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics];
 }
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
@@ -177,6 +178,23 @@ public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProv
 
     public Task DismissAsync(Guid showId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Recommendations, HttpMethod.Post, $"api/v1/dismissals/{showId}", null, ct, queueIfOffline: true);
+}
+
+/// <summary>Insights for signed-in users (the API requires a token).</summary>
+public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)
+{
+    public Task<ShowInsights?> GetShowInsightsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowInsights>(ApiClients.Analytics, $"api/v1/shows/{showId}/insights", ct, cacheForOffline: true);
+
+    public Task<List<PremiereItem>?> GetPremieresAsync(int days = 60, string sort = "date", CancellationToken ct = default) =>
+        GetAsync<List<PremiereItem>>(ApiClients.Analytics, $"api/v1/insights/premieres?days={days}&sort={sort}", ct, cacheForOffline: true);
+
+    public Task<List<TopEpisodeItem>?> GetTopEpisodesAsync(string? genre = null, int limit = 20, CancellationToken ct = default)
+    {
+        var url = $"api/v1/insights/top-episodes?limit={limit}";
+        if (!string.IsNullOrWhiteSpace(genre)) url += $"&genre={Uri.EscapeDataString(genre)}";
+        return GetAsync<List<TopEpisodeItem>>(ApiClients.Analytics, url, ct, cacheForOffline: true);
+    }
 }
 
 public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c) : ApiClientBase(f, t, o, c)

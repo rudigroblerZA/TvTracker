@@ -6,6 +6,9 @@ public record SearchImportRequest(string Query);
 
 public record SearchImportResult(int Imported);
 
+/// <param name="Started">False when a replay was already running.</param>
+public record ReplayResult(bool Started);
+
 public static class ImportApi
 {
     /// <summary>How many of the provider's best matches a search may import.</summary>
@@ -17,8 +20,15 @@ public static class ImportApi
 
         api.MapPost("/search", ImportSearchResultsAsync);
 
+        // Used by a service that starts after shows were imported (Analytics on first start) to build its copy.
+        api.MapPost("/replay", Replay);
+
         return api;
     }
+
+    /// <summary>Starts the replay in the background and answers straight away (202), so a client retry can't start another.</summary>
+    private static Accepted<ReplayResult> Replay(CatalogReplayRunner runner) =>
+        TypedResults.Accepted((string?)null, new ReplayResult(runner.TryStart()));
 
     private static async Task<Results<Ok<SearchImportResult>, BadRequest>> ImportSearchResultsAsync(
         SearchImportRequest request, CatalogSynchronizer synchronizer, IHostApplicationLifetime lifetime)

@@ -182,6 +182,43 @@ public sealed class CatalogSynchronizer(
         return aired.Count;
     }
 
+    /// <summary>
+    /// Republishes every show (as ShowAdded, with its current details and cast) and its episodes (EpisodesScheduled),
+    /// so a service added after shows were imported can build its copy. Consumers upsert, so others just see the
+    /// same data again. SeasonAnnounced isn't replayed: Notifications would re-send "new season" alerts.
+    /// </summary>
+    public async Task<int> ReplayAllAsync(CancellationToken ct)
+    {
+        const int batchSize = 20;
+        var ids = await db.Shows.OrderBy(s => s.Id).Select(s => s.Id).ToListAsync(ct);
+
+        foreach (var batch in ids.Chunk(batchSize))
+        {
+            var shows = await db.Shows
+                .Include(s => s.Episodes)
+                .Include(s => s.Cast).ThenInclude(c => c.Person)
+                .AsSplitQuery()
+                .Where(s => batch.Contains(s.Id))
+                .ToListAsync(ct);
+
+            foreach (var show in shows)
+            {
+                outbox.Add(ShowAdded(show));
+                foreach (var episodes in show.Episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).Chunk(EpisodesScheduledIntegrationEvent.MaxEpisodes))
+                {
+                    outbox.Add(EpisodesScheduled(show, episodes));
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+            await outbox.PublishAddedAsync(ct);
+            db.ChangeTracker.Clear();
+        }
+
+        logger.LogInformation("Replayed {Count} shows", ids.Count);
+        return ids.Count;
+    }
+
     /// <summary>Moves a show to the front of the refresh queue (used when someone follows it).</summary>
     public Task MarkForRefreshAsync(Guid showId, CancellationToken ct)
     {
@@ -485,6 +522,14 @@ public sealed class CatalogSynchronizer(
     private static ShowAddedIntegrationEvent ShowAdded(Show s, ProviderShow p) =>
         new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, p.Cast.Select(c => c.Name).ToList(), s.SimilarShowIds, s.Popularity,
             s.ExternalRating, p.Cast.Select(c => new CastCredit(c.Name, c.Character, c.CharacterExternalIds)).ToList());
+
+    /// <summary>ShowAdded from stored data, for a replay.</summary>
+    private static ShowAddedIntegrationEvent ShowAdded(Show s)
+    {
+        var cast = s.Cast.OrderBy(c => c.Order).ToList();
+        return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds)).ToList());
+    }
 
     private static ShowUpdatedIntegrationEvent ShowUpdated(Show s)
     {

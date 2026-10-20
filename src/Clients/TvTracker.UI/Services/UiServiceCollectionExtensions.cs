@@ -29,6 +29,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<RatingsClient>();
         services.AddScoped<RecommendationsClient>();
         services.AddScoped<NotificationsClient>();
+        services.AddScoped<AnalyticsClient>();
 
         return services;
     }
