@@ -60,6 +60,13 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             .Select(g => new { ShowId = g.Key, Sum = g.Sum(r => r.Stars), Count = g.Count() })
             .ToDictionaryAsync(r => r.ShowId, r => (r.Sum, r.Count), ct);
         var announced = (await db.AnnouncedSeasons.AsNoTracking().ToListAsync(ct)).ToLookup(a => a.ShowId);
+        var starCounts = (await db.ShowRatings.AsNoTracking()
+                .GroupBy(r => new { r.ShowId, r.Stars })
+                .Select(g => new { g.Key.ShowId, g.Key.Stars, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToLookup(r => r.ShowId, r => (r.Stars, r.Count));
+        var followDates = (await db.Follows.AsNoTracking().Select(f => new { f.ShowId, f.FollowedAtUtc }).ToListAsync(ct))
+            .ToLookup(f => f.ShowId, f => f.FollowedAtUtc);
 
         var premieres = new List<PremiereRow>();
         var listCandidates = new List<(ShowCopy Show, EpisodeCopy Episode, (int Sum, int Count) Ours, double Score)>();
@@ -70,6 +77,8 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             var episodesByShow = (await db.Episodes.AsNoTracking().Where(e => ids.Contains(e.ShowId)).ToListAsync(ct))
                 .ToLookup(e => e.ShowId);
             var existing = await db.ShowInsights.Where(i => ids.Contains(i.ShowId)).ToDictionaryAsync(i => i.ShowId, ct);
+            var watchesByShow = (await db.Watches.AsNoTracking().Where(w => ids.Contains(w.ShowId)).ToListAsync(ct))
+                .ToLookup(w => w.ShowId);
 
             foreach (var showId in ids)
             {
@@ -77,8 +86,14 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 var episodes = episodesByShow[showId].ToList();
                 var ours = (Func<Guid, (int Sum, int Count)>)(id => Visible(episodeRatings.GetValueOrDefault(id)));
 
+                var momentum = MomentumFor(followDates[showId].ToList(), now);
                 var insights = Compute(show, episodes, ours, showRatings.GetValueOrDefault(showId), announced[showId],
-                    SharedCastFor(show, castByShow[showId], showsByPerson, showsByCharacter, shows), now, computedAt);
+                    SharedCastFor(show, castByShow[showId], showsByPerson, showsByCharacter, shows), now, computedAt) with
+                {
+                    Histograms = HistogramsFor(episodes, starCounts[showId], now),
+                    Viewing = ViewingFor(episodes, watchesByShow[showId].ToList(), now),
+                    Momentum = momentum
+                };
 
                 var document = JsonSerializer.Serialize(insights, JsonOptions);
                 if (existing.TryGetValue(showId, out var row))
@@ -104,7 +119,8 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                         ShowExternalRating = show.ExternalRating,
                         DaysSincePreviousSeason = p.DaysSincePreviousSeason,
                         CatchUpEpisodes = p.CatchUpEpisodes,
-                        CatchUpRuntimeMinutes = p.CatchUpRuntimeMinutes
+                        CatchUpRuntimeMinutes = p.CatchUpRuntimeMinutes,
+                        RecentFollows = momentum?.RecentFollows
                     });
                 }
 
@@ -281,6 +297,100 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             previousEnd is { } end ? (int)(upcoming.PremieresAt - end).TotalDays : null,
             before.Count,
             before.Sum(e => e.RuntimeMinutes ?? 0));
+    }
+
+    /// <summary>Our users' star ratings of the show (from the minimum number of ratings) and the provider's episode ratings.</summary>
+    private static Histograms HistogramsFor(List<EpisodeCopy> episodes, IEnumerable<(int Stars, int Count)> starCounts, DateTimeOffset now)
+    {
+        var stars = new int[5];
+        foreach (var (star, count) in starCounts)
+        {
+            stars[star - 1] = count;
+        }
+
+        // Half-point buckets from the lowest to the highest rating, empty ones included so the shape reads right.
+        var counts = episodes
+            .Where(e => e.AirsAtUtc <= now && e.ExternalRating is not null)
+            .GroupBy(e => Math.Floor(e.ExternalRating!.Value * 2) / 2)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var buckets = new List<HistogramBucket>();
+        if (counts.Count > 0)
+        {
+            for (var from = counts.Keys.Min(); from <= counts.Keys.Max(); from += 0.5)
+            {
+                buckets.Add(new HistogramBucket(from, counts.GetValueOrDefault(from)));
+            }
+        }
+
+        return new Histograms(stars.Sum() >= InsightRules.MinRatingsToShow ? stars : null, buckets);
+    }
+
+    /// <summary>Viewers per season, completion and drop-off, from our users' watched marks.</summary>
+    private static Viewing? ViewingFor(List<EpisodeCopy> episodes, List<UserEpisodeWatch> watches, DateTimeOffset now)
+    {
+        var byUser = watches.GroupBy(w => w.UserId).ToList();
+        if (byUser.Count < InsightRules.MinUsersToShow)
+        {
+            return null;
+        }
+
+        var aired = episodes.Where(e => e.AirsAtUtc <= now).OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
+        var position = aired.Select((e, i) => (e.EpisodeId, i)).ToDictionary(x => x.EpisodeId, x => x.i);
+        var seasonOf = episodes.ToDictionary(e => e.EpisodeId, e => e.SeasonNumber);
+
+        double? completion = aired.Count == 0
+            ? null
+            : Round((double)byUser.Count(u => u.Count(w => position.ContainsKey(w.EpisodeId)) == aired.Count) / byUser.Count);
+
+        var seasons = watches
+            .Where(w => seasonOf.ContainsKey(w.EpisodeId))
+            .GroupBy(w => seasonOf[w.EpisodeId])
+            .Select(g => new SeasonViewers(g.Key, g.Select(w => w.UserId).Distinct().Count()))
+            .Where(s => s.Viewers >= InsightRules.MinUsersToShow)
+            .OrderBy(s => s.Number)
+            .ToList();
+
+        // A viewer stopped at their furthest aired episode when they haven't watched the show for a while and
+        // aired episodes are left; the episode most of them stopped at is the drop-off.
+        var cutoff = now.UtcDateTime.AddDays(-InsightRules.StoppedAfterDays);
+        var stops = byUser
+            .Where(u => u.Max(w => w.WatchedAtUtc) < cutoff)
+            .Select(u => u.Where(w => position.ContainsKey(w.EpisodeId)).Select(w => position[w.EpisodeId]).DefaultIfEmpty(-1).Max())
+            .Where(i => i >= 0 && i < aired.Count - 1)
+            .GroupBy(i => i)
+            .Select(g => (Position: g.Key, Stopped: g.Count()))
+            .Where(g => g.Stopped >= InsightRules.MinUsersToShow)
+            .OrderByDescending(g => g.Stopped)
+            .ThenBy(g => g.Position)
+            .FirstOrDefault();
+
+        var dropOff = stops == default
+            ? null
+            : new DropOff(aired[stops.Position].SeasonNumber, aired[stops.Position].EpisodeNumber, aired[stops.Position].Title,
+                stops.Stopped, Round((double)stops.Stopped / byUser.Count));
+
+        return new Viewing(byUser.Count, completion, seasons, dropOff);
+    }
+
+    /// <summary>Current followers and new follows over the last eight weeks.</summary>
+    private static Momentum? MomentumFor(List<DateTime> followedAt, DateTimeOffset now)
+    {
+        if (followedAt.Count < InsightRules.MinUsersToShow)
+        {
+            return null;
+        }
+
+        var weeks = new int[8];
+        foreach (var at in followedAt)
+        {
+            var weeksAgo = (int)((now.UtcDateTime - at).TotalDays / 7);
+            if (weeksAgo is >= 0 and < 8)
+            {
+                weeks[7 - weeksAgo]++;
+            }
+        }
+
+        return new Momentum(followedAt.Count, weeks, weeks[4..].Sum(), weeks[..4].Sum());
     }
 
     /// <summary>

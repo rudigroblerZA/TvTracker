@@ -20,6 +20,10 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowRatingRemovedIntegrationEvent, RatingEventHandlers>()
     .AddSubscription<EpisodeRatedIntegrationEvent, RatingEventHandlers>()
     .AddSubscription<EpisodeRatingRemovedIntegrationEvent, RatingEventHandlers>()
+    .AddSubscription<EpisodeWatchedIntegrationEvent, TrackingEventHandlers>()
+    .AddSubscription<EpisodeUnwatchedIntegrationEvent, TrackingEventHandlers>()
+    .AddSubscription<ShowFollowedIntegrationEvent, TrackingEventHandlers>()
+    .AddSubscription<ShowUnfollowedIntegrationEvent, TrackingEventHandlers>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 
 builder.Services.AddSingleton(TimeProvider.System);

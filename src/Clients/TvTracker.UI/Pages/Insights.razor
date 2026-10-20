@@ -16,6 +16,7 @@
                 <select @bind="premiereSort" @bind:after="LoadPremieresAsync" aria-label="Sort premieres">
                     <option value="date">Soonest first</option>
                     <option value="rating">Highest rated first</option>
+                    <option value="anticipated">Most anticipated</option>
                 </select>
             </div>
             @if (premieres is null)
@@ -44,6 +45,10 @@
                                 @if (p.CatchUpEpisodes > 0)
                                 {
                                     <div class="muted small">Catch up: @p.CatchUpEpisodes episodes, @Format.Duration(p.CatchUpRuntimeMinutes)</div>
+                                }
+                                @if (p.RecentFollows is > 0)
+                                {
+                                    <div class="muted small">@p.RecentFollows new followers in the last 4 weeks</div>
                                 }
                             </div>
                         </li>

@@ -14,7 +14,8 @@ public record PremiereDto(
     double? ShowExternalRating,
     int? DaysSincePreviousSeason,
     int CatchUpEpisodes,
-    int CatchUpRuntimeMinutes);
+    int CatchUpRuntimeMinutes,
+    int? RecentFollows);
 
 public record TopEpisodeDto(
     Guid EpisodeId,
@@ -55,7 +56,10 @@ public static class InsightsApi
         return document is null ? TypedResults.NotFound() : TypedResults.Text(document, "application/json");
     }
 
-    /// <param name="sort">"date" (soonest first, the default) or "rating" (the show's provider rating, highest first).</param>
+    /// <param name="sort">
+    /// "date" (soonest first, the default), "rating" (the show's provider rating, highest first) or
+    /// "anticipated" (most follows from our users in the last four weeks first).
+    /// </param>
     private static async Task<Ok<List<PremiereDto>>> GetPremieresAsync(
         AnalyticsContext db, TimeProvider time, int days = 60, string? sort = null, int limit = 50, CancellationToken ct = default)
     {
@@ -63,14 +67,17 @@ public static class InsightsApi
         var until = now.AddDays(Math.Clamp(days, 1, 90));
 
         var query = db.Premieres.AsNoTracking().Where(p => p.PremieresAtUtc > now && p.PremieresAtUtc <= until);
-        query = string.Equals(sort, "rating", StringComparison.OrdinalIgnoreCase)
-            ? query.OrderByDescending(p => p.ShowExternalRating ?? 0).ThenBy(p => p.PremieresAtUtc)
-            : query.OrderBy(p => p.PremieresAtUtc);
+        query = sort?.ToLowerInvariant() switch
+        {
+            "rating" => query.OrderByDescending(p => p.ShowExternalRating ?? 0).ThenBy(p => p.PremieresAtUtc),
+            "anticipated" => query.OrderByDescending(p => p.RecentFollows ?? 0).ThenBy(p => p.PremieresAtUtc),
+            _ => query.OrderBy(p => p.PremieresAtUtc)
+        };
 
         var rows = await query.Take(Math.Clamp(limit, 1, 100)).ToListAsync(ct);
         return TypedResults.Ok(rows
             .Select(p => new PremiereDto(p.ShowId, p.ShowTitle, p.PosterUrl, p.Genres, p.SeasonNumber, p.PremieresAtUtc,
-                p.ShowExternalRating, p.DaysSincePreviousSeason, p.CatchUpEpisodes, p.CatchUpRuntimeMinutes))
+                p.ShowExternalRating, p.DaysSincePreviousSeason, p.CatchUpEpisodes, p.CatchUpRuntimeMinutes, p.RecentFollows))
             .ToList());
     }
 

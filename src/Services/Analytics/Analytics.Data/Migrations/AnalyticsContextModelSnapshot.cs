@@ -129,6 +129,9 @@ namespace Analytics.Data.Migrations
                     b.Property<DateTimeOffset>("PremieresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("RecentFollows")
+                        .HasColumnType("integer");
+
                     b.Property<double?>("ShowExternalRating")
                         .HasColumnType("double precision");
 
@@ -268,6 +271,47 @@ namespace Analytics.Data.Migrations
                     b.HasIndex("ShowId");
 
                     b.ToTable("user_episode_ratings", (string)null);
+                });
+
+            modelBuilder.Entity("Analytics.Data.UserEpisodeWatch", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("WatchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "EpisodeId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("user_episode_watches", (string)null);
+                });
+
+            modelBuilder.Entity("Analytics.Data.UserFollow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("FollowedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "ShowId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("user_follows", (string)null);
                 });
 
             modelBuilder.Entity("Analytics.Data.UserShowRating", b =>

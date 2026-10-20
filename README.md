@@ -98,8 +98,10 @@ How events flow:
 - **Ratings.API** publishes `ShowRated`, `EpisodeRated`, `ShowRatingRemoved`, `EpisodeRatingRemoved`. **Identity.API** publishes `UserRegistered`, `UserProfileUpdated`, `UserDeleted`.
 - Events are saved in each service's outbox table in the same transaction as the change, then published; a background publisher retries anything left behind.
 - Consumers record processed event ids, so redelivered events are ignored.
-- **Analytics.Worker** keeps its own copy of the catalog and of our users' ratings from these events and recomputes
-  insights hourly (Analytics.API only reads the results). On its first start it asks the sync worker to replay the
+- **Analytics.Worker** keeps its own copy of the catalog and of our users' ratings, watched episodes and follows from
+  these events and recomputes insights hourly (Analytics.API only reads the results). Figures from our users (rating
+  averages and histograms, viewers, drop-off, follows) appear only with at least 5 users behind them. Ratings, watches
+  and follows made before Analytics existed aren't replayed; they accumulate from then on. On its first start it asks the sync worker to replay the
   catalog (`POST /api/v1/imports/replay`, internal), so shows imported before it existed reach it too.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 

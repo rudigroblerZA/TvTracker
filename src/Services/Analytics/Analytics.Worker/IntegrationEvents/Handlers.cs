@@ -191,12 +191,80 @@ public sealed class RatingEventHandlers(AnalyticsContext db) :
     }
 }
 
-/// <summary>Deletes a deleted user's ratings; the next hourly run drops them from every aggregate.</summary>
+/// <summary>Keeps each user's watched episodes and follows. Only aggregates ever leave this service.</summary>
+public sealed class TrackingEventHandlers(AnalyticsContext db) :
+    IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>,
+    IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>,
+    IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
+    IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>
+{
+    public Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            var ids = e.EpisodeIds.Distinct().ToList();
+            var existing = await db.Watches
+                .Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId))
+                .Select(w => w.EpisodeId)
+                .ToListAsync(ct);
+
+            db.Watches.AddRange(ids.Except(existing).Select(id => new UserEpisodeWatch
+            {
+                UserId = e.UserId,
+                EpisodeId = id,
+                ShowId = e.ShowId,
+                WatchedAtUtc = e.CreatedAt.UtcDateTime
+            }));
+        });
+
+    public Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            if (await db.Watches.FindAsync([e.UserId, e.EpisodeId], ct) is { } watch)
+            {
+                db.Watches.Remove(watch);
+            }
+        });
+
+    public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            if (await db.Follows.FindAsync([e.UserId, e.ShowId], ct) is null)
+            {
+                db.Follows.Add(new UserFollow { UserId = e.UserId, ShowId = e.ShowId, FollowedAtUtc = e.CreatedAt.UtcDateTime });
+            }
+        });
+
+    public Task HandleAsync(ShowUnfollowedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            if (await db.Follows.FindAsync([e.UserId, e.ShowId], ct) is { } follow)
+            {
+                db.Follows.Remove(follow);
+            }
+        });
+
+    private async Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply)
+    {
+        var handler = $"{nameof(TrackingEventHandlers)}.{e.GetType().Name}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        await apply();
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+}
+
+/// <summary>Deletes everything a deleted user left here; the next hourly run drops them from every aggregate.</summary>
 public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
         await db.ShowRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Watches.Where(w => w.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Follows.Where(f => f.UserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 }

@@ -5,6 +5,9 @@ namespace Analytics.Data;
 /// Our users' averages appear only once at least <see cref="InsightRules.MinRatingsToShow"/> ratings back them.
 /// </summary>
 /// <param name="Trend">"rising", "falling" or "steady" across seasons; null with fewer than three rated seasons.</param>
+/// <param name="Histograms">Rating distributions; null in documents computed before they were added.</param>
+/// <param name="Viewing">Our users' viewing; null below the minimum number of viewers.</param>
+/// <param name="Momentum">Our users' follows; null below the minimum number of followers.</param>
 public record ShowInsights(
     Guid ShowId,
     string Title,
@@ -17,7 +20,38 @@ public record ShowInsights(
     IReadOnlyList<TopEpisode> TopEpisodes,
     RunFacts Run,
     Premiere? NextPremiere,
-    IReadOnlyList<SharedCast> SharedCast);
+    IReadOnlyList<SharedCast> SharedCast,
+    Histograms? Histograms = null,
+    Viewing? Viewing = null,
+    Momentum? Momentum = null);
+
+/// <param name="OurStars">How many of our users gave the show 1-5 stars (index 0 is 1 star); null below the minimum.</param>
+/// <param name="ExternalEpisodes">Aired episodes by provider rating, in half-point buckets from the lowest to the highest.</param>
+public record Histograms(IReadOnlyList<int>? OurStars, IReadOnlyList<HistogramBucket> ExternalEpisodes);
+
+/// <param name="From">The bucket's lower bound, e.g. 7.5 for ratings from 7.5 up to 8.</param>
+public record HistogramBucket(double From, int Count);
+
+/// <param name="Viewers">Our users who watched at least one episode.</param>
+/// <param name="CompletionRate">Share of viewers (0-1) who have watched every aired episode.</param>
+/// <param name="Seasons">Viewers per season, for seasons with at least the minimum number.</param>
+/// <param name="DropOff">Where the most viewers stopped; null when no episode has the minimum number of them.</param>
+public record Viewing(int Viewers, double? CompletionRate, IReadOnlyList<SeasonViewers> Seasons, DropOff? DropOff);
+
+public record SeasonViewers(int Number, int Viewers);
+
+/// <summary>
+/// The episode after which the most viewers stopped: their furthest episode, with nothing watched on the show for
+/// <see cref="InsightRules.StoppedAfterDays"/> days (so people mid-binge don't count) and aired episodes still left.
+/// </summary>
+/// <param name="Share">Stopped viewers as a share (0-1) of all viewers.</param>
+public record DropOff(int SeasonNumber, int EpisodeNumber, string Title, int Stopped, double Share);
+
+/// <param name="Followers">Our users following the show now.</param>
+/// <param name="NewFollowsByWeek">Follows started in each of the last eight weeks, oldest first.</param>
+/// <param name="RecentFollows">Follows started in the last four weeks.</param>
+/// <param name="PreviousFollows">Follows started in the four weeks before that.</param>
+public record Momentum(int Followers, IReadOnlyList<int> NewFollowsByWeek, int RecentFollows, int PreviousFollows);
 
 /// <param name="External">The catalog provider's rating (0-10), e.g. TVmaze's.</param>
 /// <param name="Ours">Our users' average stars (1-5); null below the minimum number of ratings.</param>
@@ -74,4 +108,10 @@ public static class InsightRules
 {
     /// <summary>Our users' averages are hidden until this many ratings back them, so no one's rating can be singled out.</summary>
     public const int MinRatingsToShow = 5;
+
+    /// <summary>Viewing and follow figures need this many users behind them, for the same reason.</summary>
+    public const int MinUsersToShow = 5;
+
+    /// <summary>A viewer counts as having stopped after this many days without watching the show.</summary>
+    public const int StoppedAfterDays = 30;
 }
