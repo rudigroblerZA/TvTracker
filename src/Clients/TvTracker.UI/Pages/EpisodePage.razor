@@ -1,0 +1,245 @@
+@page "/episodes/{Id:guid}"
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject RatingsClient Ratings
+@inject UserSession Session
+
+<PageTitle>@(episode?.Title ?? "Episode") · TV Tracker</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (episode is null)
+{
+    if (error is null)
+    {
+        <p class="muted">@(notFound ? "This episode isn't in the catalog." : "Loading…")</p>
+    }
+}
+else
+{
+    <p><a href="shows/@episode.ShowId">← @(showTitle ?? "Back to show")</a></p>
+    <h1>@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) · @episode.Title</h1>
+    <p class="muted">
+        <LocalTime Utc="episode.AirsAtUtc" Format="dddd d MMMM yyyy, HH:mm" />
+        @if (episode.RuntimeMinutes is { } runtime)
+        {
+            <text> · @runtime min</text>
+        }
+        @if (Format.Label(episode.Label) is { } label)
+        {
+            <span class="tag">@label</span>
+        }
+    </p>
+    @if (!string.IsNullOrEmpty(episode.Overview))
+    {
+        <p>@episode.Overview</p>
+    }
+
+    <div class="rating-line">
+        @if (summary is { Count: > 0 })
+        {
+            <span>★ @summary.Average.ToString("0.0") <span class="muted">(@summary.Count)</span></span>
+        }
+    </div>
+
+    <AuthorizeView>
+        <Authorized>
+            <div class="actions">
+                <label class="inline checkbox">
+                    <input type="checkbox" checked="@watched" @onchange="ToggleWatchedAsync" disabled="@(!aired && !watched)" />
+                    @(watched ? "Watched" : aired ? "Mark as watched" : "Not aired yet")
+                </label>
+                <span class="muted">Your rating</span>
+                <StarRating Value="myRating" ValueChanged="RateAsync" />
+            </div>
+
+            <section>
+                <h2>Reactions</h2>
+                <div class="reactions">
+                    @foreach (var emoji in Emoji)
+                    {
+                        var count = reactions?.Counts.FirstOrDefault(c => c.Emoji == emoji)?.Count ?? 0;
+                        <button class="reaction @(reactions?.Mine == emoji ? "mine" : "")" @onclick="() => ReactAsync(emoji)">
+                            @emoji @if (count > 0) { <span>@count</span> }
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <section>
+                <h2>Comments</h2>
+                @if (comments is null)
+                {
+                    <p class="muted">Loading…</p>
+                }
+                else if (comments.HiddenUntilWatched)
+                {
+                    <div class="panel">
+                        <p>@comments.TotalCount comment(s) hidden to avoid spoilers until you've watched this episode.</p>
+                        <button class="btn btn-quiet" @onclick="() => LoadCommentsAsync(reveal: true)">Show anyway</button>
+                    </div>
+                }
+                else
+                {
+                    <form class="comment-form" @onsubmit="PostCommentAsync">
+                        <textarea @bind="newComment" maxlength="2000" placeholder="What did you think?" aria-label="Comment"></textarea>
+                        <label class="inline checkbox"><input type="checkbox" @bind="newCommentIsSpoiler" /> Contains spoilers</label>
+                        <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newComment))">Post</button>
+                    </form>
+
+                    @if (comments.Comments.Any(c => c.IsSpoiler && c.Text is null))
+                    {
+                        <button class="btn btn-quiet small" @onclick="() => LoadCommentsAsync(reveal: true, includeSpoilers: true)">Show spoilers</button>
+                    }
+
+                    <ul class="comments">
+                        @foreach (var comment in comments.Comments)
+                        {
+                            <li>
+                                <div class="muted small">@comment.DisplayName · @Format.Relative(comment.CreatedAtUtc)</div>
+                                @if (comment.Text is null)
+                                {
+                                    <em class="muted">Spoiler hidden</em>
+                                }
+                                else
+                                {
+                                    <p>@if (comment.IsSpoiler) { <span class="tag">Spoiler</span> } @comment.Text</p>
+                                }
+                                @if (comment.IsMine)
+                                {
+                                    <button class="link small" @onclick="() => DeleteCommentAsync(comment.Id)">Delete</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        </Authorized>
+        <NotAuthorized>
+            <SignInPrompt Message="Sign in to mark this episode watched, rate it and join the discussion." />
+        </NotAuthorized>
+    </AuthorizeView>
+}
+
+@code {
+    private static readonly string[] Emoji = ["😂", "😮", "😢", "😡", "😍", "🔥", "👏", "🤯"];
+
+    [Parameter] public Guid Id { get; set; }
+
+    private Episode? episode;
+    private string? showTitle;
+    private bool notFound;
+    private bool watched;
+    private bool aired;
+    private RatingSummary? summary;
+    private int? myRating;
+    private Reactions? reactions;
+    private CommentsPage? comments;
+    private string? newComment;
+    private bool newCommentIsSpoiler;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            episode = await Catalog.GetEpisodeAsync(Id);
+            notFound = episode is null;
+            if (episode is null)
+            {
+                return;
+            }
+
+            aired = episode.AirsAtUtc <= DateTimeOffset.UtcNow;
+            showTitle = (await Catalog.GetShowAsync(episode.ShowId, Session.Region))?.Title;
+            summary = await Ratings.GetEpisodeSummaryAsync(Id);
+
+            if (Session.IsSignedIn)
+            {
+                var progress = await Tracking.GetProgressAsync(episode.ShowId);
+                watched = progress?.WatchedEpisodeIds.Contains(Id) == true;
+                myRating = (await Ratings.GetMyEpisodeRatingAsync(Id))?.Stars;
+                reactions = await Ratings.GetReactionsAsync(Id);
+                await LoadCommentsAsync();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task LoadCommentsAsync(bool reveal = false, bool includeSpoilers = false)
+    {
+        comments = await Ratings.GetCommentsAsync(Id, reveal || watched, includeSpoilers);
+    }
+
+    private Task ToggleWatchedAsync(ChangeEventArgs e) => RunAsync(async () =>
+    {
+        watched = e.Value is true;
+        if (watched)
+        {
+            await Tracking.MarkWatchedAsync(new MarkWatched([Id], null, null, null, null));
+        }
+        else
+        {
+            await Tracking.UnmarkWatchedAsync(Id);
+        }
+        await LoadCommentsAsync();
+    });
+
+    private Task RateAsync(int stars) => RunAsync(async () =>
+    {
+        myRating = stars;
+        await Ratings.RateEpisodeAsync(Id, episode!.ShowId, stars);
+        summary = await Ratings.GetEpisodeSummaryAsync(Id);
+    });
+
+    private Task ReactAsync(string emoji) => RunAsync(async () =>
+    {
+        if (reactions?.Mine == emoji)
+        {
+            await Ratings.RemoveReactionAsync(Id);
+        }
+        else
+        {
+            await Ratings.ReactAsync(Id, emoji);
+        }
+        reactions = await Ratings.GetReactionsAsync(Id);
+    });
+
+    private Task PostCommentAsync() => RunAsync(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(newComment))
+        {
+            return;
+        }
+        await Ratings.PostCommentAsync(Id, episode!.ShowId, newComment, newCommentIsSpoiler);
+        newComment = null;
+        newCommentIsSpoiler = false;
+        await LoadCommentsAsync(reveal: true);
+    });
+
+    private Task DeleteCommentAsync(Guid commentId) => RunAsync(async () =>
+    {
+        await Ratings.DeleteCommentAsync(commentId);
+        await LoadCommentsAsync(reveal: true);
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

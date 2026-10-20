@@ -1,0 +1,87 @@
+@page "/inbox"
+@inject NotificationsClient Notifications
+@inject NavigationManager Navigation
+
+<PageTitle>Inbox · TV Tracker</PageTitle>
+
+<h1>Inbox</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (page is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else
+        {
+            <div class="actions">
+                <span class="muted">@page.UnreadCount unread</span>
+                @if (page.UnreadCount > 0)
+                {
+                    <button class="btn btn-quiet" @onclick="MarkAllReadAsync">Mark all as read</button>
+                }
+                <a href="settings#notifications">Notification settings</a>
+            </div>
+
+            @if (page.Items.Count == 0)
+            {
+                <p class="muted">No notifications yet. You'll hear here when new episodes of your shows air.</p>
+            }
+            else
+            {
+                <ul class="inbox">
+                    @foreach (var item in page.Items)
+                    {
+                        <li class="@(item.IsRead ? "" : "unread")">
+                            <button class="inbox-item" @onclick="() => OpenAsync(item)">
+                                <span class="strong">@item.Title</span>
+                                <span>@item.Body</span>
+                                <span class="muted small">@Format.Relative(item.CreatedAtUtc)</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see your notifications." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private InboxPage? page;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            page = await Notifications.GetInboxAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task OpenAsync(InboxItem item)
+    {
+        if (!item.IsRead)
+        {
+            await Notifications.MarkReadAsync(item.Id);
+        }
+        Navigation.NavigateTo((item.Link ?? $"/shows/{item.ShowId}").TrimStart('/'));
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        await Notifications.MarkAllReadAsync();
+        await LoadAsync();
+    }
+}

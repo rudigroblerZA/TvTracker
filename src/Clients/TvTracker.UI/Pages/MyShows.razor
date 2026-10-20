@@ -1,0 +1,75 @@
+@page "/shows"
+@inject TrackingClient Tracking
+
+<PageTitle>My shows · TV Tracker</PageTitle>
+
+<h1>My shows</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="tabs" role="tablist">
+            <button role="tab" class="@(filter is null ? "active" : "")" @onclick="() => SetFilterAsync(null)">All</button>
+            @foreach (var status in Enum.GetValues<WatchStatus>())
+            {
+                <button role="tab" class="@(filter == status ? "active" : "")" @onclick="() => SetFilterAsync(status)">@Format.WatchStatusLabel(status)</button>
+            }
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (follows is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (follows.Count == 0)
+        {
+            <p class="muted">No shows here yet.</p>
+        }
+        else
+        {
+            <div class="card-grid">
+                @foreach (var f in follows)
+                {
+                    <ShowCard ShowId="f.ShowId" Title="@(f.Title ?? "Loading show…")" PosterUrl="@f.PosterUrl"
+                              Subtitle="@Format.WatchStatusLabel(f.Status)">
+                        @if (f.AiredCount > 0)
+                        {
+                            <progress max="@f.AiredCount" value="@f.WatchedCount"></progress>
+                            <div class="muted small">@f.WatchedCount / @f.AiredCount</div>
+                        }
+                    </ShowCard>
+                }
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see the shows you follow." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<Follow>? follows;
+    private WatchStatus? filter;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SetFilterAsync(WatchStatus? status)
+    {
+        filter = status;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            follows = await Tracking.GetFollowsAsync(filter) ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

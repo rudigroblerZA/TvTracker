@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared EF Core plumbing for services:
+    - transactional outbox (events saved with the data change, then published)
+    - inbox (processed-event records so consumers ignore duplicates)
+    - database initialisation at startup
+  -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TvTracker.EventBus\TvTracker.EventBus.csproj" />
+  </ItemGroup>
+
+</Project>

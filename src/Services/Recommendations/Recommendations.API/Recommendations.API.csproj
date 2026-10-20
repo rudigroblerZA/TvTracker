@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Recommendations.API: "shows like this" and personalised picks, built from catalog data and user events. -->
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

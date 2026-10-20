@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Mobile BFF: single public entry point for the MAUI app.
+    YARP routes /{service}/... to each API, resolved through Aspire service discovery.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Yarp.ReverseProxy" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Yarp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

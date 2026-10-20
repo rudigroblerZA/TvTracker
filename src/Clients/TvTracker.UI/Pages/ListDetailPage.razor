@@ -1,0 +1,130 @@
+@page "/lists/{Id:guid}"
+@inject TrackingClient Tracking
+@inject NavigationManager Navigation
+
+<PageTitle>@(list?.Name ?? "List") · TV Tracker</PageTitle>
+
+<p><a href="lists">← Lists</a></p>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (list is null)
+        {
+            <p class="muted">@(notFound ? "This list doesn't exist." : "Loading…")</p>
+        }
+        else
+        {
+            if (editing)
+            {
+                <form class="stack" @onsubmit="SaveAsync">
+                    <input @bind="name" maxlength="100" aria-label="Name" />
+                    <textarea @bind="description" maxlength="1000" placeholder="Description" aria-label="Description"></textarea>
+                    <div class="actions">
+                        <button class="btn" type="submit">Save</button>
+                        <button class="btn btn-quiet" type="button" @onclick="() => editing = false">Cancel</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <h1>@list.Name</h1>
+                @if (!string.IsNullOrEmpty(list.Description))
+                {
+                    <p>@list.Description</p>
+                }
+                <div class="actions">
+                    <button class="btn btn-quiet" @onclick="StartEdit">Rename</button>
+                    <button class="btn btn-danger" @onclick="DeleteAsync">Delete list</button>
+                </div>
+            }
+
+            @if (list.Items.Count == 0)
+            {
+                <p class="muted">This list is empty. Add shows from their pages.</p>
+            }
+            else
+            {
+                <div class="card-grid">
+                    @foreach (var item in list.Items)
+                    {
+                        <div class="card-with-action">
+                            <ShowCard ShowId="item.ShowId" Title="@(item.Title ?? "Show")" PosterUrl="@item.PosterUrl" />
+                            <button class="link small" @onclick="() => RemoveAsync(item.ShowId)">Remove</button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ListDetail? list;
+    private bool notFound;
+    private bool editing;
+    private string name = "";
+    private string? description;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            list = await Tracking.GetListAsync(Id);
+            notFound = list is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void StartEdit()
+    {
+        name = list!.Name;
+        description = list.Description;
+        editing = true;
+    }
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        await Tracking.UpdateListAsync(Id, name, description);
+        editing = false;
+        await LoadAsync();
+    });
+
+    private Task DeleteAsync() => RunAsync(async () =>
+    {
+        await Tracking.DeleteListAsync(Id);
+        Navigation.NavigateTo("lists");
+    });
+
+    private Task RemoveAsync(Guid showId) => RunAsync(async () =>
+    {
+        await Tracking.RemoveFromListAsync(Id, showId);
+        await LoadAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ConnectionState Connection
+@inject UserSession Session
+
+<div class="app">
+    <header class="app-header">
+        <a class="brand" href="">TV Tracker</a>
+        <NavMenu />
+        <div class="header-account">
+            <AccountMenu />
+        </div>
+    </header>
+
+    @if (Connection.IsOffline)
+    {
+        <div class="offline-banner" role="status">You're offline. Showing saved data; changes will sync when you're back online.</div>
+    }
+
+    <main class="app-main">
+        @Body
+    </main>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Connection.Changed += OnChanged;
+        Session.Changed += OnChanged;
+        await Session.EnsureLoadedAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Connection.Changed -= OnChanged;
+        Session.Changed -= OnChanged;
+    }
+}

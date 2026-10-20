@@ -1,0 +1,85 @@
+@page "/lists"
+@inject TrackingClient Tracking
+
+<PageTitle>Lists · TV Tracker</PageTitle>
+
+<h1>Lists</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <form class="inline-form" @onsubmit="CreateAsync">
+            <input @bind="newName" placeholder="New list name, e.g. Weekend binge" maxlength="100" aria-label="List name" />
+            <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newName))">Create</button>
+        </form>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (lists is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (lists.Count == 0)
+        {
+            <p class="muted">No lists yet. Create one above, then add shows from their pages.</p>
+        }
+        else
+        {
+            <ul class="lists">
+                @foreach (var list in lists)
+                {
+                    <li>
+                        <a href="lists/@list.Id" class="strong">@list.Name</a>
+                        <span class="muted">@(list.ItemCount == 1 ? "1 show" : $"{list.ItemCount} shows")</span>
+                        @if (!string.IsNullOrEmpty(list.Description))
+                        {
+                            <div class="muted small">@list.Description</div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to make lists of shows." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<ListSummary>? lists;
+    private string? newName;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Tracking.GetListsAsync() ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        try
+        {
+            await Tracking.CreateListAsync(newName.Trim(), null);
+            newName = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

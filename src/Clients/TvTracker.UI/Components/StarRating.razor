@@ -1,0 +1,33 @@
+<span class="stars" role="radiogroup" aria-label="Rating">
+    @for (var i = 1; i <= 5; i++)
+    {
+        var star = i;
+        <button type="button"
+                class="star @(star <= (hover ?? Value ?? 0) ? "on" : "")"
+                role="radio"
+                aria-checked="@(Value == star)"
+                aria-label="@(star == 1 ? "1 star" : $"{star} stars")"
+                disabled="@ReadOnly"
+                @onmouseover="() => hover = ReadOnly ? null : star"
+                @onmouseout="() => hover = null"
+                @onclick="() => Select(star)">★</button>
+    }
+</span>
+
+@code {
+    [Parameter] public int? Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private int? hover;
+
+    private async Task Select(int star)
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+        Value = star;
+        await ValueChanged.InvokeAsync(star);
+    }
+}

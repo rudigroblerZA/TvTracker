@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!--
+    Catalog.SyncWorker: imports and refreshes shows from the catalog provider, detects changes,
+    and publishes catalog events. Uses MockCatalogProvider until TMDB or TVmaze is chosen.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
+    <ProjectReference Include="..\Catalog.Data\Catalog.Data.csproj" />
+  </ItemGroup>
+
+</Project>

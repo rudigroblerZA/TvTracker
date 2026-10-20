@@ -1,0 +1,70 @@
+@page "/for-you"
+@inject RecommendationsClient Recommendations
+
+<PageTitle>For you · TV Tracker</PageTitle>
+
+<h1>For you</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">Picks based on what you follow, watch and rate. Updated as you go.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (picks is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (picks.Count == 0)
+        {
+            <p class="muted">Follow or rate a few shows and recommendations will appear here.</p>
+        }
+        else
+        {
+            <div class="card-grid">
+                @foreach (var pick in picks)
+                {
+                    <div class="card-with-action">
+                        <ShowCard ShowId="pick.ShowId" Title="@pick.Title" PosterUrl="@pick.PosterUrl" Subtitle="@pick.Reason" />
+                        <button class="link small" @onclick="() => DismissAsync(pick.ShowId)">Not interested</button>
+                    </div>
+                }
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to get recommendations based on what you watch." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<RecommendedShow>? picks;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            picks = await Recommendations.GetForYouAsync(24) ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task DismissAsync(Guid showId)
+    {
+        picks?.RemoveAll(p => p.ShowId == showId);
+        try
+        {
+            await Recommendations.DismissAsync(showId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

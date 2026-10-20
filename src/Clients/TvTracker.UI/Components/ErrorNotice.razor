@@ -1,0 +1,24 @@
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div class="error-notice" role="alert">
+        <span>@Message</span>
+        @if (OnRetry.HasDelegate)
+        {
+            <button class="btn btn-quiet" @onclick="OnRetry">Try again</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    /// <summary>Turns an exception from an API call into a message for people.</summary>
+    public static string Describe(Exception ex) => ex switch
+    {
+        SignInRequiredException => "Your session has ended. Please sign in again.",
+        HttpRequestException { StatusCode: null } => "Can't reach TV Tracker right now. Check your connection.",
+        HttpRequestException => "Something went wrong on our side. Please try again.",
+        _ => "Something went wrong. Please try again."
+    };
+}

@@ -1,0 +1,26 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.0.2">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>7f3c2a51-9d4e-4b8a-a6f1-2c5e8b9d0a17</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Services\Identity\Identity.API\Identity.API.csproj" />
+    <ProjectReference Include="..\Services\Catalog\Catalog.API\Catalog.API.csproj" />
+    <ProjectReference Include="..\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
+    <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" />
+    <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />
+    <ProjectReference Include="..\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
+    <ProjectReference Include="..\Services\Notifications\Notifications.API\Notifications.API.csproj" />
+    <ProjectReference Include="..\ApiGateways\Mobile.Bff\Mobile.Bff.csproj" />
+    <ProjectReference Include="..\Clients\WebApp\WebApp.csproj" />
+  </ItemGroup>
+
+</Project>

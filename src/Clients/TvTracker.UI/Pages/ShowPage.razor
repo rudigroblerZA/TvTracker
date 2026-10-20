@@ -1,0 +1,420 @@
+@page "/shows/{Id:guid}"
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject RatingsClient Ratings
+@inject RecommendationsClient Recommendations
+@inject NotificationsClient Notifications
+@inject UserSession Session
+
+<PageTitle>@(show?.Title ?? "Show") · TV Tracker</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (show is null)
+{
+    if (error is null)
+    {
+        <p class="muted">@(notFound ? "This show isn't in the catalog." : "Loading…")</p>
+    }
+}
+else
+{
+    <section class="show-hero">
+        <Poster Title="@show.Title" Url="@show.PosterUrl" Size="large" />
+        <div class="show-hero-body">
+            <h1>@show.Title</h1>
+            <p class="muted">
+                @(string.Join(" · ", new[] { show.FirstAirDate?.Year.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))
+            </p>
+            <div class="tags">
+                @foreach (var genre in show.Genres)
+                {
+                    <a class="tag" href="search?genre=@Uri.EscapeDataString(genre)">@genre</a>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(show.Overview))
+            {
+                <p>@show.Overview</p>
+            }
+
+            <div class="rating-line">
+                @if (summary is { Count: > 0 })
+                {
+                    <span>★ @summary.Average.ToString("0.0") <span class="muted">(@summary.Count)</span></span>
+                }
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="muted">Your rating</span>
+                        <StarRating Value="myRating" ValueChanged="RateAsync" />
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+
+            <AuthorizeView>
+                <Authorized>
+                    <div class="actions">
+                        @if (follow is null)
+                        {
+                            <button class="btn" @onclick="() => FollowAsync(WatchStatus.Watching)">Follow</button>
+                            <button class="btn btn-quiet" @onclick="() => FollowAsync(WatchStatus.PlanToWatch)">Plan to watch</button>
+                        }
+                        else
+                        {
+                            <label class="inline">
+                                <span class="sr-only">Status</span>
+                                <select value="@follow.Status" @onchange="ChangeStatusAsync">
+                                    @foreach (var status in Enum.GetValues<WatchStatus>())
+                                    {
+                                        <option value="@status">@Format.WatchStatusLabel(status)</option>
+                                    }
+                                </select>
+                            </label>
+                            <button class="btn btn-quiet" @onclick="UnfollowAsync">Unfollow</button>
+                            <label class="inline checkbox">
+                                <input type="checkbox" checked="@muted" @onchange="ToggleMuteAsync" />
+                                Mute notifications
+                            </label>
+                        }
+
+                        @if (lists is { Count: > 0 })
+                        {
+                            <select @onchange="AddToListAsync" aria-label="Add to list">
+                                <option value="">Add to list…</option>
+                                @foreach (var list in lists)
+                                {
+                                    <option value="@list.Id">@list.Name</option>
+                                }
+                            </select>
+                        }
+                        @if (!string.IsNullOrEmpty(notice))
+                        {
+                            <span class="muted small">@notice</span>
+                        }
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <SignInPrompt Message="Sign in to follow this show and track what you've watched." />
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </section>
+
+    <section class="episodes-at-a-glance">
+        @if (show.NextEpisode is { } next)
+        {
+            <div class="panel">
+                <div class="muted small">Next episode @(Format.Label(next.Label) is { } nl ? $"· {nl}" : "")</div>
+                <a href="episodes/@next.Id">@Format.EpisodeCode(next.SeasonNumber, next.EpisodeNumber) · @next.Title</a>
+                <div><LocalTime Utc="next.AirsAtUtc" /> @if (next.AirsAtUtc is { } a) { <span class="muted">(@Format.Relative(a))</span> }</div>
+            </div>
+        }
+        @if (show.LastEpisode is { } last)
+        {
+            <div class="panel">
+                <div class="muted small">Latest episode</div>
+                <a href="episodes/@last.Id">@Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber) · @last.Title</a>
+                <div><LocalTime Utc="last.AirsAtUtc" /></div>
+            </div>
+        }
+        @if (progress is { AiredCount: > 0 })
+        {
+            <div class="panel">
+                <div class="muted small">Your progress</div>
+                <div>@progress.WatchedCount of @progress.AiredCount aired episodes · @progress.PercentComplete.ToString("0")%</div>
+                <progress max="100" value="@progress.PercentComplete"></progress>
+            </div>
+        }
+    </section>
+
+    <section>
+        <h2>Seasons</h2>
+        @foreach (var season in show.Seasons)
+        {
+            var seasonProgress = progress?.Seasons.FirstOrDefault(s => s.SeasonNumber == season.Number);
+            <details class="season" open="@(openSeason == season.Number)">
+                <summary @onclick="() => ToggleSeasonAsync(season.Number)" @onclick:preventDefault>
+                    <span>@season.Name</span>
+                    <span class="muted small">
+                        @(season.EpisodeCount == 0 ? (season.PremieresAtUtc is { } p ? $"Premieres {Session.ToLocal(p):d MMM yyyy}" : "Announced") : $"{season.EpisodeCount} episodes")
+                        @if (seasonProgress is { WatchedCount: > 0 })
+                        {
+                            <text> · @seasonProgress.WatchedCount watched</text>
+                        }
+                    </span>
+                </summary>
+
+                @if (seasons.TryGetValue(season.Number, out var detail))
+                {
+                    <AuthorizeView>
+                        <Authorized>
+                            @if (detail.Episodes.Any(e => e.AirsAtUtc <= DateTimeOffset.UtcNow && !IsWatched(e.Id)))
+                            {
+                                <button class="btn btn-quiet small" @onclick="() => MarkSeasonAsync(season.Number)">Mark season watched</button>
+                            }
+                        </Authorized>
+                    </AuthorizeView>
+                    <ul class="episode-list">
+                        @foreach (var episode in detail.Episodes)
+                        {
+                            var aired = episode.AirsAtUtc <= DateTimeOffset.UtcNow;
+                            <li class="@(IsWatched(episode.Id) ? "watched" : "")">
+                                <AuthorizeView>
+                                    <Authorized>
+                                        <input type="checkbox" aria-label="Watched"
+                                               checked="@IsWatched(episode.Id)"
+                                               @onchange="e => ToggleWatchedAsync(episode, (bool)e.Value!)" />
+                                    </Authorized>
+                                </AuthorizeView>
+                                <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                                <a href="episodes/@episode.Id">@episode.Title</a>
+                                @if (Format.Label(episode.Label) is { } label)
+                                {
+                                    <span class="tag">@label</span>
+                                }
+                                <span class="muted small"><LocalTime Utc="episode.AirsAtUtc" Format="d MMM yyyy, HH:mm" /></span>
+                                <AuthorizeView>
+                                    <Authorized>
+                                        @if (aired && !IsWatched(episode.Id) && episode.EpisodeNumber > 1)
+                                        {
+                                            <button class="link small" @onclick="() => MarkUpToAsync(episode)">Watched up to here</button>
+                                        }
+                                    </Authorized>
+                                </AuthorizeView>
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (season.EpisodeCount > 0)
+                {
+                    <p class="muted">Loading…</p>
+                }
+            </details>
+        }
+    </section>
+
+    @if (show.WatchProviders.Count > 0)
+    {
+        <section>
+            <h2>Where to watch <span class="muted small">(@show.Region)</span></h2>
+            <ul class="providers">
+                @foreach (var provider in show.WatchProviders)
+                {
+                    <li>
+                        @if (!string.IsNullOrEmpty(provider.Url))
+                        {
+                            <a href="@provider.Url" target="_blank" rel="noopener">@provider.ProviderName</a>
+                        }
+                        else
+                        {
+                            <span>@provider.ProviderName</span>
+                        }
+                        <span class="tag">@Format.ProviderType(provider.Type)</span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (show.Cast.Count > 0)
+    {
+        <section>
+            <h2>Cast</h2>
+            <ul class="cast">
+                @foreach (var member in show.Cast)
+                {
+                    <li><strong>@member.Name</strong> <span class="muted">@member.Character</span></li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (similar is { Count: > 0 })
+    {
+        <section>
+            <h2>Shows like this</h2>
+            <div class="card-row">
+                @foreach (var s in similar)
+                {
+                    <ShowCard ShowId="s.ShowId" Title="@s.Title" PosterUrl="@s.PosterUrl" Subtitle="@s.Reason" />
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ShowDetail? show;
+    private bool notFound;
+    private Follow? follow;
+    private ShowProgress? progress;
+    private HashSet<Guid> watched = [];
+    private RatingSummary? summary;
+    private int? myRating;
+    private bool muted;
+    private List<ListSummary>? lists;
+    private List<RecommendedShow>? similar;
+    private readonly Dictionary<int, SeasonDetail> seasons = [];
+    private int? openSeason;
+    private string? error;
+    private string? notice;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        notice = null;
+        seasons.Clear();
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            show = await Catalog.GetShowAsync(Id, Session.Region);
+            notFound = show is null;
+            if (show is null)
+            {
+                return;
+            }
+
+            summary = await Ratings.GetShowSummaryAsync(Id);
+            similar = await Recommendations.GetSimilarAsync(Id, 8);
+
+            if (Session.IsSignedIn)
+            {
+                follow = await Tracking.GetFollowAsync(Id);
+                progress = await Tracking.GetProgressAsync(Id);
+                watched = progress?.WatchedEpisodeIds.ToHashSet() ?? [];
+                myRating = (await Ratings.GetMyShowRatingAsync(Id))?.Stars;
+                muted = (await Notifications.GetShowPreferenceAsync(Id))?.Muted ?? false;
+                lists = await Tracking.GetListsAsync();
+            }
+
+            // Open the season the user is in, or the latest season.
+            openSeason = progress?.NextEpisode?.SeasonNumber ?? show.Seasons.LastOrDefault(s => s.EpisodeCount > 0)?.Number;
+            if (openSeason is { } n)
+            {
+                await LoadSeasonAsync(n);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private bool IsWatched(Guid episodeId) => watched.Contains(episodeId);
+
+    private async Task ToggleSeasonAsync(int number)
+    {
+        // One season open at a time; the open attribute is driven from here, not by the browser.
+        openSeason = openSeason == number ? null : number;
+        if (openSeason is not null)
+        {
+            await LoadSeasonAsync(number);
+        }
+    }
+
+    private async Task LoadSeasonAsync(int number)
+    {
+        if (!seasons.ContainsKey(number) && await Catalog.GetSeasonAsync(Id, number) is { } detail)
+        {
+            seasons[number] = detail;
+        }
+    }
+
+    private Task FollowAsync(WatchStatus status) => RunAsync(async () =>
+    {
+        follow = await Tracking.FollowAsync(Id, status) ?? new Follow(Id, show?.Title, show?.PosterUrl, show?.Status, status, 0, 0, DateTime.UtcNow);
+    });
+
+    private Task UnfollowAsync() => RunAsync(async () =>
+    {
+        await Tracking.UnfollowAsync(Id);
+        follow = null;
+    });
+
+    private Task ChangeStatusAsync(ChangeEventArgs e) => RunAsync(async () =>
+    {
+        if (Enum.TryParse<WatchStatus>(e.Value?.ToString(), out var status) && follow is not null)
+        {
+            follow = await Tracking.SetStatusAsync(Id, status) ?? follow with { Status = status };
+        }
+    });
+
+    private Task ToggleMuteAsync(ChangeEventArgs e) => RunAsync(async () =>
+    {
+        muted = e.Value is true;
+        await Notifications.SetShowMutedAsync(Id, muted);
+    });
+
+    private Task RateAsync(int stars) => RunAsync(async () =>
+    {
+        myRating = stars;
+        await Ratings.RateShowAsync(Id, stars);
+        summary = await Ratings.GetShowSummaryAsync(Id);
+    });
+
+    private Task AddToListAsync(ChangeEventArgs e) => RunAsync(async () =>
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var listId))
+        {
+            await Tracking.AddToListAsync(listId, Id);
+            notice = $"Added to {lists?.FirstOrDefault(l => l.Id == listId)?.Name}.";
+        }
+    });
+
+    private Task ToggleWatchedAsync(Episode episode, bool isWatched) => RunAsync(async () =>
+    {
+        if (isWatched)
+        {
+            watched.Add(episode.Id);
+            await Tracking.MarkWatchedAsync(new MarkWatched([episode.Id], null, null, null, null));
+        }
+        else
+        {
+            watched.Remove(episode.Id);
+            await Tracking.UnmarkWatchedAsync(episode.Id);
+        }
+        await RefreshProgressAsync();
+    });
+
+    private Task MarkSeasonAsync(int seasonNumber) => RunAsync(async () =>
+    {
+        await Tracking.MarkWatchedAsync(new MarkWatched(null, Id, seasonNumber, null, null));
+        foreach (var e in seasons.GetValueOrDefault(seasonNumber)?.Episodes.Where(e => e.AirsAtUtc <= DateTimeOffset.UtcNow) ?? [])
+        {
+            watched.Add(e.Id);
+        }
+        await RefreshProgressAsync();
+    });
+
+    private Task MarkUpToAsync(Episode episode) => RunAsync(async () =>
+    {
+        await Tracking.MarkWatchedAsync(new MarkWatched(null, Id, null, episode.Id, null));
+        await RefreshProgressAsync();
+    });
+
+    private async Task RefreshProgressAsync()
+    {
+        progress = await Tracking.GetProgressAsync(Id);
+        if (progress is not null)
+        {
+            watched = progress.WatchedEpisodeIds.ToHashSet();
+        }
+        follow ??= await Tracking.GetFollowAsync(Id);
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

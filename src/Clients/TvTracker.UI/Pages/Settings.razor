@@ -1,0 +1,275 @@
+@page "/settings"
+@inject IdentityClient Identity
+@inject NotificationsClient Notifications
+@inject UserSession Session
+@inject IPlatformServices Platform
+@inject IAuthActions Auth
+
+<PageTitle>Settings · TV Tracker</PageTitle>
+
+<h1>Settings</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" />
+        @if (!string.IsNullOrEmpty(saved))
+        {
+            <div class="notice" role="status">@saved</div>
+        }
+
+        <section id="profile" class="panel">
+            <h2>Profile</h2>
+            @if (profile is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else
+            {
+                <form class="stack" @onsubmit="SaveProfileAsync">
+                    <label>Display name <input @bind="displayName" maxlength="100" required /></label>
+                    <label>Avatar URL <input @bind="avatarUrl" type="url" placeholder="https://…" /></label>
+                    <label>
+                        Timezone
+                        <span class="inline">
+                            <input @bind="timeZone" placeholder="Africa/Johannesburg" />
+                            <button type="button" class="btn btn-quiet small" @onclick="UseDeviceTimeZoneAsync">Use this device's</button>
+                        </span>
+                        <span class="muted small">Air times are shown in this timezone.</span>
+                    </label>
+                    <label>
+                        Region
+                        <input @bind="region" maxlength="2" placeholder="ZA" />
+                        <span class="muted small">Two-letter country code; decides which streaming services are listed.</span>
+                    </label>
+                    <label>Language <input @bind="language" maxlength="10" placeholder="en" /></label>
+                    <div><button class="btn" type="submit">Save profile</button></div>
+                </form>
+            }
+        </section>
+
+        <section id="notifications" class="panel">
+            <h2>Notifications</h2>
+            @if (prefs is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else
+            {
+                <form class="stack" @onsubmit="SavePreferencesAsync">
+                    <fieldset>
+                        <legend>Tell me about</legend>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.NewEpisodes" /> New episodes of shows I follow</label>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.NewSeasons" /> New seasons</label>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.StatusChanges" /> Renewals, cancellations and endings</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Send them by</legend>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.PushEnabled" /> Phone notifications</label>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.WebPushEnabled" /> Browser notifications</label>
+                        <label class="checkbox"><input type="checkbox" @bind="prefs.EmailEnabled" /> Email @(string.IsNullOrEmpty(prefs.Email) ? "" : $"({prefs.Email})")</label>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Quiet hours</legend>
+                        <span class="inline">
+                            <label>From <input type="time" @bind="prefs.QuietHoursStart" /></label>
+                            <label>to <input type="time" @bind="prefs.QuietHoursEnd" /></label>
+                        </span>
+                        <span class="muted small">Notifications during quiet hours arrive when they end. Leave empty to turn off.</span>
+                    </fieldset>
+                    <div><button class="btn" type="submit">Save notification settings</button></div>
+                </form>
+
+                @if (Platform.SupportsPush)
+                {
+                    <div class="actions">
+                        <button class="btn btn-quiet" @onclick="EnablePushAsync">Turn on notifications on this device</button>
+                    </div>
+                }
+
+                @if (devices is { Count: > 0 })
+                {
+                    <h3>Devices receiving notifications</h3>
+                    <ul class="devices">
+                        @foreach (var device in devices)
+                        {
+                            <li>
+                                @device.Platform · added @device.CreatedAtUtc.ToString("d MMM yyyy")
+                                <button class="link small" @onclick="() => RemoveDeviceAsync(device.Id)">Remove</button>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        </section>
+
+        <section class="panel">
+            <h2>Your data</h2>
+            <div class="actions">
+                <button class="btn btn-quiet" @onclick="ExportAsync">Export my data</button>
+                <button class="btn btn-quiet" @onclick="Auth.SignOutAsync">Sign out</button>
+            </div>
+
+            <h3>Delete account</h3>
+            <p class="muted">Deletes your account and everything TV Tracker stores about you. This can't be undone.</p>
+            @if (confirmDelete)
+            {
+                <label>Type DELETE to confirm <input @bind="deleteConfirmation" @bind:event="oninput" /></label>
+                <div class="actions">
+                    <button class="btn btn-danger" disabled="@(deleteConfirmation != "DELETE")" @onclick="DeleteAccountAsync">Delete my account</button>
+                    <button class="btn btn-quiet" @onclick="() => confirmDelete = false">Cancel</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn btn-danger" @onclick="() => confirmDelete = true">Delete account…</button>
+            }
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private Profile? profile;
+    private string displayName = "";
+    private string? avatarUrl;
+    private string timeZone = "UTC";
+    private string region = "US";
+    private string language = "en";
+
+    private EditablePreferences? prefs;
+    private List<RegisteredDevice>? devices;
+
+    private bool confirmDelete;
+    private string? deleteConfirmation;
+    private string? error;
+    private string? saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (!Session.IsSignedIn)
+            {
+                return;
+            }
+
+            profile = await Identity.GetProfileAsync();
+            if (profile is not null)
+            {
+                displayName = profile.DisplayName;
+                avatarUrl = profile.AvatarUrl;
+                timeZone = profile.TimeZone;
+                region = profile.Region;
+                language = profile.Language;
+            }
+
+            if (await Notifications.GetPreferencesAsync() is { } p)
+            {
+                prefs = new EditablePreferences
+                {
+                    NewEpisodes = p.NewEpisodes,
+                    NewSeasons = p.NewSeasons,
+                    StatusChanges = p.StatusChanges,
+                    PushEnabled = p.PushEnabled,
+                    WebPushEnabled = p.WebPushEnabled,
+                    EmailEnabled = p.EmailEnabled,
+                    Email = p.Email,
+                    QuietHoursStart = p.QuietHoursStart,
+                    QuietHoursEnd = p.QuietHoursEnd
+                };
+            }
+            devices = await Notifications.GetDevicesAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task UseDeviceTimeZoneAsync()
+    {
+        if (await Platform.GetDeviceTimeZoneAsync() is { } tz)
+        {
+            timeZone = tz;
+        }
+    }
+
+    private Task SaveProfileAsync() => RunAsync(async () =>
+    {
+        var updated = await Identity.UpdateProfileAsync(new UpdateProfile(displayName, avatarUrl, timeZone, region, language));
+        if (updated is not null)
+        {
+            profile = updated;
+            Session.SetProfile(updated);
+        }
+        saved = "Profile saved.";
+    }, "Check the timezone (e.g. Africa/Johannesburg) and the two-letter region.");
+
+    private Task SavePreferencesAsync() => RunAsync(async () =>
+    {
+        await Notifications.UpdatePreferencesAsync(new UpdateNotificationPreferences(
+            prefs!.NewEpisodes, prefs.NewSeasons, prefs.StatusChanges, prefs.PushEnabled, prefs.WebPushEnabled,
+            prefs.EmailEnabled, prefs.QuietHoursStart, prefs.QuietHoursEnd));
+        saved = "Notification settings saved.";
+    });
+
+    private Task EnablePushAsync() => RunAsync(async () =>
+    {
+        var ok = await Platform.EnablePushAsync();
+        saved = ok ? "Notifications are on for this device." : "Notifications weren't turned on. Check your browser or phone settings.";
+        devices = await Notifications.GetDevicesAsync();
+    });
+
+    private Task RemoveDeviceAsync(Guid id) => RunAsync(async () =>
+    {
+        await Notifications.RemoveDeviceAsync(id);
+        devices = await Notifications.GetDevicesAsync();
+    });
+
+    private Task ExportAsync() => RunAsync(async () =>
+    {
+        var json = await Identity.ExportAsync();
+        await Platform.SaveTextFileAsync($"tvtracker-export-{DateTime.UtcNow:yyyyMMdd}.json", json);
+        saved = "Your data export is ready.";
+    });
+
+    private Task DeleteAccountAsync() => RunAsync(async () =>
+    {
+        await Identity.DeleteAccountAsync();
+        await Auth.SignOutAsync();
+    });
+
+    private async Task RunAsync(Func<Task> action, string? validationHint = null)
+    {
+        error = null;
+        saved = null;
+        try
+        {
+            await action();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest && validationHint is not null)
+        {
+            error = validationHint;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private sealed class EditablePreferences
+    {
+        public bool NewEpisodes { get; set; }
+        public bool NewSeasons { get; set; }
+        public bool StatusChanges { get; set; }
+        public bool PushEnabled { get; set; }
+        public bool WebPushEnabled { get; set; }
+        public bool EmailEnabled { get; set; }
+        public string? Email { get; set; }
+        public TimeOnly? QuietHoursStart { get; set; }
+        public TimeOnly? QuietHoursEnd { get; set; }
+    }
+}

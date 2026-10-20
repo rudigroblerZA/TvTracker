@@ -1,0 +1,35 @@
+@* Show poster, or a coloured tile with initials when there's no image. *@
+
+@if (!string.IsNullOrEmpty(Url))
+{
+    <img class="poster @Size" src="@Url" alt="@Title poster" loading="lazy" />
+}
+else
+{
+    <div class="poster poster-placeholder @Size" style="background:@Color" aria-label="@Title">
+        <span>@Initials</span>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Url { get; set; }
+
+    /// <summary>"small", "medium" or "large".</summary>
+    [Parameter] public string Size { get; set; } = "medium";
+
+    private string Initials => string.Concat(Title.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Where(w => char.IsLetterOrDigit(w[0]) && !string.Equals(w, "the", StringComparison.OrdinalIgnoreCase))
+        .Take(2)
+        .Select(w => char.ToUpperInvariant(w[0])));
+
+    private string Color
+    {
+        get
+        {
+            string[] palette = ["#334155", "#7c2d12", "#14532d", "#1e3a8a", "#581c87", "#713f12", "#164e63", "#831843"];
+            var hash = Title.Aggregate(17, (h, c) => unchecked(h * 31 + c));
+            return palette[(hash & int.MaxValue) % palette.Length];
+        }
+    }
+}

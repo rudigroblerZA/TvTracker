@@ -1,0 +1,19 @@
+<a class="show-card" href="shows/@ShowId">
+    <Poster Title="@Title" Url="@PosterUrl" />
+    <div class="show-card-body">
+        <div class="show-card-title">@Title</div>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <div class="muted small">@Subtitle</div>
+        }
+        @ChildContent
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? PosterUrl { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

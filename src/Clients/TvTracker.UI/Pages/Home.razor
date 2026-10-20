@@ -1,0 +1,110 @@
+@page "/"
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject RecommendationsClient Recommendations
+@inject UserSession Session
+
+<PageTitle>TV Tracker</PageTitle>
+
+<h1>TV Tracker</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <section>
+            <div class="section-head">
+                <h2>Up next</h2>
+                <a href="up-next">See all</a>
+            </div>
+            @if (upNext is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (upNext.Count == 0)
+            {
+                <p class="muted">Nothing to watch yet. <a href="search">Find a show</a> and follow it.</p>
+            }
+            else
+            {
+                <div class="card-row">
+                    @foreach (var item in upNext.Take(6))
+                    {
+                        <ShowCard ShowId="item.ShowId" Title="@item.ShowTitle" PosterUrl="@item.PosterUrl"
+                                  Subtitle="@($"{Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber)} · {item.Episode.Title}")">
+                            @if (!item.HasAired && item.Episode.AirsAtUtc is { } airs)
+                            {
+                                <div class="tag">@Format.Relative(airs)</div>
+                            }
+                            else if (item.RemainingAired > 1)
+                            {
+                                <div class="tag">@item.RemainingAired to watch</div>
+                            }
+                        </ShowCard>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (forYou is { Count: > 0 })
+        {
+            <section>
+                <div class="section-head">
+                    <h2>For you</h2>
+                    <a href="for-you">See all</a>
+                </div>
+                <div class="card-row">
+                    @foreach (var show in forYou.Take(6))
+                    {
+                        <ShowCard ShowId="show.ShowId" Title="@show.Title" PosterUrl="@show.PosterUrl" Subtitle="@show.Reason" />
+                    }
+                </div>
+            </section>
+        }
+    </Authorized>
+</AuthorizeView>
+
+<section>
+    <div class="section-head">
+        <h2>Trending</h2>
+        <a href="search">Browse</a>
+    </div>
+    <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+    @if (trending is not null)
+    {
+        <div class="card-grid">
+            @foreach (var show in trending)
+            {
+                <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl"
+                          Subtitle="@(string.Join(" · ", show.Genres.Take(2).Append(Format.Status(show.Status))))" />
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private List<ShowSummary>? trending;
+    private List<UpNextItem>? upNext;
+    private List<RecommendedShow>? forYou;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            trending = await Catalog.GetTrendingAsync() ?? [];
+
+            await Session.EnsureLoadedAsync();
+            if (Session.IsSignedIn)
+            {
+                upNext = await Tracking.GetUpNextAsync() ?? [];
+                forYou = await Recommendations.GetForYouAsync(6) ?? [];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

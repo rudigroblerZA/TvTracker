@@ -1,0 +1,36 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Aspire/">
+    <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />
+    <Project Path="src/TvTracker.ServiceDefaults/TvTracker.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="src/TvTracker.EventBus/TvTracker.EventBus.csproj" />
+    <Project Path="src/TvTracker.EventBus.RabbitMQ/TvTracker.EventBus.RabbitMQ.csproj" />
+    <Project Path="src/TvTracker.IntegrationEvents/TvTracker.IntegrationEvents.csproj" />
+    <Project Path="src/TvTracker.Persistence/TvTracker.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/Services/">
+    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
+    <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
+    <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
+    <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
+    <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
+  </Folder>
+  <Folder Name="/ApiGateways/">
+    <Project Path="src/ApiGateways/Mobile.Bff/Mobile.Bff.csproj" />
+  </Folder>
+  <Folder Name="/Clients/">
+    <Project Path="src/Clients/TvTracker.UI/TvTracker.UI.csproj" />
+    <Project Path="src/Clients/WebApp/WebApp.csproj" />
+    <Project Path="src/Clients/MobileApp/MobileApp.csproj" />
+  </Folder>
+</Solution>

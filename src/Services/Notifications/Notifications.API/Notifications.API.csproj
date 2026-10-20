@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Notifications.API: preferences, device registration, inbox, and delivery by push (Azure Notification Hubs),
+    web push and email (Azure Communication Services). Channels without configuration log instead of sending.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Azure.NotificationHubs" />
+    <PackageReference Include="WebPush" />
+    <PackageReference Include="Azure.Communication.Email" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

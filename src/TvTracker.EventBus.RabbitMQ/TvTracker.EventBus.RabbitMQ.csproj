@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RabbitMQ implementation of IEventBus.
+    Uses RabbitMQ.Client 7 directly with the connection string Aspire injects (ConnectionStrings__eventbus).
+  -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TvTracker.EventBus\TvTracker.EventBus.csproj" />
+  </ItemGroup>
+
+</Project>

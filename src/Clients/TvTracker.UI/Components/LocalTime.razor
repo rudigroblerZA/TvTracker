@@ -1,0 +1,17 @@
+@inject UserSession Session
+
+@* Shows a UTC time in the user's profile timezone. *@
+@if (Utc is { } utc)
+{
+    <time datetime="@utc.ToString("O")" title="@Session.TimeZone.Id">@Session.ToLocal(utc).ToString(Format)</time>
+}
+else
+{
+    <span class="muted">@Placeholder</span>
+}
+
+@code {
+    [Parameter] public DateTimeOffset? Utc { get; set; }
+    [Parameter] public string Format { get; set; } = "ddd d MMM, HH:mm";
+    [Parameter] public string Placeholder { get; set; } = "Date to be announced";
+}

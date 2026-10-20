@@ -1,0 +1,88 @@
+@page "/stats"
+@inject TrackingClient Tracking
+
+<PageTitle>Stats · TV Tracker</PageTitle>
+
+<h1>Your stats</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (stats is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else
+        {
+            <div class="stat-tiles">
+                <div class="stat"><div class="stat-value">@Format.Duration(stats.MinutesWatched)</div><div class="muted">watched</div></div>
+                <div class="stat"><div class="stat-value">@stats.EpisodesWatched</div><div class="muted">episodes</div></div>
+                <div class="stat"><div class="stat-value">@stats.ShowsFollowed</div><div class="muted">shows followed</div></div>
+                <div class="stat"><div class="stat-value">@stats.ShowsCompleted</div><div class="muted">shows completed</div></div>
+            </div>
+
+            @if (stats.TopGenres.Count > 0)
+            {
+                <section>
+                    <h2>Top genres</h2>
+                    @{ var max = stats.TopGenres.Max(g => g.Episodes); }
+                    <ul class="bars">
+                        @foreach (var genre in stats.TopGenres)
+                        {
+                            <li>
+                                <span class="bar-label">@genre.Genre</span>
+                                <span class="bar" style="width:@(100 * genre.Episodes / max)%"></span>
+                                <span class="muted small">@genre.Episodes</span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (stats.Years.Count > 0)
+            {
+                <section>
+                    <h2>Year in review</h2>
+                    <table class="table">
+                        <thead><tr><th>Year</th><th>Episodes</th><th>Time</th><th>New shows</th></tr></thead>
+                        <tbody>
+                            @foreach (var year in stats.Years)
+                            {
+                                <tr>
+                                    <td>@year.Year</td>
+                                    <td>@year.Episodes</td>
+                                    <td>@Format.Duration(year.Minutes)</td>
+                                    <td>@year.ShowsStarted</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private Stats? stats;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            stats = await Tracking.GetStatsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

@@ -1,0 +1,17 @@
+@inject IAuthActions Auth
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+    <Authorized>
+        <a href="stats" class="account-link">Stats</a>
+        <a href="settings" class="account-link">@(context.User.FindFirst("name")?.Value ?? context.User.Identity?.Name ?? "Account")</a>
+        <button class="btn btn-quiet" @onclick="Auth.SignOutAsync">Sign out</button>
+    </Authorized>
+    <NotAuthorized>
+        <button class="btn" @onclick="SignIn">Sign in</button>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private Task SignIn() => Auth.SignInAsync(Navigation.Uri);
+}

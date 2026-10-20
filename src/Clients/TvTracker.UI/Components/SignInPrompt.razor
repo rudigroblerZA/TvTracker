@@ -1,0 +1,12 @@
+@inject IAuthActions Auth
+@inject NavigationManager Navigation
+
+<div class="panel center">
+    <p>@Message</p>
+    <button class="btn" @onclick="() => Auth.SignInAsync(Navigation.Uri)">Sign in</button>
+    <p class="muted small">New here? You can create an account on the sign-in page.</p>
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "Sign in to see this.";
+}

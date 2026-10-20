@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Event contracts from the service design doc. Every service references this project. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\TvTracker.EventBus\TvTracker.EventBus.csproj" />
+  </ItemGroup>
+
+</Project>

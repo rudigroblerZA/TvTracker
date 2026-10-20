@@ -1,0 +1,64 @@
+using TvTracker.UI.Models;
+
+namespace TvTracker.UI.Components;
+
+public static class Format
+{
+    public static string EpisodeCode(int season, int episode) => $"S{season:00}E{episode:00}";
+
+    public static string Status(ShowStatus status) => status switch
+    {
+        ShowStatus.Upcoming => "Upcoming",
+        ShowStatus.Airing => "Airing",
+        ShowStatus.Renewed => "Renewed",
+        ShowStatus.Ended => "Ended",
+        ShowStatus.Cancelled => "Cancelled",
+        _ => status.ToString()
+    };
+
+    public static string WatchStatusLabel(WatchStatus status) => status switch
+    {
+        WatchStatus.Watching => "Watching",
+        WatchStatus.PlanToWatch => "Plan to watch",
+        WatchStatus.Completed => "Completed",
+        WatchStatus.Paused => "Paused",
+        WatchStatus.Stopped => "Stopped",
+        _ => status.ToString()
+    };
+
+    public static string? Label(EpisodeLabel label) => label switch
+    {
+        EpisodeLabel.SeriesPremiere => "Series premiere",
+        EpisodeLabel.SeasonPremiere => "Season premiere",
+        EpisodeLabel.SeasonFinale => "Season finale",
+        _ => null
+    };
+
+    public static string ProviderType(WatchProviderType type) => type switch
+    {
+        WatchProviderType.Stream => "Stream",
+        WatchProviderType.Free => "Free",
+        WatchProviderType.Rent => "Rent",
+        WatchProviderType.Buy => "Buy",
+        _ => type.ToString()
+    };
+
+    public static string Duration(int minutes) =>
+        minutes < 60 ? $"{minutes} min"
+        : minutes < 60 * 24 ? $"{minutes / 60} h {minutes % 60} min"
+        : $"{minutes / (60 * 24)} days {minutes % (60 * 24) / 60} h";
+
+    /// <summary>"in 3 days", "2 hours ago", relative to now.</summary>
+    public static string Relative(DateTimeOffset when)
+    {
+        var diff = when - DateTimeOffset.UtcNow;
+        var past = diff < TimeSpan.Zero;
+        var abs = diff.Duration();
+
+        var text = abs.TotalMinutes < 60 ? $"{Math.Max(1, (int)abs.TotalMinutes)} min"
+            : abs.TotalHours < 24 ? $"{(int)abs.TotalHours} h"
+            : $"{(int)abs.TotalDays} day{((int)abs.TotalDays == 1 ? "" : "s")}";
+
+        return past ? $"{text} ago" : $"in {text}";
+    }
+}

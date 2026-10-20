@@ -1,0 +1,99 @@
+@page "/search"
+@inject CatalogClient Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>Search · TV Tracker</PageTitle>
+
+<h1>Search</h1>
+
+<form class="search-form" @onsubmit="SearchAsync">
+    <input type="search" placeholder="Search shows by title" @bind="query" aria-label="Search shows" />
+    <select @bind="genre" aria-label="Genre">
+        <option value="">All genres</option>
+        @foreach (var g in genres)
+        {
+            <option value="@g">@g</option>
+        }
+    </select>
+    <button class="btn" type="submit">Search</button>
+</form>
+
+<ErrorNotice Message="@error" OnRetry="SearchAsync" />
+
+@if (results is not null)
+{
+    <p class="muted">@(results.TotalCount == 1 ? "1 result" : $"{results.TotalCount} results")</p>
+    <div class="card-grid">
+        @foreach (var show in results.Items)
+        {
+            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl"
+                      Subtitle="@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))" />
+        }
+    </div>
+
+    @if (results.TotalCount > results.Page * results.PageSize)
+    {
+        <button class="btn btn-quiet" @onclick="LoadMoreAsync">Load more</button>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? InitialQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "genre")] public string? InitialGenre { get; set; }
+
+    private string? query;
+    private string? genre;
+    private List<string> genres = [];
+    private PagedResult<ShowSummary>? results;
+    private List<ShowSummary> loaded = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        query = InitialQuery;
+        genre = InitialGenre;
+        try
+        {
+            genres = await Catalog.GetGenresAsync() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            // Genre filter is optional.
+        }
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        error = null;
+        try
+        {
+            results = await Catalog.SearchAsync(query, genre);
+            loaded = results?.Items.ToList() ?? [];
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+            {
+                ["q"] = string.IsNullOrWhiteSpace(query) ? null : query,
+                ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre
+            }), replace: true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (results is null)
+        {
+            return;
+        }
+
+        var next = await Catalog.SearchAsync(query, genre, results.Page + 1);
+        if (next is not null)
+        {
+            loaded.AddRange(next.Items);
+            results = next with { Items = loaded.ToList(), Page = next.Page };
+        }
+    }
+}

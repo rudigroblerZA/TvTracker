@@ -1,0 +1,95 @@
+@page "/calendar"
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>Calendar · TV Tracker</PageTitle>
+
+<h1>Calendar</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="calendar-nav">
+            <button class="btn btn-quiet" @onclick="() => MoveAsync(-14)">← Earlier</button>
+            <span>@start.ToString("d MMM") – @start.AddDays(13).ToString("d MMM yyyy")</span>
+            <button class="btn btn-quiet" @onclick="() => MoveAsync(14)">Later →</button>
+            <span class="muted small">Times in @Session.TimeZone.Id</span>
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (items is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (items.Count == 0)
+        {
+            <p class="muted">No episodes of your shows air in these two weeks.</p>
+        }
+        else
+        {
+            foreach (var day in items.GroupBy(i => DateOnly.FromDateTime(Session.ToLocal(i.Episode.AirsAtUtc!.Value).DateTime)))
+            {
+                <section class="calendar-day @(day.Key == today ? "today" : "")">
+                    <h2>@(day.Key == today ? "Today" : day.Key.ToString("dddd d MMMM"))</h2>
+                    <ul>
+                        @foreach (var item in day)
+                        {
+                            <li class="@(item.Watched ? "watched" : "")">
+                                <span class="time">@Session.ToLocal(item.Episode.AirsAtUtc!.Value).ToString("HH:mm")</span>
+                                <a href="shows/@item.ShowId" class="strong">@item.ShowTitle</a>
+                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber) · @item.Episode.Title</a>
+                                @if (item.Watched)
+                                {
+                                    <span class="tag">Watched</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see when your shows air, in your timezone." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<CalendarItem>? items;
+    private DateOnly today;
+    private DateOnly start;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        today = DateOnly.FromDateTime(Session.Now.DateTime);
+        start = today.AddDays(-2);
+        await LoadAsync();
+    }
+
+    private Task MoveAsync(int days)
+    {
+        start = start.AddDays(days);
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // Range boundaries are local midnights in the user's timezone, converted to UTC.
+            var fromLocal = start.ToDateTime(TimeOnly.MinValue);
+            var from = new DateTimeOffset(fromLocal, Session.TimeZone.GetUtcOffset(fromLocal)).ToUniversalTime();
+            var toLocal = start.AddDays(14).ToDateTime(TimeOnly.MinValue);
+            var to = new DateTimeOffset(toLocal, Session.TimeZone.GetUtcOffset(toLocal)).ToUniversalTime();
+
+            items = (await Tracking.GetCalendarAsync(from, to) ?? []).Where(i => i.Episode.AirsAtUtc is not null).ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

@@ -1,0 +1,140 @@
+using TvTracker.IntegrationEvents;
+
+namespace Catalog.Data;
+
+public class Show
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Which provider the show came from ("mock", "tmdb", "tvmaze").</summary>
+    public required string Source { get; set; }
+
+    public required string ExternalId { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? Overview { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    public string? BackdropUrl { get; set; }
+
+    public DateOnly? FirstAirDate { get; set; }
+
+    public ShowStatus Status { get; set; }
+
+    public string? Network { get; set; }
+
+    public List<string> Genres { get; set; } = [];
+
+    public List<string> Keywords { get; set; } = [];
+
+    public double Popularity { get; set; }
+
+    /// <summary>The provider's "similar shows", as provider ids.</summary>
+    public List<string> SimilarExternalIds { get; set; } = [];
+
+    /// <summary>The similar shows that exist in this catalog, resolved from <see cref="SimilarExternalIds"/>.</summary>
+    public List<Guid> SimilarShowIds { get; set; } = [];
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime LastSyncedAtUtc { get; set; }
+
+    /// <summary>When the sync worker should next refresh the show from the provider.</summary>
+    public DateTime NextRefreshAtUtc { get; set; }
+
+    public List<Season> Seasons { get; set; } = [];
+
+    public List<Episode> Episodes { get; set; } = [];
+
+    public List<CastMember> Cast { get; set; } = [];
+
+    public List<WatchProvider> WatchProviders { get; set; } = [];
+}
+
+public class Season
+{
+    public Guid Id { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    public int Number { get; set; }
+
+    public required string Name { get; set; }
+
+    public string? Overview { get; set; }
+
+    public DateTimeOffset? PremieresAtUtc { get; set; }
+}
+
+public class Episode
+{
+    public Guid Id { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    public required string ExternalId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int EpisodeNumber { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? Overview { get; set; }
+
+    /// <summary>Air time in UTC; null until scheduled.</summary>
+    public DateTimeOffset? AirsAtUtc { get; set; }
+
+    public int? RuntimeMinutes { get; set; }
+
+    /// <summary>Set once EpisodeAired has been published, so it is sent only once.</summary>
+    public bool AiredPublished { get; set; }
+}
+
+public class Person
+{
+    public Guid Id { get; set; }
+
+    public required string Name { get; set; }
+
+    public string? PhotoUrl { get; set; }
+}
+
+public class CastMember
+{
+    public Guid ShowId { get; set; }
+
+    public Guid PersonId { get; set; }
+
+    public Person Person { get; set; } = null!;
+
+    public string? Character { get; set; }
+
+    public int Order { get; set; }
+}
+
+public enum WatchProviderType
+{
+    Stream,
+    Free,
+    Rent,
+    Buy
+}
+
+public class WatchProvider
+{
+    public Guid Id { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    /// <summary>ISO 3166-1 country code.</summary>
+    public required string Region { get; set; }
+
+    public required string ProviderName { get; set; }
+
+    public WatchProviderType Type { get; set; }
+
+    public string? Url { get; set; }
+}

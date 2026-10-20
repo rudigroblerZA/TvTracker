@@ -1,0 +1,89 @@
+@page "/up-next"
+@inject TrackingClient Tracking
+
+<PageTitle>Up Next · TV Tracker</PageTitle>
+
+<h1>Up Next</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (items is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (items.Count == 0)
+        {
+            <p class="muted">You're all caught up. <a href="search">Find something new</a>.</p>
+        }
+        else
+        {
+            <ul class="up-next">
+                @foreach (var item in items)
+                {
+                    <li>
+                        <a href="shows/@item.ShowId"><Poster Title="@item.ShowTitle" Url="@item.PosterUrl" Size="small" /></a>
+                        <div class="up-next-body">
+                            <a class="strong" href="shows/@item.ShowId">@item.ShowTitle</a>
+                            <div>
+                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber) · @item.Episode.Title</a>
+                            </div>
+                            <div class="muted small">
+                                @if (item.HasAired)
+                                {
+                                    @(item.RemainingAired == 1 ? "1 episode to watch" : $"{item.RemainingAired} episodes to watch")
+                                }
+                                else
+                                {
+                                    <text>Airs <LocalTime Utc="item.Episode.AirsAtUtc" /></text>
+                                }
+                            </div>
+                            <progress max="@Math.Max(1, item.AiredCount)" value="@item.WatchedCount"></progress>
+                        </div>
+                        @if (item.HasAired)
+                        {
+                            <button class="btn" @onclick="() => MarkWatchedAsync(item)" aria-label="Mark @item.Episode.Title watched">✓ Watched</button>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see the next episode of every show you're watching." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<UpNextItem>? items;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            items = await Tracking.GetUpNextAsync() ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task MarkWatchedAsync(UpNextItem item)
+    {
+        try
+        {
+            await Tracking.MarkWatchedAsync(new MarkWatched([item.Episode.EpisodeId], null, null, null, null));
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}
