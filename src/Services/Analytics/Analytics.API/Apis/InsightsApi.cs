@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +56,7 @@ public static class InsightsApi
         api.MapGet("/insights/premieres", GetPremieresAsync);
         api.MapGet("/insights/top-episodes", GetTopEpisodesAsync);
         api.MapGet("/insights/discover/{list}", GetDiscoveryAsync);
+        api.MapGet("/insights/tags", GetTagsAsync);
         api.MapGet("/people/{personId:guid}/insights", GetPersonInsightsAsync);
         api.MapGet("/me/taste", TasteApi.GetTasteAsync);
 
@@ -96,6 +98,41 @@ public static class InsightsApi
                 p.ShowExternalRating, p.DaysSincePreviousSeason, p.CatchUpEpisodes, p.CatchUpRuntimeMinutes, p.RecentFollows))
             .ToList());
     }
+
+    private const int MaxTagShows = 100;
+
+    /// <summary>
+    /// The tags of several shows at once (comma-separated ids, at most 100), for show cards and search results.
+    /// Shows without insights yet are left out.
+    /// </summary>
+    private static async Task<Results<Ok<Dictionary<Guid, IReadOnlyList<ShowTag>>>, BadRequest<string>>> GetTagsAsync(
+        AnalyticsContext db, string? ids, CancellationToken ct)
+    {
+        var showIds = (ids ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(id => Guid.TryParse(id, out var guid) ? guid : (Guid?)null)
+            .OfType<Guid>()
+            .Distinct()
+            .ToArray();
+        if (showIds.Length > MaxTagShows)
+        {
+            return TypedResults.BadRequest($"At most {MaxTagShows} shows at a time.");
+        }
+
+        // Only the tags, not the whole documents.
+        var rows = await db.Database
+            .SqlQuery<TagsRow>($"SELECT \"ShowId\", (\"Document\"->'tags')::text AS \"Tags\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
+            .ToListAsync(ct);
+
+        return TypedResults.Ok(rows
+            .Where(r => r.Tags is not null)
+            .ToDictionary(r => r.ShowId,
+                r => (IReadOnlyList<ShowTag>)(JsonSerializer.Deserialize<List<ShowTag>>(r.Tags!, JsonOptions) ?? [])));
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private sealed record TagsRow(Guid ShowId, string? Tags);
 
     /// <summary>The stored document is returned as-is: it is already the <see cref="PersonInsights"/> JSON.</summary>
     private static async Task<Results<ContentHttpResult, NotFound>> GetPersonInsightsAsync(Guid personId, AnalyticsContext db, CancellationToken ct)

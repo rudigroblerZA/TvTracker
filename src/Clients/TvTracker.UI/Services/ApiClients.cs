@@ -210,6 +210,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<PersonInsights?> GetPersonInsightsAsync(Guid personId, CancellationToken ct = default) =>
         GetAsync<PersonInsights>(ApiClients.Analytics, $"api/v1/people/{personId}/insights", ct, cacheForOffline: true);
 
+    /// <summary>Tags of up to 100 shows; shows without insights yet are missing from the result.</summary>
+    public Task<Dictionary<Guid, List<ShowTag>>?> GetTagsAsync(IEnumerable<Guid> showIds, CancellationToken ct = default) =>
+        GetAsync<Dictionary<Guid, List<ShowTag>>>(ApiClients.Analytics, $"api/v1/insights/tags?ids={string.Join(',', showIds)}", ct);
+
     public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
         GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
 }

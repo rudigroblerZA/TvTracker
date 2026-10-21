@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject ShowTagStore Tags
+
 <a class="show-card" href="shows/@ShowId">
     <Poster Title="@Title" Url="@PosterUrl" />
     <div class="show-card-body">
@@ -5,6 +8,15 @@
         @if (!string.IsNullOrEmpty(Subtitle))
         {
             <div class="muted small">@Subtitle</div>
+        }
+        @if (Tags.ForCard(ShowId) is { Count: > 0 } tags)
+        {
+            <div class="card-tags">
+                @foreach (var tag in tags)
+                {
+                    <span class="card-tag" title="@tag.Detail">@tag.Label</span>
+                }
+            </div>
         }
         @ChildContent
     </div>
@@ -16,4 +28,12 @@
     [Parameter] public string? PosterUrl { get; set; }
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized() => Tags.Changed += OnTagsChanged;
+
+    protected override void OnParametersSet() => Tags.Request(ShowId);
+
+    private void OnTagsChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Tags.Changed -= OnTagsChanged;
 }
