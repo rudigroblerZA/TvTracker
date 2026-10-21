@@ -54,7 +54,8 @@
             </p>
         }
 
-        @if (insights.Tags is { Count: > 0 } tags)
+        @* The prolific tag repeats the "made by" block above, when that shows. *@
+        @if (insights.Tags?.Where(t => t.Key != "prolific-creator" || Highlighted().Count == 0).ToList() is { Count: > 0 } tags)
         {
             <ul class="show-tags">
                 @foreach (var tag in tags)

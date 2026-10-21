@@ -159,6 +159,10 @@ How events flow:
     - **Weekend binge:** everything aired in 12 hours or less.
     - **Fan favorite:** our users average 4.3★ or more, from at least 5 ratings, or TVmaze rates it 8.5 or higher.
     - **Limited series, quick episodes** (30 minutes or less) and **long-running** (10 seasons or more).
+    - **Prolific creator / prolific producer:** made by someone credited on 10 or more shows on TVmaze. The label depends
+      on whether they created this show. The catalog sends who made each show with its show events, and people's career
+      totals as `PeopleCareersUpdatedIntegrationEvent`, so Analytics can tag the show. It appears on cards and in the
+      search filter, and the show page shows the fuller "made by" block instead.
 
     Weekly release isn't tagged, since nearly every show has it. Discover has matching bingeable, weekend-binge and
     fan-favorite lists.
@@ -186,8 +190,9 @@ How events flow:
     - **What it shows:** their totals, best-known shows, and their other shows in the catalog.
     - **Who's featured:** the most prolific person, plus any other prolific creator. A production company's other
       executive producers aren't listed.
-    - **Data:** the sync worker imports creators, developers and executive producers with each show, in the same TVmaze
-      request. Every minute it also fetches 30 people's careers from `/people/{id}/crewcredits`, refreshed monthly: every
+    - **Data:** the sync worker imports creators, developers and executive producers with each show, from
+      `/shows/{id}/crew`. That's a separate request, because TVmaze's crew embed can return 502 when the rest works. A
+      failed crew call doesn't stop the import; the creatives are filled in within the hour. Every minute it also fetches 30 people's careers from `/people/{id}/crewcredits`, refreshed monthly: every
       creator, and anyone credited on two or more catalog shows. Shows imported before this are backfilled at 30 a minute.
     - **Person pages:** they show the same career line and a "Made" row.
   - **Person page — actor insights:** their shows' average rating, best-rated show, the years their shows aired,

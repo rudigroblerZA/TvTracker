@@ -9,6 +9,7 @@ public static class ShowTagOptions
         ("weekend-binge", "Weekend binge"),
         ("drops-at-once", "Drops all at once"),
         ("fan-favorite", "Fan favorite"),
+        ("prolific-creator", "From a prolific creator"),
         ("limited-series", "Limited series"),
         ("quick-episodes", "Quick episodes"),
         ("long-running", "Long-running")

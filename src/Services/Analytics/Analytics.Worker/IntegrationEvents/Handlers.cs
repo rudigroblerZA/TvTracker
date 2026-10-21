@@ -10,15 +10,36 @@ namespace Analytics.Worker.IntegrationEvents;
 public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
+    IIntegrationEventHandler<PeopleCareersUpdatedIntegrationEvent>,
     IIntegrationEventHandler<ShowStatusChangedIntegrationEvent>,
     IIntegrationEventHandler<EpisodesScheduledIntegrationEvent>,
     IIntegrationEventHandler<SeasonAnnouncedIntegrationEvent>
 {
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
-        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, ct));
+        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, ct));
 
     public Task HandleAsync(ShowUpdatedIntegrationEvent e, CancellationToken ct) =>
-        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, ct));
+        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, ct));
+
+    public Task HandleAsync(PeopleCareersUpdatedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            var ids = e.People.Select(p => p.PersonId).Distinct().ToList();
+            var existing = await db.Careers.Where(c => ids.Contains(c.PersonId)).ToDictionaryAsync(c => c.PersonId, ct);
+            foreach (var person in e.People.DistinctBy(p => p.PersonId))
+            {
+                if (!existing.TryGetValue(person.PersonId, out var career))
+                {
+                    career = new PersonCareerCopy { PersonId = person.PersonId, Name = person.Name };
+                    db.Careers.Add(career);
+                }
+
+                career.Name = person.Name;
+                career.Shows = person.Shows;
+                career.Created = person.Created;
+                career.ExecutiveProduced = person.ExecutiveProduced;
+            }
+        });
 
     public Task HandleAsync(ShowStatusChangedIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, async () =>
@@ -76,7 +97,7 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
 
     private async Task UpsertShowAsync(
         Guid showId, string title, string? posterUrl, ShowStatus status, IReadOnlyList<string> genres, double popularity,
-        double? externalRating, IReadOnlyList<CastCredit>? cast, CancellationToken ct)
+        double? externalRating, IReadOnlyList<CastCredit>? cast, IReadOnlyList<CreativeCredit>? creatives, CancellationToken ct)
     {
         var show = await db.Shows.FindAsync([showId], ct);
         if (show is null)
@@ -92,6 +113,16 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
         show.Popularity = popularity;
         show.ExternalRating = externalRating;
         show.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+
+        // Likewise for creatives: null in older events.
+        if (creatives is not null)
+        {
+            await db.Creatives.Where(c => c.ShowId == showId).ExecuteDeleteAsync(ct);
+            db.Creatives.AddRange(creatives
+                .DistinctBy(c => c.PersonId)
+                .Select((c, order) => new CreativeCopy { ShowId = showId, PersonId = c.PersonId, Name = c.Name, Roles = c.Roles.ToList(), Order = order }));
+            show.CreativesKnown = true;
+        }
 
         // Events published before the cast was added carry none; keep what we have rather than clearing it.
         if (cast is not null)

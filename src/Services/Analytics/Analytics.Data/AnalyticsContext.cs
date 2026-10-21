@@ -9,6 +9,8 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<EpisodeCopy> Episodes => Set<EpisodeCopy>();
     public DbSet<AnnouncedSeason> AnnouncedSeasons => Set<AnnouncedSeason>();
     public DbSet<CastCopy> Cast => Set<CastCopy>();
+    public DbSet<CreativeCopy> Creatives => Set<CreativeCopy>();
+    public DbSet<PersonCareerCopy> Careers => Set<PersonCareerCopy>();
     public DbSet<UserShowRating> ShowRatings => Set<UserShowRating>();
     public DbSet<UserEpisodeRating> EpisodeRatings => Set<UserEpisodeRating>();
     public DbSet<UserEpisodeWatch> Watches => Set<UserEpisodeWatch>();
@@ -44,6 +46,20 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
         {
             entity.ToTable("announced_seasons");
             entity.HasKey(s => new { s.ShowId, s.SeasonNumber });
+        });
+
+        modelBuilder.Entity<CreativeCopy>(entity =>
+        {
+            entity.ToTable("creatives");
+            entity.HasKey(c => new { c.ShowId, c.PersonId });
+            entity.Property(c => c.Name).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<PersonCareerCopy>(entity =>
+        {
+            entity.ToTable("careers");
+            entity.HasKey(c => c.PersonId);
+            entity.Property(c => c.Name).HasMaxLength(256);
         });
 
         modelBuilder.Entity<CastCopy>(entity =>

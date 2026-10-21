@@ -215,6 +215,7 @@ public sealed class CatalogSynchronizer(
             var shows = await db.Shows
                 .Include(s => s.Episodes)
                 .Include(s => s.Cast).ThenInclude(c => c.Person)
+                .Include(s => s.Creatives).ThenInclude(c => c.Person)
                 .AsSplitQuery()
                 .Where(s => batch.Contains(s.Id))
                 .ToListAsync(ct);
@@ -232,6 +233,14 @@ public sealed class CatalogSynchronizer(
             await outbox.PublishAddedAsync(ct);
             db.ChangeTracker.Clear();
         }
+
+        // Careers last, so consumers know the shows' creatives first (they're independent rows anyway).
+        foreach (var careers in CareerEvents(await db.People.AsNoTracking().Where(p => p.CareerShows != null).ToListAsync(ct)))
+        {
+            outbox.Add(careers);
+        }
+        await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
 
         logger.LogInformation("Replayed {Count} shows", ids.Count);
         return ids.Count;
@@ -310,7 +319,8 @@ public sealed class CatalogSynchronizer(
         detailsChanged |= await SyncCastAsync(show, p.Cast, ct);
         if (p.Creatives is { } creatives)
         {
-            await SyncCreativesAsync(show, creatives, ct);
+            // A show imported before creatives were counts as changed once, so consumers get them with ShowUpdated.
+            detailsChanged |= await SyncCreativesAsync(show, creatives, ct) || !show.CreativesImported;
             show.CreativesImported = true;
         }
         SyncWatchProviders(show, p.WatchOptions);
@@ -539,8 +549,10 @@ public sealed class CatalogSynchronizer(
     /// Replaces the show's creatives with the provider's. People are matched like cast (by provider id), so someone
     /// who acts in one show and produces another is one person.
     /// </summary>
-    private async Task SyncCreativesAsync(Show show, IReadOnlyList<ProviderCreative> creatives, CancellationToken ct)
+    /// <returns>Whether anything changed.</returns>
+    private async Task<bool> SyncCreativesAsync(Show show, IReadOnlyList<ProviderCreative> creatives, CancellationToken ct)
     {
+        var changed = false;
         var wanted = new List<(Person Person, ProviderCreative Creative)>();
         foreach (var creative in creatives)
         {
@@ -554,6 +566,7 @@ public sealed class CatalogSynchronizer(
         foreach (var existing in show.Creatives.Where(c => wanted.All(w => w.Person.Id != c.PersonId)).ToList())
         {
             show.Creatives.Remove(existing);
+            changed = true;
         }
 
         foreach (var (order, (person, creative)) in wanted.Index())
@@ -562,13 +575,17 @@ public sealed class CatalogSynchronizer(
             if (existing is null)
             {
                 show.Creatives.Add(new ShowCreative { ShowId = show.Id, PersonId = person.Id, Person = person, Roles = creative.Roles.ToList(), Order = order });
+                changed = true;
             }
             else if (!existing.Roles.SequenceEqual(creative.Roles) || existing.Order != order)
             {
                 existing.Roles = creative.Roles.ToList();
                 existing.Order = order;
+                changed = true;
             }
         }
+
+        return changed;
     }
 
     private static void UpdatePerson(Person person, string? photoUrl, ProviderPerson? details)
@@ -630,14 +647,28 @@ public sealed class CatalogSynchronizer(
     {
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
-            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList());
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList(),
+            CreativeCredits(s));
     }
+
+    /// <summary>The show's creatives for events (empty, not null, when it has none or they're still to be backfilled).</summary>
+    private static List<CreativeCredit> CreativeCredits(Show s) =>
+        s.Creatives.OrderBy(c => c.Order).Select(c => new CreativeCredit(c.PersonId, c.Person.Name, c.Roles)).ToList();
+
+    /// <summary>Career figures of people with them, for consumers that rate who made a show.</summary>
+    internal static List<PeopleCareersUpdatedIntegrationEvent> CareerEvents(IEnumerable<Person> people) => people
+        .Where(p => p.CareerShows is not null)
+        .Select(p => new PersonCareer(p.Id, p.Name, p.CareerShows!.Value, p.CareerCreated ?? 0, p.CareerExecutiveProduced ?? 0))
+        .Chunk(PeopleCareersUpdatedIntegrationEvent.MaxPeople)
+        .Select(chunk => new PeopleCareersUpdatedIntegrationEvent(chunk))
+        .ToList();
 
     private static ShowUpdatedIntegrationEvent ShowUpdated(Show s)
     {
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
-            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList());
+            s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList(),
+            CreativeCredits(s));
     }
 
     private static EpisodesScheduledIntegrationEvent EpisodesScheduled(Show s, IEnumerable<Episode> episodes) =>
