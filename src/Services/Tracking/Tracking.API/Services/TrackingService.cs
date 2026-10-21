@@ -121,7 +121,7 @@ public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox 
                 follow.UpdatedAtUtc = at;
             }
 
-            outbox.Add(new EpisodeWatchedIntegrationEvent(userId, showId, newIds));
+            outbox.Add(new EpisodeWatchedIntegrationEvent(userId, showId, newIds, at));
 
             if (follow.Status != WatchStatus.Completed && await IsFinishedAsync(userId, showId, newIds, now, ct))
             {

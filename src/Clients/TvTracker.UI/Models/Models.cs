@@ -140,7 +140,22 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
-    Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum);
+    Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags);
+
+/// <param name="Key">e.g. "bingeable", "drops-at-once", "fan-favorite".</param>
+public record ShowTag(string Key, string Label, string Detail);
+
+public record EpisodePatterns(FinaleStats? Finales, IReadOnlyList<SeasonBest> SeasonBests, Consistency? Consistency, Arc? Arc);
+
+public record FinaleStats(int Seasons, int BeatSeasonAverage, double AverageDifference);
+
+public record SeasonBest(int SeasonNumber, Guid EpisodeId, int EpisodeNumber, string Title, double Rating);
+
+/// <param name="Label">"steady", "varied" or "rollercoaster".</param>
+public record Consistency(double Spread, string Label);
+
+public record Arc(int PeakSeason, double PeakRating, int? DeclineFromSeason, bool PeakIsLatest);
 
 /// <param name="OurStars">Counts of 1-5 star ratings from our users (index 0 is 1 star); null until enough have rated.</param>
 public record Histograms(IReadOnlyList<int>? OurStars, IReadOnlyList<HistogramBucket> ExternalEpisodes);
@@ -161,3 +176,30 @@ public record PremiereItem(Guid ShowId, string ShowTitle, string? PosterUrl, IRe
 
 public record TopEpisodeItem(Guid EpisodeId, Guid ShowId, string ShowTitle, string? PosterUrl, int SeasonNumber, int EpisodeNumber,
     string Title, DateTimeOffset? AirsAtUtc, RatingPair Rating);
+
+/// <param name="Value">What the list ranks by: the show's rating, its episode-rating spread, or the finale's rating.</param>
+public record DiscoveryItem(Guid ShowId, string ShowTitle, string? PosterUrl, double? ShowExternalRating, double Value,
+    Guid? EpisodeId, int? SeasonNumber, int? EpisodeNumber, string? EpisodeTitle);
+
+/// <param name="Followers">Our users following at least one of their shows; null until there are enough.</param>
+public record PersonInsights(Guid PersonId, string Name, DateTime ComputedAtUtc, int ShowCount, double? AverageShowRating,
+    PersonShow? BestShow, int? FirstYear, int? LastYear, IReadOnlyList<CoStar> FrequentCoStars, int? Followers);
+
+public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? Rating, string? Character);
+
+public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
+
+public record Taste(RatingBias? Bias, IReadOnlyList<GenreTaste> Genres, IReadOnlyList<MonthWatch> Months, TasteProgress Progress);
+
+/// <param name="Label">"kinder", "harsher" or "in line".</param>
+public record RatingBias(int Compared, double AverageDifference, string Label, IReadOnlyList<BiasShow> Kinder, IReadOnlyList<BiasShow> Harsher);
+
+public record BiasShow(Guid ShowId, string Title, string? PosterUrl, int Stars, double ExternalRating);
+
+public record GenreTaste(string Genre, int Rated, double AverageStars, double? AverageExternal);
+
+public record MonthWatch(int Year, int Month, int Episodes, int Minutes);
+
+public record TasteProgress(int Finished, int Watching, int Dropped, IReadOnlyList<ProgressShow> RecentlyDropped);
+
+public record ProgressShow(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc);

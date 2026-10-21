@@ -198,6 +198,20 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         if (!string.IsNullOrWhiteSpace(genre)) url += $"&genre={Uri.EscapeDataString(genre)}";
         return GetAsync<List<TopEpisodeItem>>(ApiClients.Analytics, url, ct, cacheForOffline: true);
     }
+
+    /// <param name="list">"hidden-gems", "most-consistent", "rollercoasters" or "best-finales".</param>
+    public Task<List<DiscoveryItem>?> GetDiscoveryAsync(string list, string? genre = null, int limit = 20, CancellationToken ct = default)
+    {
+        var url = $"api/v1/insights/discover/{list}?limit={limit}";
+        if (!string.IsNullOrWhiteSpace(genre)) url += $"&genre={Uri.EscapeDataString(genre)}";
+        return GetAsync<List<DiscoveryItem>>(ApiClients.Analytics, url, ct, cacheForOffline: true);
+    }
+
+    public Task<PersonInsights?> GetPersonInsightsAsync(Guid personId, CancellationToken ct = default) =>
+        GetAsync<PersonInsights>(ApiClients.Analytics, $"api/v1/people/{personId}/insights", ct, cacheForOffline: true);
+
+    public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
+        GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
 }
 
 public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

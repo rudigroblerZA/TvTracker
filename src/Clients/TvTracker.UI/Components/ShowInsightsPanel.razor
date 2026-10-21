@@ -7,6 +7,20 @@
     <section class="insights">
         <h2>Insights</h2>
 
+        @if (insights.Tags is { Count: > 0 } tags)
+        {
+            <ul class="show-tags">
+                @foreach (var tag in tags)
+                {
+                    <li class="show-tag tag-@tag.Key">
+                        <strong>@tag.Label</strong>
+                        @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
+                        <span class="muted small"> @tag.Detail</span>
+                    </li>
+                }
+            </ul>
+        }
+
         <div class="stat-tiles">
             @if (insights.Rating.External is { } external)
             {
@@ -107,6 +121,39 @@
                     </li>
                 }
             </ul>
+        }
+
+        @if (insights.Patterns is { } patterns && (patterns.Finales is not null || patterns.Consistency is not null || patterns.Arc is not null || patterns.SeasonBests.Count > 1))
+        {
+            <h3>Episode patterns</h3>
+            @if (patterns.Consistency is { } consistency)
+            {
+                <p><span class="tag">@Capitalize(consistency.Label)</span> @ConsistencyText(consistency)</p>
+            }
+            @if (patterns.Arc is { } arc)
+            {
+                <p>@ArcText(arc)</p>
+            }
+            @if (patterns.Finales is { } finales)
+            {
+                <p>@FinaleText(finales)</p>
+            }
+            @if (patterns.SeasonBests.Count > 1)
+            {
+                <details class="season-bests" open="@(patterns.SeasonBests.Count <= 6)">
+                    <summary>Best episode of each season</summary>
+                    <ol class="top-episodes">
+                        @foreach (var seasonBest in patterns.SeasonBests)
+                        {
+                            <li>
+                                <span class="code">@Format.EpisodeCode(seasonBest.SeasonNumber, seasonBest.EpisodeNumber)</span>
+                                <a href="episodes/@seasonBest.EpisodeId">@seasonBest.Title</a>
+                                <span class="muted small">@Format.Rating(seasonBest.Rating)</span>
+                            </li>
+                        }
+                    </ol>
+                </details>
+            }
         }
 
         @if (insights.Histograms is { } histograms && (histograms.OurStars is not null || histograms.ExternalEpisodes.Count > 1))
@@ -214,7 +261,7 @@
                         {
                             <strong>@shared.PersonName</strong>
                         }
-                        @(shared.SameCharacter ? "also appears as" : "is also in")
+                        @(shared.SameCharacter ? " also appears as " : " is also in ")
                         <a href="shows/@shared.OtherShowId">@shared.OtherShowTitle</a>
                         @if (!string.IsNullOrEmpty(shared.CharacterThere))
                         {
@@ -259,6 +306,27 @@
 
     private static int BarWidth(double rating, double low, double high) =>
         high <= low ? 100 : (int)Math.Round(10 + 90 * (rating - low) / (high - low));
+
+    private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
+    private static string ConsistencyText(Consistency c) => c.Label switch
+    {
+        "steady" => $"Episodes rarely stray far from the show's usual standard (spread {c.Spread:0.00}).",
+        "rollercoaster" => $"Episode quality swings widely, from standouts to misfires (spread {c.Spread:0.00}).",
+        _ => $"Some episodes stand out, some dip (spread {c.Spread:0.00})."
+    };
+
+    private static string ArcText(Arc arc) =>
+        arc.PeakIsLatest ? $"Still peaking: season {arc.PeakSeason} is its best yet ({Format.Rating(arc.PeakRating)})."
+        : arc.DeclineFromSeason is { } from ? $"Peaked in season {arc.PeakSeason} ({Format.Rating(arc.PeakRating)}); from season {from} on, it never got back there."
+        : $"Peaked in season {arc.PeakSeason} ({Format.Rating(arc.PeakRating)}) and held up afterwards.";
+
+    private static string FinaleText(FinaleStats f) =>
+        f.Seasons == 1
+            ? $"The season finale rated {Math.Abs(f.AverageDifference):0.0} {(f.AverageDifference >= 0 ? "above" : "below")} the rest of the season."
+            : f.BeatSeasonAverage * 2 >= f.Seasons
+                ? $"Finales deliver: {f.BeatSeasonAverage} of {f.Seasons} rated above the rest of their season, by {f.AverageDifference:+0.0;-0.0;0.0} on average."
+                : $"Finales tend to fall short: only {f.BeatSeasonAverage} of {f.Seasons} rated above the rest of their season ({f.AverageDifference:+0.0;-0.0;0.0} on average).";
 
     private static string Gap(int days) => days >= 365 ? $"{days / 365.0:0.#} years" : days >= 60 ? $"{days / 30} months" : $"{days} days";
 }

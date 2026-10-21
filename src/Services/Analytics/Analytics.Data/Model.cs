@@ -131,3 +131,34 @@ public class TopEpisodeRow
     public double? OurRating { get; set; }
     public int OurRatingCount { get; set; }
 }
+
+/// <summary>
+/// One entry of a discovery list (see <see cref="DiscoveryLists"/>), overall (<see cref="Genre"/> "") or within a genre.
+/// Episode fields are set for episode lists (best finales).
+/// </summary>
+public class DiscoveryRow
+{
+    public required string List { get; set; }
+    public required string Genre { get; set; }
+    public int Rank { get; set; }
+    public Guid ShowId { get; set; }
+    public required string ShowTitle { get; set; }
+    public string? PosterUrl { get; set; }
+    public double? ShowExternalRating { get; set; }
+
+    /// <summary>What the list ranks by: the show's rating, its episode-rating spread, or the finale's rating.</summary>
+    public double Value { get; set; }
+
+    public Guid? EpisodeId { get; set; }
+    public int? SeasonNumber { get; set; }
+    public int? EpisodeNumber { get; set; }
+    public string? EpisodeTitle { get; set; }
+}
+
+/// <summary>An actor's insights (<see cref="PersonInsights"/> as JSON), recomputed hourly with the shows'.</summary>
+public class PersonInsightsRow
+{
+    public Guid PersonId { get; set; }
+    public required string Document { get; set; }
+    public DateTime ComputedAtUtc { get; set; }
+}

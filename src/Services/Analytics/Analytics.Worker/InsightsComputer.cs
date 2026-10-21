@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker;
 
@@ -38,6 +39,24 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
     /// <summary>Change in rating per season (0-10 scale) beyond which a show is "rising" or "falling".</summary>
     private const double TrendThreshold = 0.05;
 
+    private const int DiscoveryListLength = 30;
+
+    /// <summary>
+    /// Hidden gems: shows rated at least this, outside the catalog's most popular <see cref="HiddenGemPopularShare"/>
+    /// on the provider (TVmaze's popularity tops out at 100 for the famous ones), and followed by fewer than the
+    /// minimum number of our users.
+    /// </summary>
+    private const double HiddenGemMinRating = 7.5;
+
+    private const double HiddenGemPopularShare = 0.4;
+
+    /// <summary>The consistency lists only rank shows rated at least this, so dull-but-steady shows don't top them.</summary>
+    private const double MostConsistentMinRating = 7.5;
+
+    private const double RollercoasterMinRating = 7.0;
+
+    private const int CoStarsPerPerson = 6;
+
     public async Task<int> ComputeAllAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
@@ -65,11 +84,14 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 .Select(g => new { g.Key.ShowId, g.Key.Stars, Count = g.Count() })
                 .ToListAsync(ct))
             .ToLookup(r => r.ShowId, r => (r.Stars, r.Count));
-        var followDates = (await db.Follows.AsNoTracking().Select(f => new { f.ShowId, f.FollowedAtUtc }).ToListAsync(ct))
-            .ToLookup(f => f.ShowId, f => f.FollowedAtUtc);
+        var follows = await db.Follows.AsNoTracking().Select(f => new { f.ShowId, f.UserId, f.FollowedAtUtc }).ToListAsync(ct);
+        var followDates = follows.ToLookup(f => f.ShowId, f => f.FollowedAtUtc);
+        var followersByShow = follows.ToLookup(f => f.ShowId, f => f.UserId);
 
         var premieres = new List<PremiereRow>();
         var listCandidates = new List<(ShowCopy Show, EpisodeCopy Episode, (int Sum, int Count) Ours, double Score)>();
+        var discoveryCandidates = new List<DiscoveryCandidate>();
+        var runs = new Dictionary<Guid, RunFacts>();
 
         foreach (var batch in shows.Keys.Chunk(ShowBatchSize))
         {
@@ -126,26 +148,40 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
 
                 var rated = Aired(episodes, now).Where(e => e.ExternalRating is not null).ToList();
                 var airedCount = Aired(episodes, now).Count();
-                if (show.ExternalRating is { } showRating
+                var wellRated = show.ExternalRating is not null
                     && rated.Count >= MinRatedEpisodesForLists
-                    && rated.Count >= airedCount * MinRatedShareForLists)
+                    && rated.Count >= airedCount * MinRatedShareForLists;
+                List<(EpisodeCopy Finale, double Score)> finales = [];
+                if (wellRated)
                 {
+                    var showRating = show.ExternalRating!.Value;
                     var episodeMean = rated.Average(e => e.ExternalRating!.Value);
                     listCandidates.AddRange(rated
                         .OrderByDescending(e => e.ExternalRating)
                         .Take(MaxListEpisodesPerShow)
                         .Select(e => (show, e, ours(e.EpisodeId), showRating + (e.ExternalRating!.Value - episodeMean))));
+                    finales = FinalesOf(insights.Seasons, episodes)
+                        .Select(f => (f, showRating + (f.ExternalRating!.Value - episodeMean)))
+                        .OrderByDescending(f => f.Item2)
+                        .Take(MaxListEpisodesPerShow)
+                        .ToList();
                 }
+
+                runs[showId] = insights.Run;
+                discoveryCandidates.Add(new DiscoveryCandidate(show, airedCount, wellRated, insights.Patterns?.Consistency,
+                    followersByShow[showId].Count(), finales, insights.Tags ?? [], insights.Rating.Ours, insights.Run.RuntimeMinutes));
             }
 
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
         }
 
-        await ReplaceListsAsync(premieres, TopEpisodeRows(listCandidates), ct);
+        var people = PersonInsightsRows(cast, shows, runs, followersByShow, computedAt);
+        await ReplaceListsAsync(premieres, TopEpisodeRows(listCandidates), DiscoveryRows(discoveryCandidates), people, ct);
 
-        logger.LogInformation("Computed insights for {Shows} shows: {Premieres} upcoming premieres, {Candidates} top-episode candidates",
-            shows.Count, premieres.Count, listCandidates.Count);
+        logger.LogInformation(
+            "Computed insights for {Shows} shows and {People} people: {Premieres} upcoming premieres, {Candidates} top-episode candidates",
+            shows.Count, people.Count, premieres.Count, listCandidates.Count);
         return shows.Count;
     }
 
@@ -195,7 +231,157 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 .ToList(),
             RunFactsFor(seasons.Select(s => s.Stats).ToList(), aired),
             NextPremiere(seasons.Select(s => s.Stats).ToList(), announced, aired, now),
-            sharedCast);
+            sharedCast,
+            Patterns: PatternsFor(seasons, aired),
+            Tags: TagsFor(show, seasons.Select(s => s.Stats).ToList(), aired, Pair(show.ExternalRating, showOurs)));
+    }
+
+    /// <summary>The show's tags (see <see cref="ShowTags"/> for the rules), from its seasons, episodes and ratings.</summary>
+    private static List<ShowTag> TagsFor(ShowCopy show, List<SeasonStats> seasons, List<EpisodeCopy> aired, RatingPair rating)
+    {
+        var tags = new List<ShowTag>();
+        var airedSeasons = seasons.Where(s => s.AiredCount > 0).ToList();
+        var runtime = aired.Sum(e => e.RuntimeMinutes ?? 0);
+        // Everything announced so far has aired: no season part-way through.
+        var allOut = airedSeasons.Count > 0 && seasons.All(s => s.AiredCount == s.EpisodeCount) && aired.Count >= 3;
+
+        // Release pattern of the latest season that has fully aired.
+        var latestFull = airedSeasons.LastOrDefault(s => s.AiredCount == s.EpisodeCount && s.AiredCount >= 3);
+        if (latestFull is not null)
+        {
+            var days = aired.Where(e => e.SeasonNumber == latestFull.Number && e.AirsAtUtc is not null)
+                .Select(e => e.AirsAtUtc!.Value.UtcDateTime.Date).Distinct().Order().ToList();
+            if (days.Count == 1)
+            {
+                tags.Add(new ShowTag(ShowTags.DropsAtOnce, "Drops all at once",
+                    $"Season {latestFull.Number}: all {latestFull.AiredCount} episodes on {days[0]:d MMM yyyy}"));
+            }
+            else if (days.Count <= ShowTags.MaxDropDays && latestFull.AiredCount >= 2 * days.Count)
+            {
+                tags.Add(new ShowTag(ShowTags.DropsAtOnce, "Drops in parts",
+                    $"Season {latestFull.Number}: {latestFull.AiredCount} episodes in {days.Count} drops"));
+            }
+        }
+
+        var perSeason = airedSeasons.Count == 0 ? 0 : (double)aired.Count / airedSeasons.Count;
+        if (allOut && perSeason <= ShowTags.BingeableMaxEpisodesPerSeason && runtime <= ShowTags.BingeableMaxMinutes)
+        {
+            var time = runtime > 0 ? $" in {Hours(runtime)}" : "";
+            tags.Add(new ShowTag(ShowTags.Bingeable, "Bingeable", airedSeasons.Count == 1
+                ? $"{aired.Count} episodes{(runtime > 0 ? $" · {Hours(runtime)}" : "")}"
+                : $"About {perSeason:0} episodes a season · all {aired.Count}{time}"));
+        }
+        if (allOut && runtime is > 0 and <= ShowTags.WeekendBingeMaxMinutes)
+        {
+            tags.Add(new ShowTag(ShowTags.WeekendBinge, "Weekend binge", $"All of it in {Hours(runtime)}"));
+        }
+
+        if (rating.Ours is >= ShowTags.FanFavoriteMinStars)
+        {
+            tags.Add(new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} TV Tracker users"));
+        }
+        else if (rating.External is >= ShowTags.FanFavoriteMinExternal)
+        {
+            tags.Add(new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"Rated {rating.External:0.0} by TVmaze's viewers"));
+        }
+
+        if (airedSeasons.Count == 1 && show.Status is ShowStatus.Ended or ShowStatus.Cancelled)
+        {
+            tags.Add(new ShowTag(ShowTags.LimitedSeries, "Limited series", $"One season, {aired.Count} episodes"));
+        }
+
+        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
+        if (runtimes.Count > 0 && runtimes[runtimes.Count / 2] <= ShowTags.QuickEpisodeMaxMinutes)
+        {
+            tags.Add(new ShowTag(ShowTags.QuickEpisodes, "Quick episodes", $"About {runtimes[runtimes.Count / 2]} min each"));
+        }
+
+        if (airedSeasons.Count >= ShowTags.LongRunningMinSeasons)
+        {
+            var since = aired.Min(e => e.AirsAtUtc)?.Year;
+            tags.Add(new ShowTag(ShowTags.LongRunning, "Long-running", since is null
+                ? $"{airedSeasons.Count} seasons"
+                : $"{airedSeasons.Count} seasons since {since}"));
+        }
+
+        return tags;
+    }
+
+    /// <summary>"45 min", "6.5 h" or "33 h".</summary>
+    private static string Hours(int minutes) =>
+        minutes < 60 ? $"{minutes} min" : minutes < 600 ? $"{minutes / 60.0:0.#} h" : $"{Math.Round(minutes / 60.0)} h";
+
+    /// <summary>Finales, each season's best episode, consistency and the show's arc, from the provider's ratings.</summary>
+    private static EpisodePatterns PatternsFor(List<(SeasonStats Stats, int RatedEpisodes)> seasons, List<EpisodeCopy> aired)
+    {
+        var rated = aired.Where(e => e.ExternalRating is not null).ToList();
+        var ratedBySeason = rated.ToLookup(e => e.SeasonNumber);
+
+        // A season's last episode is its finale only once the whole season has aired. It's compared with the
+        // season's other episodes.
+        var finaleDifferences = seasons
+            .Where(s => s.RatedEpisodes >= MinRatedEpisodesPerSeason && s.Stats.AiredCount == s.Stats.EpisodeCount)
+            .Select(s =>
+            {
+                var finale = aired.Where(e => e.SeasonNumber == s.Stats.Number).MaxBy(e => e.EpisodeNumber);
+                var others = ratedBySeason[s.Stats.Number].Where(e => e != finale).ToList();
+                return finale?.ExternalRating is { } rating && others.Count > 0
+                    ? rating - others.Average(e => e.ExternalRating!.Value)
+                    : (double?)null;
+            })
+            .OfType<double>()
+            .ToList();
+        var finales = finaleDifferences.Count == 0
+            ? null
+            : new FinaleStats(finaleDifferences.Count, finaleDifferences.Count(d => d > 0), Round(finaleDifferences.Average()));
+
+        var seasonBests = ratedBySeason
+            .OrderBy(g => g.Key)
+            .Select(g => g.OrderByDescending(e => e.ExternalRating).ThenBy(e => e.EpisodeNumber).First())
+            .Select(e => new SeasonBest(e.SeasonNumber, e.EpisodeId, e.EpisodeNumber, e.Title, e.ExternalRating!.Value))
+            .ToList();
+
+        Consistency? consistency = null;
+        if (rated.Count >= InsightRules.MinRatedEpisodesForConsistency)
+        {
+            var mean = rated.Average(e => e.ExternalRating!.Value);
+            var spread = Round(Math.Sqrt(rated.Sum(e => Math.Pow(e.ExternalRating!.Value - mean, 2)) / (rated.Count - 1)));
+            consistency = new Consistency(spread,
+                spread < InsightRules.SteadySpread ? "steady" : spread >= InsightRules.RollercoasterSpread ? "rollercoaster" : "varied");
+        }
+
+        return new EpisodePatterns(finales, seasonBests, consistency, ArcFor(seasons));
+    }
+
+    /// <summary>
+    /// The best-rated season, and the season a decline set in: the first after the peak from which every rated
+    /// season stayed at least <see cref="InsightRules.DeclineMargin"/> below it.
+    /// </summary>
+    private static Arc? ArcFor(List<(SeasonStats Stats, int RatedEpisodes)> seasons)
+    {
+        var points = seasons
+            .Where(s => s.Stats.Rating.External is not null && s.RatedEpisodes >= MinRatedEpisodesPerSeason)
+            .Select(s => (s.Stats.Number, Rating: s.Stats.Rating.External!.Value))
+            .ToList();
+        if (points.Count < 3)
+        {
+            return null;
+        }
+
+        var peakIndex = points.FindIndex(p => p.Rating == points.Max(x => x.Rating));
+        var peak = points[peakIndex];
+
+        int? declineFrom = null;
+        for (var i = peakIndex + 1; i < points.Count; i++)
+        {
+            if (points.Skip(i).All(p => p.Rating <= peak.Rating - InsightRules.DeclineMargin))
+            {
+                declineFrom = points[i].Number;
+                break;
+            }
+        }
+
+        return new Arc(peak.Number, peak.Rating, declineFrom, peakIndex == points.Count - 1);
     }
 
     /// <summary>
@@ -477,7 +663,177 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             .ToList();
     }
 
-    private Task ReplaceListsAsync(List<PremiereRow> premieres, List<TopEpisodeRow> topEpisodes, CancellationToken ct) =>
+    /// <summary>Each fully aired season's last episode, when it's rated and the season has enough rated episodes.</summary>
+    private static IEnumerable<EpisodeCopy> FinalesOf(IReadOnlyList<SeasonStats> seasons, List<EpisodeCopy> episodes)
+    {
+        var bySeason = episodes.ToLookup(e => e.SeasonNumber);
+        return seasons
+            .Where(s => s.AiredCount > 0 && s.AiredCount == s.EpisodeCount
+                && bySeason[s.Number].Count(e => e.ExternalRating is not null) >= MinRatedEpisodesPerSeason)
+            .Select(s => bySeason[s.Number].MaxBy(e => e.EpisodeNumber)!)
+            .Where(e => e.ExternalRating is not null);
+    }
+
+    private sealed record DiscoveryCandidate(
+        ShowCopy Show, int AiredEpisodes, bool WellRated, Consistency? Consistency, int Followers,
+        List<(EpisodeCopy Finale, double Score)> Finales, IReadOnlyList<ShowTag> Tags, double? OurRating, int RuntimeMinutes)
+    {
+        public bool Has(string tag) => Tags.Any(t => t.Key == tag);
+    }
+
+    /// <summary>The discovery lists (see <see cref="DiscoveryLists"/>), overall (genre "") and per genre.</summary>
+    private static List<DiscoveryRow> DiscoveryRows(List<DiscoveryCandidate> candidates)
+    {
+        var genres = new[] { "" }.Concat(candidates.SelectMany(c => c.Show.Genres).Distinct());
+        var rows = new List<DiscoveryRow>();
+
+        var byPopularity = candidates.Select(c => c.Show.Popularity).OrderDescending().ToList();
+        var popularCutoff = byPopularity.Count == 0 ? 0 : byPopularity[(int)(byPopularity.Count * HiddenGemPopularShare)];
+
+        foreach (var genre in genres)
+        {
+            var inGenre = candidates.Where(c => genre == "" || c.Show.Genres.Contains(genre)).ToList();
+
+            Add(DiscoveryLists.HiddenGems, genre, inGenre
+                .Where(c => c.AiredEpisodes > 0 && c.Show.ExternalRating >= HiddenGemMinRating
+                    && c.Show.Popularity < popularCutoff && c.Followers < InsightRules.MinUsersToShow)
+                .OrderByDescending(c => c.Show.ExternalRating)
+                .ThenBy(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.Show.ExternalRating!.Value)));
+
+            Add(DiscoveryLists.MostConsistent, genre, inGenre
+                .Where(c => c.WellRated && c.Consistency is not null && c.Show.ExternalRating >= MostConsistentMinRating)
+                .OrderBy(c => c.Consistency!.Spread)
+                .ThenByDescending(c => c.Show.ExternalRating)
+                .Select(c => Row(c.Show, c.Consistency!.Spread)));
+
+            Add(DiscoveryLists.Rollercoasters, genre, inGenre
+                .Where(c => c.WellRated && c.Consistency is not null && c.Show.ExternalRating >= RollercoasterMinRating)
+                .OrderByDescending(c => c.Consistency!.Spread)
+                .Select(c => Row(c.Show, c.Consistency!.Spread)));
+
+            Add(DiscoveryLists.BestFinales, genre, inGenre
+                .SelectMany(c => c.Finales.Select(f => (c.Show, f.Finale, f.Score)))
+                .OrderByDescending(f => f.Score)
+                .ThenByDescending(f => f.Show.Popularity)
+                .Select(f => Row(f.Show, f.Finale.ExternalRating!.Value, f.Finale)));
+
+            // Value: minutes to watch it all.
+            Add(DiscoveryLists.Bingeable, genre, inGenre
+                .Where(c => c.Has(ShowTags.Bingeable))
+                .OrderByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.RuntimeMinutes)));
+
+            Add(DiscoveryLists.WeekendBinges, genre, inGenre
+                .Where(c => c.Has(ShowTags.WeekendBinge))
+                .OrderByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.RuntimeMinutes)));
+
+            // Value: our users' average stars, or 0 when it's a favourite by the provider's rating.
+            Add(DiscoveryLists.FanFavorites, genre, inGenre
+                .Where(c => c.Has(ShowTags.FanFavorite))
+                .OrderByDescending(c => c.OurRating is >= ShowTags.FanFavoriteMinStars)
+                .ThenByDescending(c => c.OurRating ?? 0)
+                .ThenByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.OurRating is >= ShowTags.FanFavoriteMinStars ? c.OurRating.Value : 0)));
+        }
+
+        return rows;
+
+        void Add(string list, string genre, IEnumerable<DiscoveryRow> ranked)
+        {
+            var rank = 0;
+            foreach (var row in ranked.Take(DiscoveryListLength))
+            {
+                row.List = list;
+                row.Genre = genre;
+                row.Rank = rank++;
+                rows.Add(row);
+            }
+        }
+
+        static DiscoveryRow Row(ShowCopy show, double value, EpisodeCopy? episode = null) => new()
+        {
+            List = "",
+            Genre = "",
+            ShowId = show.ShowId,
+            ShowTitle = show.Title,
+            PosterUrl = show.PosterUrl,
+            ShowExternalRating = show.ExternalRating,
+            Value = value,
+            EpisodeId = episode?.EpisodeId,
+            SeasonNumber = episode?.SeasonNumber,
+            EpisodeNumber = episode?.EpisodeNumber,
+            EpisodeTitle = episode?.Title
+        };
+    }
+
+    /// <summary>
+    /// Insights for every actor with a catalog id: their shows' ratings, the years those shows span, the actors they
+    /// share at least two shows with, and how many of our users follow their shows.
+    /// </summary>
+    private static List<PersonInsightsRow> PersonInsightsRows(
+        List<CastCopy> cast, Dictionary<Guid, ShowCopy> shows, Dictionary<Guid, RunFacts> runs, ILookup<Guid, string> followersByShow,
+        DateTime computedAt)
+    {
+        var credits = cast.Where(c => c.PersonId is not null && shows.ContainsKey(c.ShowId)).ToList();
+        var castByShow = credits.ToLookup(c => c.ShowId);
+
+        return credits
+            .GroupBy(c => c.PersonId!.Value)
+            .Select(person =>
+            {
+                var personShows = person
+                    .DistinctBy(c => c.ShowId)
+                    .Select(c => (Show: shows[c.ShowId], c.Character))
+                    .OrderByDescending(x => x.Show.Popularity)
+                    .Select(x => new PersonShow(x.Show.ShowId, x.Show.Title, x.Show.PosterUrl, x.Show.ExternalRating, x.Character))
+                    .ToList();
+                var rated = personShows.Where(s => s.Rating is not null).ToList();
+                var showIds = personShows.Select(s => s.ShowId).ToHashSet();
+
+                var coStars = personShows
+                    .SelectMany(s => castByShow[s.ShowId].Where(c => c.PersonId != person.Key).Select(c => (Credit: c, Show: s)))
+                    .GroupBy(x => x.Credit.PersonId!.Value)
+                    .Where(g => g.Select(x => x.Show.ShowId).Distinct().Count() >= 2)
+                    .OrderByDescending(g => g.Select(x => x.Show.ShowId).Distinct().Count())
+                    .ThenBy(g => g.Min(x => x.Credit.Order))
+                    .Take(CoStarsPerPerson)
+                    .Select(g => new CoStar(g.Key, g.First().Credit.PersonName,
+                        g.DistinctBy(x => x.Show.ShowId).Select(x => x.Show with { Character = x.Credit.Character }).ToList()))
+                    .ToList();
+
+                var followers = showIds.SelectMany(id => followersByShow[id]).Distinct().Count();
+                var years = showIds.Select(id => runs.GetValueOrDefault(id)).OfType<RunFacts>().ToList();
+
+                var insights = new PersonInsights(
+                    person.Key,
+                    person.First().PersonName,
+                    computedAt,
+                    personShows.Count,
+                    rated.Count > 0 ? Round(rated.Average(s => s.Rating!.Value)) : null,
+                    rated.MaxBy(s => s.Rating),
+                    years.Min(r => r.FirstAiredUtc)?.Year,
+                    years.Max(r => r.LastAiredUtc)?.Year,
+                    coStars,
+                    followers >= InsightRules.MinUsersToShow ? followers : null);
+
+                return new PersonInsightsRow
+                {
+                    PersonId = person.Key,
+                    Document = JsonSerializer.Serialize(insights, JsonOptions),
+                    ComputedAtUtc = computedAt
+                };
+            })
+            .ToList();
+    }
+
+    private Task ReplaceListsAsync(
+        List<PremiereRow> premieres, List<TopEpisodeRow> topEpisodes, List<DiscoveryRow> discovery, List<PersonInsightsRow> people,
+        CancellationToken ct) =>
         // One transaction, so readers never see an empty list mid-refresh. Run through the execution strategy:
         // Aspire's Npgsql integration retries on transient errors and refuses transactions started outside it.
         db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -486,8 +842,12 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await db.Premieres.ExecuteDeleteAsync(ct);
             await db.TopEpisodes.ExecuteDeleteAsync(ct);
+            await db.Discovery.ExecuteDeleteAsync(ct);
+            await db.PersonInsights.ExecuteDeleteAsync(ct);
             db.Premieres.AddRange(premieres);
             db.TopEpisodes.AddRange(topEpisodes);
+            db.Discovery.AddRange(discovery);
+            db.PersonInsights.AddRange(people);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             db.ChangeTracker.Clear();
