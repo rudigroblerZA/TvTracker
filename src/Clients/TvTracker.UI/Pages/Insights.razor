@@ -95,6 +95,57 @@
             }
         </section>
 
+        <section>
+            <div class="section-header">
+                <h2>Discover</h2>
+                <select @bind="discoverGenre" @bind:after="LoadDiscoveryAsync" aria-label="Genre for discovery lists">
+                    <option value="">All genres</option>
+                    @foreach (var g in genres)
+                    {
+                        <option value="@g">@g</option>
+                    }
+                </select>
+            </div>
+            <div class="tabs" role="tablist">
+                @foreach (var (key, label, _) in DiscoveryTabs)
+                {
+                    <button role="tab" aria-selected="@(key == discoverList)" class="@(key == discoverList ? "active" : "")"
+                            @onclick="() => SelectDiscoveryAsync(key)">@label</button>
+                }
+            </div>
+            <p class="muted small">@DiscoveryTabs.First(t => t.Key == discoverList).Description</p>
+            @if (discovery is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (discovery.Count == 0)
+            {
+                <p class="muted">Nothing here yet@(string.IsNullOrEmpty(discoverGenre) ? "" : $" for {discoverGenre}").</p>
+            }
+            else
+            {
+                <ol class="discovery">
+                    @foreach (var item in discovery)
+                    {
+                        <li>
+                            <Poster Title="@item.ShowTitle" Url="@item.PosterUrl" Size="small" />
+                            <div>
+                                <a href="shows/@item.ShowId"><strong>@item.ShowTitle</strong></a>
+                                @if (item.EpisodeId is { } episodeId)
+                                {
+                                    <div>
+                                        <span class="code">@Format.EpisodeCode(item.SeasonNumber ?? 0, item.EpisodeNumber ?? 0)</span>
+                                        <a href="episodes/@episodeId">@item.EpisodeTitle</a>
+                                    </div>
+                                }
+                                <div class="muted small">@DiscoveryDetail(item)</div>
+                            </div>
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+
         <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
     </Authorized>
     <NotAuthorized>
@@ -109,6 +160,17 @@
     private string premiereSort = "date";
     private string genre = "";
     private string? error;
+    private List<DiscoveryItem>? discovery;
+    private string discoverList = "hidden-gems";
+    private string discoverGenre = "";
+
+    private static readonly (string Key, string Label, string Description)[] DiscoveryTabs =
+    [
+        ("hidden-gems", "Hidden gems", "Highly rated shows that fly under the radar: less well known, and few TV Tracker users follow them yet."),
+        ("most-consistent", "Most consistent", "Well-rated shows whose episodes hardly ever dip."),
+        ("rollercoasters", "Rollercoasters", "Well-rated shows with the biggest swings between episodes."),
+        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes.")
+    ];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -125,6 +187,31 @@
         }
         await LoadPremieresAsync();
         await LoadTopEpisodesAsync();
+        await LoadDiscoveryAsync();
+    }
+
+    private Task SelectDiscoveryAsync(string list)
+    {
+        discoverList = list;
+        return LoadDiscoveryAsync();
+    }
+
+    private Task LoadDiscoveryAsync() => RunAsync(async () =>
+    {
+        discovery = null;
+        discovery = await Analytics.GetDiscoveryAsync(discoverList, discoverGenre, 15) ?? [];
+    });
+
+    private string DiscoveryDetail(DiscoveryItem item)
+    {
+        var rating = item.ShowExternalRating is { } r ? $"Show rated {Format.Rating(r)}" : null;
+        var detail = discoverList switch
+        {
+            "most-consistent" or "rollercoasters" => $"Episode spread {item.Value:0.00}",
+            "best-finales" => $"Finale rated {Format.Rating(item.Value)}",
+            _ => null
+        };
+        return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));
     }
 
     private Task LoadPremieresAsync() => RunAsync(async () => premieres = await Analytics.GetPremieresAsync(60, premiereSort) ?? []);

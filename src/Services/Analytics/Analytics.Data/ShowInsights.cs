@@ -8,6 +8,7 @@ namespace Analytics.Data;
 /// <param name="Histograms">Rating distributions; null in documents computed before they were added.</param>
 /// <param name="Viewing">Our users' viewing; null below the minimum number of viewers.</param>
 /// <param name="Momentum">Our users' follows; null below the minimum number of followers.</param>
+/// <param name="Patterns">How the show's episode ratings behave, from the provider's ratings; null before they were added.</param>
 public record ShowInsights(
     Guid ShowId,
     string Title,
@@ -23,7 +24,31 @@ public record ShowInsights(
     IReadOnlyList<SharedCast> SharedCast,
     Histograms? Histograms = null,
     Viewing? Viewing = null,
-    Momentum? Momentum = null);
+    Momentum? Momentum = null,
+    EpisodePatterns? Patterns = null);
+
+/// <param name="Finales">Season finales against their season's average; null with no finished, rated season.</param>
+/// <param name="SeasonBests">The best-rated episode of each season with rated episodes.</param>
+/// <param name="Consistency">How much episode ratings vary; null below the minimum number of rated episodes.</param>
+/// <param name="Arc">Where the show peaked and whether it declined after; null with fewer than three rated seasons.</param>
+public record EpisodePatterns(FinaleStats? Finales, IReadOnlyList<SeasonBest> SeasonBests, Consistency? Consistency, Arc? Arc);
+
+/// <param name="Seasons">Finished seasons with enough rated episodes to compare.</param>
+/// <param name="BeatSeasonAverage">Of those, how many finales rated above their season's average.</param>
+/// <param name="AverageDifference">Finale rating minus season average, averaged over those seasons.</param>
+public record FinaleStats(int Seasons, int BeatSeasonAverage, double AverageDifference);
+
+public record SeasonBest(int SeasonNumber, Guid EpisodeId, int EpisodeNumber, string Title, double Rating);
+
+/// <param name="Spread">Standard deviation of aired episodes' ratings (0-10 scale).</param>
+/// <param name="Label">"steady", "varied" or "rollercoaster" (see <see cref="InsightRules"/>).</param>
+public record Consistency(double Spread, string Label);
+
+/// <param name="DeclineFromSeason">
+/// The first season after the peak from which every rated season stayed well below it; null when the show held up.
+/// </param>
+/// <param name="PeakIsLatest">True when the latest rated season is the best one.</param>
+public record Arc(int PeakSeason, double PeakRating, int? DeclineFromSeason, bool PeakIsLatest);
 
 /// <param name="OurStars">How many of our users gave the show 1-5 stars (index 0 is 1 star); null below the minimum.</param>
 /// <param name="ExternalEpisodes">Aired episodes by provider rating, in half-point buckets from the lowest to the highest.</param>
@@ -116,4 +141,59 @@ public static class InsightRules
 
     /// <summary>A viewer counts as having stopped after this many days without watching the show.</summary>
     public const int StoppedAfterDays = 30;
+
+    /// <summary>
+    /// Episode-rating spreads (standard deviation) below this are "steady", from <see cref="RollercoasterSpread"/>
+    /// a "rollercoaster", "varied" between. On TVmaze, most shows fall between 0.25 and 0.6 (median about 0.4).
+    /// </summary>
+    public const double SteadySpread = 0.3;
+
+    public const double RollercoasterSpread = 0.6;
+
+    /// <summary>Consistency needs this many rated episodes.</summary>
+    public const int MinRatedEpisodesForConsistency = 20;
+
+    /// <summary>A season counts as a decline from the peak when it's at least this far below it (0-10 scale).</summary>
+    public const double DeclineMargin = 0.3;
 }
+
+/// <summary>The discovery lists Analytics keeps, by their API names.</summary>
+public static class DiscoveryLists
+{
+    /// <summary>Highly rated shows that aren't among the most popular, and that few of our users follow yet.</summary>
+    public const string HiddenGems = "hidden-gems";
+
+    /// <summary>Well-rated shows whose episodes vary least.</summary>
+    public const string MostConsistent = "most-consistent";
+
+    /// <summary>Well-rated shows whose episodes vary most.</summary>
+    public const string Rollercoasters = "rollercoasters";
+
+    /// <summary>Season finales, ranked like top episodes.</summary>
+    public const string BestFinales = "best-finales";
+
+    public static readonly IReadOnlyList<string> All = [HiddenGems, MostConsistent, Rollercoasters, BestFinales];
+}
+
+/// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>
+/// <param name="AverageShowRating">The provider's ratings of their shows, averaged; null when none are rated.</param>
+/// <param name="FirstYear">The year the earliest of their shows first aired.</param>
+/// <param name="LastYear">The year the latest episode of their shows aired.</param>
+/// <param name="FrequentCoStars">Actors credited in at least two of the same shows, most shared first.</param>
+/// <param name="Followers">Our users following at least one of their shows; null below the minimum number.</param>
+public record PersonInsights(
+    Guid PersonId,
+    string Name,
+    DateTime ComputedAtUtc,
+    int ShowCount,
+    double? AverageShowRating,
+    PersonShow? BestShow,
+    int? FirstYear,
+    int? LastYear,
+    IReadOnlyList<CoStar> FrequentCoStars,
+    int? Followers);
+
+public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? Rating, string? Character);
+
+/// <param name="PersonId">The catalog's id for the co-star, for linking to their page.</param>
+public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);

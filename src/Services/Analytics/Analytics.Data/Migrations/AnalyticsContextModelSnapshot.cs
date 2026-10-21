@@ -69,6 +69,54 @@ namespace Analytics.Data.Migrations
                     b.ToTable("cast_credits", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.DiscoveryRow", b =>
+                {
+                    b.Property<string>("List")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Genre")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("EpisodeNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EpisodeTitle")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("PosterUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("SeasonNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("ShowExternalRating")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ShowTitle")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<double>("Value")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("List", "Genre", "Rank");
+
+                    b.ToTable("discovery", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.EpisodeCopy", b =>
                 {
                     b.Property<Guid>("EpisodeId")
@@ -103,6 +151,24 @@ namespace Analytics.Data.Migrations
                     b.HasIndex("ShowId");
 
                     b.ToTable("episodes", (string)null);
+                });
+
+            modelBuilder.Entity("Analytics.Data.PersonInsightsRow", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ComputedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("PersonId");
+
+                    b.ToTable("person_insights", (string)null);
                 });
 
             modelBuilder.Entity("Analytics.Data.PremiereRow", b =>

@@ -28,6 +28,19 @@ public record TopEpisodeDto(
     DateTimeOffset? AirsAtUtc,
     RatingPair Rating);
 
+/// <param name="Value">What the list ranks by: the show's rating (hidden gems), its episode-rating spread (consistency lists)
+/// or the finale's rating (best finales).</param>
+public record DiscoveryItemDto(
+    Guid ShowId,
+    string ShowTitle,
+    string? PosterUrl,
+    double? ShowExternalRating,
+    double Value,
+    Guid? EpisodeId,
+    int? SeasonNumber,
+    int? EpisodeNumber,
+    string? EpisodeTitle);
+
 /// <summary>
 /// Insights for signed-in users only. Everything is computed hourly by Analytics.Worker; these endpoints just read it.
 /// Our users' averages are only included once enough ratings back them (see <see cref="InsightRules"/>).
@@ -41,6 +54,9 @@ public static class InsightsApi
         api.MapGet("/shows/{showId:guid}/insights", GetShowInsightsAsync);
         api.MapGet("/insights/premieres", GetPremieresAsync);
         api.MapGet("/insights/top-episodes", GetTopEpisodesAsync);
+        api.MapGet("/insights/discover/{list}", GetDiscoveryAsync);
+        api.MapGet("/people/{personId:guid}/insights", GetPersonInsightsAsync);
+        api.MapGet("/me/taste", TasteApi.GetTasteAsync);
 
         return api;
     }
@@ -78,6 +94,40 @@ public static class InsightsApi
         return TypedResults.Ok(rows
             .Select(p => new PremiereDto(p.ShowId, p.ShowTitle, p.PosterUrl, p.Genres, p.SeasonNumber, p.PremieresAtUtc,
                 p.ShowExternalRating, p.DaysSincePreviousSeason, p.CatchUpEpisodes, p.CatchUpRuntimeMinutes, p.RecentFollows))
+            .ToList());
+    }
+
+    /// <summary>The stored document is returned as-is: it is already the <see cref="PersonInsights"/> JSON.</summary>
+    private static async Task<Results<ContentHttpResult, NotFound>> GetPersonInsightsAsync(Guid personId, AnalyticsContext db, CancellationToken ct)
+    {
+        var document = await db.PersonInsights.AsNoTracking()
+            .Where(i => i.PersonId == personId)
+            .Select(i => i.Document)
+            .SingleOrDefaultAsync(ct);
+
+        return document is null ? TypedResults.NotFound() : TypedResults.Text(document, "application/json");
+    }
+
+    /// <param name="list">One of <see cref="DiscoveryLists.All"/>.</param>
+    /// <param name="genre">A genre to rank within; omitted for the overall list.</param>
+    private static async Task<Results<Ok<List<DiscoveryItemDto>>, NotFound>> GetDiscoveryAsync(
+        string list, AnalyticsContext db, string? genre = null, int limit = 20, CancellationToken ct = default)
+    {
+        if (!DiscoveryLists.All.Contains(list))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var key = genre?.Trim() ?? "";
+        var rows = await db.Discovery.AsNoTracking()
+            .Where(d => d.List == list && d.Genre == key)
+            .OrderBy(d => d.Rank)
+            .Take(Math.Clamp(limit, 1, 30))
+            .ToListAsync(ct);
+
+        return TypedResults.Ok(rows
+            .Select(d => new DiscoveryItemDto(d.ShowId, d.ShowTitle, d.PosterUrl, d.ShowExternalRating, d.Value,
+                d.EpisodeId, d.SeasonNumber, d.EpisodeNumber, d.EpisodeTitle))
             .ToList());
     }
 

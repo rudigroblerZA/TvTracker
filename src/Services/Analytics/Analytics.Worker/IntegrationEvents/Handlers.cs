@@ -213,7 +213,7 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
                 UserId = e.UserId,
                 EpisodeId = id,
                 ShowId = e.ShowId,
-                WatchedAtUtc = e.CreatedAt.UtcDateTime
+                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
             }));
         });
 

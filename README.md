@@ -134,7 +134,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
-| Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, run facts, premiere build-up, shared cast |
+| Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
 | WebApp | `src/Clients/WebApp` | Blazor web app; OIDC sign-in, tokens kept server-side in Redis, browser push |
@@ -152,6 +152,23 @@ How events flow:
   averages and histograms, viewers, drop-off, follows) appear only with at least 5 users behind them. Ratings, watches
   and follows made before Analytics existed aren't replayed; they accumulate from then on. On its first start it asks the sync worker to replay the
   catalog (`POST /api/v1/imports/replay`, internal), so shows imported before it existed reach it too.
+- **What Analytics shows:**
+  - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
+    from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
+    each season's best episode.
+  - **Insights page — discovery lists**, overall or by genre:
+    - hidden gems: rated 7.5+, outside the catalog's most popular 40% on TVmaze, and few of our users follow them;
+    - most consistent and biggest rollercoasters, among well-rated shows;
+    - best season finales.
+  - **Person page — actor insights:** their shows' average rating, best-rated show, the years their shows aired,
+    co-stars they share two or more shows with, and how many of our users follow their shows.
+  - **Stats page — your taste:** computed on request from your own data only.
+    - How your ratings compare with TVmaze's (stars doubled to its 0-10).
+    - The genres you rate highest.
+    - Time watched over the last 12 months.
+    - Shows you're caught up on, watching, or dropped (nothing watched for 30 days).
+
+  Watched events carry the time the user watched, so episodes the mobile app marks while offline count in the right month.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 
 ## Database schema

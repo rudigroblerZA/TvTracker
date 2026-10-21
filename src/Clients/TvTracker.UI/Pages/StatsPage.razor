@@ -1,5 +1,6 @@
 @page "/stats"
 @inject TrackingClient Tracking
+@inject AnalyticsClient Analytics
 
 <PageTitle>Stats · TV Tracker</PageTitle>
 
@@ -61,6 +62,107 @@
                 </section>
             }
         }
+
+        @if (taste is not null)
+        {
+            <section>
+                <h2>Your taste</h2>
+
+                @if (taste.Bias is { } bias)
+                {
+                    <p>
+                        <span class="tag">@BiasLabel(bias)</span>
+                        @BiasText(bias)
+                    </p>
+                    @if (bias.Kinder.Count > 0 || bias.Harsher.Count > 0)
+                    {
+                        <div class="taste-compare">
+                            @if (bias.Kinder.Count > 0)
+                            {
+                                <div>
+                                    <div class="muted small">You liked more than TVmaze</div>
+                                    <ul class="shared-cast">
+                                        @foreach (var show in bias.Kinder)
+                                        {
+                                            <li><a href="shows/@show.ShowId">@show.Title</a> <span class="muted small">★ @show.Stars vs @Format.Rating(show.ExternalRating)</span></li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                            @if (bias.Harsher.Count > 0)
+                            {
+                                <div>
+                                    <div class="muted small">You liked less than TVmaze</div>
+                                    <ul class="shared-cast">
+                                        @foreach (var show in bias.Harsher)
+                                        {
+                                            <li><a href="shows/@show.ShowId">@show.Title</a> <span class="muted small">★ @show.Stars vs @Format.Rating(show.ExternalRating)</span></li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="muted">Rate a few more shows or episodes to see how your taste compares with TVmaze's.</p>
+                }
+
+                @if (taste.Genres.Count > 0)
+                {
+                    <h3>Genres you rate highest</h3>
+                    <ul class="bars wide-values">
+                        @foreach (var genre in taste.Genres)
+                        {
+                            <li>
+                                <span class="bar-label">@genre.Genre</span>
+                                <span class="bar" style="width:@((int)Math.Round(100 * genre.AverageStars / 5))%"></span>
+                                <span class="muted small nowrap" title="@genre.Rated shows rated">★ @genre.AverageStars.ToString("0.0") (@genre.Rated)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                @if (taste.Months.Any(m => m.Minutes > 0))
+                {
+                    <h3>The last 12 months</h3>
+                    var most = Math.Max(1, taste.Months.Max(m => m.Minutes));
+                    <div class="columns" aria-label="Time watched per month">
+                        @foreach (var month in taste.Months)
+                        {
+                            <div class="column" title="@MonthName(month): @month.Episodes episodes, @Format.Duration(month.Minutes)">
+                                <span style="height:@(100 * month.Minutes / most)%"></span>
+                                <span class="column-label">@MonthName(month)[..1]</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (taste.Progress is { } progress && progress.Finished + progress.Watching + progress.Dropped > 0)
+                {
+                    <h3>Finished, watching, dropped</h3>
+                    <div class="stat-tiles">
+                        <div class="stat"><div class="stat-value">@progress.Finished</div><div class="muted">caught up</div></div>
+                        <div class="stat"><div class="stat-value">@progress.Watching</div><div class="muted">watching</div></div>
+                        <div class="stat"><div class="stat-value">@progress.Dropped</div><div class="muted">dropped (nothing for 30+ days)</div></div>
+                    </div>
+                    @if (progress.RecentlyDropped.Count > 0)
+                    {
+                        <p class="muted small">Pick one back up?</p>
+                        <ul class="shared-cast">
+                            @foreach (var show in progress.RecentlyDropped)
+                            {
+                                <li>
+                                    <a href="shows/@show.ShowId">@show.Title</a>
+                                    <span class="muted small">@show.Watched of @show.Aired episodes · last watched @Format.Relative(show.LastWatchedAtUtc)</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+            </section>
+        }
     </Authorized>
     <NotAuthorized>
         <SignInPrompt />
@@ -69,6 +171,7 @@
 
 @code {
     private Stats? stats;
+    private Taste? taste;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -84,5 +187,31 @@
         {
             error = ErrorNotice.Describe(ex);
         }
+
+        try
+        {
+            taste = await Analytics.GetTasteAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Your taste is extra: the stats above work without Analytics.
+        }
     }
+
+    private static string BiasLabel(RatingBias bias) => bias.Label switch
+    {
+        "kinder" => "Generous rater",
+        "harsher" => "Tough critic",
+        _ => "In line with TVmaze"
+    };
+
+    private static string BiasText(RatingBias bias) => bias.Label switch
+    {
+        "in line" => $"Across {bias.Compared} ratings, your stars (doubled to TVmaze's 0-10) land close to TVmaze's.",
+        _ => $"Across {bias.Compared} ratings, your stars (doubled to TVmaze's 0-10) are {Math.Abs(bias.AverageDifference):0.0} points " +
+             $"{(bias.AverageDifference > 0 ? "above" : "below")} TVmaze's on average."
+    };
+
+    private static string MonthName(MonthWatch month) =>
+        new DateTime(month.Year, month.Month, 1).ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
 }

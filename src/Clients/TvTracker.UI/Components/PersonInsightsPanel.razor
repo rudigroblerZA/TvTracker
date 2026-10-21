@@ -1,0 +1,80 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+@* Actor insights for signed-in users; computed hourly with the shows'. *@
+@if (insights is not null)
+{
+    <section class="insights">
+        <h2>Insights</h2>
+
+        <div class="stat-tiles">
+            @if (insights.AverageShowRating is { } average)
+            {
+                <div class="stat"><div class="stat-value">@Format.Rating(average)</div><div class="muted">average TVmaze rating of their shows</div></div>
+            }
+            @if (insights.BestShow is { Rating: { } bestRating } best && insights.ShowCount > 1)
+            {
+                <div class="stat">
+                    <div class="stat-value"><a href="shows/@best.ShowId">@best.Title</a></div>
+                    <div class="muted">best rated · @Format.Rating(bestRating)@(string.IsNullOrEmpty(best.Character) ? "" : $" · as {best.Character}")</div>
+                </div>
+            }
+            @if (insights.FirstYear is { } first && insights.LastYear is { } last)
+            {
+                <div class="stat">
+                    <div class="stat-value">@(first == last ? first.ToString() : $"{first}–{last}")</div>
+                    <div class="muted">years their shows aired</div>
+                </div>
+            }
+            @if (insights.Followers is { } followers)
+            {
+                <div class="stat"><div class="stat-value">@followers</div><div class="muted">TV Tracker users follow their shows</div></div>
+            }
+        </div>
+
+        @if (insights.FrequentCoStars.Count > 0)
+        {
+            <h3>Frequent co-stars</h3>
+            <ul class="shared-cast">
+                @foreach (var coStar in insights.FrequentCoStars)
+                {
+                    <li>
+                        <a href="people/@coStar.PersonId"><strong>@coStar.Name</strong></a>
+                        @* Spaces inside the span: Blazor drops text nodes that are only whitespace. *@
+                        <span class="muted"> · @coStar.SharedShows.Count shows together: </span>
+                        @for (var i = 0; i < coStar.SharedShows.Count; i++)
+                        {
+                            var show = coStar.SharedShows[i];
+                            <a href="shows/@show.ShowId">@show.Title</a>@(i < coStar.SharedShows.Count - 1 ? ", " : "")
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        <p class="muted small">From the shows in the catalog and <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> ratings. Updated hourly.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PersonId { get; set; }
+
+    private PersonInsights? insights;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        insights = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (Session.IsSignedIn)
+            {
+                insights = await Analytics.GetPersonInsightsAsync(PersonId);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Insights are extra: the rest of the page works without them.
+        }
+    }
+}
