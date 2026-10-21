@@ -125,7 +125,7 @@ public sealed partial class TvMazeCatalogProvider(
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync(
-            $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=images", cancellationToken);
+            $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=crew&embed[]=images", cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -209,7 +209,8 @@ public sealed partial class TvMazeCatalogProvider(
             Cast: cast,
             WatchOptions: WatchOptions(s),
             SimilarExternalIds: [],
-            Rating: s.Rating?.Average);
+            Rating: s.Rating?.Average,
+            Creatives: Creatives(embedded.Crew));
     }
 
     /// <summary>
@@ -237,6 +238,55 @@ public sealed partial class TvMazeCatalogProvider(
         return regions
             .Select(region => new ProviderWatchOption(region, Truncate(name, 128), WatchProviderType.Stream, s.WebChannel.OfficialSite ?? s.OfficialSite))
             .ToList();
+    }
+
+    /// <summary>The roles that say who made a show; TVmaze also lists writers, composers, casting and the like.</summary>
+    internal static readonly string[] CreativeRoles = ["Creator", "Developer", "Executive Producer"];
+
+    /// <summary>Creators and developers first, then executive producers, one entry per person.</summary>
+    private static List<ProviderCreative> Creatives(List<TvMazeCrewCredit> crew) => crew
+        .Where(c => c.Person?.Name is not null && c.Type is not null && CreativeRoles.Contains(c.Type))
+        .GroupBy(c => c.Person!.Id?.ToString() ?? c.Person.Name!)
+        .Select(g => new ProviderCreative(
+            Truncate(g.First().Person!.Name!, 256),
+            g.First().Person!.Image?.Medium,
+            g.Select(c => c.Type!).Distinct().OrderBy(t => Array.IndexOf(CreativeRoles, t)).ToList(),
+            g.First().Person is { Id: { } personId } p
+                ? new ProviderPerson(personId.ToString(), p.Birthday, p.Deathday, p.Gender, p.Country?.Name)
+                : null))
+        .OrderBy(c => c.Roles.Contains("Executive Producer") && c.Roles.Count == 1)
+        .ToList();
+
+    /// <summary>One call: the person's crew credits with each show embedded (for its name and popularity).</summary>
+    public async Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync($"people/{Uri.EscapeDataString(personExternalId)}/crewcredits?embed=show", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var credits = await response.Content.ReadFromJsonAsync<List<TvMazeCrewCareerCredit>>(cancellationToken) ?? [];
+        var shows = credits.Where(c => c.Embedded?.Show is not null).ToList();
+        if (shows.Count == 0)
+        {
+            return null;
+        }
+
+        int Count(params string[] types) => shows.Where(c => types.Contains(c.Type)).Select(c => c.Embedded!.Show!.Id).Distinct().Count();
+        return new ProviderCareer(
+            shows.Select(c => c.Embedded!.Show!.Id).Distinct().Count(),
+            Count("Creator", "Developer"),
+            Count("Executive Producer"),
+            shows.Where(c => c.Type is not null && CreativeRoles.Contains(c.Type))
+                .Select(c => c.Embedded!.Show!)
+                .DistinctBy(s => s.Id)
+                .OrderByDescending(s => s.Weight)
+                .ThenByDescending(s => s.Rating?.Average ?? 0)
+                .Take(10)
+                .Select(s => Truncate(s.Name ?? $"Show {s.Id}", 256))
+                .ToList());
     }
 
     private static string? StripHtml(string? html)
@@ -340,6 +390,7 @@ internal sealed record TvMazeEmbedded
     public List<TvMazeEpisode> Episodes { get; init; } = [];
     public List<TvMazeSeason> Seasons { get; init; } = [];
     public List<TvMazeCastCredit> Cast { get; init; } = [];
+    public List<TvMazeCrewCredit> Crew { get; init; } = [];
     public List<TvMazeShowImage> Images { get; init; } = [];
 }
 
@@ -348,6 +399,19 @@ internal sealed record TvMazeEpisode(int Id, string? Name, int? Season, int? Num
 internal sealed record TvMazeSeason(int Number, string? Name, DateOnly? PremiereDate, string? Summary);
 
 internal sealed record TvMazeCastCredit(TvMazePerson? Person, TvMazeCharacter? Character);
+
+internal sealed record TvMazeCrewCredit(string? Type, TvMazePerson? Person);
+
+/// <summary>An entry of /people/{id}/crewcredits?embed=show.</summary>
+internal sealed record TvMazeCrewCareerCredit
+{
+    public string? Type { get; init; }
+
+    [JsonPropertyName("_embedded")]
+    public TvMazeCrewCareerEmbedded? Embedded { get; init; }
+}
+
+internal sealed record TvMazeCrewCareerEmbedded(TvMazeShow? Show);
 
 internal sealed record TvMazePerson(int? Id, string? Name, TvMazeImage? Image, DateOnly? Birthday, DateOnly? Deathday, string? Gender, TvMazeCountry? Country);
 

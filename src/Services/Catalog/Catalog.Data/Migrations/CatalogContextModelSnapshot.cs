@@ -56,7 +56,6 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.Episode", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<bool>("AiredPublished")
@@ -108,11 +107,28 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.Person", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly?>("Birthday")
                         .HasColumnType("date");
+
+                    b.Property<int?>("CareerCreated")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CareerExecutiveProduced")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("CareerNotableShows")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'");
+
+                    b.Property<DateTime?>("CareerRefreshedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CareerShows")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Country")
                         .HasMaxLength(128)
@@ -151,7 +167,6 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.Season", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Name")
@@ -182,7 +197,6 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.Show", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("BackdropUrl")
@@ -190,6 +204,9 @@ namespace Catalog.Data.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("CreativesImported")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ExternalId")
                         .IsRequired()
@@ -274,6 +291,28 @@ namespace Catalog.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowCreative", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.HasKey("ShowId", "PersonId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("show_creatives", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.ShowEmbedding", b =>
                 {
                     b.Property<Guid>("ShowId")
@@ -309,7 +348,6 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.WatchProvider", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("ProviderName")
@@ -421,6 +459,23 @@ namespace Catalog.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowCreative", b =>
+                {
+                    b.HasOne("Catalog.Data.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithMany("Creatives")
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Person");
+                });
+
             modelBuilder.Entity("Catalog.Data.ShowEmbedding", b =>
                 {
                     b.HasOne("Catalog.Data.Show", null)
@@ -442,6 +497,8 @@ namespace Catalog.Data.Migrations
             modelBuilder.Entity("Catalog.Data.Show", b =>
                 {
                     b.Navigation("Cast");
+
+                    b.Navigation("Creatives");
 
                     b.Navigation("Episodes");
 

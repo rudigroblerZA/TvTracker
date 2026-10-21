@@ -44,6 +44,8 @@ builder.Services.AddScoped<CatalogSynchronizer>();
 builder.Services.AddSingleton<CatalogReplayRunner>();
 builder.Services.AddSingleton<BulkImportRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();
+// Creators and executive producers: backfills older shows and keeps career figures current.
+builder.Services.AddHostedService<CreativesService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
 builder.Services.AddLocalEmbeddings(builder.Configuration);

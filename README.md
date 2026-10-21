@@ -181,6 +181,15 @@ How events flow:
     - hidden gems: rated 7.5+, outside the catalog's most popular 40% on TVmaze, and few of our users follow them;
     - most consistent and biggest rollercoasters, among well-rated shows;
     - best season finales.
+  - **Show page — prolific creators and producers:** who made the show, featuring the most prolific person.
+    - **Prolific** means credited behind the camera on 10 or more shows on TVmaze. Dick Wolf has 57 and Chuck Lorre 19.
+    - **What it shows:** their totals, best-known shows, and their other shows in the catalog.
+    - **Who's featured:** the most prolific person, plus any other prolific creator. A production company's other
+      executive producers aren't listed.
+    - **Data:** the sync worker imports creators, developers and executive producers with each show, in the same TVmaze
+      request. Every minute it also fetches 30 people's careers from `/people/{id}/crewcredits`, refreshed monthly: every
+      creator, and anyone credited on two or more catalog shows. Shows imported before this are backfilled at 30 a minute.
+    - **Person pages:** they show the same career line and a "Made" row.
   - **Person page — actor insights:** their shows' average rating, best-rated show, the years their shows aired,
     co-stars they share two or more shows with, and how many of our users follow their shows.
   - **Stats page — your taste:** computed on request from your own data only.

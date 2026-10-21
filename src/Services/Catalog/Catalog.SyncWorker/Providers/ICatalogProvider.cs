@@ -29,6 +29,9 @@ public interface ICatalogProvider
 
     /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
+
+    /// <summary>A person's whole career behind the camera, from the provider; null when it has nothing for them.</summary>
+    Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default);
 }
 
 public record ProviderShow(
@@ -48,7 +51,18 @@ public record ProviderShow(
     IReadOnlyList<ProviderCastMember> Cast,
     IReadOnlyList<ProviderWatchOption> WatchOptions,
     IReadOnlyList<string> SimilarExternalIds,
-    double? Rating);
+    double? Rating,
+    IReadOnlyList<ProviderCreative>? Creatives = null);
+
+/// <summary>Someone who made the show: its creators and executive producers.</summary>
+/// <param name="Roles">"Creator", "Developer" and/or "Executive Producer".</param>
+public record ProviderCreative(string Name, string? PhotoUrl, IReadOnlyList<string> Roles, ProviderPerson? Person);
+
+/// <param name="Shows">Shows they're credited on behind the camera.</param>
+/// <param name="Created">Shows they created or developed.</param>
+/// <param name="ExecutiveProduced">Shows they were an executive producer on.</param>
+/// <param name="NotableShows">Their best-known shows (the provider's most popular), at most 10.</param>
+public record ProviderCareer(int Shows, int Created, int ExecutiveProduced, IReadOnlyList<string> NotableShows);
 
 public record ProviderSeason(int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc);
 
