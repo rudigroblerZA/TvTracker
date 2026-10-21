@@ -1,6 +1,7 @@
 @page "/search"
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation
+@inject UserSession Session
 
 <PageTitle>Search · TV Tracker</PageTitle>
 
@@ -71,7 +72,9 @@ else if (results is not null)
     {
         query = InitialQuery;
         genre = InitialGenre;
-        tag = InitialTag;
+        await Session.EnsureLoadedAsync();
+        // The tag filter is for signed-in users (the API refuses it otherwise); a shared ?tag= link just searches without it.
+        tag = Session.IsSignedIn ? InitialTag : null;
         try
         {
             genres = await Catalog.GetGenresAsync() ?? [];

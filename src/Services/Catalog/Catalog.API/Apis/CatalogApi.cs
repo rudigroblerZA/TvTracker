@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -35,11 +36,19 @@ public static class CatalogApi
     /// Shows whose title contains the search term (most popular first), followed by shows similar in meaning
     /// (closest first; see <see cref="SemanticSearch"/>). Genre, status and tags filter both.
     /// </summary>
-    /// <param name="tags">Comma-separated tag keys from Analytics ("bingeable,fan-favorite"); shows must have all of them.</param>
-    private static async Task<Ok<PagedResult<ShowSummaryDto>>> SearchShowsAsync(
-        CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, string? search, string? genre, ShowStatus? status,
-        string? tags = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
+    /// <param name="tags">
+    /// Comma-separated tag keys from Analytics ("bingeable,fan-favorite"); shows must have all of them. Tags are part of
+    /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
+    /// </param>
+    private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
+        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, string? search, string? genre,
+        ShowStatus? status, string? tags = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
+        {
+            return TypedResults.Unauthorized();
+        }
+
         if (page <= 1 && !string.IsNullOrWhiteSpace(search))
         {
             // Pulls in matching shows the catalog doesn't have yet, so they appear in the results.

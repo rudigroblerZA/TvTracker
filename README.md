@@ -168,7 +168,8 @@ How events flow:
     (`GET /api/v1/insights/tags?ids=…`).
 
     Search can filter by tag for signed-in users. The filter is a "kind of show" dropdown, or `tags=bingeable,fan-favorite` on
-    `GET /api/v1/shows`, where shows must have every tag listed. Analytics sends tag changes to the catalog after each
+    `GET /api/v1/shows`, where shows must have every tag listed. The API answers 401 to a tag filter without a valid
+    token; the rest of search stays public, and a shared `?tag=` link opened while signed out searches without the tag. Analytics sends tag changes to the catalog after each
     hourly run (`ShowTagsChangedIntegrationEvent`). It also sends every show's tags after it starts and then daily, in
     case an event is lost. The catalog keeps them in `shows.Tags`, so the filter runs inside the search query and
     paging, title matches and similar-meaning matches all respect it.
