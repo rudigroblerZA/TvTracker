@@ -31,6 +31,14 @@ The catalog grows as the schedule changes. Imported shows are refreshed daily (e
 is refreshed promptly when someone follows it. The first sync takes a minute or two, because calls are throttled to stay under
 TVmaze's limit of 20 calls every 10 seconds. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
 
+If TVmaze's combined show request fails (a 5xx after the retries; seen during an outage), the sync worker switches to
+separate requests for 15 minutes. It fetches the show, episodes, seasons, cast and images in parallel; those kept
+working when the combined request didn't.
+- **Needed:** the show, episodes and seasons. If one of them fails, the show isn't imported this time.
+- **Optional:** cast and images. If they fail, the show imports without them, and a refresh keeps what it already had.
+- **One show at a time:** a show TVmaze keeps failing is skipped (imports), retried in an hour (refreshes and the
+  creatives backfill), and doesn't stop the others.
+
 Search finds any show on TVmaze, not just imported ones. Before searching, Catalog.API asks the sync worker
 (`POST /api/v1/imports/search`, internal only) to import TVmaze's top 5 matches it doesn't have yet, then searches the catalog.
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes

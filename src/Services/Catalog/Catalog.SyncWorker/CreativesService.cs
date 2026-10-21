@@ -23,6 +23,9 @@ public sealed class CreativesService(
     private static readonly TimeSpan CareerMaxAge = TimeSpan.FromDays(30);
     private static readonly TimeSpan BackfillRetry = TimeSpan.FromHours(1);
 
+    // Shows the provider failed, and when to try them again. Only this service's loop touches it.
+    private readonly Dictionary<string, DateTimeOffset> _failed = [];
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -54,8 +57,10 @@ public sealed class CreativesService(
 
         // Synced over an hour ago: a show whose crew the provider failed to return is retried hourly, not every round.
         var syncedBefore = time.GetUtcNow().UtcDateTime - BackfillRetry;
+        var now = time.GetUtcNow();
+        var skip = _failed.Where(f => f.Value > now).Select(f => f.Key).ToList();
         var pending = await db.Shows
-            .Where(s => !s.CreativesImported && s.Source == provider.Name && s.LastSyncedAtUtc < syncedBefore)
+            .Where(s => !s.CreativesImported && s.Source == provider.Name && s.LastSyncedAtUtc < syncedBefore && !skip.Contains(s.ExternalId))
             .OrderByDescending(s => s.Popularity)
             .Select(s => s.ExternalId)
             .Take(ShowsPerRound)
@@ -63,9 +68,18 @@ public sealed class CreativesService(
 
         foreach (var externalId in pending)
         {
-            if (await provider.GetShowAsync(externalId, ct) is { } show)
+            try
             {
-                await synchronizer.RefreshAsync(show, ct);
+                if (await provider.GetShowAsync(externalId, ct) is { } show)
+                {
+                    await synchronizer.RefreshAsync(show, ct);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // The provider failing one show shouldn't stop the round, or come first in every round after.
+                _failed[externalId] = now + BackfillRetry;
+                logger.LogWarning(ex, "Couldn't backfill show {ExternalId}; retrying in {Retry}", externalId, BackfillRetry);
             }
         }
 
