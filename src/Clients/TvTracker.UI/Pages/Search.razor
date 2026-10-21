@@ -15,6 +15,15 @@
             <option value="@g">@g</option>
         }
     </select>
+    <AuthorizeView>
+        <select @bind="tag" aria-label="Tag">
+            <option value="">Any kind of show</option>
+            @foreach (var (key, label) in ShowTagOptions.All)
+            {
+                <option value="@key">@label</option>
+            }
+        </select>
+    </AuthorizeView>
     <button class="btn" type="submit" disabled="@searching">Search</button>
 </form>
 
@@ -45,9 +54,11 @@ else if (results is not null)
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? InitialQuery { get; set; }
     [SupplyParameterFromQuery(Name = "genre")] public string? InitialGenre { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? InitialTag { get; set; }
 
     private string? query;
     private string? genre;
+    private string? tag;
     private List<string> genres = [];
     private PagedResult<ShowSummary>? results;
     private List<ShowSummary> loaded = [];
@@ -58,6 +69,7 @@ else if (results is not null)
     {
         query = InitialQuery;
         genre = InitialGenre;
+        tag = InitialTag;
         try
         {
             genres = await Catalog.GetGenresAsync() ?? [];
@@ -75,12 +87,13 @@ else if (results is not null)
         searching = true;
         try
         {
-            results = await Catalog.SearchAsync(query, genre);
+            results = await Catalog.SearchAsync(query, genre, tag: tag);
             loaded = results?.Items.ToList() ?? [];
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
             {
                 ["q"] = string.IsNullOrWhiteSpace(query) ? null : query,
-                ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre
+                ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre,
+                ["tag"] = string.IsNullOrWhiteSpace(tag) ? null : tag
             }), replace: true);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -100,7 +113,7 @@ else if (results is not null)
             return;
         }
 
-        var next = await Catalog.SearchAsync(query, genre, results.Page + 1);
+        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, tag);
         if (next is not null)
         {
             loaded.AddRange(next.Items);

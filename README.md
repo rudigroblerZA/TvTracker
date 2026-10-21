@@ -166,6 +166,12 @@ How events flow:
     Show cards (search results, home, For you, lists and the rest) also carry up to two tags, for signed-in users.
     The cards on a page ask together, so their tags come from Analytics in one batched request
     (`GET /api/v1/insights/tags?ids=…`).
+
+    Search can filter by tag for signed-in users. The filter is a "kind of show" dropdown, or `tags=bingeable,fan-favorite` on
+    `GET /api/v1/shows`, where shows must have every tag listed. Analytics sends tag changes to the catalog after each
+    hourly run (`ShowTagsChangedIntegrationEvent`). It also sends every show's tags after it starts and then daily, in
+    case an event is lost. The catalog keeps them in `shows.Tags`, so the filter runs inside the search query and
+    paging, title matches and similar-meaning matches all respect it.
   - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
     from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
     each season's best episode.

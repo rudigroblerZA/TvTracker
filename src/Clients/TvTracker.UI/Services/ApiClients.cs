@@ -42,11 +42,13 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
 
 public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
-    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, CancellationToken ct = default)
+    /// <param name="tag">A show tag key (see <see cref="Components.ShowTagOptions"/>), e.g. "bingeable".</param>
+    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, string? tag = null, CancellationToken ct = default)
     {
         var query = $"api/v1/shows?page={page}&pageSize=24";
         if (!string.IsNullOrWhiteSpace(search)) query += $"&search={Uri.EscapeDataString(search)}";
         if (!string.IsNullOrWhiteSpace(genre)) query += $"&genre={Uri.EscapeDataString(genre)}";
+        if (!string.IsNullOrWhiteSpace(tag)) query += $"&tags={Uri.EscapeDataString(tag)}";
         return GetAsync<PagedResult<ShowSummary>>(ApiClients.Catalog, query, ct);
     }
 

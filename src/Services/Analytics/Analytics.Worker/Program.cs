@@ -26,6 +26,9 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowUnfollowedIntegrationEvent, TrackingEventHandlers>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 
+// Publishes show tags for the catalog's search filter.
+builder.Services.AddIntegrationEventOutbox<AnalyticsContext>();
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<InsightsComputer>();
 builder.Services.AddHostedService<InsightsRefresher>();

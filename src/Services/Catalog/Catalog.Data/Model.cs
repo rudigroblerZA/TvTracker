@@ -35,6 +35,12 @@ public class Show
     /// <summary>The provider's average rating (0-10, e.g. TVmaze's), or null if it has none.</summary>
     public double? ExternalRating { get; set; }
 
+    /// <summary>
+    /// Analytics' tags for the show ("bingeable", "fan-favorite", …), kept current from its events so search can filter
+    /// by them. Empty until Analytics has computed the show.
+    /// </summary>
+    public List<string> Tags { get; set; } = [];
+
     /// <summary>The provider's "similar shows", as provider ids.</summary>
     public List<string> SimilarExternalIds { get; set; } = [];
 

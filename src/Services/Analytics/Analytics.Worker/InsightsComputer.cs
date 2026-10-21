@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using TvTracker.Persistence;
 using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker;
@@ -9,7 +10,7 @@ namespace Analytics.Worker;
 /// Computes every show's insights, the premieres list and the top-episode rankings from Analytics' copies of
 /// the catalog and our users' ratings. Runs hourly; the API only reads what this writes.
 /// </summary>
-public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILogger<InsightsComputer> logger)
+public sealed class InsightsComputer(AnalyticsContext db, IIntegrationEventOutbox outbox, TimeProvider time, ILogger<InsightsComputer> logger)
 {
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -57,7 +58,8 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
 
     private const int CoStarsPerPerson = 6;
 
-    public async Task<int> ComputeAllAsync(CancellationToken ct)
+    /// <param name="publishAllTags">Send every show's tags to the catalog, not just the ones that changed.</param>
+    public async Task<int> ComputeAllAsync(CancellationToken ct, bool publishAllTags = false)
     {
         var now = time.GetUtcNow();
         var computedAt = now.UtcDateTime;
@@ -92,6 +94,7 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
         var listCandidates = new List<(ShowCopy Show, EpisodeCopy Episode, (int Sum, int Count) Ours, double Score)>();
         var discoveryCandidates = new List<DiscoveryCandidate>();
         var runs = new Dictionary<Guid, RunFacts>();
+        var tagChanges = new List<ShowTagKeys>();
 
         foreach (var batch in shows.Keys.Chunk(ShowBatchSize))
         {
@@ -118,6 +121,12 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 };
 
                 var document = JsonSerializer.Serialize(insights, JsonOptions);
+                var tagKeys = (insights.Tags ?? []).Select(t => t.Key).ToList();
+                if (publishAllTags || !existing.TryGetValue(showId, out var previous) || !TagKeysOf(previous.Document).SequenceEqual(tagKeys))
+                {
+                    tagChanges.Add(new ShowTagKeys(showId, tagKeys));
+                }
+
                 if (existing.TryGetValue(showId, out var row))
                 {
                     row.Document = document;
@@ -175,6 +184,8 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
         }
+
+        await PublishTagsAsync(tagChanges, ct);
 
         var people = PersonInsightsRows(cast, shows, runs, followersByShow, computedAt);
         await ReplaceListsAsync(premieres, TopEpisodeRows(listCandidates), DiscoveryRows(discoveryCandidates), people, ct);
@@ -661,6 +672,32 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 };
             }))
             .ToList();
+    }
+
+    /// <summary>Sends the changed tags to the catalog through the outbox, in events of at most <see cref="ShowTagsChangedIntegrationEvent.MaxShows"/> shows.</summary>
+    private async Task PublishTagsAsync(List<ShowTagKeys> changes, CancellationToken ct)
+    {
+        foreach (var chunk in changes.Chunk(ShowTagsChangedIntegrationEvent.MaxShows))
+        {
+            outbox.Add(new ShowTagsChangedIntegrationEvent(chunk));
+        }
+
+        if (changes.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            await outbox.PublishAddedAsync(ct);
+            logger.LogInformation("Published tags for {Shows} shows", changes.Count);
+        }
+    }
+
+    /// <summary>The tag keys in a stored insights document (none in documents from before tags).</summary>
+    private static List<string> TagKeysOf(string document)
+    {
+        using var json = JsonDocument.Parse(document);
+        return json.RootElement.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
+            ? tags.EnumerateArray().Select(t => t.GetProperty("key").GetString()!).ToList()
+            : [];
     }
 
     /// <summary>Each fully aired season's last episode, when it's rated and the season has enough rated episodes.</summary>
