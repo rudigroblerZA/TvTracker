@@ -314,7 +314,7 @@ public sealed class CatalogSynchronizer(
             || show.Title != p.Title
             || show.Overview != p.Overview
             || show.PosterUrl != p.PosterUrl
-            || (!p.ImagesMissing && show.BackdropUrl != p.BackdropUrl)
+            || (!p.ImagesMissing && (show.BackdropUrl != p.BackdropUrl || show.BannerUrl != p.BannerUrl))
             || show.Network != p.Network
             || show.FirstAirDate != p.FirstAirDate
             || !show.Genres.SequenceEqual(p.Genres)
@@ -329,6 +329,7 @@ public sealed class CatalogSynchronizer(
         if (!p.ImagesMissing)
         {
             show.BackdropUrl = p.BackdropUrl;
+            show.BannerUrl = p.BannerUrl;
         }
         show.Network = p.Network;
         show.FirstAirDate = p.FirstAirDate;

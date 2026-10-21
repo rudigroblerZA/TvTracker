@@ -18,7 +18,11 @@ public class Show
 
     public string? PosterUrl { get; set; }
 
+    /// <summary>A large wide image (the provider's background art), for the show page's hero.</summary>
     public string? BackdropUrl { get; set; }
+
+    /// <summary>A thin wide banner, usually with the show's logo (TVmaze's 758×140 "banner").</summary>
+    public string? BannerUrl { get; set; }
 
     public DateOnly? FirstAirDate { get; set; }
 

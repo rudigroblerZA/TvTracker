@@ -1,0 +1,45 @@
+@* The show page's wide art: the large background image when the show has one, else its thin logo banner, else nothing.
+   An image that fails to load falls through to the next. The show hero overlaps the background (see app.css). *@
+
+@if (current < Art.Count)
+{
+    var (url, isBackdrop) = Art[current];
+    if (isBackdrop)
+    {
+        <div class="show-backdrop" aria-hidden="true">
+            <img src="@url" alt="" @onerror="Next" />
+        </div>
+    }
+    else
+    {
+        <img class="show-banner" src="@url" alt="@Title banner" @onerror="Next" />
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? BackdropUrl { get; set; }
+    [Parameter] public string? BannerUrl { get; set; }
+
+    private int current;
+    private string? shownFor;
+
+    private List<(string Url, bool IsBackdrop)> Art =>
+        new[] { (Url: BackdropUrl, IsBackdrop: true), (Url: BannerUrl, IsBackdrop: false) }
+            .Where(a => !string.IsNullOrEmpty(a.Url))
+            .Select(a => (a.Url!, a.IsBackdrop))
+            .ToList();
+
+    protected override void OnParametersSet()
+    {
+        // Another show (navigating between show pages reuses the component): start from its best image again.
+        var key = BackdropUrl + "|" + BannerUrl;
+        if (key != shownFor)
+        {
+            shownFor = key;
+            current = 0;
+        }
+    }
+
+    private void Next() => current++;
+}
