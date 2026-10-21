@@ -40,7 +40,7 @@ else if (results is not null)
     <div class="card-grid">
         @foreach (var show in results.Items)
         {
-            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl"
+            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag"
                       Subtitle="@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))" />
         }
     </div>
@@ -59,6 +59,8 @@ else if (results is not null)
     private string? query;
     private string? genre;
     private string? tag;
+    // The tag the results shown were filtered by (the dropdown may have changed since).
+    private string? resultsTag;
     private List<string> genres = [];
     private PagedResult<ShowSummary>? results;
     private List<ShowSummary> loaded = [];
@@ -88,6 +90,7 @@ else if (results is not null)
         try
         {
             results = await Catalog.SearchAsync(query, genre, tag: tag);
+            resultsTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
             loaded = results?.Items.ToList() ?? [];
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
             {
@@ -113,7 +116,7 @@ else if (results is not null)
             return;
         }
 
-        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, tag);
+        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, resultsTag);
         if (next is not null)
         {
             loaded.AddRange(next.Items);

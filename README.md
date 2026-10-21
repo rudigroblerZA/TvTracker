@@ -172,6 +172,7 @@ How events flow:
     hourly run (`ShowTagsChangedIntegrationEvent`). It also sends every show's tags after it starts and then daily, in
     case an event is lost. The catalog keeps them in `shows.Tags`, so the filter runs inside the search query and
     paging, title matches and similar-meaning matches all respect it.
+    Cards in filtered results show the filtered tag first.
   - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
     from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
     each season's best episode.
