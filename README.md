@@ -153,6 +153,15 @@ How events flow:
   and follows made before Analytics existed aren't replayed; they accumulate from then on. On its first start it asks the sync worker to replay the
   catalog (`POST /api/v1/imports/replay`, internal), so shows imported before it existed reach it too.
 - **What Analytics shows:**
+  - **Show page — tags:**
+    - **Drops all at once:** the latest season released in one day, or "drops in parts" for up to 3 batches.
+    - **Bingeable:** about 10 episodes a season or fewer, under 50 hours in all, nothing left to air.
+    - **Weekend binge:** everything aired in 12 hours or less.
+    - **Fan favorite:** our users average 4.3★ or more, from at least 5 ratings, or TVmaze rates it 8.5 or higher.
+    - **Limited series, quick episodes** (30 minutes or less) and **long-running** (10 seasons or more).
+
+    Weekly release isn't tagged, since nearly every show has it. Discover has matching bingeable, weekend-binge and
+    fan-favorite lists.
   - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
     from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
     each season's best episode.

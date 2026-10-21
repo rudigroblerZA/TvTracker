@@ -228,6 +228,9 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .premieres .poster { flex: none; }
 .bars.wide-values li { grid-template-columns: 120px 1fr minmax(40px, auto); }
 .bars .nowrap { white-space: nowrap; }
+.show-tags { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.show-tag { border: 1px solid var(--border); border-radius: 10px; padding: 6px 12px; background: var(--surface); }
+.show-tag strong { color: var(--accent); }
 .taste-compare { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .discovery { list-style: none; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .discovery li { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }

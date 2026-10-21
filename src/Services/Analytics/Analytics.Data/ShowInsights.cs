@@ -9,6 +9,7 @@ namespace Analytics.Data;
 /// <param name="Viewing">Our users' viewing; null below the minimum number of viewers.</param>
 /// <param name="Momentum">Our users' follows; null below the minimum number of followers.</param>
 /// <param name="Patterns">How the show's episode ratings behave, from the provider's ratings; null before they were added.</param>
+/// <param name="Tags">Short labels for how the show is released and watched (see <see cref="ShowTags"/>); null before they were added.</param>
 public record ShowInsights(
     Guid ShowId,
     string Title,
@@ -25,7 +26,52 @@ public record ShowInsights(
     Histograms? Histograms = null,
     Viewing? Viewing = null,
     Momentum? Momentum = null,
-    EpisodePatterns? Patterns = null);
+    EpisodePatterns? Patterns = null,
+    IReadOnlyList<ShowTag>? Tags = null);
+
+/// <param name="Key">One of <see cref="ShowTags"/>.</param>
+/// <param name="Detail">The facts behind it, e.g. "8 episodes a season · all 34 in 33 h".</param>
+public record ShowTag(string Key, string Label, string Detail);
+
+/// <summary>The tags Analytics gives shows, and the rules behind them.</summary>
+public static class ShowTags
+{
+    /// <summary>
+    /// Most recent full season released on a single day, or in up to <see cref="MaxDropDays"/> batches (a streaming-style drop).
+    /// Weekly releases aren't tagged: nearly every show is weekly.
+    /// </summary>
+    public const string DropsAtOnce = "drops-at-once";
+
+    /// <summary>
+    /// Short seasons (at most <see cref="BingeableMaxEpisodesPerSeason"/> episodes on average), at most
+    /// <see cref="BingeableMaxMinutes"/> in all, with nothing left to air.
+    /// </summary>
+    public const string Bingeable = "bingeable";
+
+    /// <summary>Everything aired fits in <see cref="WeekendBingeMaxMinutes"/>, with nothing left to air.</summary>
+    public const string WeekendBinge = "weekend-binge";
+
+    /// <summary>Our users average at least <see cref="FanFavoriteMinStars"/> (from the minimum number of ratings), or the provider rates it at least <see cref="FanFavoriteMinExternal"/>.</summary>
+    public const string FanFavorite = "fan-favorite";
+
+    /// <summary>One season, and the show has ended.</summary>
+    public const string LimitedSeries = "limited-series";
+
+    /// <summary>Typical episode at most <see cref="QuickEpisodeMaxMinutes"/> minutes.</summary>
+    public const string QuickEpisodes = "quick-episodes";
+
+    /// <summary>At least <see cref="LongRunningMinSeasons"/> seasons.</summary>
+    public const string LongRunning = "long-running";
+
+    public const int MaxDropDays = 3;
+    public const int BingeableMaxEpisodesPerSeason = 10;
+    public const int BingeableMaxMinutes = 50 * 60;
+    public const int WeekendBingeMaxMinutes = 12 * 60;
+    public const double FanFavoriteMinStars = 4.3;
+    public const double FanFavoriteMinExternal = 8.5;
+    public const int QuickEpisodeMaxMinutes = 30;
+    public const int LongRunningMinSeasons = 10;
+}
 
 /// <param name="Finales">Season finales against their season's average; null with no finished, rated season.</param>
 /// <param name="SeasonBests">The best-rated episode of each season with rated episodes.</param>
@@ -172,7 +218,17 @@ public static class DiscoveryLists
     /// <summary>Season finales, ranked like top episodes.</summary>
     public const string BestFinales = "best-finales";
 
-    public static readonly IReadOnlyList<string> All = [HiddenGems, MostConsistent, Rollercoasters, BestFinales];
+    /// <summary>Shows tagged <see cref="ShowTags.Bingeable"/>, best rated first.</summary>
+    public const string Bingeable = "bingeable";
+
+    /// <summary>Shows tagged <see cref="ShowTags.WeekendBinge"/>, best rated first.</summary>
+    public const string WeekendBinges = "weekend-binges";
+
+    /// <summary>Shows tagged <see cref="ShowTags.FanFavorite"/>: our users' favourites first, then the provider's.</summary>
+    public const string FanFavorites = "fan-favorites";
+
+    public static readonly IReadOnlyList<string> All =
+        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites];
 }
 
 /// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>

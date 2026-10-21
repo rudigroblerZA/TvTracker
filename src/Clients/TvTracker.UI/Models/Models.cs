@@ -141,7 +141,10 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags);
+
+/// <param name="Key">e.g. "bingeable", "drops-at-once", "fan-favorite".</param>
+public record ShowTag(string Key, string Label, string Detail);
 
 public record EpisodePatterns(FinaleStats? Finales, IReadOnlyList<SeasonBest> SeasonBests, Consistency? Consistency, Arc? Arc);
 

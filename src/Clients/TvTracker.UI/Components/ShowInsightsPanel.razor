@@ -7,6 +7,20 @@
     <section class="insights">
         <h2>Insights</h2>
 
+        @if (insights.Tags is { Count: > 0 } tags)
+        {
+            <ul class="show-tags">
+                @foreach (var tag in tags)
+                {
+                    <li class="show-tag tag-@tag.Key">
+                        <strong>@tag.Label</strong>
+                        @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
+                        <span class="muted small"> @tag.Detail</span>
+                    </li>
+                }
+            </ul>
+        }
+
         <div class="stat-tiles">
             @if (insights.Rating.External is { } external)
             {

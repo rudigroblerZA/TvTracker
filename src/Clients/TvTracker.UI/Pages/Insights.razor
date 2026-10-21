@@ -169,7 +169,10 @@
         ("hidden-gems", "Hidden gems", "Highly rated shows that fly under the radar: less well known, and few TV Tracker users follow them yet."),
         ("most-consistent", "Most consistent", "Well-rated shows whose episodes hardly ever dip."),
         ("rollercoasters", "Rollercoasters", "Well-rated shows with the biggest swings between episodes."),
-        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes.")
+        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes."),
+        ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for."),
+        ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less."),
+        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more).")
     ];
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -209,6 +212,8 @@
         {
             "most-consistent" or "rollercoasters" => $"Episode spread {item.Value:0.00}",
             "best-finales" => $"Finale rated {Format.Rating(item.Value)}",
+            "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
+            "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from TV Tracker users",
             _ => null
         };
         return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));

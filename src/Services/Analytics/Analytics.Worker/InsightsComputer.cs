@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker;
 
@@ -168,7 +169,7 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
 
                 runs[showId] = insights.Run;
                 discoveryCandidates.Add(new DiscoveryCandidate(show, airedCount, wellRated, insights.Patterns?.Consistency,
-                    followersByShow[showId].Count(), finales));
+                    followersByShow[showId].Count(), finales, insights.Tags ?? [], insights.Rating.Ours, insights.Run.RuntimeMinutes));
             }
 
             await db.SaveChangesAsync(ct);
@@ -231,8 +232,84 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
             RunFactsFor(seasons.Select(s => s.Stats).ToList(), aired),
             NextPremiere(seasons.Select(s => s.Stats).ToList(), announced, aired, now),
             sharedCast,
-            Patterns: PatternsFor(seasons, aired));
+            Patterns: PatternsFor(seasons, aired),
+            Tags: TagsFor(show, seasons.Select(s => s.Stats).ToList(), aired, Pair(show.ExternalRating, showOurs)));
     }
+
+    /// <summary>The show's tags (see <see cref="ShowTags"/> for the rules), from its seasons, episodes and ratings.</summary>
+    private static List<ShowTag> TagsFor(ShowCopy show, List<SeasonStats> seasons, List<EpisodeCopy> aired, RatingPair rating)
+    {
+        var tags = new List<ShowTag>();
+        var airedSeasons = seasons.Where(s => s.AiredCount > 0).ToList();
+        var runtime = aired.Sum(e => e.RuntimeMinutes ?? 0);
+        // Everything announced so far has aired: no season part-way through.
+        var allOut = airedSeasons.Count > 0 && seasons.All(s => s.AiredCount == s.EpisodeCount) && aired.Count >= 3;
+
+        // Release pattern of the latest season that has fully aired.
+        var latestFull = airedSeasons.LastOrDefault(s => s.AiredCount == s.EpisodeCount && s.AiredCount >= 3);
+        if (latestFull is not null)
+        {
+            var days = aired.Where(e => e.SeasonNumber == latestFull.Number && e.AirsAtUtc is not null)
+                .Select(e => e.AirsAtUtc!.Value.UtcDateTime.Date).Distinct().Order().ToList();
+            if (days.Count == 1)
+            {
+                tags.Add(new ShowTag(ShowTags.DropsAtOnce, "Drops all at once",
+                    $"Season {latestFull.Number}: all {latestFull.AiredCount} episodes on {days[0]:d MMM yyyy}"));
+            }
+            else if (days.Count <= ShowTags.MaxDropDays && latestFull.AiredCount >= 2 * days.Count)
+            {
+                tags.Add(new ShowTag(ShowTags.DropsAtOnce, "Drops in parts",
+                    $"Season {latestFull.Number}: {latestFull.AiredCount} episodes in {days.Count} drops"));
+            }
+        }
+
+        var perSeason = airedSeasons.Count == 0 ? 0 : (double)aired.Count / airedSeasons.Count;
+        if (allOut && perSeason <= ShowTags.BingeableMaxEpisodesPerSeason && runtime <= ShowTags.BingeableMaxMinutes)
+        {
+            var time = runtime > 0 ? $" in {Hours(runtime)}" : "";
+            tags.Add(new ShowTag(ShowTags.Bingeable, "Bingeable", airedSeasons.Count == 1
+                ? $"{aired.Count} episodes{(runtime > 0 ? $" · {Hours(runtime)}" : "")}"
+                : $"About {perSeason:0} episodes a season · all {aired.Count}{time}"));
+        }
+        if (allOut && runtime is > 0 and <= ShowTags.WeekendBingeMaxMinutes)
+        {
+            tags.Add(new ShowTag(ShowTags.WeekendBinge, "Weekend binge", $"All of it in {Hours(runtime)}"));
+        }
+
+        if (rating.Ours is >= ShowTags.FanFavoriteMinStars)
+        {
+            tags.Add(new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} TV Tracker users"));
+        }
+        else if (rating.External is >= ShowTags.FanFavoriteMinExternal)
+        {
+            tags.Add(new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"Rated {rating.External:0.0} by TVmaze's viewers"));
+        }
+
+        if (airedSeasons.Count == 1 && show.Status is ShowStatus.Ended or ShowStatus.Cancelled)
+        {
+            tags.Add(new ShowTag(ShowTags.LimitedSeries, "Limited series", $"One season, {aired.Count} episodes"));
+        }
+
+        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
+        if (runtimes.Count > 0 && runtimes[runtimes.Count / 2] <= ShowTags.QuickEpisodeMaxMinutes)
+        {
+            tags.Add(new ShowTag(ShowTags.QuickEpisodes, "Quick episodes", $"About {runtimes[runtimes.Count / 2]} min each"));
+        }
+
+        if (airedSeasons.Count >= ShowTags.LongRunningMinSeasons)
+        {
+            var since = aired.Min(e => e.AirsAtUtc)?.Year;
+            tags.Add(new ShowTag(ShowTags.LongRunning, "Long-running", since is null
+                ? $"{airedSeasons.Count} seasons"
+                : $"{airedSeasons.Count} seasons since {since}"));
+        }
+
+        return tags;
+    }
+
+    /// <summary>"45 min", "6.5 h" or "33 h".</summary>
+    private static string Hours(int minutes) =>
+        minutes < 60 ? $"{minutes} min" : minutes < 600 ? $"{minutes / 60.0:0.#} h" : $"{Math.Round(minutes / 60.0)} h";
 
     /// <summary>Finales, each season's best episode, consistency and the show's arc, from the provider's ratings.</summary>
     private static EpisodePatterns PatternsFor(List<(SeasonStats Stats, int RatedEpisodes)> seasons, List<EpisodeCopy> aired)
@@ -599,7 +676,10 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
 
     private sealed record DiscoveryCandidate(
         ShowCopy Show, int AiredEpisodes, bool WellRated, Consistency? Consistency, int Followers,
-        List<(EpisodeCopy Finale, double Score)> Finales);
+        List<(EpisodeCopy Finale, double Score)> Finales, IReadOnlyList<ShowTag> Tags, double? OurRating, int RuntimeMinutes)
+    {
+        public bool Has(string tag) => Tags.Any(t => t.Key == tag);
+    }
 
     /// <summary>The discovery lists (see <see cref="DiscoveryLists"/>), overall (genre "") and per genre.</summary>
     private static List<DiscoveryRow> DiscoveryRows(List<DiscoveryCandidate> candidates)
@@ -637,6 +717,28 @@ public sealed class InsightsComputer(AnalyticsContext db, TimeProvider time, ILo
                 .OrderByDescending(f => f.Score)
                 .ThenByDescending(f => f.Show.Popularity)
                 .Select(f => Row(f.Show, f.Finale.ExternalRating!.Value, f.Finale)));
+
+            // Value: minutes to watch it all.
+            Add(DiscoveryLists.Bingeable, genre, inGenre
+                .Where(c => c.Has(ShowTags.Bingeable))
+                .OrderByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.RuntimeMinutes)));
+
+            Add(DiscoveryLists.WeekendBinges, genre, inGenre
+                .Where(c => c.Has(ShowTags.WeekendBinge))
+                .OrderByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.RuntimeMinutes)));
+
+            // Value: our users' average stars, or 0 when it's a favourite by the provider's rating.
+            Add(DiscoveryLists.FanFavorites, genre, inGenre
+                .Where(c => c.Has(ShowTags.FanFavorite))
+                .OrderByDescending(c => c.OurRating is >= ShowTags.FanFavoriteMinStars)
+                .ThenByDescending(c => c.OurRating ?? 0)
+                .ThenByDescending(c => c.Show.ExternalRating ?? 0)
+                .ThenByDescending(c => c.Show.Popularity)
+                .Select(c => Row(c.Show, c.OurRating is >= ShowTags.FanFavoriteMinStars ? c.OurRating.Value : 0)));
         }
 
         return rows;
