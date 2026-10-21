@@ -26,7 +26,8 @@ public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
     public event Action? Changed;
 
     /// <summary>The tags to show on a card, or none (not signed in, not loaded yet, or the show has none).</summary>
-    public IReadOnlyList<ShowTag> ForCard(Guid showId)
+    /// <param name="preferred">A tag key to put first when the show has it, e.g. the tag search results are filtered by.</param>
+    public IReadOnlyList<ShowTag> ForCard(Guid showId, string? preferred = null)
     {
         lock (_lock)
         {
@@ -35,11 +36,12 @@ public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
                 return [];
             }
 
-            // A weekend binge is bingeable too; show the more specific one.
+            // A weekend binge is bingeable too; show the more specific one (unless bingeable is the one asked for).
             var keys = tags.Select(t => t.Key).ToHashSet();
             return tags
-                .Where(t => CardPriority.Contains(t.Key) && !(t.Key == "bingeable" && keys.Contains("weekend-binge")))
-                .OrderBy(t => Array.IndexOf(CardPriority, t.Key))
+                .Where(t => t.Key == preferred
+                    || (CardPriority.Contains(t.Key) && !(t.Key == "bingeable" && keys.Contains("weekend-binge"))))
+                .OrderBy(t => t.Key == preferred ? -1 : Array.IndexOf(CardPriority, t.Key))
                 .Take(MaxPerCard)
                 .ToList();
         }

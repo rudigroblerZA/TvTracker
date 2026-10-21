@@ -9,7 +9,7 @@
         {
             <div class="muted small">@Subtitle</div>
         }
-        @if (Tags.ForCard(ShowId) is { Count: > 0 } tags)
+        @if (Tags.ForCard(ShowId, PreferredTag) is { Count: > 0 } tags)
         {
             <div class="card-tags">
                 @foreach (var tag in tags)
@@ -28,6 +28,9 @@
     [Parameter] public string? PosterUrl { get; set; }
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>A tag key to show first when the show has it, e.g. the tag search results are filtered by.</summary>
+    [Parameter] public string? PreferredTag { get; set; }
 
     protected override void OnInitialized() => Tags.Changed += OnTagsChanged;
 

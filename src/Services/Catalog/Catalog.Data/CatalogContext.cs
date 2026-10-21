@@ -29,6 +29,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(s => s.ExternalId).HasMaxLength(64);
             entity.Property(s => s.Title).HasMaxLength(256);
             entity.Property(s => s.Network).HasMaxLength(128);
+            entity.Property(s => s.Tags).HasDefaultValueSql("'{}'");
+            entity.HasIndex(s => s.Tags).HasMethod("gin");
 
             entity.HasMany(s => s.Seasons).WithOne().HasForeignKey(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(s => s.Episodes).WithOne().HasForeignKey(e => e.ShowId).OnDelete(DeleteBehavior.Cascade);

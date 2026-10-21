@@ -16,7 +16,8 @@ builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
 
 builder.AddRabbitMQEventBus("eventbus")
-    .AddSubscription<ShowFollowedIntegrationEvent, ShowFollowedHandler>();
+    .AddSubscription<ShowFollowedIntegrationEvent, ShowFollowedHandler>()
+    .AddSubscription<ShowTagsChangedIntegrationEvent, ShowTagsChangedHandler>();
 builder.Services.AddIntegrationEventOutbox<CatalogContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);

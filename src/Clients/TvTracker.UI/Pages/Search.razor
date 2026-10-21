@@ -1,6 +1,7 @@
 @page "/search"
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation
+@inject UserSession Session
 
 <PageTitle>Search · TV Tracker</PageTitle>
 
@@ -15,6 +16,15 @@
             <option value="@g">@g</option>
         }
     </select>
+    <AuthorizeView>
+        <select @bind="tag" aria-label="Tag">
+            <option value="">Any kind of show</option>
+            @foreach (var (key, label) in ShowTagOptions.All)
+            {
+                <option value="@key">@label</option>
+            }
+        </select>
+    </AuthorizeView>
     <button class="btn" type="submit" disabled="@searching">Search</button>
 </form>
 
@@ -31,7 +41,7 @@ else if (results is not null)
     <div class="card-grid">
         @foreach (var show in results.Items)
         {
-            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl"
+            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag"
                       Subtitle="@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))" />
         }
     </div>
@@ -45,9 +55,13 @@ else if (results is not null)
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? InitialQuery { get; set; }
     [SupplyParameterFromQuery(Name = "genre")] public string? InitialGenre { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? InitialTag { get; set; }
 
     private string? query;
     private string? genre;
+    private string? tag;
+    // The tag the results shown were filtered by (the dropdown may have changed since).
+    private string? resultsTag;
     private List<string> genres = [];
     private PagedResult<ShowSummary>? results;
     private List<ShowSummary> loaded = [];
@@ -58,6 +72,9 @@ else if (results is not null)
     {
         query = InitialQuery;
         genre = InitialGenre;
+        await Session.EnsureLoadedAsync();
+        // The tag filter is for signed-in users (the API refuses it otherwise); a shared ?tag= link just searches without it.
+        tag = Session.IsSignedIn ? InitialTag : null;
         try
         {
             genres = await Catalog.GetGenresAsync() ?? [];
@@ -75,12 +92,14 @@ else if (results is not null)
         searching = true;
         try
         {
-            results = await Catalog.SearchAsync(query, genre);
+            results = await Catalog.SearchAsync(query, genre, tag: tag);
+            resultsTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
             loaded = results?.Items.ToList() ?? [];
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
             {
                 ["q"] = string.IsNullOrWhiteSpace(query) ? null : query,
-                ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre
+                ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre,
+                ["tag"] = string.IsNullOrWhiteSpace(tag) ? null : tag
             }), replace: true);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -100,7 +119,7 @@ else if (results is not null)
             return;
         }
 
-        var next = await Catalog.SearchAsync(query, genre, results.Page + 1);
+        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, resultsTag);
         if (next is not null)
         {
             loaded.AddRange(next.Items);

@@ -245,6 +245,12 @@ namespace Catalog.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.PrimitiveCollection<List<string>>("Tags")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -255,6 +261,10 @@ namespace Catalog.Data.Migrations
                     b.HasIndex("NextRefreshAtUtc");
 
                     b.HasIndex("Popularity");
+
+                    b.HasIndex("Tags");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Tags"), "gin");
 
                     b.HasIndex("Title");
 
