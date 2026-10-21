@@ -63,6 +63,12 @@ public static class ShowTags
     /// <summary>At least <see cref="LongRunningMinSeasons"/> seasons.</summary>
     public const string LongRunning = "long-running";
 
+    /// <summary>
+    /// Made by someone credited behind the camera on at least <see cref="ProlificMinShows"/> shows on the catalog
+    /// provider (Dick Wolf, Chuck Lorre). Labelled "Prolific creator" when they created this show, else "Prolific producer".
+    /// </summary>
+    public const string ProlificCreator = "prolific-creator";
+
     public const int MaxDropDays = 3;
     public const int BingeableMaxEpisodesPerSeason = 10;
     public const int BingeableMaxMinutes = 50 * 60;
@@ -71,6 +77,9 @@ public static class ShowTags
     public const double FanFavoriteMinExternal = 8.5;
     public const int QuickEpisodeMaxMinutes = 30;
     public const int LongRunningMinSeasons = 10;
+
+    /// <summary>Same threshold as the catalog's "prolific" on show and person pages.</summary>
+    public const int ProlificMinShows = 10;
 }
 
 /// <param name="Finales">Season finales against their season's average; null with no finished, rated season.</param>

@@ -1,6 +1,7 @@
 using Catalog.Data;
 using Catalog.SyncWorker.Providers;
 using Microsoft.EntityFrameworkCore;
+using TvTracker.Persistence;
 
 namespace Catalog.SyncWorker;
 
@@ -8,7 +9,7 @@ namespace Catalog.SyncWorker;
 /// Keeps "who made it" current, a little at a time so the provider's rate limit stays shared with everything else.
 /// Every minute it:
 /// <list type="bullet">
-/// <item>re-syncs shows imported before creatives were (so they gain their creators and producers), and</item>
+/// <item>re-syncs shows without creatives (imported before they were, or whose crew the provider failed to return), and</item>
 /// <item>fetches career figures for the people that matter for the "prolific producer" insight: every creator or
 /// developer, and anyone credited on at least two of the catalog's shows. Figures are refreshed monthly.</item>
 /// </list>
@@ -20,6 +21,7 @@ public sealed class CreativesService(
     private const int PeoplePerRound = 30;
     private static readonly TimeSpan Round = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan CareerMaxAge = TimeSpan.FromDays(30);
+    private static readonly TimeSpan BackfillRetry = TimeSpan.FromHours(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -50,8 +52,10 @@ public sealed class CreativesService(
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
         var synchronizer = scope.ServiceProvider.GetRequiredService<CatalogSynchronizer>();
 
+        // Synced over an hour ago: a show whose crew the provider failed to return is retried hourly, not every round.
+        var syncedBefore = time.GetUtcNow().UtcDateTime - BackfillRetry;
         var pending = await db.Shows
-            .Where(s => !s.CreativesImported && s.Source == provider.Name)
+            .Where(s => !s.CreativesImported && s.Source == provider.Name && s.LastSyncedAtUtc < syncedBefore)
             .OrderByDescending(s => s.Popularity)
             .Select(s => s.ExternalId)
             .Take(ShowsPerRound)
@@ -73,6 +77,7 @@ public sealed class CreativesService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
+        var outbox = scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>();
         var staleBefore = time.GetUtcNow().UtcDateTime - CareerMaxAge;
 
         var due = await db.People
@@ -94,7 +99,13 @@ public sealed class CreativesService(
             person.CareerRefreshedAtUtc = time.GetUtcNow().UtcDateTime;
         }
 
+        // Analytics tags shows from prolific people with these.
+        foreach (var careers in CatalogSynchronizer.CareerEvents(due))
+        {
+            outbox.Add(careers);
+        }
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
         return due.Count;
     }
 }

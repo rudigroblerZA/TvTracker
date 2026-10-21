@@ -11,7 +11,7 @@ public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
 {
     /// <summary>Tags shown on a card, in this order of preference; at most <see cref="MaxPerCard"/>.</summary>
     private static readonly string[] CardPriority =
-        ["fan-favorite", "weekend-binge", "bingeable", "drops-at-once", "limited-series", "long-running", "quick-episodes"];
+        ["fan-favorite", "prolific-creator", "weekend-binge", "bingeable", "drops-at-once", "limited-series", "long-running", "quick-episodes"];
 
     private const int MaxPerCard = 2;
     private const int MaxPerRequest = 100;

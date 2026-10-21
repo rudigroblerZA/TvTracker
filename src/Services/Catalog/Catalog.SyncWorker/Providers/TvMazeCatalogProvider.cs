@@ -124,8 +124,11 @@ public sealed partial class TvMazeCatalogProvider(
 
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
     {
+        // In parallel with the show, so the extra call costs a request's worth of rate limit, not of time.
+        var creatives = GetCreativesAsync(externalId, cancellationToken);
+
         using var response = await http.GetAsync(
-            $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=crew&embed[]=images", cancellationToken);
+            $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=images", cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -140,7 +143,29 @@ public sealed partial class TvMazeCatalogProvider(
             return null;
         }
 
-        return Map(show);
+        return Map(show) with { Creatives = await creatives };
+    }
+
+    /// <summary>
+    /// The show's crew, in a call of its own: TVmaze's crew embed can fail (502) for shows whose other embeds work,
+    /// and a show shouldn't fail to import over it. Null when the call fails, so the creatives are filled in later.
+    /// </summary>
+    private async Task<List<ProviderCreative>?> GetCreativesAsync(string externalId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var crew = await http.GetFromJsonAsync<List<TvMazeCrewCredit>>($"shows/{Uri.EscapeDataString(externalId)}/crew", cancellationToken) ?? [];
+            return Creatives(crew);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null; // No such show; GetShowAsync reports that.
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Couldn't get the crew of TVmaze show {ExternalId}; its creatives are filled in later", externalId);
+            return null;
+        }
     }
 
     private ProviderShow Map(TvMazeShow s)
@@ -209,8 +234,7 @@ public sealed partial class TvMazeCatalogProvider(
             Cast: cast,
             WatchOptions: WatchOptions(s),
             SimilarExternalIds: [],
-            Rating: s.Rating?.Average,
-            Creatives: Creatives(embedded.Crew));
+            Rating: s.Rating?.Average);
     }
 
     /// <summary>
@@ -390,7 +414,6 @@ internal sealed record TvMazeEmbedded
     public List<TvMazeEpisode> Episodes { get; init; } = [];
     public List<TvMazeSeason> Seasons { get; init; } = [];
     public List<TvMazeCastCredit> Cast { get; init; } = [];
-    public List<TvMazeCrewCredit> Crew { get; init; } = [];
     public List<TvMazeShowImage> Images { get; init; } = [];
 }
 

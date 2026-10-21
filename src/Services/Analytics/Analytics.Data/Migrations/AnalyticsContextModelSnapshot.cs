@@ -69,6 +69,31 @@ namespace Analytics.Data.Migrations
                     b.ToTable("cast_credits", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.CreativeCopy", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.HasKey("ShowId", "PersonId");
+
+                    b.ToTable("creatives", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.DiscoveryRow", b =>
                 {
                     b.Property<string>("List")
@@ -153,6 +178,31 @@ namespace Analytics.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.PersonCareerCopy", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Created")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ExecutiveProduced")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Shows")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PersonId");
+
+                    b.ToTable("careers", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.PersonInsightsRow", b =>
                 {
                     b.Property<Guid>("PersonId")
@@ -221,6 +271,9 @@ namespace Analytics.Data.Migrations
                     b.Property<Guid>("ShowId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("CreativesKnown")
+                        .HasColumnType("boolean");
 
                     b.Property<double?>("ExternalRating")
                         .HasColumnType("double precision");

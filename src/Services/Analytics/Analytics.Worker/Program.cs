@@ -13,6 +13,7 @@ builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb");
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowAddedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<ShowUpdatedIntegrationEvent, CatalogEventHandlers>()
+    .AddSubscription<PeopleCareersUpdatedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<ShowStatusChangedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodesScheduledIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<SeasonAnnouncedIntegrationEvent, CatalogEventHandlers>()

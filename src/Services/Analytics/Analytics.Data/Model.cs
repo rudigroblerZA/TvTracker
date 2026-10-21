@@ -16,7 +16,30 @@ public class ShowCopy
     /// <summary>The catalog provider's average rating (0-10), e.g. TVmaze's.</summary>
     public double? ExternalRating { get; set; }
 
+    /// <summary>Whether a catalog event has carried the show's creatives yet (they may be none).</summary>
+    public bool CreativesKnown { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; }
+}
+
+/// <summary>Someone who made a show (creator, developer or executive producer), from catalog events.</summary>
+public class CreativeCopy
+{
+    public Guid ShowId { get; set; }
+    public Guid PersonId { get; set; }
+    public required string Name { get; set; }
+    public List<string> Roles { get; set; } = [];
+    public int Order { get; set; }
+}
+
+/// <summary>A person's career behind the camera across the catalog provider, from catalog events.</summary>
+public class PersonCareerCopy
+{
+    public Guid PersonId { get; set; }
+    public required string Name { get; set; }
+    public int Shows { get; set; }
+    public int Created { get; set; }
+    public int ExecutiveProduced { get; set; }
 }
 
 public class EpisodeCopy

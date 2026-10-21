@@ -66,6 +66,14 @@ public sealed class InsightsComputer(AnalyticsContext db, IIntegrationEventOutbo
 
         var shows = await db.Shows.AsNoTracking().ToDictionaryAsync(s => s.ShowId, ct);
         var cast = await db.Cast.AsNoTracking().ToListAsync(ct);
+        var careers = await db.Careers.AsNoTracking().ToDictionaryAsync(c => c.PersonId, ct);
+        var prolificByShow = (await db.Creatives.AsNoTracking().ToListAsync(ct))
+            .Where(c => careers.TryGetValue(c.PersonId, out var career) && career.Shows >= ShowTags.ProlificMinShows)
+            .GroupBy(c => c.ShowId)
+            .ToDictionary(g => g.Key, g => g
+                .Select(c => (Creative: c, Career: careers[c.PersonId]))
+                .OrderByDescending(x => x.Career.Shows)
+                .First());
         var castByShow = cast.ToLookup(c => c.ShowId);
         var showsByPerson = cast.ToLookup(PersonKey);
         var showsByCharacter = cast
@@ -119,6 +127,10 @@ public sealed class InsightsComputer(AnalyticsContext db, IIntegrationEventOutbo
                     Viewing = ViewingFor(episodes, watchesByShow[showId].ToList(), now),
                     Momentum = momentum
                 };
+                if (prolificByShow.TryGetValue(showId, out var prolific))
+                {
+                    insights = insights with { Tags = [.. insights.Tags ?? [], ProlificTag(prolific.Creative, prolific.Career)] };
+                }
 
                 var document = JsonSerializer.Serialize(insights, JsonOptions);
                 var tagKeys = (insights.Tags ?? []).Select(t => t.Key).ToList();
@@ -316,6 +328,14 @@ public sealed class InsightsComputer(AnalyticsContext db, IIntegrationEventOutbo
         }
 
         return tags;
+    }
+
+    /// <summary>The show's most prolific maker: "Prolific creator · Chuck Lorre, 19 shows behind the camera".</summary>
+    private static ShowTag ProlificTag(CreativeCopy creative, PersonCareerCopy career)
+    {
+        var created = creative.Roles.Contains("Creator") || creative.Roles.Contains("Developer");
+        return new ShowTag(ShowTags.ProlificCreator, created ? "Prolific creator" : "Prolific producer",
+            $"{creative.Name}, {career.Shows} shows behind the camera");
     }
 
     /// <summary>"45 min", "6.5 h" or "33 h".</summary>
