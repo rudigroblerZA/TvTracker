@@ -59,8 +59,13 @@ and the sync worker so both use the same one. Two are built in:
 | `all-MiniLM-L6-v2` (default) | ~90 MB | Fast; matches below a cosine distance of 0.65 |
 | `bge-small-en-v1.5` | ~130 MB | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
 
-On 22 test searches over the 150-show dev catalog, the expected show was in the top 3 for 20 with MiniLM and 21 with
-bge-small, and first for 17 and 15. Changing the model re-embeds the catalog within a few minutes; until then semantic
+On 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
+first for 27 and in the top 3 for 35; bge-small did so for 24 and 31, and found slightly more of the expected shows in
+the top 10 (84% against 82%). Each model wins different searches: bge-small finds Dark for "time travel mystery in a
+small german town" (10th against 64th) and The Mandalorian for "bounty hunter protects a child in a galaxy far away"
+(31st against 213th); MiniLM finds Breaking Bad and Doctor Who from descriptions bge-small misses. With both cutoffs,
+8 unrelated searches ("best mortgage rates", "replace a car battery") match nothing, apart from bge-small matching
+"best mortgage rates" to two property shows. MiniLM stays the default: it ranks better and runs about 2.5× faster. Changing the model re-embeds the catalog within a few minutes; until then semantic
 results are limited to the shows already embedded with the new model. Any built-in setting can be overridden, e.g.
 `Embeddings:Models:bge-small-en-v1.5:MaxDistance`, and another BERT-style ONNX model with a WordPiece `vocab.txt` can be
 added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `Dimensions`, `MaxDistance`, plus
