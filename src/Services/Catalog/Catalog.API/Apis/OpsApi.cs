@@ -47,21 +47,20 @@ public static class OpsApi
     }
 
     private static async Task<OpsStats> GetStatsAsync(
-        CatalogContext db, IHttpClientFactory httpFactory, TimeProvider time, ILogger<OpsStats> logger, CancellationToken ct)
+        CatalogContext db, EmbeddingModel model, IHttpClientFactory httpFactory, TimeProvider time, ILogger<OpsStats> logger, CancellationToken ct)
     {
         var now = time.GetUtcNow();
 
         // The other services' sections are optional: if one is down the page shows the rest.
         var analytics = FetchAsync(httpFactory, "analytics", "api/v1/ops/stats", logger, ct);
         var bulkImport = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/bulk/current", logger, ct);
-        var catalog = await GetCatalogStatsAsync(db, now, ct);
+        var catalog = await GetCatalogStatsAsync(db, model.Id, now, ct);
 
         return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport);
     }
 
-    private static async Task<CatalogOpsStats> GetCatalogStatsAsync(CatalogContext db, DateTimeOffset now, CancellationToken ct)
+    private static async Task<CatalogOpsStats> GetCatalogStatsAsync(CatalogContext db, string model, DateTimeOffset now, CancellationToken ct)
     {
-        var model = LocalEmbeddingGenerator.ModelId;
         var shows = await db.Shows.CountAsync(ct);
         var current = await db.ShowEmbeddings
             .CountAsync(e => e.Model == model && db.Shows.Any(s => s.Id == e.ShowId && e.EmbeddedAtUtc >= s.LastSyncedAtUtc), ct);

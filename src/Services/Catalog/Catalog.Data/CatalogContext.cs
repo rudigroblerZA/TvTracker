@@ -111,7 +111,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasOne<Show>().WithOne().HasForeignKey<ShowEmbedding>(e => e.ShowId).OnDelete(DeleteBehavior.Cascade);
             entity.Property(e => e.Model).HasMaxLength(64);
             entity.Property(e => e.SourceHash).HasMaxLength(64);
-            entity.Property(e => e.Embedding).HasColumnType("vector(384)");
+            entity.Property(e => e.Embedding).HasColumnType($"vector({ShowEmbedding.Dimensions})");
             // Approximate nearest-neighbour index for cosine distance (the vectors are normalized).
             entity.HasIndex(e => e.Embedding).HasMethod("hnsw").HasOperators("vector_cosine_ops");
         });

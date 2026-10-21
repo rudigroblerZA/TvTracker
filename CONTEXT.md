@@ -71,10 +71,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Search
 
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
-- **Embeddings:** all-MiniLM-L6-v2, run locally with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
+- **Embeddings:** all-MiniLM-L6-v2 by default, run locally with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
   - The model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, with mean pooling and L2 normalisation, 384 dimensions.
   - It's downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
+  - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
+    cutoff). Built in: all-MiniLM-L6-v2 (default; mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
+    an instruction prefix on search terms, cutoff 0.45). The AppHost sets it on Catalog.API and the sync worker
+    together; search only compares vectors made by the current model.
+  - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on 22 test
+    searches against the dev catalog, between the expected shows and unrelated searches.
+  - **Dimensions:** `ShowEmbedding.Dimensions` (384) is the column size. Services refuse to start with a model of
+    another size. Changing it needs a migration of the column and its HNSW index.
+  - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
+    applies to them. Changing a prefix without changing the model id doesn't re-embed the catalog.
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire

@@ -49,7 +49,23 @@ by up to 30 shows whose title, genres, network and summary are close in meaning 
 "cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
 Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The model (about 90 MB) is downloaded from
 Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
-to change it). Until it loads, search matches titles only. The sync worker embeds new and refreshed shows every 30 seconds
+to change it). Until it loads, search matches titles only.
+
+The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`, which the AppHost passes to Catalog.API
+and the sync worker so both use the same one. Two are built in:
+
+| Model | Download | Notes |
+| --- | --- | --- |
+| `all-MiniLM-L6-v2` (default) | ~90 MB | Fast; matches below a cosine distance of 0.65 |
+| `bge-small-en-v1.5` | ~130 MB | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
+
+On 22 test searches over the 150-show dev catalog, the expected show was in the top 3 for 20 with MiniLM and 21 with
+bge-small, and first for 17 and 15. Changing the model re-embeds the catalog within a few minutes; until then semantic
+results are limited to the shows already embedded with the new model. Any built-in setting can be overridden, e.g.
+`Embeddings:Models:bge-small-en-v1.5:MaxDistance`, and another BERT-style ONNX model with a WordPiece `vocab.txt` can be
+added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `Dimensions`, `MaxDistance`, plus
+`Pooling` (`Mean` or `Cls`), `MaxTokens`, `QueryPrefix` and `DocumentPrefix` as the model needs. Models must make
+384-dimension vectors, the size of the `show_embeddings` column; services refuse to start otherwise. The sync worker embeds new and refreshed shows every 30 seconds
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
 
