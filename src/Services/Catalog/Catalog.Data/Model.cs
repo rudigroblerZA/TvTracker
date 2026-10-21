@@ -82,6 +82,9 @@ public class Show
 /// </summary>
 public class ShowEmbedding
 {
+    /// <summary>The vector column's size; the embedding model has to match it.</summary>
+    public const int Dimensions = 384;
+
     public Guid ShowId { get; set; }
 
     /// <summary>The embedding model that produced <see cref="Embedding"/>; vectors from different models can't be compared.</summary>

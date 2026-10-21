@@ -16,43 +16,44 @@ public sealed class EmbeddingOptions
     /// </summary>
     public string? ModelDirectory { get; set; }
 
-    /// <summary>Where the model files are downloaded from: Hugging Face, pinned to a commit so the checksums below hold.</summary>
-    public string ModelBaseUrl { get; set; } =
-        "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/";
+    /// <summary>
+    /// Which model to use: a built-in one (<see cref="EmbeddingModels.BuiltIn"/>) or one defined under
+    /// <c>Models</c>. Catalog.API and the sync worker must use the same one.
+    /// </summary>
+    public string Model { get; set; } = EmbeddingModels.MiniLm;
+}
+
+/// <summary>Whether text is a search term or a document (show text); some models embed the two differently.</summary>
+public static class EmbeddingInput
+{
+    /// <summary>The <see cref="EmbeddingGenerationOptions.AdditionalProperties"/> key; its value is <see cref="Query"/> or <see cref="Document"/>.</summary>
+    public const string Key = "input_type";
+    public const string Query = "query";
+    public const string Document = "document";
+
+    /// <summary>Options that mark the input as search terms. Without them, input is embedded as documents.</summary>
+    public static EmbeddingGenerationOptions QueryOptions => new() { AdditionalProperties = new() { [Key] = Query } };
 }
 
 /// <summary>The model isn't loaded yet (still downloading, or the download failed). Callers carry on without vectors.</summary>
 public sealed class EmbeddingsUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
-/// Sentence embeddings from all-MiniLM-L6-v2, run in-process with ONNX Runtime: 384 dimensions, mean-pooled and
-/// normalized, so cosine distance compares them. The model (~90 MB) is downloaded and checksummed on first use;
-/// until then, and for a few minutes after a failed download, calls throw <see cref="EmbeddingsUnavailableException"/>.
+/// Sentence embeddings from the configured <see cref="EmbeddingModel"/> (all-MiniLM-L6-v2 by default), run in-process
+/// with ONNX Runtime and normalized, so cosine distance compares them. The model is downloaded and checksummed on
+/// first use; until then, and for a few minutes after a failed download, calls throw <see cref="EmbeddingsUnavailableException"/>.
 /// </summary>
-public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, TimeProvider time, ILogger<LocalEmbeddingGenerator> logger)
+public sealed class LocalEmbeddingGenerator(
+    EmbeddingModel spec, IOptions<EmbeddingOptions> options, TimeProvider time, ILogger<LocalEmbeddingGenerator> logger)
     : IEmbeddingGenerator<string, Embedding<float>>
 {
-    /// <summary>Stored with each vector, so a model change re-embeds everything.</summary>
-    public const string ModelId = "all-MiniLM-L6-v2";
-
-    public const int Dimensions = 384;
-
-    // The model was trained on up to 256 word pieces; longer text is cut off.
-    private const int MaxTokens = 256;
-
-    private static readonly (string Path, string Sha256)[] Files =
-    [
-        ("onnx/model.onnx", "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452"),
-        ("vocab.txt", "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3")
-    ];
-
     private static readonly TimeSpan RetryAfterFailure = TimeSpan.FromMinutes(5);
 
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private Model? _model;
     private DateTimeOffset _retryAt = DateTimeOffset.MinValue;
 
-    public EmbeddingGeneratorMetadata Metadata { get; } = new("onnxruntime", defaultModelId: ModelId, defaultModelDimensions: Dimensions);
+    public EmbeddingGeneratorMetadata Metadata { get; } = new("onnxruntime", defaultModelId: spec.Id, defaultModelDimensions: spec.Dimensions);
 
     /// <summary>Downloads (if needed) and loads the model now, rather than on the first request.</summary>
     public async Task WarmUpAsync(CancellationToken ct)
@@ -71,13 +72,16 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
         IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
     {
         var model = await GetModelAsync(cancellationToken);
-        var texts = values.ToList();
+        var prefix = options?.AdditionalProperties?.TryGetValue(EmbeddingInput.Key, out var input) == true && Equals(input, EmbeddingInput.Query)
+            ? spec.QueryPrefix
+            : spec.DocumentPrefix;
+        var texts = values.Select(v => prefix + v).ToList();
         var result = new GeneratedEmbeddings<Embedding<float>>(texts.Count);
         if (texts.Count > 0)
         {
             // CPU-bound; keep it off the request thread's synchronous path.
             var vectors = await Task.Run(() => model.Embed(texts), cancellationToken);
-            result.AddRange(vectors.Select(v => new Embedding<float>(v) { ModelId = ModelId, CreatedAt = time.GetUtcNow() }));
+            result.AddRange(vectors.Select(v => new Embedding<float>(v) { ModelId = spec.Id, CreatedAt = time.GetUtcNow() }));
         }
         return result;
     }
@@ -113,14 +117,14 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
             try
             {
                 var directory = await EnsureFilesAsync(ct);
-                _model = new Model(Path.Combine(directory, "model.onnx"), Path.Combine(directory, "vocab.txt"));
-                logger.LogInformation("Embedding model {Model} loaded from {Directory}", ModelId, directory);
+                _model = new Model(spec, Path.Combine(directory, Path.GetFileName(spec.OnnxPath)), Path.Combine(directory, Path.GetFileName(spec.VocabPath)));
+                logger.LogInformation("Embedding model {Model} loaded from {Directory}", spec.Id, directory);
                 return _model;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _retryAt = time.GetUtcNow() + RetryAfterFailure;
-                logger.LogWarning(ex, "Couldn't load embedding model {Model}; search works without vectors until it loads", ModelId);
+                logger.LogWarning(ex, "Couldn't load embedding model {Model}; search works without vectors until it loads", spec.Id);
                 throw new EmbeddingsUnavailableException("The embedding model failed to load.", ex);
             }
         }
@@ -134,11 +138,11 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
     {
         var directory = options.Value.ModelDirectory is { Length: > 0 } configured
             ? configured
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TvTracker", "models", ModelId);
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TvTracker", "models", spec.Id);
         Directory.CreateDirectory(directory);
 
         using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        foreach (var (remotePath, sha256) in Files)
+        foreach (var (remotePath, sha256) in new[] { (spec.OnnxPath, spec.OnnxSha256), (spec.VocabPath, spec.VocabSha256) })
         {
             var target = Path.Combine(directory, Path.GetFileName(remotePath));
             if (File.Exists(target))
@@ -146,14 +150,14 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
                 continue;
             }
 
-            logger.LogInformation("Downloading {File} for embedding model {Model}", remotePath, ModelId);
+            logger.LogInformation("Downloading {File} for embedding model {Model}", remotePath, spec.Id);
             // Downloaded to a temporary name and moved into place once verified, so a process that's stopped
             // mid-download, or another service downloading at the same time, never leaves a partial file behind.
             var temporary = $"{target}.{Guid.NewGuid():N}.tmp";
             try
             {
                 await using (var file = File.Create(temporary))
-                await using (var body = await http.GetStreamAsync(new Uri(new Uri(options.Value.ModelBaseUrl), remotePath), ct))
+                await using (var body = await http.GetStreamAsync(new Uri(new Uri(spec.BaseUrl), remotePath), ct))
                 {
                     await body.CopyToAsync(file, ct);
                 }
@@ -180,21 +184,31 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
 
     private sealed class Model : IDisposable
     {
+        private readonly EmbeddingModel _spec;
         private readonly InferenceSession _session;
         private readonly BertTokenizer _tokenizer;
         private readonly bool _needsTokenTypes;
 
-        public Model(string modelPath, string vocabPath)
+        public Model(EmbeddingModel spec, string modelPath, string vocabPath)
         {
+            _spec = spec;
             _session = new InferenceSession(modelPath);
             _tokenizer = BertTokenizer.Create(vocabPath);
             _needsTokenTypes = _session.InputMetadata.ContainsKey("token_type_ids");
+
+            // The hidden size is fixed in the export; a mismatch means the model and its settings don't belong together.
+            var hidden = _session.OutputMetadata[_session.OutputNames[0]].Dimensions[^1];
+            if (hidden > 0 && hidden != spec.Dimensions)
+            {
+                _session.Dispose();
+                throw new InvalidDataException($"Model {spec.Id} produces {hidden}-dimension vectors; its settings say {spec.Dimensions}.");
+            }
         }
 
         public List<float[]> Embed(IReadOnlyList<string> texts)
         {
             var tokens = texts
-                .Select(text => _tokenizer.EncodeToIds(text, MaxTokens, out _, out _))
+                .Select(text => _tokenizer.EncodeToIds(text, _spec.MaxTokens, out _, out _))
                 .ToList();
             var length = tokens.Max(t => t.Count);
 
@@ -225,7 +239,7 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
             {
                 using var runOptions = new RunOptions();
                 using var outputs = _session.Run(runOptions, inputs, [_session.OutputNames[0]]);
-                return MeanPool(outputs[0].GetTensorDataAsSpan<float>(), mask, texts.Count, length);
+                return Pool(outputs[0].GetTensorDataAsSpan<float>(), mask, texts.Count, length);
             }
             finally
             {
@@ -236,15 +250,21 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
             }
         }
 
-        /// <summary>Averages each text's token vectors (ignoring padding) and scales the result to unit length.</summary>
-        private static List<float[]> MeanPool(ReadOnlySpan<float> hidden, long[] mask, int count, int length)
+        /// <summary>
+        /// One vector per text from its token vectors: their average (ignoring padding) or the first token's, per the
+        /// model's <see cref="EmbeddingModel.Pooling"/>, scaled to unit length.
+        /// </summary>
+        private List<float[]> Pool(ReadOnlySpan<float> hidden, long[] mask, int count, int length)
         {
+            var dimensions = _spec.Dimensions;
             var vectors = new List<float[]>(count);
             for (var row = 0; row < count; row++)
             {
-                var vector = new float[Dimensions];
+                var vector = new float[dimensions];
                 var tokens = 0;
-                for (var i = 0; i < length; i++)
+                // [CLS] is always the first token.
+                var pooled = _spec.Pooling == EmbeddingPooling.Cls ? 1 : length;
+                for (var i = 0; i < pooled; i++)
                 {
                     if (mask[row * length + i] == 0)
                     {
@@ -252,15 +272,15 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
                     }
 
                     tokens++;
-                    var offset = (row * length + i) * Dimensions;
-                    for (var d = 0; d < Dimensions; d++)
+                    var offset = (row * length + i) * dimensions;
+                    for (var d = 0; d < dimensions; d++)
                     {
                         vector[d] += hidden[offset + d];
                     }
                 }
 
                 var norm = 0f;
-                for (var d = 0; d < Dimensions; d++)
+                for (var d = 0; d < dimensions; d++)
                 {
                     vector[d] /= Math.Max(1, tokens);
                     norm += vector[d] * vector[d];
@@ -269,7 +289,7 @@ public sealed class LocalEmbeddingGenerator(IOptions<EmbeddingOptions> options, 
                 norm = MathF.Sqrt(norm);
                 if (norm > 0)
                 {
-                    for (var d = 0; d < Dimensions; d++)
+                    for (var d = 0; d < dimensions; d++)
                     {
                         vector[d] /= norm;
                     }

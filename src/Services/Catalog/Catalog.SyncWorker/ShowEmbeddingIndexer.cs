@@ -16,6 +16,7 @@ namespace Catalog.SyncWorker;
 public sealed class ShowEmbeddingIndexer(
     IServiceScopeFactory scopeFactory,
     IEmbeddingGenerator<string, Embedding<float>> generator,
+    EmbeddingModel model,
     TimeProvider time,
     ILogger<ShowEmbeddingIndexer> logger) : BackgroundService
 {
@@ -63,7 +64,7 @@ public sealed class ShowEmbeddingIndexer(
 
         var shows = await db.Shows.AsNoTracking()
             .Where(s => !db.ShowEmbeddings.Any(e =>
-                e.ShowId == s.Id && e.Model == LocalEmbeddingGenerator.ModelId && e.EmbeddedAtUtc >= s.LastSyncedAtUtc))
+                e.ShowId == s.Id && e.Model == model.Id && e.EmbeddedAtUtc >= s.LastSyncedAtUtc))
             .OrderByDescending(s => s.Popularity)
             .Take(BatchSize)
             .Select(s => new { s.Id, s.Title, s.Genres, s.Network, s.Overview })
@@ -78,7 +79,7 @@ public sealed class ShowEmbeddingIndexer(
 
         var texts = shows.ToDictionary(s => s.Id, s => EmbeddingText(s.Title, s.Genres, s.Network, s.Overview));
         var changed = shows
-            .Where(s => !existing.TryGetValue(s.Id, out var e) || e.Model != LocalEmbeddingGenerator.ModelId || e.SourceHash != Hash(texts[s.Id]))
+            .Where(s => !existing.TryGetValue(s.Id, out var e) || e.Model != model.Id || e.SourceHash != Hash(texts[s.Id]))
             .Select(s => s.Id)
             .ToList();
 
@@ -88,14 +89,14 @@ public sealed class ShowEmbeddingIndexer(
         {
             if (!existing.TryGetValue(show.Id, out var embedding))
             {
-                embedding = new ShowEmbedding { ShowId = show.Id, Model = "", Embedding = new Vector(new float[LocalEmbeddingGenerator.Dimensions]), SourceHash = "" };
+                embedding = new ShowEmbedding { ShowId = show.Id, Model = "", Embedding = new Vector(new float[ShowEmbedding.Dimensions]), SourceHash = "" };
                 db.ShowEmbeddings.Add(embedding);
             }
 
             var index = changed.IndexOf(show.Id);
             if (index >= 0)
             {
-                embedding.Model = LocalEmbeddingGenerator.ModelId;
+                embedding.Model = model.Id;
                 embedding.Embedding = new Vector(vectors[index].Vector);
                 embedding.SourceHash = Hash(texts[show.Id]);
             }

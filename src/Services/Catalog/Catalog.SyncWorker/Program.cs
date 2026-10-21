@@ -49,7 +49,7 @@ builder.Services.AddHostedService<CatalogSyncService>();
 builder.Services.AddHostedService<CreativesService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
-builder.Services.AddLocalEmbeddings(builder.Configuration);
+builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions);
 builder.Services.AddHostedService<ShowEmbeddingIndexer>();
 
 var app = builder.Build();
