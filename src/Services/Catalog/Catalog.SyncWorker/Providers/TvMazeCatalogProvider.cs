@@ -44,7 +44,7 @@ public sealed class TvMazeOptions
 /// TVmaze has no keywords or similar-show lists, so those stay empty; recommendations fall back to genres and cast.
 /// </summary>
 public sealed partial class TvMazeCatalogProvider(
-    HttpClient http, IOptions<TvMazeOptions> options, TimeProvider time, ILogger<TvMazeCatalogProvider> logger)
+    HttpClient http, IOptions<TvMazeOptions> options, TvMazeEmbedOutage embedOutage, TimeProvider time, ILogger<TvMazeCatalogProvider> logger)
     : ICatalogProvider
 {
     private readonly TvMazeOptions _options = options.Value;
@@ -127,9 +127,91 @@ public sealed partial class TvMazeCatalogProvider(
         // In parallel with the show, so the extra call costs a request's worth of rate limit, not of time.
         var creatives = GetCreativesAsync(externalId, cancellationToken);
 
-        using var response = await http.GetAsync(
-            $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=images", cancellationToken);
+        var show = embedOutage.IsActive
+            ? await GetShowInPartsAsync(externalId, cancellationToken)
+            : await GetShowEmbeddedAsync(externalId, cancellationToken);
+        if (show is null)
+        {
+            return null;
+        }
 
+        return Map(show) with { Creatives = await creatives };
+    }
+
+    /// <summary>
+    /// The show with its episodes, seasons, cast and images in one call. If TVmaze fails it (5xx, after the standard
+    /// retries), its embedded requests are likely failing for every show; switch to the separate requests for a while.
+    /// </summary>
+    private async Task<TvMazeShow?> GetShowEmbeddedAsync(string externalId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await GetShowPartAsync(
+                $"shows/{Uri.EscapeDataString(externalId)}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=images", externalId, cancellationToken);
+        }
+        catch (HttpRequestException ex) when ((int?)ex.StatusCode >= 500)
+        {
+            embedOutage.Report();
+            logger.LogWarning(ex, "TVmaze failed show {ExternalId} with its embeds ({Status}); using separate requests until {Until}",
+                externalId, (int?)ex.StatusCode, embedOutage.Until);
+            return await GetShowInPartsAsync(externalId, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// The same data from five requests in parallel (show, episodes, seasons, cast, images): they kept working while
+    /// TVmaze's embedded requests failed. Each is retried like any other. The show, episodes and seasons are needed (if
+    /// one still fails, so does the import); cast and images aren't: during the outage they failed consistently for
+    /// some shows, which then import without them and keep what they had on a refresh.
+    /// </summary>
+    private async Task<TvMazeShow?> GetShowInPartsAsync(string externalId, CancellationToken cancellationToken)
+    {
+        var id = Uri.EscapeDataString(externalId);
+        var episodes = http.GetFromJsonAsync<List<TvMazeEpisode>>($"shows/{id}/episodes", cancellationToken);
+        var seasons = http.GetFromJsonAsync<List<TvMazeSeason>>($"shows/{id}/seasons", cancellationToken);
+        var cast = http.GetFromJsonAsync<List<TvMazeCastCredit>>($"shows/{id}/cast", cancellationToken);
+        var images = http.GetFromJsonAsync<List<TvMazeShowImage>>($"shows/{id}/images", cancellationToken);
+
+        var show = await GetShowPartAsync($"shows/{id}", externalId, cancellationToken);
+        if (show is null)
+        {
+            // Unknown show: the other requests 404 too; observe them so their failures aren't left unobserved.
+            await Task.WhenAll(episodes, seasons, cast, images).ContinueWith(_ => { }, TaskScheduler.Default);
+            return null;
+        }
+
+        return show with
+        {
+            Embedded = new TvMazeEmbedded
+            {
+                Episodes = await episodes ?? [],
+                Seasons = await seasons ?? [],
+                Cast = await OptionalAsync(cast, "cast", externalId) ?? [],
+                Images = await OptionalAsync(images, "images", externalId) ?? [],
+                CastMissing = cast.IsFaulted,
+                ImagesMissing = images.IsFaulted
+            }
+        };
+    }
+
+    /// <summary>The part, or null (logged) when TVmaze failed it with a server error.</summary>
+    private async Task<T?> OptionalAsync<T>(Task<T?> part, string name, string externalId) where T : class
+    {
+        try
+        {
+            return await part;
+        }
+        catch (HttpRequestException ex) when ((int?)ex.StatusCode >= 500)
+        {
+            logger.LogWarning("TVmaze failed the {Part} of show {ExternalId} ({Status}); importing without it", name, externalId, (int?)ex.StatusCode);
+            return null;
+        }
+    }
+
+    /// <summary>The show at <paramref name="url"/>, or null when TVmaze doesn't have it.</summary>
+    private async Task<TvMazeShow?> GetShowPartAsync(string url, string externalId, CancellationToken cancellationToken)
+    {
+        using var response = await http.GetAsync(url, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -140,10 +222,8 @@ public sealed partial class TvMazeCatalogProvider(
         if (show is null)
         {
             logger.LogWarning("TVmaze returned an empty body for show {ExternalId}", externalId);
-            return null;
         }
-
-        return Map(show) with { Creatives = await creatives };
+        return show;
     }
 
     /// <summary>
@@ -234,7 +314,9 @@ public sealed partial class TvMazeCatalogProvider(
             Cast: cast,
             WatchOptions: WatchOptions(s),
             SimilarExternalIds: [],
-            Rating: s.Rating?.Average);
+            Rating: s.Rating?.Average,
+            CastMissing: embedded.CastMissing,
+            ImagesMissing: embedded.ImagesMissing);
     }
 
     /// <summary>
@@ -345,6 +427,23 @@ public sealed class TvMazeRateLimitHandler(TvMazeRateLimiter limiter) : Delegati
 }
 
 /// <summary>Singleton holder so every handler instance shares one budget.</summary>
+/// <summary>
+/// Remembers that TVmaze's embedded show requests are failing, so imports use the separate requests for
+/// <see cref="Duration"/> instead of each first waiting out the retries of a request that's going to fail.
+/// </summary>
+public sealed class TvMazeEmbedOutage(TimeProvider time)
+{
+    public static readonly TimeSpan Duration = TimeSpan.FromMinutes(15);
+
+    private long _untilTicks;
+
+    public DateTimeOffset Until => new(Interlocked.Read(ref _untilTicks), TimeSpan.Zero);
+
+    public bool IsActive => time.GetUtcNow() < Until;
+
+    public void Report() => Interlocked.Exchange(ref _untilTicks, (time.GetUtcNow() + Duration).UtcTicks);
+}
+
 public sealed class TvMazeRateLimiter : IDisposable
 {
     public RateLimiter Limiter { get; } = new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
@@ -415,6 +514,10 @@ internal sealed record TvMazeEmbedded
     public List<TvMazeSeason> Seasons { get; init; } = [];
     public List<TvMazeCastCredit> Cast { get; init; } = [];
     public List<TvMazeShowImage> Images { get; init; } = [];
+
+    /// <summary>Set when these were fetched separately and TVmaze failed them (not part of TVmaze's JSON).</summary>
+    [JsonIgnore] public bool CastMissing { get; init; }
+    [JsonIgnore] public bool ImagesMissing { get; init; }
 }
 
 internal sealed record TvMazeEpisode(int Id, string? Name, int? Season, int? Number, DateTimeOffset? Airstamp, int? Runtime, string? Summary, TvMazeRating? Rating);

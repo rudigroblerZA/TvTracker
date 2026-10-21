@@ -31,6 +31,7 @@ else
 {
     builder.Services.Configure<TvMazeOptions>(builder.Configuration.GetSection("TvMaze"));
     builder.Services.AddSingleton<TvMazeRateLimiter>();
+    builder.Services.AddSingleton<TvMazeEmbedOutage>();
     builder.Services.AddTransient<TvMazeRateLimitHandler>();
     builder.Services.AddHttpClient<ICatalogProvider, TvMazeCatalogProvider>((sp, http) =>
         {

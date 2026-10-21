@@ -50,9 +50,17 @@ public sealed class CatalogSynchronizer(
         var imported = 0;
         foreach (var externalId in ids.Except(existing))
         {
-            if ((await ImportNewAsync(externalId, ct)).Outcome == ImportOutcome.Imported)
+            try
             {
-                imported++;
+                if ((await ImportNewAsync(externalId, ct)).Outcome == ImportOutcome.Imported)
+                {
+                    imported++;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // The provider failing one show (it happens per show in an outage) shouldn't stop the rest importing.
+                logger.LogWarning(ex, "Couldn't import show {ExternalId}; skipping it", externalId);
             }
         }
 
@@ -115,7 +123,20 @@ public sealed class CatalogSynchronizer(
 
         foreach (var item in due)
         {
-            var providerShow = await provider.GetShowAsync(item.ExternalId, ct);
+            ProviderShow? providerShow;
+            try
+            {
+                providerShow = await provider.GetShowAsync(item.ExternalId, ct);
+            }
+            catch (HttpRequestException ex)
+            {
+                // One show the provider is failing shouldn't hold up the rest of the queue; try it again in an hour.
+                logger.LogWarning(ex, "Couldn't refresh show {ExternalId}; retrying in an hour", item.ExternalId);
+                await db.Shows.Where(s => s.Id == item.Id)
+                    .ExecuteUpdateAsync(u => u.SetProperty(s => s.NextRefreshAtUtc, now.AddHours(1)), ct);
+                continue;
+            }
+
             if (providerShow is null)
             {
                 logger.LogWarning("Provider no longer has show {ExternalId}; skipping for a week", item.ExternalId);
@@ -293,7 +314,7 @@ public sealed class CatalogSynchronizer(
             || show.Title != p.Title
             || show.Overview != p.Overview
             || show.PosterUrl != p.PosterUrl
-            || show.BackdropUrl != p.BackdropUrl
+            || (!p.ImagesMissing && show.BackdropUrl != p.BackdropUrl)
             || show.Network != p.Network
             || show.FirstAirDate != p.FirstAirDate
             || !show.Genres.SequenceEqual(p.Genres)
@@ -305,7 +326,10 @@ public sealed class CatalogSynchronizer(
         show.Title = p.Title;
         show.Overview = p.Overview;
         show.PosterUrl = p.PosterUrl;
-        show.BackdropUrl = p.BackdropUrl;
+        if (!p.ImagesMissing)
+        {
+            show.BackdropUrl = p.BackdropUrl;
+        }
         show.Network = p.Network;
         show.FirstAirDate = p.FirstAirDate;
         show.Genres = p.Genres.ToList();
@@ -316,7 +340,10 @@ public sealed class CatalogSynchronizer(
         show.SimilarShowIds = await ResolveSimilarAsync(p.SimilarExternalIds, ct);
         show.Status = p.Status;
 
-        detailsChanged |= await SyncCastAsync(show, p.Cast, ct);
+        if (!p.CastMissing)
+        {
+            detailsChanged |= await SyncCastAsync(show, p.Cast, ct);
+        }
         if (p.Creatives is { } creatives)
         {
             // A show imported before creatives were counts as changed once, so consumers get them with ShowUpdated.
