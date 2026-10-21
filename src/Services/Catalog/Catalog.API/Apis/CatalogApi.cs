@@ -231,7 +231,8 @@ public static class CatalogApi
             creatives
                 .Select(c => new CreativeDto(c.PersonId, c.Person.Name, c.Person.PhotoUrl, c.Roles, CareerDto.For(c.Person, show.Title),
                     otherShows[c.PersonId].OrderByDescending(o => o.Popularity).Select(o => new ShowRefDto(o.Id, o.Title)).ToList()))
-                .ToList());
+                .ToList(),
+            show.BannerUrl);
     }
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(

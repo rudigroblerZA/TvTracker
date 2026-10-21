@@ -202,6 +202,9 @@ namespace Catalog.Data.Migrations
                     b.Property<string>("BackdropUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("BannerUrl")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 

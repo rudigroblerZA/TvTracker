@@ -290,11 +290,12 @@ public sealed partial class TvMazeCatalogProvider(
                     : null))
             .ToList();
 
-        var backdrop = embedded.Images
-            .Where(i => i.Type == "background")
+        string? Image(string type) => embedded.Images
+            .Where(i => i.Type == type)
             .OrderByDescending(i => i.Main)
             .Select(i => i.Resolutions?.Original?.Url)
             .FirstOrDefault(url => url is not null);
+        var backdrop = Image("background");
 
         return new ProviderShow(
             ExternalId: s.Id.ToString(),
@@ -316,7 +317,8 @@ public sealed partial class TvMazeCatalogProvider(
             SimilarExternalIds: [],
             Rating: s.Rating?.Average,
             CastMissing: embedded.CastMissing,
-            ImagesMissing: embedded.ImagesMissing);
+            ImagesMissing: embedded.ImagesMissing,
+            BannerUrl: Image("banner"));
     }
 
     /// <summary>

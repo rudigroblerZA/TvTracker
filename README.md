@@ -68,6 +68,11 @@ TVmaze data is licensed CC BY-SA; the app footer carries the required credit. TV
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
+Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
+the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
+neither keeps the plain poster layout. An image that fails to load falls back to the next. Shows imported earlier
+get their banner on their next refresh.
+
 Useful local addresses:
 
 | What | Address |

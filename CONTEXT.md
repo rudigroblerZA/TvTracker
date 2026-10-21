@@ -105,6 +105,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 - **Shared pages:** every page and component is in `TvTracker.UI`. WebApp and MobileApp supply `HostServices`
   (tokens, platform bits). API access goes through the typed clients in `Services/ApiClients.cs` on `ApiClientBase`.
+- **Show page art:** `ShowBanner` uses `BackdropUrl` (TVmaze "background", large) for a full-bleed hero, else
+  `BannerUrl` (TVmaze "banner", 758×140 with the logo) as a strip, else nothing. Each image falls back to the next
+  on `@onerror`. That works because the web app doesn't prerender; with prerendering, an early error would be missed.
+  Both images are optional parts of a sync: with `ImagesMissing`, the catalog keeps the ones it has.
 - **Tags on cards:** `ShowCard` gets tags from the scoped `ShowTagStore`. It batches every card on a page into one
   `GET /api/v1/insights/tags?ids=…` call within a 50 ms window. Tags are shown only to signed-in users.
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a

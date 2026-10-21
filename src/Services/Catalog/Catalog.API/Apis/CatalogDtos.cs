@@ -79,7 +79,8 @@ public record ShowDetailDto(
     IReadOnlyList<WatchProviderDto> WatchProviders,
     EpisodeDto? NextEpisode,
     EpisodeDto? LastEpisode,
-    IReadOnlyList<CreativeDto>? Creatives = null);
+    IReadOnlyList<CreativeDto>? Creatives = null,
+    string? BannerUrl = null);
 
 public record EpisodeDto(
     Guid Id,
