@@ -22,6 +22,8 @@ public record CastMemberDto(string Name, string? Character, string? PhotoUrl, Gu
 public record PersonCreditDto(ShowSummaryDto Show, string? Character);
 
 /// <param name="Credits">Their shows in the catalog, newest first.</param>
+/// <param name="Career">Their career behind the camera, from the provider; null when not known.</param>
+/// <param name="Made">Catalog shows they created or executive produced, most popular first.</param>
 public record PersonDetailDto(
     Guid Id,
     string Name,
@@ -30,7 +32,34 @@ public record PersonDetailDto(
     DateOnly? Deathday,
     string? Gender,
     string? Country,
-    IReadOnlyList<PersonCreditDto> Credits);
+    IReadOnlyList<PersonCreditDto> Credits,
+    CareerDto? Career = null,
+    IReadOnlyList<MadeCreditDto>? Made = null);
+
+/// <summary>A show someone made, with their roles on it ("Creator", "Developer", "Executive Producer").</summary>
+public record MadeCreditDto(ShowSummaryDto Show, IReadOnlyList<string> Roles);
+
+/// <summary>Someone who made a show.</summary>
+/// <param name="Roles">"Creator", "Developer" and/or "Executive Producer".</param>
+/// <param name="OtherShows">Other catalog shows they made, most popular first.</param>
+public record CreativeDto(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, CareerDto? Career,
+    IReadOnlyList<ShowRefDto> OtherShows);
+
+/// <param name="Shows">Shows they're credited on behind the camera, across the provider (TVmaze), not just this catalog.</param>
+/// <param name="Prolific">At least <see cref="CareerDto.ProlificMinShows"/> shows.</param>
+/// <param name="NotableShows">Their best-known shows, most popular first (titles; many aren't in the catalog).</param>
+public record CareerDto(int Shows, int Created, int ExecutiveProduced, bool Prolific, IReadOnlyList<string> NotableShows)
+{
+    /// <summary>Behind-the-camera credits on this many shows make a "prolific" creator or producer (Dick Wolf has 57).</summary>
+    public const int ProlificMinShows = 10;
+
+    public static CareerDto? For(Person person, string? excludeTitle = null) => person.CareerShows is { } shows
+        ? new CareerDto(shows, person.CareerCreated ?? 0, person.CareerExecutiveProduced ?? 0, shows >= ProlificMinShows,
+            person.CareerNotableShows.Where(t => t != excludeTitle).ToList())
+        : null;
+}
+
+public record ShowRefDto(Guid Id, string Title);
 
 public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url);
 
@@ -49,7 +78,8 @@ public record ShowDetailDto(
     string Region,
     IReadOnlyList<WatchProviderDto> WatchProviders,
     EpisodeDto? NextEpisode,
-    EpisodeDto? LastEpisode);
+    EpisodeDto? LastEpisode,
+    IReadOnlyList<CreativeDto>? Creatives = null);
 
 public record EpisodeDto(
     Guid Id,

@@ -22,8 +22,23 @@ else
             {
                 <p class="muted">@facts</p>
             }
+            @if (person.Career is { } career)
+            {
+                <p>
+                    @if (career.Prolific)
+                    {
+                        <span class="tag">Prolific @(career.Created > 0 ? "creator" : "producer")</span>
+                    }
+                    @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
+                    <span> @CareerText(career)</span>
+                </p>
+                @if (career.NotableShows.Count > 0)
+                {
+                    <p class="muted small">Known for @string.Join(", ", career.NotableShows.Take(8))</p>
+                }
+            }
             <p class="muted small">
-                In @person.Credits.Count @(person.Credits.Count == 1 ? "show" : "shows") in the catalog.
+                In @(person.Credits.Count + (person.Made?.Count ?? 0)) @(person.Credits.Count + (person.Made?.Count ?? 0) == 1 ? "show" : "shows") in the catalog.
                 Details from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>.
             </p>
         </div>
@@ -31,10 +46,24 @@ else
 
     <PersonInsightsPanel PersonId="Id" />
 
+    @if (person.Made is { Count: > 0 } made)
+    {
+        <section>
+            <h2>Made</h2>
+            <div class="card-grid">
+                @foreach (var credit in made)
+                {
+                    <ShowCard ShowId="credit.Show.Id" Title="@credit.Show.Title" PosterUrl="@credit.Show.PosterUrl"
+                              Subtitle="@(string.Join(" · ", new[] { string.Join(", ", credit.Roles), credit.Show.Year?.ToString() }.Where(s => !string.IsNullOrEmpty(s))))" />
+                }
+            </div>
+        </section>
+    }
+
     @if (person.Credits.Count > 0)
     {
         <section>
-            <h2>Shows</h2>
+            <h2>@(person.Made is { Count: > 0 } ? "Appears in" : "Shows")</h2>
             <div class="card-grid">
                 @foreach (var credit in person.Credits)
                 {
@@ -67,6 +96,14 @@ else
         {
             error = ErrorNotice.Describe(ex);
         }
+    }
+
+    private static string CareerText(Career career)
+    {
+        var parts = new List<string>();
+        if (career.Created > 0) parts.Add($"created {career.Created}");
+        if (career.ExecutiveProduced > 0) parts.Add($"executive producer on {career.ExecutiveProduced}");
+        return $"Behind the camera on {career.Shows} shows on TVmaze" + (parts.Count > 0 ? $": {string.Join(", ", parts)}." : ".");
     }
 
     /// <summary>"Born 17 Jul 1979 (age 47) · United States", or "17 Jul 1931 – 3 Feb 2020 (88)" for someone who has died.</summary>

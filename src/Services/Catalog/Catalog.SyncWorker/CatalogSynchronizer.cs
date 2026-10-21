@@ -59,6 +59,9 @@ public sealed class CatalogSynchronizer(
         return imported;
     }
 
+    /// <summary>Applies the provider's current details of a show already fetched (e.g. to backfill new fields).</summary>
+    public Task RefreshAsync(ProviderShow show, CancellationToken ct) => SyncShowAsync(show, ct);
+
     /// <summary>Imports one show by the provider's id, unless the catalog already has it.</summary>
     public async Task<ImportResult> ImportShowAsync(string externalId, CancellationToken ct) =>
         await db.Shows.Where(s => s.Source == provider.Name && s.ExternalId == externalId).Select(s => s.Title).FirstOrDefaultAsync(ct) is { } title
@@ -252,6 +255,7 @@ public sealed class CatalogSynchronizer(
             .Include(s => s.Seasons)
             .Include(s => s.Episodes)
             .Include(s => s.Cast).ThenInclude(c => c.Person)
+            .Include(s => s.Creatives).ThenInclude(c => c.Person)
             .Include(s => s.WatchProviders)
             .AsSplitQuery()
             .SingleOrDefaultAsync(s => s.Source == provider.Name && s.ExternalId == p.ExternalId, ct);
@@ -304,6 +308,11 @@ public sealed class CatalogSynchronizer(
         show.Status = p.Status;
 
         detailsChanged |= await SyncCastAsync(show, p.Cast, ct);
+        if (p.Creatives is { } creatives)
+        {
+            await SyncCreativesAsync(show, creatives, ct);
+            show.CreativesImported = true;
+        }
         SyncWatchProviders(show, p.WatchOptions);
 
         // Seasons
@@ -457,7 +466,7 @@ public sealed class CatalogSynchronizer(
             // different row, re-point the credit to it.
             var person = existing is not null && (member.Person is null || existing.Person.ExternalId == member.Person.ExternalId)
                 ? existing.Person
-                : await GetOrCreatePersonAsync(member, ct);
+                : await GetOrCreatePersonAsync(member.Name, member.PhotoUrl, member.Person, ct);
             if (existing is not null && existing.PersonId != person.Id)
             {
                 show.Cast.Remove(existing);
@@ -480,7 +489,7 @@ public sealed class CatalogSynchronizer(
             }
 
             // Existing cast too, so details added later (or corrected) reach people already in the catalog.
-            UpdatePerson(person, member);
+            UpdatePerson(person, member.PhotoUrl, member.Person);
 
             if (existing.Character != member.Character
                 || existing.Order != order
@@ -500,40 +509,76 @@ public sealed class CatalogSynchronizer(
     /// Finds the person by the provider's id; else by name among people without one (adopting it), so earlier rows
     /// keyed by name gain the id; else creates them. Without a provider id, matches by name only.
     /// </summary>
-    private async Task<Person> GetOrCreatePersonAsync(ProviderCastMember member, CancellationToken ct)
+    private async Task<Person> GetOrCreatePersonAsync(string name, string? photoUrl, ProviderPerson? details, CancellationToken ct)
     {
         Person? person;
-        if (member.Person?.ExternalId is { } externalId)
+        if (details?.ExternalId is { } externalId)
         {
             person = db.People.Local.FirstOrDefault(p => p.ExternalId == externalId)
                 ?? await db.People.FirstOrDefaultAsync(p => p.ExternalId == externalId, ct)
-                ?? db.People.Local.FirstOrDefault(p => p.Name == member.Name && p.ExternalId == null)
-                ?? await db.People.FirstOrDefaultAsync(p => p.Name == member.Name && p.ExternalId == null, ct);
+                ?? db.People.Local.FirstOrDefault(p => p.Name == name && p.ExternalId == null)
+                ?? await db.People.FirstOrDefaultAsync(p => p.Name == name && p.ExternalId == null, ct);
         }
         else
         {
-            person = db.People.Local.FirstOrDefault(p => p.Name == member.Name)
-                ?? await db.People.FirstOrDefaultAsync(p => p.Name == member.Name, ct);
+            person = db.People.Local.FirstOrDefault(p => p.Name == name)
+                ?? await db.People.FirstOrDefaultAsync(p => p.Name == name, ct);
         }
 
         if (person is null)
         {
-            person = new Person { Id = Guid.CreateVersion7(), Name = member.Name };
+            person = new Person { Id = Guid.CreateVersion7(), Name = name };
             db.People.Add(person);
         }
 
-        UpdatePerson(person, member);
+        UpdatePerson(person, photoUrl, details);
         return person;
     }
 
-    private static void UpdatePerson(Person person, ProviderCastMember member)
+    /// <summary>
+    /// Replaces the show's creatives with the provider's. People are matched like cast (by provider id), so someone
+    /// who acts in one show and produces another is one person.
+    /// </summary>
+    private async Task SyncCreativesAsync(Show show, IReadOnlyList<ProviderCreative> creatives, CancellationToken ct)
     {
-        if (member.PhotoUrl is not null)
+        var wanted = new List<(Person Person, ProviderCreative Creative)>();
+        foreach (var creative in creatives)
         {
-            person.PhotoUrl = member.PhotoUrl;
+            var person = await GetOrCreatePersonAsync(creative.Name, creative.PhotoUrl, creative.Person, ct);
+            if (wanted.All(w => w.Person.Id != person.Id))
+            {
+                wanted.Add((person, creative));
+            }
         }
 
-        if (member.Person is { } details)
+        foreach (var existing in show.Creatives.Where(c => wanted.All(w => w.Person.Id != c.PersonId)).ToList())
+        {
+            show.Creatives.Remove(existing);
+        }
+
+        foreach (var (order, (person, creative)) in wanted.Index())
+        {
+            var existing = show.Creatives.FirstOrDefault(c => c.PersonId == person.Id);
+            if (existing is null)
+            {
+                show.Creatives.Add(new ShowCreative { ShowId = show.Id, PersonId = person.Id, Person = person, Roles = creative.Roles.ToList(), Order = order });
+            }
+            else if (!existing.Roles.SequenceEqual(creative.Roles) || existing.Order != order)
+            {
+                existing.Roles = creative.Roles.ToList();
+                existing.Order = order;
+            }
+        }
+    }
+
+    private static void UpdatePerson(Person person, string? photoUrl, ProviderPerson? details)
+    {
+        if (photoUrl is not null)
+        {
+            person.PhotoUrl = photoUrl;
+        }
+
+        if (details is not null)
         {
             person.ExternalId = details.ExternalId;
             person.Birthday = details.Birthday;

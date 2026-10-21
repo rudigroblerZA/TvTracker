@@ -34,8 +34,24 @@ public record CastMember(string Name, string? Character, string? PhotoUrl, Guid 
 
 public record PersonCredit(ShowSummary Show, string? Character);
 
+/// <param name="Career">Their career behind the camera (from TVmaze); null when not known.</param>
+/// <param name="Made">Catalog shows they created or executive produced.</param>
 public record PersonDetail(Guid Id, string Name, string? PhotoUrl, DateOnly? Birthday, DateOnly? Deathday, string? Gender, string? Country,
-    IReadOnlyList<PersonCredit> Credits);
+    IReadOnlyList<PersonCredit> Credits, Career? Career, IReadOnlyList<MadeCredit>? Made);
+
+public record MadeCredit(ShowSummary Show, IReadOnlyList<string> Roles);
+
+/// <summary>Someone who made a show: a creator, developer or executive producer.</summary>
+public record Creative(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, Career? Career, IReadOnlyList<ShowRef> OtherShows)
+{
+    public bool IsCreator => Roles.Contains("Creator") || Roles.Contains("Developer");
+}
+
+/// <param name="Shows">Shows they're credited on behind the camera, across TVmaze.</param>
+/// <param name="Prolific">Credited on at least 10 shows.</param>
+public record Career(int Shows, int Created, int ExecutiveProduced, bool Prolific, IReadOnlyList<string> NotableShows);
+
+public record ShowRef(Guid Id, string Title);
 
 public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url);
 
@@ -44,7 +60,8 @@ public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber,
 
 public record ShowDetail(Guid Id, string Title, string? Overview, string? PosterUrl, string? BackdropUrl, DateOnly? FirstAirDate,
     ShowStatus Status, string? Network, IReadOnlyList<string> Genres, IReadOnlyList<SeasonSummary> Seasons,
-    IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode);
+    IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode,
+    IReadOnlyList<Creative>? Creatives);
 
 public record SeasonDetail(Guid ShowId, int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc, IReadOnlyList<Episode> Episodes);
 

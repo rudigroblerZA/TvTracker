@@ -7,6 +7,53 @@
     <section class="insights">
         <h2>Insights</h2>
 
+        @if (Highlighted() is { Count: > 0 } prolific)
+        {
+            <div class="panel made-by">
+                @foreach (var creative in prolific)
+                {
+                    <div class="made-by-person">
+                        <Poster Title="@creative.Name" Url="@creative.PhotoUrl" Size="small" />
+                        <div>
+                            <div class="muted small">From a prolific @(creative.IsCreator ? "creator" : "producer")</div>
+                            <div><a href="people/@creative.PersonId"><strong>@creative.Name</strong></a> <span class="muted small">· @RolesText(creative.Roles)</span></div>
+                            <div class="small">@CareerText(creative.Career!)</div>
+                            @if (creative.Career!.NotableShows.Count > 0)
+                            {
+                                <div class="muted small">Known for @string.Join(", ", creative.Career.NotableShows.Take(5))</div>
+                            }
+                            @if (creative.OtherShows.Count > 0)
+                            {
+                                <div class="small">
+                                    In TV Tracker:
+                                    @for (var i = 0; i < Math.Min(4, creative.OtherShows.Count); i++)
+                                    {
+                                        var other = creative.OtherShows[i];
+                                        <a href="shows/@other.Id">@other.Title</a>@(i < Math.Min(4, creative.OtherShows.Count) - 1 ? ", " : "")
+                                    }
+                                    @if (creative.OtherShows.Count > 4)
+                                    {
+                                        <span class="muted"> and @(creative.OtherShows.Count - 4) more</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        @if (Creatives?.Where(c => c.IsCreator && !Highlighted().Contains(c)).ToList() is { Count: > 0 } creators)
+        {
+            <p class="muted small">
+                Created by
+                @for (var i = 0; i < creators.Count; i++)
+                {
+                    var creator = creators[i];
+                    <a href="people/@creator.PersonId">@creator.Name</a>@(i < creators.Count - 2 ? ", " : i == creators.Count - 2 ? " and " : "")
+                }
+            </p>
+        }
+
         @if (insights.Tags is { Count: > 0 } tags)
         {
             <ul class="show-tags">
@@ -280,6 +327,9 @@
 @code {
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
 
+    /// <summary>Who made the show, from the catalog; prolific creators and producers are highlighted.</summary>
+    [Parameter] public IReadOnlyList<Creative>? Creatives { get; set; }
+
     private ShowInsights? insights;
 
     protected override async Task OnParametersSetAsync()
@@ -306,6 +356,28 @@
 
     private static int BarWidth(double rating, double low, double high) =>
         high <= low ? 100 : (int)Math.Round(10 + 90 * (rating - low) / (high - low));
+
+    /// <summary>
+    /// The prolific people to feature: the most prolific one, plus any other prolific creator. A big producer's
+    /// production company often brings several prolific executive producers (Dick Wolf's shows list three or four);
+    /// only the best known is worth a line.
+    /// </summary>
+    private List<Creative> Highlighted()
+    {
+        var prolific = (Creatives ?? []).Where(c => c.Career?.Prolific == true).OrderByDescending(c => c.Career!.Shows).ToList();
+        return prolific.Take(1).Concat(prolific.Skip(1).Where(c => c.IsCreator)).ToList();
+    }
+
+    private static string RolesText(IReadOnlyList<string> roles) =>
+        string.Join(" and ", roles.Select(r => r.ToLowerInvariant()).Select(r => r == "executive producer" ? "executive producer" : r));
+
+    private static string CareerText(Career career)
+    {
+        var parts = new List<string>();
+        if (career.Created > 0) parts.Add($"created {career.Created}");
+        if (career.ExecutiveProduced > 0) parts.Add($"executive producer on {career.ExecutiveProduced}");
+        return $"{career.Shows} shows behind the camera" + (parts.Count > 0 ? $" ({string.Join(", ", parts)})" : "");
+    }
 
     private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 

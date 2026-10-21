@@ -182,6 +182,18 @@ public static class CatalogApi
 
         EpisodeDto Labeled(Episode e) => e.ToDto(CatalogMappings.LabelFor(e, bySeason[e.SeasonNumber]));
 
+        var creatives = await db.Creatives.AsNoTracking()
+            .Where(c => c.ShowId == id)
+            .Include(c => c.Person)
+            .OrderBy(c => c.Order)
+            .ToListAsync(ct);
+        var creativeIds = creatives.Select(c => c.PersonId).ToList();
+        var otherShows = (await db.Creatives.AsNoTracking()
+                .Where(c => creativeIds.Contains(c.PersonId) && c.ShowId != id)
+                .Join(db.Shows, c => c.ShowId, s => s.Id, (c, s) => new { c.PersonId, s.Id, s.Title, s.Popularity })
+                .ToListAsync(ct))
+            .ToLookup(x => x.PersonId);
+
         var next = show.Episodes
             .Where(e => e.AirsAtUtc > now)
             .OrderBy(e => e.AirsAtUtc)
@@ -215,7 +227,11 @@ public static class CatalogApi
                 .Select(w => new WatchProviderDto(w.ProviderName, w.Type, w.Url))
                 .ToList(),
             next is null ? null : Labeled(next),
-            last is null ? null : Labeled(last));
+            last is null ? null : Labeled(last),
+            creatives
+                .Select(c => new CreativeDto(c.PersonId, c.Person.Name, c.Person.PhotoUrl, c.Roles, CareerDto.For(c.Person, show.Title),
+                    otherShows[c.PersonId].OrderByDescending(o => o.Popularity).Select(o => new ShowRefDto(o.Id, o.Title)).ToList()))
+                .ToList());
     }
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(
@@ -249,6 +265,10 @@ public static class CatalogApi
             .Where(c => c.PersonId == id)
             .Join(db.Shows.AsNoTracking(), c => c.ShowId, s => s.Id, (c, s) => new { Show = s, c.Character })
             .ToListAsync(ct);
+        var made = await db.Creatives.AsNoTracking()
+            .Where(c => c.PersonId == id)
+            .Join(db.Shows.AsNoTracking(), c => c.ShowId, s => s.Id, (c, s) => new { Show = s, c.Roles })
+            .ToListAsync(ct);
 
         return TypedResults.Ok(new PersonDetailDto(
             person.Id,
@@ -262,6 +282,11 @@ public static class CatalogApi
                 .OrderByDescending(c => c.Show.FirstAirDate)
                 .ThenBy(c => c.Show.Title)
                 .Select(c => new PersonCreditDto(c.Show.ToSummary(), c.Character))
+                .ToList(),
+            CareerDto.For(person),
+            made
+                .OrderByDescending(m => m.Show.Popularity)
+                .Select(m => new MadeCreditDto(m.Show.ToSummary(), m.Roles))
                 .ToList()));
     }
 

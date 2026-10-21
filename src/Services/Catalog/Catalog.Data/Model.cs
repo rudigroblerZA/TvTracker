@@ -60,6 +60,15 @@ public class Show
 
     public List<CastMember> Cast { get; set; } = [];
 
+    /// <summary>Who made the show: its creators, developers and executive producers.</summary>
+    public List<ShowCreative> Creatives { get; set; } = [];
+
+    /// <summary>
+    /// Whether <see cref="Creatives"/> came from the provider (it may still be empty). False for shows imported before
+    /// creatives were; the sync worker backfills those.
+    /// </summary>
+    public bool CreativesImported { get; set; }
+
     public List<WatchProvider> WatchProviders { get; set; } = [];
 }
 
@@ -144,6 +153,37 @@ public class Person
 
     /// <summary>Country name, e.g. "United States".</summary>
     public string? Country { get; set; }
+
+    /// <summary>Shows they're credited on behind the camera, across the provider (not just this catalog); null until looked up.</summary>
+    public int? CareerShows { get; set; }
+
+    /// <summary>Shows they created or developed, across the provider.</summary>
+    public int? CareerCreated { get; set; }
+
+    /// <summary>Shows they were an executive producer on, across the provider.</summary>
+    public int? CareerExecutiveProduced { get; set; }
+
+    /// <summary>Their best-known shows behind the camera, most popular first (titles; many aren't in this catalog).</summary>
+    public List<string> CareerNotableShows { get; set; } = [];
+
+    /// <summary>When the career figures were last fetched from the provider.</summary>
+    public DateTime? CareerRefreshedAtUtc { get; set; }
+}
+
+/// <summary>A person who made a show, with their roles on it.</summary>
+public class ShowCreative
+{
+    public Guid ShowId { get; set; }
+
+    public Guid PersonId { get; set; }
+
+    public Person Person { get; set; } = null!;
+
+    /// <summary>"Creator", "Developer" and/or "Executive Producer".</summary>
+    public List<string> Roles { get; set; } = [];
+
+    /// <summary>Creators and developers first, as the provider lists them.</summary>
+    public int Order { get; set; }
 }
 
 public class CastMember
