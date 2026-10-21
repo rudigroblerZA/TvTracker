@@ -162,6 +162,10 @@ How events flow:
 
     Weekly release isn't tagged, since nearly every show has it. Discover has matching bingeable, weekend-binge and
     fan-favorite lists.
+
+    Show cards (search results, home, For you, lists and the rest) also carry up to two tags, for signed-in users.
+    The cards on a page ask together, so their tags come from Analytics in one batched request
+    (`GET /api/v1/insights/tags?ids=…`).
   - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
     from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
     each season's best episode.

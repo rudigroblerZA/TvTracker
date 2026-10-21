@@ -23,6 +23,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<ConnectionState>();
         services.TryAddScoped<ClientInfo>();
         services.AddScoped<UserSession>();
+        services.AddScoped<ShowTagStore>();
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();
