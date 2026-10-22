@@ -1,10 +1,10 @@
 using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.SyncWorker;
+using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
-using Catalog.SyncWorker.Nanogenres;
 
 var builder = WebApplication.CreateBuilder(args);
 
