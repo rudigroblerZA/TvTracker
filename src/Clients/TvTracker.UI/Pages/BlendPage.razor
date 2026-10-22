@@ -1,0 +1,212 @@
+@page "/blend"
+@inject CatalogClient Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>@(a is not null && b is not null ? $"{a.Title} × {b.Title}" : "Blend") · TV Tracker</PageTitle>
+
+<h1>Blend</h1>
+<p class="muted">Pick two shows and find the ones that sit between them.</p>
+
+<div class="blend-pickers">
+    <ShowPicker Label="First show" Selected="a" SelectedChanged="PickA" Exclude="b?.Id" />
+    <span class="blend-x" aria-hidden="true">×</span>
+    <ShowPicker Label="Second show" Selected="b" SelectedChanged="PickB" Exclude="a?.Id" />
+</div>
+
+@if (a is null && b is null)
+{
+    <div class="blend-examples">
+        <span class="muted small">Try</span>
+        @foreach (var (first, second) in Examples)
+        {
+            <button class="btn btn-quiet small" type="button" @onclick="() => TryExampleAsync(first, second)">@first × @second</button>
+        }
+    </div>
+}
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (a is not null && b is not null)
+{
+    <label class="blend-lean">
+        <span class="small">More @a.Title</span>
+        @* The slider runs from A (left) to B (right); the API's lean is how much like A. *@
+        <input type="range" min="20" max="80" step="10" value="@(100 - lean)" @onchange="OnLeanChanged" aria-label="Lean between the two shows" />
+        <span class="small">More @b.Title</span>
+    </label>
+
+    @if (loading)
+    {
+        <p class="muted">Blending…</p>
+    }
+    else if (blend is { Indexed: false })
+    {
+        <p class="notice">One of these shows was just added and is still being indexed. Try again in a minute.</p>
+    }
+    else if (blend is not null)
+    {
+        @if (blend.Loose)
+        {
+            <p class="notice">These two don't have much in common, so these are the closest middle ground rather than close matches.</p>
+        }
+
+        <div class="card-grid">
+            @foreach (var match in blend.Matches)
+            {
+                <ShowCard ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl"
+                          Subtitle="@(string.Join(" · ", new[] { match.Show.Year?.ToString(), match.Show.Network }.Where(s => !string.IsNullOrEmpty(s))))">
+                    <div class="blend-bar" title="@($"{match.LikeA}% {a.Title}, {100 - match.LikeA}% {b.Title}")">
+                        <span style="width: @(match.LikeA)%"></span>
+                    </div>
+                    @if (Reason(match) is { Length: > 0 } reason)
+                    {
+                        <div class="muted small">@reason</div>
+                    }
+                </ShowCard>
+            }
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "a")] public Guid? A { get; set; }
+    [SupplyParameterFromQuery(Name = "b")] public Guid? B { get; set; }
+    [SupplyParameterFromQuery(Name = "lean")] public int? Lean { get; set; }
+
+    private static readonly (string, string)[] Examples =
+    [
+        ("Breaking Bad", "The Office"),
+        ("NCIS", "Friends"),
+        ("Game of Thrones", "Friends"),
+        ("Squid Game", "Love Is Blind")
+    ];
+
+    private ShowSummary? a;
+    private ShowSummary? b;
+    private int lean = 50;
+    private Blend? blend;
+    private bool loading;
+    private string? error;
+    private string? loadedFor;
+
+    // Shows already picked, so a pick doesn't fetch the show again when the address changes.
+    private readonly Dictionary<Guid, ShowSummary> known = [];
+
+    // The address is the state (so a blend can be shared): picking or moving the slider changes it, and this loads it.
+    protected override async Task OnParametersSetAsync()
+    {
+        lean = Math.Clamp(Lean ?? 50, 20, 80);
+        var key = $"{A}|{B}|{lean}";
+        if (key != loadedFor)
+        {
+            loadedFor = key;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            if (A is { } idA && B is { } idB && idA != idB)
+            {
+                loading = true;
+                a = await ShowAsync(idA);
+                b = await ShowAsync(idB);
+                blend = await Catalog.GetBlendAsync(idA, idB, lean);
+                if (blend is not null)
+                {
+                    (a, b) = (blend.A, blend.B);
+                }
+            }
+            else
+            {
+                blend = null;
+                a = A is { } onlyA ? await ShowAsync(onlyA) : null;
+                b = B is { } onlyB && onlyB != A ? await ShowAsync(onlyB) : null;
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task<ShowSummary?> ShowAsync(Guid id)
+    {
+        if (known.TryGetValue(id, out var show))
+        {
+            return show;
+        }
+
+        if (await Catalog.GetShowAsync(id) is not { } detail)
+        {
+            return null;
+        }
+
+        show = new ShowSummary(detail.Id, detail.Title, detail.PosterUrl, detail.FirstAirDate?.Year, detail.Status, detail.Network, detail.Genres);
+        known[id] = show;
+        return show;
+    }
+
+    private void PickA(ShowSummary? show) => Go(show, b, lean);
+
+    private void PickB(ShowSummary? show) => Go(a, show, lean);
+
+    private void OnLeanChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var towardsB))
+        {
+            Go(a, b, 100 - towardsB);
+        }
+    }
+
+    private async Task TryExampleAsync(string first, string second)
+    {
+        try
+        {
+            var showA = (await Catalog.SuggestAsync(first))?.FirstOrDefault(s => s.Title == first);
+            var showB = (await Catalog.SuggestAsync(second))?.FirstOrDefault(s => s.Title == second);
+            if (showA is null || showB is null)
+            {
+                error = $"{(showA is null ? first : second)} isn't in the catalog yet. Search for it to add it.";
+                return;
+            }
+            Go(showA, showB, 50);
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Go(ShowSummary? showA, ShowSummary? showB, int newLean)
+    {
+        foreach (var show in new[] { showA, showB }.OfType<ShowSummary>())
+        {
+            known[show.Id] = show;
+        }
+
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["a"] = showA?.Id,
+            ["b"] = showB?.Id,
+            ["lean"] = newLean == 50 ? null : newLean
+        }), replace: true);
+    }
+
+    /// <summary>"Crime from Breaking Bad · Comedy from The Office": the genres the match takes from each.</summary>
+    private string Reason(BlendMatch match)
+    {
+        var parts = new List<string>();
+        if (match.GenresFromA.Count > 0) parts.Add($"{string.Join(", ", match.GenresFromA)} from {a!.Title}");
+        if (match.GenresFromB.Count > 0) parts.Add($"{string.Join(", ", match.GenresFromB)} from {b!.Title}");
+        if (parts.Count == 0 && match.GenresFromBoth.Count > 0) parts.Add($"{string.Join(", ", match.GenresFromBoth)}, like both");
+        return string.Join(" · ", parts);
+    }
+}

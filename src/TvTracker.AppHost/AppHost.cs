@@ -130,12 +130,17 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WaitFor(analyticsWorker)
     .WithHttpHealthCheck("/health");
 
-// The embedding model for semantic search (Embeddings:Model in the AppHost's configuration). Set on both, since
-// Catalog.API embeds search terms with the model the sync worker embedded the shows with; changing it re-embeds the catalog.
-if (builder.Configuration["Embeddings:Model"] is { Length: > 0 } embeddingModel)
+// The embedding model for semantic search: the "Embeddings" section of the AppHost's configuration (Model, and any
+// Models:{id} settings, such as a Docker Model Runner endpoint). Passed to both, since Catalog.API embeds search terms
+// with the model the sync worker embedded the shows with; changing the model re-embeds the catalog.
+foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExtensions.AsEnumerable(builder.Configuration.GetSection("Embeddings"), makePathsRelative: true))
 {
-    catalogApi.WithEnvironment("Embeddings__Model", embeddingModel);
-    catalogSync.WithEnvironment("Embeddings__Model", embeddingModel);
+    if (value is not null)
+    {
+        var name = "Embeddings__" + key.Replace(":", "__");
+        catalogApi.WithEnvironment(name, value);
+        catalogSync.WithEnvironment(name, value);
+    }
 }
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.

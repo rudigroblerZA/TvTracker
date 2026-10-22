@@ -9,7 +9,7 @@ public static class EmbeddingServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the configured embedding model as <see cref="EmbeddingModel"/> and
-    /// <see cref="IEmbeddingGenerator{TInput,TEmbedding}"/>, and loads it at startup (in the background, so the
+    /// <see cref="IEmbeddingGenerator{TInput,TEmbedding}"/> (run in-process, or called on its server), and loads it at startup (in the background, so the
     /// service starts straight away). Fails at startup if the model is unknown, incomplete, or doesn't fit
     /// <paramref name="storedDimensions"/>, the size of the vectors the database holds.
     /// </summary>
@@ -17,9 +17,20 @@ public static class EmbeddingServiceCollectionExtensions
     {
         var section = configuration.GetSection("Embeddings");
         services.Configure<EmbeddingOptions>(section);
-        services.AddSingleton(ResolveModel(section, storedDimensions));
-        services.AddSingleton<LocalEmbeddingGenerator>();
-        services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp => sp.GetRequiredService<LocalEmbeddingGenerator>());
+        var model = ResolveModel(section, storedDimensions);
+        services.AddSingleton(model);
+        if (model.Source == EmbeddingSource.Server)
+        {
+            services.AddSingleton<ServerEmbeddingGenerator>();
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp => sp.GetRequiredService<ServerEmbeddingGenerator>());
+            services.AddSingleton<IWarmUp>(sp => sp.GetRequiredService<ServerEmbeddingGenerator>());
+        }
+        else
+        {
+            services.AddSingleton<LocalEmbeddingGenerator>();
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp => sp.GetRequiredService<LocalEmbeddingGenerator>());
+            services.AddSingleton<IWarmUp>(sp => sp.GetRequiredService<LocalEmbeddingGenerator>());
+        }
         services.AddHostedService<EmbeddingWarmUp>();
         return services;
     }
@@ -43,19 +54,31 @@ public static class EmbeddingServiceCollectionExtensions
         model.Id = id;
 
         var missing = new List<string>();
-        if (string.IsNullOrWhiteSpace(model.BaseUrl)) missing.Add(nameof(model.BaseUrl));
-        if (string.IsNullOrWhiteSpace(model.OnnxSha256)) missing.Add(nameof(model.OnnxSha256));
-        if (string.IsNullOrWhiteSpace(model.VocabSha256)) missing.Add(nameof(model.VocabSha256));
+        if (model.Source == EmbeddingSource.Server)
+        {
+            if (!Uri.TryCreate(model.Endpoint, UriKind.Absolute, out _)) missing.Add(nameof(model.Endpoint));
+            if (string.IsNullOrWhiteSpace(model.ServedModel)) missing.Add(nameof(model.ServedModel));
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(model.BaseUrl)) missing.Add(nameof(model.BaseUrl));
+            if (string.IsNullOrWhiteSpace(model.OnnxSha256)) missing.Add(nameof(model.OnnxSha256));
+            if (string.IsNullOrWhiteSpace(model.VocabSha256)) missing.Add(nameof(model.VocabSha256));
+        }
         if (model.Dimensions <= 0) missing.Add(nameof(model.Dimensions));
         if (model.MaxDistance <= 0) missing.Add(nameof(model.MaxDistance));
         if (missing.Count > 0)
         {
             throw new InvalidOperationException($"Embedding model '{id}' needs {string.Join(", ", missing)} under Embeddings:Models:{id}.");
         }
+        // Otherwise the last path segment is replaced when relative paths are resolved against them.
         if (!model.BaseUrl.EndsWith('/'))
         {
-            // Otherwise the last path segment is replaced when the file paths are resolved against it.
             model.BaseUrl += "/";
+        }
+        if (!model.Endpoint.EndsWith('/'))
+        {
+            model.Endpoint += "/";
         }
         if (model.Dimensions != storedDimensions)
         {
@@ -67,7 +90,7 @@ public static class EmbeddingServiceCollectionExtensions
         return model;
     }
 
-    private sealed class EmbeddingWarmUp(LocalEmbeddingGenerator generator) : BackgroundService
+    private sealed class EmbeddingWarmUp(IWarmUp generator) : BackgroundService
     {
         protected override Task ExecuteAsync(CancellationToken stoppingToken) => generator.WarmUpAsync(stoppingToken);
     }

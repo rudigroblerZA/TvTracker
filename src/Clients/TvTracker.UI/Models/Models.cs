@@ -27,6 +27,13 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int
 
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
+/// <summary>Shows between two others (see Catalog.API's BlendApi).</summary>
+public record Blend(ShowSummary A, ShowSummary B, int Lean, bool Indexed, IReadOnlyList<BlendMatch> Matches, bool Loose);
+
+/// <param name="LikeA">Where the show sits between the two, as a percentage like A.</param>
+public record BlendMatch(ShowSummary Show, int Fit, int LikeA, IReadOnlyList<string> GenresFromA, IReadOnlyList<string> GenresFromB,
+    IReadOnlyList<string> GenresFromBoth);
+
 public record SeasonSummary(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
 /// <param name="PersonId">Empty in responses cached before people had pages (e.g. offline on mobile); don't link then.</param>

@@ -21,6 +21,8 @@ public static class CatalogApi
         api.MapGet("/shows", SearchShowsAsync).RequireRateLimiting(SearchRateLimiting.Policy);
         api.MapGet("/shows/trending", GetTrendingAsync);
         api.MapGet("/shows/batch", GetShowsByIdsAsync);
+        api.MapGet("/shows/suggest", SuggestShowsAsync);
+        api.MapBlendApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
@@ -56,6 +58,27 @@ public static class CatalogApi
         }
 
         return await QueryShowsAsync(db, semantic, search, genre, status, page, pageSize, ct, tags);
+    }
+
+    /// <summary>
+    /// Up to 8 catalog shows whose title contains the term, most popular first, for pickers that suggest as you type.
+    /// Unlike search it doesn't import from the provider or match by meaning, so it's cheap enough for every keystroke.
+    /// </summary>
+    private static async Task<List<ShowSummaryDto>> SuggestShowsAsync(CatalogContext db, string? q, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
+        {
+            return [];
+        }
+
+        var pattern = $"%{q.Trim()}%";
+        var shows = await db.Shows.AsNoTracking()
+            .Where(s => EF.Functions.ILike(s.Title, pattern))
+            .OrderByDescending(s => s.Popularity)
+            .ThenBy(s => s.Title)
+            .Take(8)
+            .ToListAsync(ct);
+        return shows.Select(s => s.ToSummary()).ToList();
     }
 
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(

@@ -77,14 +77,30 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
     cutoff). Built in: all-MiniLM-L6-v2 (default; mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
-    an instruction prefix on search terms, cutoff 0.45). The AppHost sets it on Catalog.API and the sync worker
+    an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
+    (task prefixes, truncated from 768, cutoff 0.38). The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
-  - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on 22 test
-    searches against the dev catalog, between the expected shows and unrelated searches.
+  - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
+    searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
+    595 shows (42 searches): MiniLM ranks better (MRR 0.74 against 0.68), so it stays the default.
+  - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
+    `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
+    - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
+      retries to every search. After a failure, calls fail fast for 30 s and one warning is logged per outage.
+    - Docker Hub's embedding models are 768+ dimensions. `Truncate` cuts Matryoshka models to 384 and
+      re-normalises; the column stays as it is.
+    - Text is cut at about 4 characters a token (`MaxTokens`), since Model Runner's llama.cpp refuses input longer
+      than its 512-token batch.
   - **Dimensions:** `ShowEmbedding.Dimensions` (384) is the column size. Services refuse to start with a model of
     another size. Changing it needs a migration of the column and its HNSW index.
   - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
     applies to them. Changing a prefix without changing the model id doesn't re-embed the catalog.
+- **Blend** (`BlendApi`): mixes two shows' vectors (weighted by the lean, normalised) and ranks the shows nearest
+  the mix by `max(2w·dA, 2(1−w)·dB)`, their weighted distance to the farther show. Ranking by distance to the mix
+  alone would favour shows very close to just one of the two (an NCIS spinoff, blended with Friends).
+  - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
+  - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
+  - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire

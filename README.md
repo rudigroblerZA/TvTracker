@@ -51,16 +51,37 @@ Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The mo
 Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
 to change it). Until it loads, search matches titles only.
 
-The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`, which the AppHost passes to Catalog.API
-and the sync worker so both use the same one. Two are built in:
+The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`. The AppHost passes its whole
+`Embeddings` section to Catalog.API and the sync worker, so both use the same model. Three are built in:
 
-| Model | Download | Notes |
+| Model | Runs | Notes |
 | --- | --- | --- |
-| `all-MiniLM-L6-v2` (default) | ~90 MB | Fast; matches below a cosine distance of 0.65 |
-| `bge-small-en-v1.5` | ~130 MB | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
+| `all-MiniLM-L6-v2` (default) | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
+| `bge-small-en-v1.5` | In-process (ONNX), ~130 MB download | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
+| `dmr/nomic-embed-text-v1.5` | Docker Model Runner | ~10× slower per search and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
 
-On 22 test searches over the 150-show dev catalog, the expected show was in the top 3 for 20 with MiniLM and 21 with
-bge-small, and first for 17 and 15. Changing the model re-embeds the catalog within a few minutes; until then semantic
+**Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API.
+- **Setup:** Docker Desktop: enable Model Runner with host-side TCP support (port 12434). Docker Engine: install
+  the `docker-model-plugin`. Then `docker model pull ai/nomic-embed-text-v1.5`.
+- **Endpoint:** the services call `http://localhost:12434/engines/v1/` by default.
+  Change it with `Embeddings:Models:{id}:Endpoint`.
+- **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
+- **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
+  embeds once it's back. Each service logs one warning per outage.
+- **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
+  `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
+  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as nomic and EmbeddingGemma):
+    its longer vectors are cut to the column's 384 dimensions.
+  - A model that makes 384 dimensions natively needs no truncation. A longer one without `Truncate` is refused,
+    since cutting other models loses most of their meaning.
+
+On 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
+first for 27 and in the top 3 for 35; bge-small did so for 24 and 31, and found slightly more of the expected shows in
+the top 10 (84% against 82%). Each model wins different searches: bge-small finds Dark for "time travel mystery in a
+small german town" (10th against 64th) and The Mandalorian for "bounty hunter protects a child in a galaxy far away"
+(31st against 213th); MiniLM finds Breaking Bad and Doctor Who from descriptions bge-small misses. With both cutoffs,
+8 unrelated searches ("best mortgage rates", "replace a car battery") match nothing, apart from bge-small matching
+"best mortgage rates" to two property shows. MiniLM stays the default: it ranks better and runs about 2.5× faster. Changing the model re-embeds the catalog within a few minutes; until then semantic
 results are limited to the shows already embedded with the new model. Any built-in setting can be overridden, e.g.
 `Embeddings:Models:bge-small-en-v1.5:MaxDistance`, and another BERT-style ONNX model with a WordPiece `vocab.txt` can be
 added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `Dimensions`, `MaxDistance`, plus
@@ -68,6 +89,18 @@ added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `D
 384-dimension vectors, the size of the `show_embeddings` column; services refuse to start otherwise. The sync worker embeds new and refreshed shows every 30 seconds
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
+
+**Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
+Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
+Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
+genres it takes from each. The address holds the blend, so it can be shared, and it works signed out.
+- **How:** it mixes the two shows' search vectors, takes the 40 catalog shows nearest the mix, and ranks them by
+  their distance to the farther of the two, so a show close to only one of them ranks low.
+- **Loose blends:** when even the best match is farther from one show than search's cutoff for "similar"
+  (Stranger Things × The Great British Bake Off), the page says the two have little in common.
+- **API:** `GET /api/v1/shows/blend?a={id}&b={id}&lean=50` (lean 0-100, how much like the first show). The pickers use
+  `GET /api/v1/shows/suggest?q=`: up to 8 catalog title matches, without the TVmaze import search does, so it's cheap
+  enough to call as you type.
 
 Search is rate limited (429 with `Retry-After` when over), per signed-in user, or per client IP for anonymous visitors
 (the last `X-Forwarded-For` entry: the mobile gateway adds it, and the web app forwards each browser's address, captured
