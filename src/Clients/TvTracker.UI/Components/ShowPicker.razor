@@ -1,0 +1,89 @@
+@* Picks one catalog show: suggestions by title as you type, then the chosen show with a way to change it. *@
+@implements IDisposable
+@inject CatalogClient Catalog
+
+<div class="show-picker">
+    <span class="show-picker-label muted small">@Label</span>
+    @if (Selected is { } show)
+    {
+        <div class="show-picker-chosen">
+            <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+            <div>
+                <div class="strong">@show.Title</div>
+                <div class="muted small">@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network }.Where(s => !string.IsNullOrEmpty(s))))</div>
+                <button class="link small" type="button" @onclick="ClearAsync">Change</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <input type="search" placeholder="Type a show's title" aria-label="@Label" value="@term" @oninput="OnInput" autocomplete="off" />
+        @if (suggestions is { Count: > 0 })
+        {
+            <ul class="show-picker-suggestions" role="listbox" aria-label="@($"{Label} suggestions")">
+                @foreach (var suggestion in suggestions.Where(s => s.Id != Exclude))
+                {
+                    <li>
+                        <button type="button" role="option" @onclick="() => PickAsync(suggestion)">
+                            <Poster Title="@suggestion.Title" Url="@suggestion.PosterUrl" Size="small" />
+                            <span>
+                                <span class="strong">@suggestion.Title</span>
+                                <span class="muted small">@(suggestion.Year is { } year ? $" ({year})" : "")</span>
+                            </span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        else if (suggestions is not null && term?.Trim().Length >= 2)
+        {
+            <p class="muted small">No show in the catalog has that title. <a href="search?q=@Uri.EscapeDataString(term.Trim())">Search for it</a> to add it.</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public ShowSummary? Selected { get; set; }
+    [Parameter] public EventCallback<ShowSummary?> SelectedChanged { get; set; }
+
+    /// <summary>A show not to suggest (the one picked in the other picker).</summary>
+    [Parameter] public Guid? Exclude { get; set; }
+
+    private string? term;
+    private List<ShowSummary>? suggestions;
+    private CancellationTokenSource? pending;
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString();
+        pending?.Cancel();
+        pending = new CancellationTokenSource();
+        var ct = pending.Token;
+        try
+        {
+            // Wait for a pause in typing, so suggestions follow the term rather than every keystroke.
+            await Task.Delay(250, ct);
+            suggestions = term?.Trim().Length >= 2 ? await Catalog.SuggestAsync(term.Trim(), ct) ?? [] : null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke.
+        }
+        catch (HttpRequestException)
+        {
+            suggestions = null;
+        }
+    }
+
+    private async Task PickAsync(ShowSummary show)
+    {
+        term = null;
+        suggestions = null;
+        await SelectedChanged.InvokeAsync(show);
+    }
+
+    private Task ClearAsync() => SelectedChanged.InvokeAsync(null);
+
+    public void Dispose() => pending?.Cancel();
+}

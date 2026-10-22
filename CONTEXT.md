@@ -86,6 +86,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     another size. Changing it needs a migration of the column and its HNSW index.
   - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
     applies to them. Changing a prefix without changing the model id doesn't re-embed the catalog.
+- **Blend** (`BlendApi`): mixes two shows' vectors (weighted by the lean, normalised) and ranks the shows nearest
+  the mix by `max(2w·dA, 2(1−w)·dB)`, their weighted distance to the farther show. Ranking by distance to the mix
+  alone would favour shows very close to just one of the two (an NCIS spinoff, blended with Friends).
+  - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
+  - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
+  - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire

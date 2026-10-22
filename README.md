@@ -74,6 +74,18 @@ added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `D
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
 
+**Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
+Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
+Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
+genres it takes from each. The address holds the blend, so it can be shared, and it works signed out.
+- **How:** it mixes the two shows' search vectors, takes the 40 catalog shows nearest the mix, and ranks them by
+  their distance to the farther of the two, so a show close to only one of them ranks low.
+- **Loose blends:** when even the best match is farther from one show than search's cutoff for "similar"
+  (Stranger Things × The Great British Bake Off), the page says the two have little in common.
+- **API:** `GET /api/v1/shows/blend?a={id}&b={id}&lean=50` (lean 0-100, how much like the first show). The pickers use
+  `GET /api/v1/shows/suggest?q=`: up to 8 catalog title matches, without the TVmaze import search does, so it's cheap
+  enough to call as you type.
+
 Search is rate limited (429 with `Retry-After` when over), per signed-in user, or per client IP for anonymous visitors
 (the last `X-Forwarded-For` entry: the mobile gateway adds it, and the web app forwards each browser's address, captured
 when the page loads). Calls with neither, from other services, share one larger limit. The web app doesn't retry 429s or
