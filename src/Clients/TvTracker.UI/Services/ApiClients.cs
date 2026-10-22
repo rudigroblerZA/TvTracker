@@ -226,6 +226,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
 
     public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
         GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
+
+    /// <param name="level">"light", "lean" or "essentials".</param>
+    public Task<EssentialCut?> GetEssentialCutAsync(Guid showId, string level = "lean", CancellationToken ct = default) =>
+        GetAsync<EssentialCut>(ApiClients.Analytics, $"api/v1/shows/{showId}/essential-cut?level={level}", ct, cacheForOffline: true);
 }
 
 public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

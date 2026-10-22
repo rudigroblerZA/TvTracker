@@ -213,6 +213,22 @@ public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? R
 
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
 
+/// <summary>A shorter path through a long show (see Analytics.API's EssentialCutApi).</summary>
+public record EssentialCut(Guid ShowId, string Title, string Level, bool Available, string? Reason, CutTotals Full, CutTotals Cut,
+    IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress);
+
+public record CutTotals(int Episodes, int Minutes);
+
+public record CutSeason(int Number, int Episodes, int Kept, int MinutesSaved, IReadOnlyList<CutEpisode> Items);
+
+/// <param name="Why">"series-premiere", "season-premiere", "season-finale", "series-finale", "two-parter",
+/// "best-of-season", "above-average", "unrated" or "below-average" (skipped).</param>
+public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double? Rating, bool Keep, string Why, bool Watched);
+
+public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double AverageRating, double SeasonAverage);
+
+public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
+
 public record Taste(RatingBias? Bias, IReadOnlyList<GenreTaste> Genres, IReadOnlyList<MonthWatch> Months, TasteProgress Progress);
 
 /// <param name="Label">"kinder", "harsher" or "in line".</param>

@@ -59,6 +59,7 @@ public static class InsightsApi
         api.MapGet("/insights/tags", GetTagsAsync);
         api.MapGet("/people/{personId:guid}/insights", GetPersonInsightsAsync);
         api.MapGet("/me/taste", TasteApi.GetTasteAsync);
+        api.MapEssentialCutApi();
 
         return api;
     }

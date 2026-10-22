@@ -45,8 +45,11 @@ public static class Format
 
     public static string Duration(int minutes) =>
         minutes < 60 ? $"{minutes} min"
-        : minutes < 60 * 24 ? $"{minutes / 60} h {minutes % 60} min"
+        : minutes < 60 * 24 ? (minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes / 60} h {minutes % 60} min")
         : $"{minutes / (60 * 24)} day{(minutes / (60 * 24) == 1 ? "" : "s")} {minutes % (60 * 24) / 60} h";
+
+    /// <summary>Watching time in whole hours ("365 h") for long stretches, where days would be misleading.</summary>
+    public static string Hours(int minutes) => minutes < 120 ? Duration(minutes) : $"{Math.Round(minutes / 60.0):N0} h";
 
     /// <summary>A provider rating (0-10), e.g. "7.9".</summary>
     public static string Rating(double rating) => rating.ToString("0.0");
