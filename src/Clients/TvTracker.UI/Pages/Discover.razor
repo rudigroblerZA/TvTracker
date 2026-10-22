@@ -1,0 +1,158 @@
+@page "/discover"
+@inject AnalyticsClient Analytics
+@inject CatalogClient Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>@(Selected.Label) · Discover · TV Tracker</PageTitle>
+
+<h1>Discover</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        <div class="section-header">
+            <div class="tabs" role="tablist">
+                @foreach (var tab in Lists)
+                {
+                    <button role="tab" aria-selected="@(tab.Key == list)" class="@(tab.Key == list ? "active" : "")"
+                            @onclick="() => Go(tab.Key, genre)">@tab.Label</button>
+                }
+            </div>
+            <select value="@genre" @onchange="e => Go(list, e.Value?.ToString() ?? string.Empty)" aria-label="Genre">
+                <option value="">All genres</option>
+                @foreach (var g in genres)
+                {
+                    <option value="@g">@g</option>
+                }
+            </select>
+        </div>
+        <p class="muted small">@Selected.Description</p>
+
+        @if (items is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (items.Count == 0)
+        {
+            <p class="muted">Nothing here yet@(string.IsNullOrEmpty(genre) ? "" : $" for {genre}").</p>
+        }
+        else
+        {
+            <ol class="discovery">
+                @foreach (var item in items)
+                {
+                    <li>
+                        <Poster Title="@item.ShowTitle" Url="@item.PosterUrl" Size="small" />
+                        <div>
+                            <a href="shows/@item.ShowId"><strong>@item.ShowTitle</strong></a>
+                            @if (item.EpisodeId is { } episodeId)
+                            {
+                                <div>
+                                    <span class="code">@Format.EpisodeCode(item.SeasonNumber ?? 0, item.EpisodeNumber ?? 0)</span>
+                                    <a href="episodes/@episodeId">@item.EpisodeTitle</a>
+                                </div>
+                            }
+                            <div class="muted small">@Detail(item)</div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+
+        <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to discover hidden gems, bingeable shows, fan favorites and more." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // The address holds the list and genre, so a list can be shared or bookmarked.
+    [SupplyParameterFromQuery(Name = "list")] public string? List { get; set; }
+    [SupplyParameterFromQuery(Name = "genre")] public string? Genre { get; set; }
+
+    private const int Length = 30;
+
+    private static readonly (string Key, string Label, string Description)[] Lists =
+    [
+        ("hidden-gems", "Hidden gems", "Highly rated shows that fly under the radar: less well known, and few TV Tracker users follow them yet."),
+        ("most-consistent", "Most consistent", "Well-rated shows whose episodes hardly ever dip."),
+        ("rollercoasters", "Rollercoasters", "Well-rated shows with the biggest swings between episodes."),
+        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes."),
+        ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for."),
+        ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less."),
+        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more).")
+    ];
+
+    private string list = Lists[0].Key;
+    private string genre = "";
+    private List<string> genres = [];
+    private List<DiscoveryItem>? items;
+    private string? error;
+    private string? loadedFor;
+
+    private (string Key, string Label, string Description) Selected => Lists.First(t => t.Key == list);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            genres = await Catalog.GetGenresAsync() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            // The genre filter is optional.
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        list = Lists.Any(t => t.Key == List) ? List! : Lists[0].Key;
+        genre = Genre ?? "";
+        var key = $"{list}|{genre}";
+        if (key != loadedFor)
+        {
+            loadedFor = key;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        items = null;
+        try
+        {
+            items = await Analytics.GetDiscoveryAsync(list, genre, Length) ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Go(string newList, string newGenre) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["list"] = newList == Lists[0].Key ? null : newList,
+            ["genre"] = string.IsNullOrEmpty(newGenre) ? null : newGenre
+        }), replace: true);
+
+    private string Detail(DiscoveryItem item)
+    {
+        var rating = item.ShowExternalRating is { } r ? $"Show rated {Format.Rating(r)}" : null;
+        var detail = list switch
+        {
+            "most-consistent" or "rollercoasters" => $"Episode spread {item.Value:0.00}",
+            "best-finales" => $"Finale rated {Format.Rating(item.Value)}",
+            "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
+            "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from TV Tracker users",
+            _ => null
+        };
+        return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));
+    }
+}

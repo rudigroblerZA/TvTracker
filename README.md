@@ -275,7 +275,8 @@ How events flow:
   - **Show page — episode patterns:** consistency, from the spread of episode ratings (steady below 0.3, rollercoaster
     from 0.6), where the show peaked and whether it declined after, whether finales beat the rest of their season, and
     each season's best episode.
-  - **Insights page — discovery lists**, overall or by genre:
+  - **Discover page** (`/discover`, its own menu item) — discovery lists, overall or by genre, 30 shows each. The
+    list and genre are in the address (`/discover?list=bingeable&genre=Drama`), so a list can be shared:
     - hidden gems: rated 7.5+, outside the catalog's most popular 40% on TVmaze, and few of our users follow them;
     - most consistent and biggest rollercoasters, among well-rated shows;
     - best season finales.
