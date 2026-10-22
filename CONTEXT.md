@@ -73,13 +73,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
 - **Embeddings:** dmr/nomic-embed-text-v1.5 on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
   or all-MiniLM-L6-v2 / bge-small run in-process with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
-  - The model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, with mean pooling and L2 normalisation, 384 dimensions.
-  - It's downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
+  - Either way the model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, L2-normalised, 384 dimensions.
+  - ONNX models are downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
-    cutoff). Built in: all-MiniLM-L6-v2 (default; mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
+    cutoff). Built in: all-MiniLM-L6-v2 (mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
     an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
-    (task prefixes, truncated from 768, cutoff 0.38). The AppHost sets it on Catalog.API and the sync worker
+    (the AppHost's default; task prefixes, truncated from 768, cutoff 0.38). With no configuration at all (services run
+    outside the AppHost), `EmbeddingOptions.Model` falls back to all-MiniLM-L6-v2, which needs no server. The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
