@@ -21,12 +21,17 @@ else
 
     <div class="tabs" role="tablist">
         <button role="tab" aria-selected="@(view == "timeline")" class="@(view == "timeline" ? "active" : "")" @onclick='() => SetView("timeline")'>Timeline</button>
+        <button role="tab" aria-selected="@(view == "order")" class="@(view == "order" ? "active" : "")" @onclick='() => SetView("order")'>Watch order</button>
         <button role="tab" aria-selected="@(view == "map")" class="@(view == "map" ? "active" : "")" @onclick='() => SetView("map")'>Links</button>
     </div>
 
     @if (view == "timeline")
     {
         <UniverseTimeline Universe="universe" />
+    }
+    else if (view == "order")
+    {
+        <UniverseWatchOrder ShowId="Id" Hide="@Hide" />
     }
     else
     {
@@ -105,13 +110,20 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    // "timeline" (the default) or "map"; in the address, so a link opens the same view.
+    // "timeline" (the default), "order" or "map"; in the address, so a link opens the same view.
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
 
-    private string view => View == "map" ? "map" : "timeline";
+    // Shows left out of the watch order.
+    [SupplyParameterFromQuery(Name = "hide")] public string? Hide { get; set; }
+
+    private string view => View is "map" or "order" ? View : "timeline";
 
     private void SetView(string next) =>
-        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("view", next == "timeline" ? null : next), replace: true);
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["view"] = next == "timeline" ? null : next,
+            ["hide"] = next == "order" ? Hide : null
+        }), replace: true);
 
     /// <summary>"3 shows, 2012–2026, linked by 20 characters played by the same actors" or "… by their franchise name".</summary>
     private string Summary

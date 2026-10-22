@@ -137,6 +137,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     It's named after the hub, unless every show shares one name before a colon and none is just that ("Star Wars").
   - **Timeline:** `UniverseShowDto.Seasons` carries each season's first and last episode dates and aired counts.
     - **Overlap:** the "on air together" line counts a running show as on air until today, even between seasons.
+  - **Watch order** (`GetWatchOrderAsync`): dated episodes of the universe's shows (season 0 left out, as Tracking
+    does), ordered by air time, then show premiere order.
+    - **Crossover events:** two shows' episodes count as one event when their titles match without part markers
+      ("Infection, Part I" / "Infection, Part II"), within 7 days, ignoring placeholders such as "TBA".
+    - **Why not same night:** same-night airing flagged 534 of One Chicago's 798 episodes, since the shows air back
+      to back weekly.
+    - **Progress:** the UI reads the user's progress from Tracking, one `/progress/{showId}` call per show.
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
