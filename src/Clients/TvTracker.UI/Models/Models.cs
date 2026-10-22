@@ -45,6 +45,17 @@ public record UniverseLink(Guid A, Guid B, string Kind, IReadOnlyList<SharedChar
 
 public record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
+/// <summary>A show in the user's queue for Tonight's plan (see Tracking.API's TonightApi): its next unwatched episodes.</summary>
+public record TonightShow(Guid ShowId, string Title, string? PosterUrl, IReadOnlyList<string> Genres, WatchStatus Status,
+    DateTime? LastWatchedAtUtc, int WatchedCount, IReadOnlyList<TonightEpisode> Episodes);
+
+/// <param name="RuntimeEstimated">The provider has no runtime; it's the show's typical one.</param>
+public record TonightEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int RuntimeMinutes, bool RuntimeEstimated);
+
+public record MoodResponse(bool Available, IReadOnlyList<MoodFit> Fits);
+
+public record MoodFit(Guid ShowId, double Fit, double Distance);
+
 /// <summary>A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).</summary>
 public record WatchOrder(Guid Id, string Name, IReadOnlyList<ShowSummary> Shows, IReadOnlyList<WatchOrderEpisode> Episodes, int Undated);
 

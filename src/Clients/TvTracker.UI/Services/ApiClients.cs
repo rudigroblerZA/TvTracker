@@ -77,6 +77,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<Universe?> GetUniverseAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<Universe>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe", ct, cacheForOffline: true);
 
+    /// <summary>How well each show fits a mood, 0-1 within the set (Catalog's semantic-search vectors).</summary>
+    public Task<MoodResponse?> GetMoodFitsAsync(string mood, IReadOnlyCollection<Guid> showIds, CancellationToken ct = default) =>
+        SendAsync<MoodResponse>(ApiClients.Catalog, HttpMethod.Post, "api/v1/shows/mood", new { mood, showIds }, ct);
+
     public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
 
@@ -114,6 +118,10 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task UnmarkWatchedAsync(Guid episodeId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Delete,
             $"api/v1/watched/{episodeId}?changedAt={Uri.EscapeDataString(DateTimeOffset.UtcNow.ToString("O"))}", null, ct, queueIfOffline: true);
+
+    /// <summary>Shows being watched or on the watchlist, with their next unwatched aired episodes, for Tonight's plan.</summary>
+    public Task<List<TonightShow>?> GetTonightQueueAsync(int perShow = 6, CancellationToken ct = default) =>
+        GetAsync<List<TonightShow>>(ApiClients.Tracking, $"api/v1/tonight/queue?perShow={perShow}", ct);
 
     public Task<List<UpNextItem>?> GetUpNextAsync(CancellationToken ct = default) =>
         GetAsync<List<UpNextItem>>(ApiClients.Tracking, "api/v1/up-next", ct, cacheForOffline: true);

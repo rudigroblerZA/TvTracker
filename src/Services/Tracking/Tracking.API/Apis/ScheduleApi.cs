@@ -17,6 +17,7 @@ public static class ScheduleApi
         api.MapGet("/calendar", GetCalendarAsync);
         api.MapGet("/progress/{showId:guid}", GetProgressAsync);
         api.MapGet("/stats", GetStatsAsync);
+        api.MapTonightApi();
 
         return api;
     }
