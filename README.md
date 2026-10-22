@@ -7,6 +7,9 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
+What sets it apart (universes and their timelines, the essential cut, blend, search by meaning, computed show tags)
+is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
+
 ## Prerequisites
 
 - .NET 10 SDK
