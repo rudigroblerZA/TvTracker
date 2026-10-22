@@ -397,6 +397,41 @@ public sealed partial class TvMazeCatalogProvider(
                 .ToList());
     }
 
+    /// <summary>
+    /// One call: the person's cast credits with each show embedded. The character's name comes in the credit's link,
+    /// without embedding it. A person playing several characters in one show has a credit for each; they're joined.
+    /// </summary>
+    public async Task<IReadOnlyList<ProviderActingRole>?> GetCastCreditsAsync(string personExternalId, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync($"people/{Uri.EscapeDataString(personExternalId)}/castcredits?embed=show", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var credits = await response.Content.ReadFromJsonAsync<List<TvMazeCastCareerCredit>>(cancellationToken) ?? [];
+        return credits
+            .Where(c => !c.Self && c.Embedded?.Show is not null)
+            .GroupBy(c => c.Embedded!.Show!.Id)
+            .Select(g =>
+            {
+                var show = g.First().Embedded!.Show!;
+                var characters = g.Select(c => c.Links?.Character?.Name).OfType<string>().Distinct().ToList();
+                return new ProviderActingRole(
+                    show.Id.ToString(),
+                    Truncate(show.Name ?? $"Show {show.Id}", 256),
+                    show.Image?.Medium ?? show.Image?.Original,
+                    MapStatus(show),
+                    show.Premiered,
+                    show.Weight,
+                    show.Rating?.Average,
+                    characters.Count == 0 ? null : Truncate(string.Join(" / ", characters), 512),
+                    g.All(c => c.Voice));
+            })
+            .ToList();
+    }
+
     private static string? StripHtml(string? html)
     {
         if (string.IsNullOrWhiteSpace(html))
@@ -540,6 +575,25 @@ internal sealed record TvMazeCrewCareerCredit
 }
 
 internal sealed record TvMazeCrewCareerEmbedded(TvMazeShow? Show);
+
+/// <summary>An entry of /people/{id}/castcredits?embed=show.</summary>
+internal sealed record TvMazeCastCareerCredit
+{
+    /// <summary>Appearing as themselves (a host, a panellist, a documentary).</summary>
+    public bool Self { get; init; }
+
+    public bool Voice { get; init; }
+
+    [JsonPropertyName("_links")]
+    public TvMazeCastCareerLinks? Links { get; init; }
+
+    [JsonPropertyName("_embedded")]
+    public TvMazeCrewCareerEmbedded? Embedded { get; init; }
+}
+
+internal sealed record TvMazeCastCareerLinks(TvMazeLink? Character);
+
+internal sealed record TvMazeLink(string? Href, string? Name);
 
 internal sealed record TvMazePerson(int? Id, string? Name, TvMazeImage? Image, DateOnly? Birthday, DateOnly? Deathday, string? Gender, TvMazeCountry? Country);
 

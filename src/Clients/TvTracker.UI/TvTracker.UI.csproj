@@ -8,6 +8,8 @@
   <ItemGroup>
     <!-- The flag keys, shared with the services so both gate a feature by the same key. -->
     <Compile Include="..\..\TvTracker.ServiceDefaults\FeatureFlags.cs" Link="Services\FeatureFlags.cs" />
+    <!-- Show DNA's traits and labels, shared with Analytics and Recommendations. -->
+    <Compile Include="..\..\TvTracker.IntegrationEvents\DnaTraits.cs" Link="Models\DnaTraits.cs" />
   </ItemGroup>
 
   <ItemGroup>

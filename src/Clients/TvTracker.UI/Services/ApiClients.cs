@@ -242,6 +242,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<Dictionary<Guid, List<ShowTag>>?> GetTagsAsync(IEnumerable<Guid> showIds, CancellationToken ct = default) =>
         GetAsync<Dictionary<Guid, List<ShowTag>>>(ApiClients.Analytics, $"api/v1/insights/tags?ids={string.Join(',', showIds)}", ct);
 
+    /// <summary>Shows where actors from the user's favourites work together again (the reunion radar).</summary>
+    public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
+        GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
+
     public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
         GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
 

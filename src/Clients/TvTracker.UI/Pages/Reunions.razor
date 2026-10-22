@@ -1,0 +1,129 @@
+@page "/reunions"
+@attribute [RequiresFeature(FeatureFlags.ReunionRadar)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>Reunion radar · TV Tracker</PageTitle>
+
+<h1>Reunion radar</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">Shows where two or more actors from shows you love work together again. Spin-offs and revivals aren't counted: those are on Universes.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (radar is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Scanning…</p>
+            }
+        }
+        else
+        {
+            @if (radar.ActorsPending > 0)
+            {
+                <p class="notice small">Still looking up what @radar.ActorsPending of your shows' actors have been in. More reunions will turn up as they're found.</p>
+            }
+
+            @if (radar.LovedShows == 0)
+            {
+                <p class="notice">Rate shows 4 or 5 stars, or follow them, and the radar looks for their actors working together again.</p>
+            }
+            else if (radar.Reunions.Count == 0)
+            {
+                <p class="muted">No reunions among the actors of your @radar.LovedShows favourite shows yet.</p>
+            }
+            else
+            {
+                var fresh = radar.Reunions.Where(r => r.IsNew).ToList();
+                var rest = radar.Reunions.Where(r => !r.IsNew).ToList();
+                @if (fresh.Count > 0)
+                {
+                    <h2>New and coming soon</h2>
+                    <ol class="reunions">
+                        @foreach (var reunion in fresh)
+                        {
+                            @Item(reunion)
+                        }
+                    </ol>
+                }
+                @if (rest.Count > 0)
+                {
+                    <h2>@(fresh.Count > 0 ? "Already out there" : "Together again")</h2>
+                    <ol class="reunions">
+                        @foreach (var reunion in rest)
+                        {
+                            @Item(reunion)
+                        }
+                    </ol>
+                }
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see where the actors from your favourite shows work together again." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private ReunionRadar? radar;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            radar = await Analytics.GetReunionsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    // Shows not in the catalog go through search, which imports them from the provider.
+    private static string Link(ReunionShow show) =>
+        show.ShowId is { } id ? $"shows/{id}" : $"search?q={Uri.EscapeDataString(show.Title)}";
+
+    private static string When(ReunionShow show) => show.Status switch
+    {
+        ShowStatus.Upcoming when show.Premiered is { } date => $"Premieres {date:d MMM yyyy}",
+        ShowStatus.Upcoming => "Coming",
+        _ when show.Premiered is { } date => $"{date.Year}{(show.Status == ShowStatus.Airing ? " – now" : "")}",
+        _ => Format.Status(show.Status)
+    };
+
+    private RenderFragment Item(Reunion reunion) =>
+        @<li class="panel reunion" @key="reunion.Show.ExternalId">
+            <a href="@Link(reunion.Show)"><Poster Title="@reunion.Show.Title" Url="@reunion.Show.PosterUrl" Size="small" /></a>
+            <div class="reunion-body">
+                <div class="section-head">
+                    <a class="strong" href="@Link(reunion.Show)">@reunion.Show.Title</a>
+                    <span class="muted small">@When(reunion.Show)@(reunion.Show.Rating is { } rating ? $" · {Format.Rating(rating)}" : "")</span>
+                </div>
+                <div class="small">
+                    <span class="muted">From </span><a href="shows/@reunion.From.ShowId">@reunion.From.Title</a><span class="muted">: @reunion.People.Count together again</span>
+                </div>
+                <ul class="reunion-people">
+                    @foreach (var person in reunion.People)
+                    {
+                        <li>
+                            <a href="people/@person.PersonId">@person.Name</a>
+                            <span class="muted small">@Roles(person)</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </li>;
+
+    private static string Roles(ReunionPerson person) =>
+        (person.CharacterThen, person.CharacterNow) switch
+        {
+            ({ } then, { } now) => $" {then} → {(person.Voice ? "voices " : "")}{now}",
+            (null, { } now) => $" now {(person.Voice ? "voices " : "")}{now}",
+            _ => ""
+        };
+}

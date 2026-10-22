@@ -7,11 +7,55 @@ using TvTracker.Persistence;
 
 namespace Recommendations.API.IntegrationEvents;
 
-/// <summary>Keeps show features current from the catalog.</summary>
+/// <summary>Keeps show features current from the catalog, and show DNA from Analytics.</summary>
 public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
-    IIntegrationEventHandler<ShowUpdatedIntegrationEvent>
+    IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
+    IIntegrationEventHandler<ShowDnaChangedIntegrationEvent>
 {
+    /// <summary>Each show's traits replace the ones held; a show sent without traits has none any more.</summary>
+    public async Task HandleAsync(ShowDnaChangedIntegrationEvent e, CancellationToken ct)
+    {
+        var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
+        var ids = shows.Select(s => s.ShowId).ToList();
+        var existing = await db.Dna.Where(d => ids.Contains(d.ShowId)).ToDictionaryAsync(d => d.ShowId, ct);
+        var now = time.GetUtcNow().UtcDateTime;
+        var changed = false;
+        foreach (var show in shows)
+        {
+            if (!existing.TryGetValue(show.ShowId, out var dna))
+            {
+                dna = new ShowDna { ShowId = show.ShowId };
+                db.Dna.Add(dna);
+            }
+            else if (dna.Traits.Count == show.Traits.Count && show.Traits.All(t => dna.Traits.TryGetValue(t.Key, out var v) && v == t.Value))
+            {
+                continue;
+            }
+
+            dna.Traits = new Dictionary<string, double>(show.Traits);
+            dna.UpdatedAtUtc = now;
+            changed = true;
+        }
+
+        // Any user's picks can depend on any show's DNA: rebuild every list that isn't already queued.
+        if (changed)
+        {
+            var queued = db.DirtyUsers.Select(d => d.UserId);
+            var users = await db.Signals.Select(s => s.UserId).Distinct().Where(u => !queued.Contains(u)).ToListAsync(ct);
+            db.DirtyUsers.AddRange(users.Select(u => new DirtyUser { UserId = u, MarkedAtUtc = now }));
+        }
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
         UpsertAsync(e, e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Keywords, e.CastNames, e.SimilarShowIds, e.Popularity, ct);
 

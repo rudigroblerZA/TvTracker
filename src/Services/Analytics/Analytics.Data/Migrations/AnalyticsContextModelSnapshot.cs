@@ -203,6 +203,50 @@ namespace Analytics.Data.Migrations
                     b.ToTable("careers", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.PersonCastCreditCopy", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ShowExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Character")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<double>("Popularity")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("PosterUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("Premiered")
+                        .HasColumnType("date");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid?>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("Voice")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("PersonId", "ShowExternalId");
+
+                    b.ToTable("person_cast_credits", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.PersonInsightsRow", b =>
                 {
                     b.Property<Guid>("PersonId")

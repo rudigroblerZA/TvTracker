@@ -24,6 +24,18 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Tonight's plan: episodes that fit the time and mood given (/tonight, and its links on Home and Up Next)." }
+    },
+    "reunion-radar": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Reunion radar: shows where actors from shows you love work together again (/reunions, and its link on For you)." }
+    },
+    "show-dna": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Show DNA: the trait profile on show pages. Recommendations use DNA either way." }
     }
   }
 }

@@ -70,6 +70,38 @@ public record PeopleCareersUpdatedIntegrationEvent(IReadOnlyList<PersonCareer> P
 public record PersonCareer(Guid PersonId, string Name, int Shows, int Created, int ExecutiveProduced);
 
 /// <summary>
+/// Actors' roles across the catalog provider (not just this catalog), for actors in catalog shows: the data behind the
+/// reunion radar. Each person's list replaces the one sent before. Sent as the sync worker looks them up (monthly per
+/// person), and with a catalog replay.
+/// </summary>
+public record PeopleCastCreditsUpdatedIntegrationEvent(IReadOnlyList<PersonCastCredits> People) : IntegrationEvent
+{
+    public const int MaxPeople = 100;
+}
+
+public record PersonCastCredits(Guid PersonId, string Name, IReadOnlyList<ActingRole> Roles);
+
+/// <summary>
+/// One show an actor is in the main cast of. The provider lists main casts only; appearances on a show as themselves
+/// (talk shows, documentaries) are left out.
+/// </summary>
+/// <param name="ShowExternalId">The provider's id for the show.</param>
+/// <param name="ShowId">The catalog's id, when the show is in the catalog.</param>
+/// <param name="Character">The character, or several joined with " / ".</param>
+/// <param name="Voice">A voice role (animation).</param>
+public record ActingRole(
+    string ShowExternalId,
+    Guid? ShowId,
+    string Title,
+    string? PosterUrl,
+    ShowStatus Status,
+    DateOnly? Premiered,
+    double Popularity,
+    double? Rating,
+    string? Character,
+    bool Voice);
+
+/// <summary>
 /// Episodes of one show were scheduled, or their details or air times changed. Times are UTC.
 /// One event per sync of a show, split into batches of at most <see cref="MaxEpisodes"/>,
 /// so importing a show with thousands of episodes publishes a handful of events rather than thousands.

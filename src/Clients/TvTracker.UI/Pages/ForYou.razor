@@ -8,6 +8,9 @@
 <AuthorizeView>
     <Authorized>
         <p class="muted">Picks based on what you follow, watch and rate. Updated as you go.</p>
+        <Feature Flag="@FeatureFlags.ReunionRadar">
+            <p><a href="reunions"><strong>Reunion radar</strong></a><span class="muted">: where actors from shows you love work together again.</span></p>
+        </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (picks is null)

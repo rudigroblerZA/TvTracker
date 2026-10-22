@@ -42,6 +42,28 @@ public class PersonCareerCopy
     public int ExecutiveProduced { get; set; }
 }
 
+/// <summary>
+/// A show an actor is in the main cast of, anywhere on the catalog provider, from catalog events: what the reunion
+/// radar looks for actors working together again in.
+/// </summary>
+public class PersonCastCreditCopy
+{
+    public Guid PersonId { get; set; }
+    public required string ShowExternalId { get; set; }
+
+    /// <summary>The catalog's id, when the show is in the catalog.</summary>
+    public Guid? ShowId { get; set; }
+
+    public required string Title { get; set; }
+    public string? PosterUrl { get; set; }
+    public ShowStatus Status { get; set; }
+    public DateOnly? Premiered { get; set; }
+    public double Popularity { get; set; }
+    public double? Rating { get; set; }
+    public string? Character { get; set; }
+    public bool Voice { get; set; }
+}
+
 public class EpisodeCopy
 {
     public Guid EpisodeId { get; set; }

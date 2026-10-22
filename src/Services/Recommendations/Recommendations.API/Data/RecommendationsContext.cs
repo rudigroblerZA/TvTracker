@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
@@ -58,9 +60,21 @@ public class DirtyUser
     public DateTime MarkedAtUtc { get; set; }
 }
 
+/// <summary>
+/// A show's DNA from Analytics (see <see cref="DnaTraits"/>): trait key to value, 0-1. Kept apart from
+/// <see cref="ShowFeatures"/> because it comes from another service and can arrive first.
+/// </summary>
+public class ShowDna
+{
+    public Guid ShowId { get; set; }
+    public Dictionary<string, double> Traits { get; set; } = [];
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
 public class RecommendationsContext(DbContextOptions<RecommendationsContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<ShowFeatures> Shows => Set<ShowFeatures>();
+    public DbSet<ShowDna> Dna => Set<ShowDna>();
     public DbSet<UserShowSignal> Signals => Set<UserShowSignal>();
     public DbSet<Dismissal> Dismissals => Set<Dismissal>();
     public DbSet<UserRecommendation> UserRecommendations => Set<UserRecommendation>();
@@ -76,6 +90,22 @@ public class RecommendationsContext(DbContextOptions<RecommendationsContext> opt
             entity.ToTable("shows");
             entity.HasKey(s => s.ShowId);
             entity.Property(s => s.Title).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<ShowDna>(entity =>
+        {
+            entity.ToTable("show_dna");
+            entity.HasKey(d => d.ShowId);
+            entity.Property(d => d.ShowId).ValueGeneratedNever();
+            entity.Property(d => d.Traits)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    traits => JsonSerializer.Serialize(traits, (JsonSerializerOptions?)null),
+                    json => JsonSerializer.Deserialize<Dictionary<string, double>>(json, (JsonSerializerOptions?)null) ?? new(),
+                    new ValueComparer<Dictionary<string, double>>(
+                        (a, b) => a!.Count == b!.Count && a.All(t => b.ContainsKey(t.Key) && b[t.Key] == t.Value),
+                        traits => traits.Aggregate(0, (hash, t) => HashCode.Combine(hash, t.Key, t.Value)),
+                        traits => new Dictionary<string, double>(traits)));
         });
 
         modelBuilder.Entity<UserShowSignal>(entity =>

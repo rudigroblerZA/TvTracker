@@ -16,10 +16,11 @@ dotnet build src/Tools/Catalog.ImportCli
 # Run everything (Docker or Podman must be running). Web app https://localhost:7120, demo / demo.
 dotnet run --project src/TvTracker.AppHost
 
-# Migrations (Catalog and Analytics only; dotnet-ef is pinned in dotnet-tools.json)
+# Migrations (Catalog, Analytics and Recommendations; dotnet-ef is pinned in dotnet-tools.json)
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
+dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
@@ -46,8 +47,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 - **TVmaze calls** share one 20-per-10 s limiter. Background work must be throttled, and a failure for one show must not
   stop a loop (catch per item, retry later).
 - **Analytics insights:** add a class (`IShowInsight` for part of the show document, `IShowTagRule` for a tag,
-  `IListInsight` for a table built across shows) and register it in `AddInsights`. Insights only compute; loading,
-  batching, saving and events stay in `InsightsPipeline`.
+  `IListInsight` for a table built across shows, `IInsightPublication` for a part another service copies) and register
+  it in `AddInsights`. Insights only compute; loading, batching, saving and events stay in `InsightsPipeline`.
 - **Feature flags:** a new user-facing feature gets a key in `FeatureFlags` and an entry in `Flags/flagd.json`. Put
   `RequireFeature(...)` on its endpoints, `[RequiresFeature]` on its pages, and `<Feature>` around links to it.
 - **Privacy:** anything Analytics shows about our users needs 5 or more users or ratings behind it.

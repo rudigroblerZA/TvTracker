@@ -72,6 +72,35 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     public IReadOnlyList<SeasonStats> SeasonStats => field ??= Seasons.Select(s => s.Stats).ToList();
 
     /// <summary>
+    /// The provider's ratings of the seasons that count (<see cref="SeasonSummary.RatingCounts"/>), in season order:
+    /// the points behind the trend, the arc and the DNA's trajectory and peak.
+    /// </summary>
+    public IReadOnlyList<(int Number, double Rating)> RatedSeasons => field ??= Seasons
+        .Where(s => s.Stats.Rating.External is not null && s.RatingCounts)
+        .Select(s => (s.Stats.Number, s.Stats.Rating.External!.Value))
+        .ToList();
+
+    /// <summary>
+    /// Least-squares slope of <see cref="RatedSeasons"/>' ratings against their order (rating points per season); null
+    /// with fewer than three.
+    /// </summary>
+    public double? SeasonSlope
+    {
+        get
+        {
+            var points = RatedSeasons.Select((s, i) => (X: (double)i, Y: s.Rating)).ToList();
+            if (points.Count < 3)
+            {
+                return null;
+            }
+
+            var meanX = points.Average(p => p.X);
+            var meanY = points.Average(p => p.Y);
+            return points.Sum(p => (p.X - meanX) * (p.Y - meanY)) / points.Sum(p => (p.X - meanX) * (p.X - meanX));
+        }
+    }
+
+    /// <summary>
     /// An episode's ratings from our users, or none when there are too few to show. Applied before any aggregation, so
     /// a hidden episode's ratings never feed a season average either (else subtracting the visible episodes would reveal them).
     /// </summary>
