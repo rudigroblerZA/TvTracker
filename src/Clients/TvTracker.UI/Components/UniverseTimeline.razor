@@ -1,0 +1,188 @@
+@* How a universe's shows fit in time: one bar per show, split into its seasons, with today marked. Each show
+   after the first says when it started relative to the first ("2 years after Chicago Fire"). *@
+
+@if (rows.Count == 0)
+{
+    <p class="muted">None of these shows have episode dates yet.</p>
+}
+else
+{
+    @if (Overlap() is { } overlap)
+    {
+        <p class="small">@overlap</p>
+    }
+
+    <div class="timeline">
+        <div class="timeline-axis" aria-hidden="true">
+            @foreach (var year in Ticks())
+            {
+                <span class="@(year == start.Year ? "first" : null)" style="left: @Pct(new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero))%">@year</span>
+            }
+        </div>
+        <div class="timeline-rows">
+            <span class="timeline-today" style="left: @Pct(Now)%" title="Today"></span>
+            @for (var i = 0; i < rows.Count; i++)
+            {
+                var (item, first, last) = rows[i];
+                var show = item.Show;
+                <div class="timeline-row">
+                    <div class="timeline-label">
+                        <a class="strong" href="shows/@show.Id">@show.Title</a>
+                        <span class="muted small"> @Span(item, first, last)</span>
+                        @if (i > 0)
+                        {
+                            <span class="small timeline-gap"> · @After(first, rows[0])</span>
+                        }
+                    </div>
+                    <div class="timeline-track">
+                        @foreach (var season in item.Seasons!)
+                        {
+                            @* Aired episodes solid, scheduled ones hatched; a season airing now is both. *@
+                            var airedTo = season.Aired >= season.Episodes ? season.To : Now < season.To ? Now : season.To;
+                            if (season.Aired > 0)
+                            {
+                                <span class="timeline-season" style="left: @Pct(season.From)%; width: @Width(season.From, airedTo)%"
+                                      title="@Tooltip(show, season)"></span>
+                            }
+                            if (season.Aired < season.Episodes)
+                            {
+                                var from = season.Aired > 0 ? airedTo : season.From;
+                                <span class="timeline-season scheduled" style="left: @Pct(from)%; width: @Width(from, season.To)%"
+                                      title="@Tooltip(show, season)"></span>
+                            }
+                        }
+                        @if (IsOngoing(show, last))
+                        {
+                            <span class="timeline-ongoing" style="left: @Pct(last)%" title="Still running"></span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <p class="universe-legend small muted">
+        <span class="nowrap"><span class="timeline-key"></span> aired</span>
+        <span class="nowrap"><span class="timeline-key scheduled"></span> scheduled</span>
+        <span class="nowrap"><span class="timeline-key today"></span> today</span>
+        <span>· each block is a season; hover one for its dates</span>
+    </p>
+}
+
+@code {
+    [Parameter, EditorRequired] public Universe Universe { get; set; } = null!;
+
+    private static DateTimeOffset Now => DateTimeOffset.UtcNow;
+
+    private List<(UniverseShow Item, DateTimeOffset First, DateTimeOffset Last)> rows = [];
+    private DateTimeOffset start;
+    private DateTimeOffset end;
+
+    protected override void OnParametersSet()
+    {
+        rows = Universe.Shows
+            .Where(s => s.Seasons is { Count: > 0 })
+            .Select(s => (Item: s, First: s.Seasons!.Min(x => x.From), Last: s.Seasons!.Max(x => x.To)))
+            .OrderBy(r => r.First)
+            .ToList();
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        // Whole years, from the first premiere to the later of today and the last scheduled episode.
+        start = new DateTimeOffset(rows.Min(r => r.First).Year, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var latest = rows.Max(r => r.Last) > Now ? rows.Max(r => r.Last) : Now;
+        end = new DateTimeOffset(latest.Year + 1, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    }
+
+    private string Pct(DateTimeOffset when) =>
+        (100.0 * (when - start).TotalDays / (end - start).TotalDays).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    // At least a sliver, so a one-episode season still shows.
+    private string Width(DateTimeOffset from, DateTimeOffset to) =>
+        Math.Max(0.35, 100.0 * (to - from).TotalDays / (end - start).TotalDays).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Year labels, every 1, 2, 5 or 10 years so about eight fit.</summary>
+    private IEnumerable<int> Ticks()
+    {
+        var years = end.Year - start.Year;
+        var step = new[] { 1, 2, 5, 10, 20 }.First(s => years / s <= 8);
+        for (var year = start.Year + (step - start.Year % step) % step; year < end.Year; year += step)
+        {
+            yield return year;
+        }
+    }
+
+    private static bool IsOngoing(ShowSummary show, DateTimeOffset last) =>
+        show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled) && last >= Now.AddMonths(-18);
+
+    /// <summary>Its last episode, or a moment after today while it's still running.</summary>
+    private static DateTimeOffset RunsUntil(ShowSummary show, DateTimeOffset last) =>
+        IsOngoing(show, last) && last < Now.AddDays(1) ? Now.AddDays(1) : last;
+
+    /// <summary>"2012–2023 · 11 seasons", or "2014– · 13 seasons" while it's running.</summary>
+    private static string Span(UniverseShow item, DateTimeOffset first, DateTimeOffset last)
+    {
+        var count = item.Seasons!.Count;
+        var years = IsOngoing(item.Show, last) ? $"{first.Year}–" : first.Year == last.Year ? $"{first.Year}" : $"{first.Year}–{last.Year}";
+        return $"{years} · {count} season{(count == 1 ? "" : "s")}";
+    }
+
+    /// <summary>"2 years after Chicago Fire", "5 months after …", "the same month as …".</summary>
+    private static string After(DateTimeOffset first, (UniverseShow Item, DateTimeOffset First, DateTimeOffset Last) origin)
+    {
+        var months = (first.Year - origin.First.Year) * 12 + first.Month - origin.First.Month;
+        var title = origin.Item.Show.Title;
+        if (months <= 0)
+        {
+            return $"the same month as {title}";
+        }
+        var (years, rest) = (months / 12, months % 12);
+        var text = years == 0 ? $"{rest} month{(rest == 1 ? "" : "s")}"
+            : rest == 0 ? $"{years} year{(years == 1 ? "" : "s")}"
+            : $"{years} year{(years == 1 ? "" : "s")} {rest} month{(rest == 1 ? "" : "s")}";
+        return $"{text} after {title}";
+    }
+
+    private static string Tooltip(ShowSummary show, TimelineSeason season)
+    {
+        var dates = season.From.Year == season.To.Year && season.From.Month == season.To.Month
+            ? season.From.ToString("MMM yyyy")
+            : $"{season.From:MMM yyyy} – {season.To:MMM yyyy}";
+        var scheduled = season.Episodes - season.Aired;
+        return $"{show.Title}, season {season.Number}: {dates} · {season.Episodes} episode{(season.Episodes == 1 ? "" : "s")}"
+               + (scheduled > 0 ? $" ({scheduled} still to air)" : "");
+    }
+
+    /// <summary>
+    /// The most shows on air at once and since when (or for how long), counting each show from its first episode to
+    /// its last, or to today while it's still running (between seasons too): "All 3 on air together since November
+    /// 2015". Nothing for a universe whose shows never overlapped.
+    /// </summary>
+    private string? Overlap()
+    {
+        var events = rows.SelectMany(r => new[] { (At: r.First, Delta: 1), (At: RunsUntil(r.Item.Show, r.Last), Delta: -1) })
+            .OrderBy(e => e.At).ThenBy(e => e.Delta)
+            .ToList();
+        var (count, best, from, to) = (0, 0, DateTimeOffset.MinValue, DateTimeOffset.MinValue);
+        for (var i = 0; i < events.Count; i++)
+        {
+            count += events[i].Delta;
+            if (count > best)
+            {
+                (best, from) = (count, events[i].At);
+                to = events.Skip(i + 1).FirstOrDefault(e => e.Delta < 0).At;
+            }
+        }
+        if (best < 2)
+        {
+            return null;
+        }
+
+        var who = best == rows.Count ? $"All {best}" : $"{best} of these shows";
+        var ongoing = to >= Now;
+        return ongoing
+            ? $"{who} on air together since {from:MMMM yyyy}."
+            : $"{who} on air together from {from:MMMM yyyy} to {to:MMMM yyyy}.";
+    }
+}

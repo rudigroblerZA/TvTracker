@@ -101,26 +101,40 @@ added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `D
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
 
-**Universes** (`/universes`, and "Shared universe" on show pages) finds spin-offs, sequels, revivals and crossovers
-from the cast: shows where the same actor plays the same character. The 595-show dev catalog has 30, all real
-franchises: the Marvel Netflix shows with Hawkeye, What If...? and Daredevil: Born Again (9 shows, 20 characters),
-Dexter (4), Yellowstone with Marshals and Dutton Ranch, Bosch, The Walking Dead, Breaking Bad and Better Call Saul,
-Doctor Who and Torchwood, Frasier's revival.
-- **Each universe's page:** a map of its shows, oldest first, with arcs joining shows that share characters.
-  Colour shows the kind of link: continues the story, crossover or revival. Thickness shows how many characters they
-  share. Selecting a show lists its links with the characters and actors.
-- **Show pages:** the shows it shares characters with, and which characters.
-- **How links are found:** TVmaze gives each show its own character ids, even for the same character in a spin-off,
-  so links come from names. The same actor playing a character with the same name counts, ignoring titles,
-  nicknames and aliases ("Matt Murdock / Daredevil" matches "Matt Murdock"; "Dr. Frasier Crane" matches
-  "Frasier Crane").
-- **What's left out:**
-  - Only scripted and animated shows count, since hosts and crews recur across reality shows.
-  - Self roles and narrators don't count.
+**Universes** (`/universes`, and "Shared universe" on show pages) finds spin-offs, sequels, revivals, crossovers and
+franchises. The 625-show dev catalog has 35, all real:
+- **Shared characters:** the Marvel shows (10, with Agents of S.H.I.E.L.D., Hawkeye and Daredevil: Born Again),
+  Dexter, Yellowstone, Bosch, Breaking Bad and Better Call Saul, Doctor Who and Torchwood, Frasier's revival.
+- **Franchise names:** One Chicago, NCIS (7 shows), Star Trek (7), Star Wars, 9-1-1, FBI.
+
+**Each universe's page:**
+- **Timeline (the default):** one bar per show across the years, split into seasons, with today marked.
+  - **Seasons:** aired seasons are solid and scheduled ones hatched; hover a season for its dates and episodes.
+  - **When each started:** every later show says how long after the first it started ("Chicago P.D. · 1 year
+    3 months after Chicago Fire", "Chicago Med · 3 years 1 month after").
+  - **Overlap:** a line says how many ran at once ("All 3 on air together since November 2015"; for NCIS, "4 of
+    these shows on air together since October 2026").
+- **Links:** a map of the shows with arcs joining linked ones. Colour shows the kind of link: continues the story,
+  crossover, revival, or same franchise (dashed). Thickness shows how many characters they share. Selecting a show
+  lists its links, with the characters and actors.
+- **The address** holds the view (`?view=map`).
+
+**How links are found:**
+- **Characters:** TVmaze gives each show its own character ids, even for the same character in a spin-off, so
+  characters are matched by name. The same actor playing a character with the same name counts, ignoring titles,
+  nicknames and aliases ("Matt Murdock / Daredevil" matches "Matt Murdock").
+  - Only scripted and animated shows count, and self roles and narrators don't.
   - A link needs two shared characters, or one with a full name.
-  - TVmaze lists only main casts, so crossovers made of guest appearances (the One Chicago shows) aren't found.
-- **API:** `GET /api/v1/universes` and `GET /api/v1/shows/{id}/universe` (Catalog.API, public). The universe map
-  is cached for 30 minutes.
+- **Franchise names:** catch franchises whose crossovers are guest appearances, which TVmaze's main casts don't list.
+  Two shows are one franchise when:
+  - one title extends the other's name before a colon ("NCIS: Sydney" with "NCIS" or "NCIS: Origins"); or
+  - both start with the same word and share two or more makers (creators, developers, executive producers):
+    "Chicago Fire", "Chicago P.D." and "Chicago Med" share seven.
+
+  One shared maker isn't enough: "Tyler Perry's …" shows share a producer, not a story.
+
+**API:** `GET /api/v1/universes` and `GET /api/v1/shows/{id}/universe` (Catalog.API, public). The second includes
+each show's season dates for the timeline. The universe map is cached for 30 minutes.
 
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and

@@ -28,15 +28,19 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
 /// <summary>Shows linked by shared characters (see Catalog.API's Universes).</summary>
+/// <param name="ToYear">The year of its last episode; null while any of its shows is still running.</param>
 public record UniverseSummary(Guid Id, string Name, int ShowCount, int CharacterCount, int? FromYear, int? ToYear, IReadOnlyList<ShowSummary> Posters);
 
 /// <param name="Shows">Oldest first.</param>
 public record Universe(Guid Id, string Name, IReadOnlyList<UniverseShow> Shows, IReadOnlyList<UniverseLink> Links);
 
-public record UniverseShow(ShowSummary Show, int Characters);
+public record UniverseShow(ShowSummary Show, int Characters, IReadOnlyList<TimelineSeason>? Seasons = null);
+
+/// <param name="Aired">Episodes aired by now; the rest are scheduled.</param>
+public record TimelineSeason(int Number, DateTimeOffset From, DateTimeOffset To, int Episodes, int Aired);
 
 /// <param name="A">The earlier show.</param>
-/// <param name="Kind">"revival", "continuation" or "crossover".</param>
+/// <param name="Kind">"revival", "continuation", "crossover" or "franchise" (no shared characters: the same franchise name).</param>
 public record UniverseLink(Guid A, Guid B, string Kind, IReadOnlyList<SharedCharacter> Characters);
 
 public record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);

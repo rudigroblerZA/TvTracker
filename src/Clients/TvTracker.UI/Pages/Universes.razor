@@ -5,8 +5,8 @@
 
 <h1>Universes</h1>
 <p class="muted">
-    Spin-offs, sequels, revivals and crossovers in the catalog, found from the cast: shows where the same actors play
-    the same characters.
+    Spin-offs, sequels, revivals and crossovers in the catalog: shows where the same actors play the same characters,
+    and franchises named as one ("NCIS: Sydney", or "Chicago Fire" and "Chicago P.D." from the same makers).
 </p>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
@@ -35,10 +35,10 @@ else
                     }
                 </span>
                 <span class="strong">@universe.Name</span>
-                <span class="muted small">@universe.ShowCount shows · @(universe.CharacterCount == 1 ? "1 character" : $"{universe.CharacterCount} characters")</span>
+                <span class="muted small">@universe.ShowCount shows · @(universe.CharacterCount == 0 ? "one franchise" : universe.CharacterCount == 1 ? "1 shared character" : $"{universe.CharacterCount} shared characters")</span>
                 @if (universe.FromYear is { } from)
                 {
-                    <span class="muted small">@(from == universe.ToYear ? $"{from}" : $"{from}–{universe.ToYear}")</span>
+                    <span class="muted small">@(universe.ToYear is null ? $"{from}–now" : from == universe.ToYear ? $"{from}" : $"{from}–{universe.ToYear}")</span>
                 }
             </a>
         }

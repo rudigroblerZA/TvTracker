@@ -7,7 +7,7 @@
         <h2>Shared universe</h2>
         <p class="muted small">
             <span>Part of the </span>
-            <a href="universes/@ShowId"><strong>@universe.Name universe</strong></a><span>: @universe.Shows.Count shows that share characters.</span>
+            <a href="universes/@ShowId"><strong>@universe.Name universe</strong></a><span>: @universe.Shows.Count shows. See how they fit on its timeline.</span>
         </p>
         <ul class="universe-links">
             @foreach (var (other, link) in Links.Take(4))
@@ -74,11 +74,13 @@
         {
             "revival" => (otherIsLater ? "revival" : "the original") + year,
             "continuation" => (otherIsLater ? "continues the story" : "where it started") + year,
+            "franchise" => "same franchise" + year,
             _ => "crossover" + year
         };
     }
 
     private static string Characters(UniverseLink link) =>
+        link.Characters.Count == 0 ? "Shares its franchise name and makers" :
         string.Join(", ", link.Characters.Take(3).Select(c => c.Character))
         + (link.Characters.Count > 3 ? $" and {link.Characters.Count - 3} more" : "");
 }
