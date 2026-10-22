@@ -71,18 +71,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Search
 
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
-- **Embeddings:** all-MiniLM-L6-v2 by default, run locally with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
-  - The model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, with mean pooling and L2 normalisation, 384 dimensions.
-  - It's downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
+- **Embeddings:** dmr/nomic-embed-text-v1.5 on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
+  or all-MiniLM-L6-v2 / bge-small run in-process with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
+  - Either way the model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, L2-normalised, 384 dimensions.
+  - ONNX models are downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
-    cutoff). Built in: all-MiniLM-L6-v2 (default; mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
+    cutoff). Built in: all-MiniLM-L6-v2 (mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
     an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
-    (task prefixes, truncated from 768, cutoff 0.38). The AppHost sets it on Catalog.API and the sync worker
+    (the AppHost's default; task prefixes, truncated from 768, cutoff 0.38). With no configuration at all (services run
+    outside the AppHost), `EmbeddingOptions.Model` falls back to all-MiniLM-L6-v2, which needs no server. The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
-    595 shows (42 searches): MiniLM ranks better (MRR 0.74 against 0.68), so it stays the default.
+    595 shows (42 searches): MiniLM ranks best (MRR 0.74; bge-small 0.68, nomic 0.63). The default is nomic on
+    Docker Model Runner anyway, by choice: the model runs out of process and can be swapped for any Docker Hub model.
   - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
     `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
     - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
@@ -91,6 +94,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
       re-normalises; the column stays as it is.
     - Text is cut at about 4 characters a token (`MaxTokens`), since Model Runner's llama.cpp refuses input longer
       than its 512-token batch.
+    - **Where Model Runner comes from:** the AppHost runs `docker/model-runner` as a container (CPU, models in the
+      `tvtracker-model-runner` volume), unless `ModelRunner:Url` names one already running (Docker Desktop's can
+      use the GPU). Either way it sets `Embeddings:Endpoint`, which applies to every server model without its own.
+    - **Pulling:** `Pull` models are pulled through Model Runner's own API (`GET /models/{name}`,
+      `POST /models/create`, next to `/engines/v1/`). Only the sync worker pulls (`AddLocalEmbeddings(pullModel:
+      true)`), so the two services don't download the same model at once. It retries every minute until it works.
+    - **Pull responses:** Model Runner streams progress as JSON lines, with the quotes HTML-escaped (`&#34;`), so
+      the success check decodes first.
+    - **Seeding the volume by hand:** the image runs as `modelrunner`, so the volume's files must be owned by
+      that user. Docker sets this when it creates the volume on first mount; a volume made with
+      `docker volume create` is root-owned.
   - **Dimensions:** `ShowEmbedding.Dimensions` (384) is the column size. Services refuse to start with a model of
     another size. Changing it needs a migration of the column and its HNSW index.
   - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
@@ -101,6 +115,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
   - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
   - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
+- **Universes** (`Catalog.API/Services/Universes.cs`): shows linked by the same actor playing a same-named
+  character, grouped into connected components.
+  - **Why names:** TVmaze's character ids are per show; not one of 6,514 credits shared an id across shows. So
+    `CharacterExternalIds` can't find crossovers, and Analytics' `SharedCast.SameCharacter` (which compares ids) is
+    effectively never true.
+  - **Matching:** names are split on "/" into aliases, and quoted nicknames, parentheses, titles and punctuation are
+    dropped. A match is equal word sets, or one set inside the other with at least two words.
+  - **Noise guards:** scripted/animation shows only, no self roles, and a link needs two characters or one
+    full-name character. Checked by hand on the 595-show catalog: 30 universes, no false links.
+  - **Naming:** a universe is named and addressed by its hub, the show sharing the most characters.
+  - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
+    from that link, so a team-up (The Defenders) reads as a crossover.
+  - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire

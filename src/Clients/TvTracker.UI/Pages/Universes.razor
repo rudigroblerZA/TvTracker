@@ -1,0 +1,66 @@
+@page "/universes"
+@inject CatalogClient Catalog
+
+<PageTitle>Universes · TV Tracker</PageTitle>
+
+<h1>Universes</h1>
+<p class="muted">
+    Spin-offs, sequels, revivals and crossovers in the catalog, found from the cast: shows where the same actors play
+    the same characters.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (universes is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else if (universes.Count == 0)
+{
+    <p class="muted">No shows in the catalog share characters yet.</p>
+}
+else
+{
+    <div class="universe-grid">
+        @foreach (var universe in universes)
+        {
+            <a class="universe-card" href="universes/@universe.Id">
+                <span class="universe-posters">
+                    @foreach (var show in universe.Posters)
+                    {
+                        <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+                    }
+                </span>
+                <span class="strong">@universe.Name</span>
+                <span class="muted small">@universe.ShowCount shows · @(universe.CharacterCount == 1 ? "1 character" : $"{universe.CharacterCount} characters")</span>
+                @if (universe.FromYear is { } from)
+                {
+                    <span class="muted small">@(from == universe.ToYear ? $"{from}" : $"{from}–{universe.ToYear}")</span>
+                }
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<UniverseSummary>? universes;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            universes = await Catalog.GetUniversesAsync() ?? [];
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

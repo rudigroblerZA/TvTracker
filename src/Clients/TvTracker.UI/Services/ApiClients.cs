@@ -70,6 +70,13 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<List<string>?> GetGenresAsync(CancellationToken ct = default) =>
         GetAsync<List<string>>(ApiClients.Catalog, "api/v1/genres", ct, cacheForOffline: true);
 
+    public Task<List<UniverseSummary>?> GetUniversesAsync(CancellationToken ct = default) =>
+        GetAsync<List<UniverseSummary>>(ApiClients.Catalog, "api/v1/universes", ct, cacheForOffline: true);
+
+    /// <summary>The universe the show is in; null when it shares characters with no other show.</summary>
+    public Task<Universe?> GetUniverseAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<Universe>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe", ct, cacheForOffline: true);
+
     /// <summary>Catalog shows whose title contains the term, for suggest-as-you-type pickers; no provider import.</summary>
     public Task<List<ShowSummary>?> SuggestAsync(string term, CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, $"api/v1/shows/suggest?q={Uri.EscapeDataString(term)}", ct);

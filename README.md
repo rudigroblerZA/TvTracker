@@ -10,7 +10,7 @@ that share one Razor component library. The design behind it is in the "TV Track
 ## Prerequisites
 
 - .NET 10 SDK
-- Docker Desktop or Podman (Aspire runs PostgreSQL, Redis, RabbitMQ and Keycloak as containers)
+- Docker Desktop or Podman (Aspire runs PostgreSQL, Redis, RabbitMQ, Keycloak and Docker Model Runner as containers)
 - For the mobile app only: the MAUI workload (`dotnet workload install maui`), plus Xcode for iOS or the Android SDK for Android
 
 ## Run it
@@ -56,15 +56,26 @@ The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`. 
 
 | Model | Runs | Notes |
 | --- | --- | --- |
-| `all-MiniLM-L6-v2` (default) | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
+| `all-MiniLM-L6-v2` | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
 | `bge-small-en-v1.5` | In-process (ONNX), ~130 MB download | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
-| `dmr/nomic-embed-text-v1.5` | Docker Model Runner | ~10× slower per search and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
+| `dmr/nomic-embed-text-v1.5` (default) | Docker Model Runner, ~270 MB model | ~10× slower per search (~30 ms) and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
 
-**Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API.
-- **Setup:** Docker Desktop: enable Model Runner with host-side TCP support (port 12434). Docker Engine: install
-  the `docker-model-plugin`. Then `docker model pull ai/nomic-embed-text-v1.5`.
-- **Endpoint:** the services call `http://localhost:12434/engines/v1/` by default.
-  Change it with `Embeddings:Models:{id}:Endpoint`.
+**Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API. It runs the
+default model, so semantic search needs nothing installed beyond Docker.
+- **Container:** the AppHost runs `docker/model-runner` as the `model-runner` container, on CPU. Models are kept
+  in the `tvtracker-model-runner` volume.
+- **First start:** the sync worker pulls the model from Docker Hub (~270 MB). Until it's ready, search matches
+  titles only, then the catalog is embedded within a few minutes. If the pull fails, for example because Docker Hub
+  rate-limits it, it retries every minute.
+- **Your own Model Runner:** set `ModelRunner:Url` in the AppHost's configuration (e.g. `http://localhost:12434`)
+  to use one that's already running instead of the container.
+  - With Docker Desktop: enable Model Runner with host-side TCP support. It can use your GPU.
+  - With Docker Engine: install the `docker-model-plugin`.
+  - The sync worker pulls the model there too, if it's missing.
+- **Endpoint:** the AppHost sets `Embeddings:Endpoint` for every server model to its Model Runner. A model's own
+  `Embeddings:Models:{id}:Endpoint` takes precedence; without either, it's `http://localhost:12434/engines/v1/`.
+- **In-process instead:** set `Embeddings:Model` to `all-MiniLM-L6-v2`, which also ranked best on the test
+  searches. The AppHost then doesn't start Model Runner at all.
 - **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
 - **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
   embeds once it's back. Each service logs one warning per outage.
@@ -81,7 +92,7 @@ the top 10 (84% against 82%). Each model wins different searches: bge-small find
 small german town" (10th against 64th) and The Mandalorian for "bounty hunter protects a child in a galaxy far away"
 (31st against 213th); MiniLM finds Breaking Bad and Doctor Who from descriptions bge-small misses. With both cutoffs,
 8 unrelated searches ("best mortgage rates", "replace a car battery") match nothing, apart from bge-small matching
-"best mortgage rates" to two property shows. MiniLM stays the default: it ranks better and runs about 2.5× faster. Changing the model re-embeds the catalog within a few minutes; until then semantic
+"best mortgage rates" to two property shows. MiniLM ranks better than bge-small and runs about 2.5× faster. Changing the model re-embeds the catalog within a few minutes; until then semantic
 results are limited to the shows already embedded with the new model. Any built-in setting can be overridden, e.g.
 `Embeddings:Models:bge-small-en-v1.5:MaxDistance`, and another BERT-style ONNX model with a WordPiece `vocab.txt` can be
 added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `Dimensions`, `MaxDistance`, plus
@@ -89,6 +100,27 @@ added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `D
 384-dimension vectors, the size of the `show_embeddings` column; services refuse to start otherwise. The sync worker embeds new and refreshed shows every 30 seconds
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
+
+**Universes** (`/universes`, and "Shared universe" on show pages) finds spin-offs, sequels, revivals and crossovers
+from the cast: shows where the same actor plays the same character. The 595-show dev catalog has 30, all real
+franchises: the Marvel Netflix shows with Hawkeye, What If...? and Daredevil: Born Again (9 shows, 20 characters),
+Dexter (4), Yellowstone with Marshals and Dutton Ranch, Bosch, The Walking Dead, Breaking Bad and Better Call Saul,
+Doctor Who and Torchwood, Frasier's revival.
+- **Each universe's page:** a map of its shows, oldest first, with arcs joining shows that share characters.
+  Colour shows the kind of link: continues the story, crossover or revival. Thickness shows how many characters they
+  share. Selecting a show lists its links with the characters and actors.
+- **Show pages:** the shows it shares characters with, and which characters.
+- **How links are found:** TVmaze gives each show its own character ids, even for the same character in a spin-off,
+  so links come from names. The same actor playing a character with the same name counts, ignoring titles,
+  nicknames and aliases ("Matt Murdock / Daredevil" matches "Matt Murdock"; "Dr. Frasier Crane" matches
+  "Frasier Crane").
+- **What's left out:**
+  - Only scripted and animated shows count, since hosts and crews recur across reality shows.
+  - Self roles and narrators don't count.
+  - A link needs two shared characters, or one with a full name.
+  - TVmaze lists only main casts, so crossovers made of guest appearances (the One Chicago shows) aren't found.
+- **API:** `GET /api/v1/universes` and `GET /api/v1/shows/{id}/universe` (Catalog.API, public). The universe map
+  is cached for 30 minutes.
 
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and

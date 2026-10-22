@@ -204,8 +204,8 @@ public class CastMember
     public string? Character { get; set; }
 
     /// <summary>
-    /// The provider's ids for the characters this person plays in the show. The same character id in
-    /// two shows' casts is a crossover or spin-off.
+    /// The provider's ids for the characters this person plays in the show. TVmaze's are per show, even for the same
+    /// character in a spin-off, so crossovers are found by actor and character name instead (Catalog.API's Universes).
     /// </summary>
     public List<string> CharacterExternalIds { get; set; } = [];
 

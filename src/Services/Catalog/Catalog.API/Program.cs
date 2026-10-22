@@ -51,6 +51,7 @@ builder.Services.AddSearchRateLimiting(builder.Configuration);
 // Search also lists shows similar in meaning to the term, by comparing its vector with the sync worker's show vectors.
 builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions);
 builder.Services.AddSingleton<SemanticSearch>();
+builder.Services.AddSingleton<Universes>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
