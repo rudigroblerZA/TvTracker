@@ -1,5 +1,6 @@
 @page "/universes/{Id:guid}"
 @inject CatalogClient Catalog
+@inject NavigationManager Navigation
 
 <PageTitle>@(universe is not null ? $"{universe.Name} universe" : "Universe") · TV Tracker</PageTitle>
 
@@ -9,89 +10,122 @@
 {
     @if (error is null)
     {
-        <p class="muted">@(notFound ? "This show doesn't share characters with any other show in the catalog." : "Loading…")</p>
+        <p class="muted">@(notFound ? "This show isn't part of a franchise or shared universe in the catalog." : "Loading…")</p>
     }
 }
 else
 {
     <p class="small"><a href="universes">← All universes</a></p>
     <h1>@universe.Name universe</h1>
-    <p class="muted">
-        @universe.Shows.Count shows, @Years, linked by @CharacterCount characters played by the same actors.
-        Select a show to see its links.
-    </p>
+    <p class="muted">@Summary</p>
 
-    <p class="universe-legend small">
-        <span class="universe-key continuation"></span> continues the story
-        <span class="universe-key crossover"></span> crossover
-        <span class="universe-key revival"></span> revival
-        <span class="muted">· thicker shares more characters</span>
-    </p>
-
-    <div class="universe-map" style="--gutter: @(Gutter)px; --row: @(RowHeight)px">
-        <svg class="universe-arcs" width="@Gutter" height="@(universe.Shows.Count * RowHeight)" aria-hidden="true">
-            @foreach (var link in universe.Links)
-            {
-                <path d="@Arc(link)" class="universe-arc @link.Kind @(IsActive(link) ? "active" : selected is null ? null : "dim")"
-                      stroke-width="@Math.Min(7, 1.5 + link.Characters.Count)" />
-            }
-            @for (var i = 0; i < universe.Shows.Count; i++)
-            {
-                <circle cx="@(Gutter - 2)" cy="@Center(i)" r="4" class="universe-node @(universe.Shows[i].Show.Id == selected ? "active" : null)" />
-            }
-        </svg>
-        @foreach (var item in universe.Shows)
-        {
-            var show = item.Show;
-            <button type="button" class="universe-row @(show.Id == selected ? "active" : null)" @onclick="() => Select(show.Id)"
-                    aria-pressed="@(show.Id == selected ? "true" : "false")">
-                <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
-                <span class="universe-row-text">
-                    <span class="strong">@show.Title</span>
-                    <span class="muted small">@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))</span>
-                    <span class="small">@(item.Characters == 1 ? "1 shared character" : $"{item.Characters} shared characters")</span>
-                </span>
-            </button>
-        }
+    <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="@(view == "timeline")" class="@(view == "timeline" ? "active" : "")" @onclick='() => SetView("timeline")'>Timeline</button>
+        <button role="tab" aria-selected="@(view == "map")" class="@(view == "map" ? "active" : "")" @onclick='() => SetView("map")'>Links</button>
     </div>
 
-    @if (selected is { } id && universe.Shows.FirstOrDefault(s => s.Show.Id == id) is { } chosen)
+    @if (view == "timeline")
     {
-        <section class="panel universe-detail">
-            <div class="section-head">
-                <h2>@chosen.Show.Title</h2>
-                <a class="small" href="shows/@id">Open show</a>
-            </div>
-            @foreach (var link in universe.Links.Where(l => l.A == id || l.B == id).OrderByDescending(l => l.Characters.Count))
+        <UniverseTimeline Universe="universe" />
+    }
+    else
+    {
+        <p class="muted small">Select a show to see its links.</p>
+        <p class="universe-legend small">
+            <span class="universe-key continuation"></span> continues the story
+            <span class="universe-key crossover"></span> crossover
+            <span class="universe-key revival"></span> revival
+            <span class="universe-key franchise"></span> same franchise
+            <span class="muted">· thicker shares more characters</span>
+        </p>
+
+        <div class="universe-map" style="--gutter: @(Gutter)px; --row: @(RowHeight)px">
+            <svg class="universe-arcs" width="@Gutter" height="@(universe.Shows.Count * RowHeight)" aria-hidden="true">
+                @foreach (var link in universe.Links)
+                {
+                    <path d="@Arc(link)" class="universe-arc @link.Kind @(IsActive(link) ? "active" : selected is null ? null : "dim")"
+                          stroke-width="@Math.Min(7, 1.5 + link.Characters.Count)" />
+                }
+                @for (var i = 0; i < universe.Shows.Count; i++)
+                {
+                    <circle cx="@(Gutter - 2)" cy="@Center(i)" r="4" class="universe-node @(universe.Shows[i].Show.Id == selected ? "active" : null)" />
+                }
+            </svg>
+            @foreach (var item in universe.Shows)
             {
-                var other = Show(link.A == id ? link.B : link.A);
-                <h3>
-                    <span>@KindText(link, id) </span>
-                    <a href="shows/@other.Id">@other.Title</a>
-                    @if (other.Year is { } year)
-                    {
-                        <span class="muted small"> (@year)</span>
-                    }
-                </h3>
-                <ul class="universe-characters">
-                    @foreach (var character in link.Characters)
-                    {
-                        <li>
-                            <Poster Title="@character.PersonName" Url="@character.PhotoUrl" Size="small" />
-                            <span>
-                                <span class="strong">@character.Character</span>
-                                <a class="small" href="people/@character.PersonId">@character.PersonName</a>
-                            </span>
-                        </li>
-                    }
-                </ul>
+                var show = item.Show;
+                <button type="button" class="universe-row @(show.Id == selected ? "active" : null)" @onclick="() => Select(show.Id)"
+                        aria-pressed="@(show.Id == selected ? "true" : "false")">
+                    <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+                    <span class="universe-row-text">
+                        <span class="strong">@show.Title</span>
+                        <span class="muted small">@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))</span>
+                        <span class="small">@(item.Characters == 0 ? "same franchise" : item.Characters == 1 ? "1 shared character" : $"{item.Characters} shared characters")</span>
+                    </span>
+                </button>
             }
-        </section>
+        </div>
+
+        @if (selected is { } id && universe.Shows.FirstOrDefault(s => s.Show.Id == id) is { } chosen)
+        {
+            <section class="panel universe-detail">
+                <div class="section-head">
+                    <h2>@chosen.Show.Title</h2>
+                    <a class="small" href="shows/@id">Open show</a>
+                </div>
+                @foreach (var link in universe.Links.Where(l => l.A == id || l.B == id).OrderByDescending(l => l.Characters.Count))
+                {
+                    var other = Show(link.A == id ? link.B : link.A);
+                    <h3>
+                        <span>@KindText(link, id) </span>
+                        <a href="shows/@other.Id">@other.Title</a>
+                        @if (other.Year is { } year)
+                        {
+                            <span class="muted small"> (@year)</span>
+                        }
+                    </h3>
+                    <ul class="universe-characters">
+                        @foreach (var character in link.Characters)
+                        {
+                            <li>
+                                <Poster Title="@character.PersonName" Url="@character.PhotoUrl" Size="small" />
+                                <span>
+                                    <span class="strong">@character.Character</span>
+                                    <a class="small" href="people/@character.PersonId">@character.PersonName</a>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+    }
     }
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
+
+    // "timeline" (the default) or "map"; in the address, so a link opens the same view.
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
+    private string view => View == "map" ? "map" : "timeline";
+
+    private void SetView(string next) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("view", next == "timeline" ? null : next), replace: true);
+
+    /// <summary>"3 shows, 2012–2026, linked by 20 characters played by the same actors" or "… by their franchise name".</summary>
+    private string Summary
+    {
+        get
+        {
+            var how = CharacterCount == 0
+                ? "one franchise by name and makers"
+                : universe!.Links.Any(l => l.Kind == "franchise")
+                    ? $"linked by name and by {CharacterCount} characters played by the same actors"
+                    : $"linked by {CharacterCount} characters played by the same actors";
+            return $"{universe!.Shows.Count} shows, {Years}, {how}.";
+        }
+    }
 
     private const int RowHeight = 76;
 
@@ -106,12 +140,16 @@ else
 
     private int CharacterCount => universe?.Links.SelectMany(l => l.Characters).Select(c => (c.PersonId, c.Character.ToLowerInvariant())).Distinct().Count() ?? 0;
 
+    /// <summary>"2012–now" while any show is still running, else first premiere to last episode ("2006–2025").</summary>
     private string Years
     {
         get
         {
-            var years = universe!.Shows.Select(s => s.Show.Year).OfType<int>().ToList();
-            return years.Count == 0 ? "" : years.Min() == years.Max() ? $"from {years.Min()}" : $"{years.Min()}–{years.Max()}";
+            var shows = universe!.Shows;
+            var first = shows.Select(s => s.Seasons is { Count: > 0 } seasons ? seasons.Min(x => x.From).Year : s.Show.Year).OfType<int>().DefaultIfEmpty().Min();
+            var last = shows.Select(s => s.Seasons is { Count: > 0 } seasons ? seasons.Max(x => x.To).Year : s.Show.Year).OfType<int>().DefaultIfEmpty().Max();
+            var running = shows.Any(s => s.Show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled));
+            return first == 0 ? "" : running ? $"{first}–now" : first == last ? $"{first}" : $"{first}–{last}";
         }
     }
 
@@ -168,6 +206,7 @@ else
         ("continuation", false) => "Continues from",
         ("revival", true) => "Revived as",
         ("revival", false) => "Revival of",
+        ("franchise", _) => "Same franchise as",
         _ => "Crossover with"
     };
 }
