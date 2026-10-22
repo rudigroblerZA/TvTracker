@@ -1,4 +1,5 @@
 @page "/tonight"
+@attribute [RequiresFeature(FeatureFlags.TonightPlan)]
 @inject TrackingClient Tracking
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation

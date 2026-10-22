@@ -37,10 +37,12 @@ else
             {
                 <p>@show.Overview</p>
             }
-            <p class="small"><a href="blend?a=@show.Id">Blend @show.Title with another show</a></p>
+            <Feature Flag="@FeatureFlags.Blend">
+                <p class="small"><a href="blend?a=@show.Id">Blend @show.Title with another show</a></p>
+            </Feature>
             <AuthorizeView>
                 <Authorized>
-                    <EssentialCutTeaser ShowId="show.Id" />
+                    <Feature Flag="@FeatureFlags.EssentialCut"><EssentialCutTeaser ShowId="show.Id" /></Feature>
                 </Authorized>
             </AuthorizeView>
 
@@ -247,7 +249,7 @@ else
         </section>
     }
 
-    <UniverseSection ShowId="show.Id" />
+    <Feature Flag="@FeatureFlags.Universes"><UniverseSection ShowId="show.Id" /></Feature>
 
     @if (similar is { Count: > 0 })
     {

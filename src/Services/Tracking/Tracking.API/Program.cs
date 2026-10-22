@@ -7,6 +7,7 @@ using TvTracker.IntegrationEvents;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddFeatureFlags();
 builder.AddDefaultAuthentication();
 
 builder.AddNpgsqlDbContext<TrackingContext>("trackingdb");

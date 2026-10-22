@@ -3,7 +3,24 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="typeof(Routes).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+            @if (FlagOf(routeData.PageType) is { } flag)
+            {
+                <Feature Flag="@flag">
+                    <ChildContent>
+                        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+                    </ChildContent>
+                    <Off>
+                        <LayoutView Layout="typeof(MainLayout)">
+                            <h1>Not available</h1>
+                            <p>This feature is switched off right now. <a href="">Back to Home</a></p>
+                        </LayoutView>
+                    </Off>
+                </Feature>
+            }
+            else
+            {
+                <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+            }
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
         <NotFound>
@@ -23,4 +40,7 @@
     [Parameter] public string? ClientAddress { get; set; }
 
     protected override void OnInitialized() => Client.Address ??= ClientAddress;
+
+    private static string? FlagOf(Type page) =>
+        (Attribute.GetCustomAttribute(page, typeof(RequiresFeatureAttribute)) as RequiresFeatureAttribute)?.Flag;
 }

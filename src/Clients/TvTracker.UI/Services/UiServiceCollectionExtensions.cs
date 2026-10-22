@@ -9,7 +9,7 @@ public static class UiServiceCollectionExtensions
     /// Registers the shared UI's API clients and session state. <paramref name="baseAddressFor"/> returns the
     /// base address for each named client (see <see cref="ApiClients"/>). The host must also register
     /// <see cref="IAccessTokenProvider"/>, <see cref="IAuthActions"/>, <see cref="IPlatformServices"/>
-    /// and an AuthenticationStateProvider; <see cref="IOfflineStore"/> defaults to online-only.
+    /// an AuthenticationStateProvider and OpenFeature's IFeatureClient; <see cref="IOfflineStore"/> defaults to online-only.
     /// </summary>
     public static IServiceCollection AddTvTrackerUi(this IServiceCollection services, Func<string, Uri> baseAddressFor)
     {
@@ -24,6 +24,7 @@ public static class UiServiceCollectionExtensions
         services.TryAddScoped<ClientInfo>();
         services.AddScoped<UserSession>();
         services.AddScoped<ShowTagStore>();
+        services.AddScoped<FeatureFlagStore>();
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();

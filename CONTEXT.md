@@ -26,7 +26,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
-| Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ...) |
+| Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
 
 ## Events
@@ -213,6 +213,28 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Overrun:** allowed by max(5 min, budget/12).
 - **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
   previous plan, and the browser showed the old poster until the new one loaded.
+
+## Feature flags
+
+- **OpenFeature, served by flagd:** flags are in `TvTracker.AppHost/Flags/flagd.json`, mounted into the flagd
+  container, which picks up edits.
+- **Keys:** in `FeatureFlags` (ServiceDefaults). TvTracker.UI links the same file, so the services and the UI gate a
+  feature by the same key. Every flag is a boolean.
+- **Services:** `AddFeatureFlags()` registers OpenFeature with the flagd provider (`ConnectionStrings:flagd`).
+  `RequireFeature(flag)` on an endpoint answers 404 while the flag is off for the caller.
+  - **Provider cache off:** in OpenFeature.Providers.Flagd 0.8.0, every cached evaluation failed with a
+    NullReferenceException, and so silently returned the default. Uncached, each evaluation is one gRPC call to flagd.
+- **UI:** `FeatureFlagStore` evaluates through OpenFeature's `IFeatureClient`, which each host registers.
+  - **Web app:** the flagd provider.
+  - **Mobile app:** the OFREP provider, through the BFF's `/features` route to flagd's OFREP port. The phone only
+    reaches the BFF.
+  - **Caching:** answers are kept 30 s, since the nav menu asks on every navigation.
+  - **Gating:** `<Feature Flag=…>` hides links and sections. `[RequiresFeature]` on a page makes the router show
+    "Not available" instead, so the page never calls an API that answers 404.
+- **Context:** `FeatureFlags.ContextFor(user)` gives `targetingKey` (Keycloak `sub`) and `email`, so flags can
+  target users and roll out by percentage.
+- **Fail open:** the default is on. With flagd down or a flag unknown, features stay available. Turning one off is a
+  deliberate edit.
 
 ## UI
 

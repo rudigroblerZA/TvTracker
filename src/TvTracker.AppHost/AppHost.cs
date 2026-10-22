@@ -53,6 +53,13 @@ var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26
 
 var keycloakUrl = keycloak.GetEndpoint("http");
 
+// flagd: the OpenFeature flag server, reading ./Flags/flagd.json and picking up edits to it while running. Services
+// and the web app evaluate flags through the OpenFeature SDK (flagd provider, ConnectionStrings:flagd); the mobile
+// app through the BFF's /features route, over OFREP. Nothing waits for it: with flagd down, flags take their defaults.
+var flagd = builder.AddFlagd("flagd")
+    .WithBindFileSync("./Flags/")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 // Development secrets; they match Realms/tvtracker-realm.json. Change both for any shared environment.
 const string WebClientSecret = "tvtracker-web-dev-secret";
 const string IdentityAdminClientSecret = "tvtracker-identity-admin-dev-secret";
@@ -71,12 +78,14 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
 
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(catalogDb).WaitFor(catalogDb)
+    .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
 var trackingApi = builder.AddProject<Projects.Tracking_API>("tracking-api")
     .WithReference(trackingDb).WaitFor(trackingDb)
+    .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(redis).WaitFor(redis)
     .WithEnvironment("Identity__Url", keycloakUrl)
@@ -105,6 +114,7 @@ var notificationsApi = builder.AddProject<Projects.Notifications_API>("notificat
 // Analytics.API owns analyticsdb; the worker consumes catalog and rating events and computes insights hourly.
 var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
     .WithReference(analyticsDb).WaitFor(analyticsDb)
+    .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
@@ -193,6 +203,7 @@ analyticsWorker.WithReference(catalogSync);
 // The MAUI app talks to the services only through this gateway (http://localhost:5110, or 10.0.2.2:5110 from the Android emulator).
 builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithExternalHttpEndpoints()
+    .WithReference(flagd.GetEndpoint("ofrep"))
     .WithReference(identityApi)
     .WithReference(catalogApi)
     .WithReference(trackingApi)
@@ -203,6 +214,7 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
 
 builder.AddProject<Projects.WebApp>("webapp")
     .WithExternalHttpEndpoints()
+    .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithEnvironment("Identity__WebClientSecret", WebClientSecret)

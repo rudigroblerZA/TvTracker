@@ -1,0 +1,29 @@
+{
+  "$schema": "https://flagd.dev/schema/v0/flags.json",
+  "flags": {
+    "blend": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Blend: shows that sit between two others (/blend, and the link on show pages)." }
+    },
+    "universes": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Universes: franchise timelines, watch order and links (/universes, and the section on show pages)." }
+    },
+    "essential-cut": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Essential cut: the shorter way through a long show (/shows/{id}/essential-cut, and the teaser on show pages)." }
+    },
+    "tonight-plan": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Tonight's plan: episodes that fit the time and mood given (/tonight, and its links on Home and Up Next)." }
+    }
+  }
+}
