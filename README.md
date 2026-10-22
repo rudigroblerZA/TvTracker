@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -270,6 +270,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
+| `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
 | `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 
@@ -425,6 +426,11 @@ How events flow:
       - A different kind of show (reality against scripted) or language counts for much less.
       - The reason names the shared distinctive traits: "Same DNA: short episodes, long seasons", or "Same DNA as Severance:
         long waits between seasons, big finales".
+    - **DNA twins** (show pages, public): "Made like this, about something else". Shows of the same kind whose DNA is
+      close (0.85 or more) and that share at least two distinctive traits, but share few genres, no nanogenre, and
+      aren't on each other's similar-shows lists. Each says what they share and what it's about instead: Ted Lasso →
+      Silo ("Peaks early, long waits between seasons · but science-fiction and mystery"); The Office → Scrubs; Stranger
+      Things → MINDHUNTER. `GET /api/v1/shows/{id}/dna-twins` on Recommendations.API.
   - **Nanogenres** (chips on show pages, `/nanogenres`, a search filter; public): fine-grained genres found in the
     catalog itself, with no list written down. Ted Lasso is a "Sports comedy"; Wednesday both a "Supernatural comedy"
     and a "Mystery comedy"; The Simpsons an "Animated family comedy".

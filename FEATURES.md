@@ -150,6 +150,10 @@ On show pages, and behind every recommendation.
   - Breaking Bad finds Mr. Robot, The Wire, The Sopranos and Boardwalk Empire.
   - Ted Lasso finds Resident Alien, The Marvelous Mrs. Maisel, Hacks and Shrinking.
 - **Reasons:** each says what's shared: "Same DNA: short episodes, long seasons" (The Office → Frasier, Seinfeld).
+- **DNA twins:** "Made like this, about something else". Shows built the same way in other genres, each with what
+  they share and what it's about instead. Ted Lasso finds Silo and Andor (long waits, big finales); The Office finds
+  Scrubs and Brooklyn Nine-Nine (short episodes, long seasons); Game of Thrones finds Boardwalk Empire and Justified
+  (acclaimed, fades over time); Stranger Things finds MINDHUNTER and Narcos (drops all at once, acclaimed).
 
 ### 13. What's next, with honest forecasts
 

@@ -48,6 +48,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Nanogenres: chips on show pages, /nanogenres browse pages, and the search filter. Recommendations use them either way." }
+    },
+    "dna-twins": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages." }
     }
   }
 }

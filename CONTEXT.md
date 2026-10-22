@@ -293,6 +293,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Reasons:** a reason names the DNA ("Same DNA as X: …") when the affinity is at least 0.6 and the two shows share
   a distinctive trait.
 - **Rebuilds:** a DNA event that changes anything marks every user with signals for a rebuild of their list.
+- **DNA twins** (`GetDnaTwinsAsync`): the reverse of DNA's role in ranking. Shows made alike (similarity ≥ 0.85, two or
+  more shared distinctive traits, same kind) but about something else: genre overlap ≤ 0.34 with a genre of its own,
+  no shared nanogenre, and not on either's provider similar-shows list. Those would be "Shows like this".
+  - **Why distinctive traits:** similarity alone pairs every hour-long weekly drama with every other one.
+  - **Computed on request** from all DNA rows (a few hundred), cached 30 minutes like similar shows.
 
 ## Tonight's plan
 

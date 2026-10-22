@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
+builder.AddFeatureFlags();
 
 builder.AddNpgsqlDbContext<RecommendationsContext>("recommendationsdb");
 // Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
