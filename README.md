@@ -259,6 +259,26 @@ How events flow:
     - **Person pages:** they show the same career line and a "Made" row.
   - **Person page — actor insights:** their shows' average rating, best-rated show, the years their shows aired,
     co-stars they share two or more shows with, and how many of our users follow their shows.
+  - **Essential cut** (`/shows/{id}/essential-cut`, linked from long shows' pages): a shorter way through a long
+    show, from its episode ratings.
+    - **What it keeps:** each season keeps its premiere, finale, best episode and both halves of two-parters.
+    - **What it skips:** the season's lowest-rated episodes that sit clearly below its average, so a weak season
+      is thinned rather than skipped whole, and an evenly rated one loses little.
+    - **Levels:**
+      - **Light:** up to 15% of a season, rated a full spread below its average.
+      - **Lean:** up to 30%, half a spread below.
+      - **Essentials:** up to 50%, a quarter below.
+    - **On One Piece** (1,180 rated episodes) it cuts 510 hours to 443, 376 or 324. Without any filler data, it skips
+      53%, 70% or 78% of the canonical filler. At "light" a skipped episode is filler 3.6× as often as an average one.
+      Breaking Bad loses 10% at "light".
+    - **The page:** hours and episodes saved, the biggest runs to skip ("S2007 E35–E44, rated 7.2 against the
+      season's 8.6") and a chip per episode.
+    - **From where you are:** for a show you've started, it shows the next episode the cut keeps and what's left in full and
+      in the cut.
+    - **Spoiler-safe:** episode titles stay hidden unless you ask for them.
+    - **Ratings:** TVmaze's, averaged with our users' once 5 rate an episode.
+    - **Which shows:** it needs 20 or more aired episodes, 80% of them rated.
+    - **API:** `GET /api/v1/shows/{id}/essential-cut?level=lean` on Analytics.API, signed in, computed on request.
   - **Stats page — your taste:** computed on request from your own data only.
     - How your ratings compare with TVmaze's (stars doubled to its 0-10).
     - The genres you rate highest.

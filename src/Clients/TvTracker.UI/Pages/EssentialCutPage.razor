@@ -1,0 +1,214 @@
+@page "/shows/{Id:guid}/essential-cut"
+@attribute [Authorize]
+@inject AnalyticsClient Analytics
+@inject NavigationManager Navigation
+
+<PageTitle>Essential cut@(cut is not null ? $" · {cut.Title}" : "") · TV Tracker</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (cut is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">@(notFound ? "This show has no episodes in Insights yet." : "Loading…")</p>
+    }
+}
+else
+{
+    <p class="small"><a href="shows/@Id">← @cut.Title</a></p>
+    <h1>Essential cut</h1>
+    <p class="muted">
+        A shorter way through @cut.Title, from its episode ratings: each season keeps its premiere, finale and best
+        episode, and drops its weakest. Only numbers and ratings are shown, so nothing is spoiled.
+    </p>
+
+    @if (!cut.Available)
+    {
+        <p class="notice">@cut.Reason</p>
+    }
+    else
+    {
+        <div class="cut-levels" role="radiogroup" aria-label="How much to cut">
+            @foreach (var (key, label, detail) in Levels)
+            {
+                <button type="button" role="radio" aria-checked="@(key == cut.Level ? "true" : "false")"
+                        class="cut-level @(key == cut.Level ? "active" : null)" @onclick="() => ChangeLevel(key)" disabled="@loading">
+                    <span class="strong">@label</span>
+                    <span class="muted small">@detail</span>
+                </button>
+            }
+        </div>
+
+        <div class="cut-totals">
+            <div class="cut-total">
+                <span class="muted small">Whole show</span>
+                <span class="cut-total-value">@Format.Hours(cut.Full.Minutes)</span>
+                <span class="muted small">@cut.Full.Episodes.ToString("N0") episodes</span>
+            </div>
+            <span class="cut-arrow" aria-hidden="true">→</span>
+            <div class="cut-total">
+                <span class="muted small">Essential cut</span>
+                <span class="cut-total-value">@Format.Hours(cut.Cut.Minutes)</span>
+                <span class="muted small">@cut.Cut.Episodes.ToString("N0") episodes</span>
+            </div>
+            <div class="cut-total cut-saved">
+                <span class="muted small">You save</span>
+                <span class="cut-total-value">@Format.Hours(cut.Full.Minutes - cut.Cut.Minutes)</span>
+                <span class="muted small">@Format.Percent(1 - (double)cut.Cut.Minutes / Math.Max(1, cut.Full.Minutes)) of the show</span>
+            </div>
+        </div>
+
+        @if (cut.Progress is { } progress)
+        {
+            <div class="panel">
+                @if (progress.NextEpisodeId is { } next)
+                {
+                    <div>
+                        <span class="muted small">Up next in the cut</span>
+                        <a class="strong" href="episodes/@next">@Format.EpisodeCode(progress.NextSeason!.Value, progress.NextEpisode!.Value)</a>
+                    </div>
+                    <div class="small">
+                        <span>From where you are: @Format.Hours(progress.FullRemaining.Minutes) left, or </span>
+                        <strong>@Format.Hours(progress.CutRemaining.Minutes)</strong>
+                        <span> in the cut (@progress.CutRemaining.Episodes of @progress.FullRemaining.Episodes episodes).</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="small">You're caught up: nothing left to watch in the cut.</div>
+                }
+            </div>
+        }
+
+        @if (cut.Skips.Count > 0)
+        {
+            <h2>Biggest skips</h2>
+            <ul class="cut-runs">
+                @foreach (var run in cut.Skips.OrderByDescending(r => r.Episodes).ThenByDescending(r => r.SeasonAverage - r.AverageRating).Take(5))
+                {
+                    <li>
+                        <span class="strong">@RunCode(run)</span>
+                        <span class="muted small">
+                            @(run.Episodes == 1 ? "1 episode" : $"{run.Episodes} episodes") · @Format.Duration(run.Minutes) ·
+                            rated @Format.Rating(run.AverageRating) against the season's @Format.Rating(run.SeasonAverage)
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+
+        <div class="section-head">
+            <h2>Season by season</h2>
+            <label class="inline checkbox small">
+                <input type="checkbox" @bind="showTitles" />
+                Show episode titles (may spoil)
+            </label>
+        </div>
+        <p class="cut-legend muted small">
+            <span class="cut-ep keep">1</span> watch
+            <span class="cut-ep skip">2</span> skip
+            <span class="cut-ep keep watched">3</span> watched
+        </p>
+
+        @foreach (var season in cut.Seasons)
+        {
+            <details class="season cut-season" open="@(cut.Seasons.Count <= 8)">
+                <summary>
+                    <span>Season @season.Number</span>
+                    <span class="muted small">
+                        @season.Kept of @season.Episodes@(season.MinutesSaved > 0 ? $" · saves {Format.Duration(season.MinutesSaved)}" : "")
+                    </span>
+                </summary>
+                <div class="cut-episodes">
+                    @foreach (var episode in season.Items)
+                    {
+                        <a class="cut-ep @(episode.Keep ? "keep" : "skip") @(episode.Watched ? "watched" : null)"
+                           href="episodes/@episode.EpisodeId" title="@Tooltip(season.Number, episode)">@episode.EpisodeNumber</a>
+                    }
+                </div>
+            </details>
+        }
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery(Name = "level")] public string? Level { get; set; }
+
+    private static readonly (string Key, string Label, string Detail)[] Levels =
+    [
+        ("light", "Light", "Only the clear misses"),
+        ("lean", "Lean", "The weaker episodes too"),
+        ("essentials", "Essentials", "Just the core")
+    ];
+
+    private EssentialCut? cut;
+    private string? error;
+    private bool notFound;
+    private bool loading;
+    private bool showTitles;
+    private string? loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Id}|{Level}";
+        if (key != loadedFor)
+        {
+            loadedFor = key;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        loading = true;
+        try
+        {
+            var level = Levels.Any(l => l.Key == Level) ? Level! : "lean";
+            cut = await Analytics.GetEssentialCutAsync(Id, level);
+            notFound = cut is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    // The address holds the level, so a cut can be shared or bookmarked.
+    private void ChangeLevel(string level) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("level", level == "lean" ? null : level), replace: true);
+
+    private static string RunCode(SkipRun run) =>
+        run.FromEpisode == run.ToEpisode
+            ? Format.EpisodeCode(run.SeasonNumber, run.FromEpisode)
+            : $"{Format.EpisodeCode(run.SeasonNumber, run.FromEpisode)}–E{run.ToEpisode:00}";
+
+    private string Tooltip(int season, CutEpisode episode)
+    {
+        var parts = new List<string> { Format.EpisodeCode(season, episode.EpisodeNumber) };
+        if (showTitles) parts.Add(episode.Title);
+        parts.Add(episode.Rating is { } rating ? $"rated {Format.Rating(rating)}" : "not rated");
+        parts.Add(Why(episode.Why));
+        if (episode.Watched) parts.Add("watched");
+        return string.Join(" · ", parts);
+    }
+
+    private static string Why(string why) => why switch
+    {
+        "series-premiere" => "watch: the first episode",
+        "season-premiere" => "watch: season premiere",
+        "season-finale" => "watch: season finale",
+        "series-finale" => "watch: the last episode",
+        "two-parter" => "watch: part of a two-parter",
+        "best-of-season" => "watch: the season's best",
+        "unrated" => "watch: not rated, kept to be safe",
+        "below-average" => "skip: well below the season's average",
+        _ => "watch"
+    };
+}

@@ -295,3 +295,30 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .show-picker-suggestions button { display: flex; gap: 10px; align-items: center; width: 100%; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .show-picker-suggestions button:hover, .show-picker-suggestions button:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .show-picker-suggestions .poster.small { width: 32px; }
+
+/* Essential cut */
+
+.cut-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; }
+.cut-level { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cut-level.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cut-level:disabled { cursor: progress; }
+.cut-totals { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 16px; }
+.cut-total { display: flex; flex-direction: column; }
+.cut-total-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.cut-saved .cut-total-value { color: var(--accent); }
+.cut-arrow { font-size: 1.4rem; color: var(--muted); }
+.cut-runs { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.cut-runs li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.cut-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cut-legend .cut-ep { pointer-events: none; }
+.cut-legend .cut-ep + .cut-ep, .cut-legend .cut-ep:not(:first-child) { margin-left: 10px; }
+.cut-episodes { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 12px; }
+/* One chip per episode: solid to watch, faint and struck through to skip, ticked once watched. */
+.cut-ep { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 4px; border-radius: 6px; font-size: 0.78rem; font-variant-numeric: tabular-nums; text-decoration: none; }
+.cut-ep:hover { text-decoration: none; filter: brightness(1.1); }
+.cut-ep.keep { background: var(--accent); color: var(--accent-text); }
+.cut-ep.skip { background: transparent; color: var(--muted); border: 1px dashed var(--border); text-decoration: line-through; }
+.cut-ep.watched { opacity: 0.55; }
+.cut-ep.watched::after { content: "✓"; margin-left: 2px; font-size: 0.7rem; }
+.cut-teaser { margin-top: -4px; }
+@media (max-width: 640px) { .cut-levels { grid-template-columns: 1fr; } }
