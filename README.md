@@ -90,6 +90,27 @@ added under `Embeddings:Models:{id}`: `BaseUrl`, `OnnxSha256`, `VocabSha256`, `D
 and keeps the vectors in `show_embeddings`, a pgvector column with an HNSW index. Postgres runs from the
 `pgvector/pgvector` image for that.
 
+**Universes** (`/universes`, and "Shared universe" on show pages) finds spin-offs, sequels, revivals and crossovers
+from the cast: shows where the same actor plays the same character. The 595-show dev catalog has 30, all real
+franchises: the Marvel Netflix shows with Hawkeye, What If...? and Daredevil: Born Again (9 shows, 20 characters),
+Dexter (4), Yellowstone with Marshals and Dutton Ranch, Bosch, The Walking Dead, Breaking Bad and Better Call Saul,
+Doctor Who and Torchwood, Frasier's revival.
+- **Each universe's page:** a map of its shows, oldest first, with arcs joining shows that share characters.
+  Colour shows the kind of link: continues the story, crossover or revival. Thickness shows how many characters they
+  share. Selecting a show lists its links with the characters and actors.
+- **Show pages:** the shows it shares characters with, and which characters.
+- **How links are found:** TVmaze gives each show its own character ids, even for the same character in a spin-off,
+  so links come from names. The same actor playing a character with the same name counts, ignoring titles,
+  nicknames and aliases ("Matt Murdock / Daredevil" matches "Matt Murdock"; "Dr. Frasier Crane" matches
+  "Frasier Crane").
+- **What's left out:**
+  - Only scripted and animated shows count, since hosts and crews recur across reality shows.
+  - Self roles and narrators don't count.
+  - A link needs two shared characters, or one with a full name.
+  - TVmaze lists only main casts, so crossovers made of guest appearances (the One Chicago shows) aren't found.
+- **API:** `GET /api/v1/universes` and `GET /api/v1/shows/{id}/universe` (Catalog.API, public). The universe map
+  is cached for 30 minutes.
+
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
 Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the

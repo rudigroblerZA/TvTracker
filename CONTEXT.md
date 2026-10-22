@@ -101,6 +101,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
   - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
   - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
+- **Universes** (`Catalog.API/Services/Universes.cs`): shows linked by the same actor playing a same-named
+  character, grouped into connected components.
+  - **Why names:** TVmaze's character ids are per show; not one of 6,514 credits shared an id across shows. So
+    `CharacterExternalIds` can't find crossovers, and Analytics' `SharedCast.SameCharacter` (which compares ids) is
+    effectively never true.
+  - **Matching:** names are split on "/" into aliases, and quoted nicknames, parentheses, titles and punctuation are
+    dropped. A match is equal word sets, or one set inside the other with at least two words.
+  - **Noise guards:** scripted/animation shows only, no self roles, and a link needs two characters or one
+    full-name character. Checked by hand on the 595-show catalog: 30 universes, no false links.
+  - **Naming:** a universe is named and addressed by its hub, the show sharing the most characters.
+  - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
+    from that link, so a team-up (The Defenders) reads as a crossover.
+  - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire

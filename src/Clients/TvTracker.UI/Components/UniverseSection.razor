@@ -1,0 +1,84 @@
+@inject CatalogClient Catalog
+
+@* The show page's link to its shared universe: the shows it shares characters with, and which characters. *@
+@if (universe is not null && Links.Count > 0)
+{
+    <section class="universe-section">
+        <h2>Shared universe</h2>
+        <p class="muted small">
+            <span>Part of the </span>
+            <a href="universes/@ShowId"><strong>@universe.Name universe</strong></a><span>: @universe.Shows.Count shows that share characters.</span>
+        </p>
+        <ul class="universe-links">
+            @foreach (var (other, link) in Links.Take(4))
+            {
+                <li>
+                    <Poster Title="@other.Show.Title" Url="@other.Show.PosterUrl" Size="small" />
+                    <div>
+                        <div>
+                            <a class="strong" href="shows/@other.Show.Id">@other.Show.Title</a>
+                            <span class="muted small"> · @Label(link, other)</span>
+                        </div>
+                        <div class="small">@Characters(link)</div>
+                    </div>
+                </li>
+            }
+        </ul>
+        @if (Links.Count > 4 || universe.Shows.Count > Links.Count + 1)
+        {
+            <a class="small" href="universes/@ShowId">See the whole universe</a>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private Universe? universe;
+    private Guid loadedFor;
+
+    /// <summary>This show's direct links, most shared characters first.</summary>
+    private List<(UniverseShow Other, UniverseLink Link)> Links =>
+        universe is null
+            ? []
+            : universe.Links
+                .Where(l => l.A == ShowId || l.B == ShowId)
+                .Select(l => (Other: universe.Shows.First(s => s.Show.Id == (l.A == ShowId ? l.B : l.A)), Link: l))
+                .OrderByDescending(x => x.Link.Characters.Count)
+                .ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        universe = null;
+        try
+        {
+            universe = await Catalog.GetUniverseAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Optional on the show page.
+        }
+    }
+
+    /// <summary>"Continues it (2025)", "Revival (2023)", "Crossover (2017)", from this show's point of view.</summary>
+    private string Label(UniverseLink link, UniverseShow other)
+    {
+        var year = other.Show.Year is { } y ? $" ({y})" : "";
+        var otherIsLater = link.B == other.Show.Id;
+        return link.Kind switch
+        {
+            "revival" => (otherIsLater ? "revival" : "the original") + year,
+            "continuation" => (otherIsLater ? "continues the story" : "where it started") + year,
+            _ => "crossover" + year
+        };
+    }
+
+    private static string Characters(UniverseLink link) =>
+        string.Join(", ", link.Characters.Take(3).Select(c => c.Character))
+        + (link.Characters.Count > 3 ? $" and {link.Characters.Count - 3} more" : "");
+}
