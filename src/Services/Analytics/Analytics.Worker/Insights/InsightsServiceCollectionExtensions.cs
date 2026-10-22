@@ -4,7 +4,8 @@ public static class InsightsServiceCollectionExtensions
 {
     /// <summary>
     /// The insights pipeline and every insight. Adding an insight is one line here plus its class: a stage for a part
-    /// of the show document, a rule for a tag, or a list for a table built across shows.
+    /// of the show document, a rule for a tag, a list for a table built across shows, or a publication for a part other
+    /// services keep a copy of.
     /// </summary>
     public static IServiceCollection AddInsights(this IServiceCollection services)
     {
@@ -21,6 +22,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowInsight, HistogramsInsight>();
         services.AddSingleton<IShowInsight, ViewingInsight>();
         services.AddSingleton<IShowInsight, MomentumInsight>();
+        services.AddSingleton<IShowInsight, DnaInsight>();
 
         // Tag rules, in the order tags are shown.
         services.AddSingleton<IShowTagRule, DropsAtOnceRule>();
@@ -31,6 +33,10 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowTagRule, QuickEpisodesRule>();
         services.AddSingleton<IShowTagRule, LongRunningRule>();
         services.AddSingleton<IShowTagRule, ProlificMakerRule>();
+
+        // Parts of the document other services keep a copy of, published when they change.
+        services.AddSingleton<IInsightPublication, TagsPublication>();
+        services.AddSingleton<IInsightPublication, DnaPublication>();
 
         // Lists built across shows; each sees every show's finished document.
         services.AddSingleton<IListInsight, PremieresList>();

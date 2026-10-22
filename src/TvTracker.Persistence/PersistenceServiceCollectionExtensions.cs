@@ -16,16 +16,22 @@ public static class PersistenceServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Creates the database schema at startup, then runs <paramref name="seed"/> if given.</summary>
+    /// <summary>Creates or migrates the database schema at startup, then runs <paramref name="seed"/> if given.</summary>
+    /// <param name="baseline">
+    /// For a context that moved from EnsureCreated to migrations: the name of its first migration, made from the same
+    /// model, so existing databases are marked as having it instead of refusing to start.
+    /// </param>
     public static IServiceCollection AddDatabaseInitializer<TContext>(
         this IServiceCollection services,
-        Func<TContext, IServiceProvider, CancellationToken, Task>? seed = null)
+        Func<TContext, IServiceProvider, CancellationToken, Task>? seed = null,
+        string? baseline = null)
         where TContext : DbContext
     {
         services.AddHostedService(sp => new DatabaseInitializer<TContext>(
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<ILogger<DatabaseInitializer<TContext>>>(),
-            seed));
+            seed,
+            baseline));
         return services;
     }
 }

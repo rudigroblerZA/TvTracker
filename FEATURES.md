@@ -136,7 +136,22 @@ On the Stats page, computed from your own data only.
 - **Only real reunions:** a spin-off or revival (anyone playing the same character) belongs to Universes, so it isn't
   counted. Neither are shows you already know.
 
-### 12. Smaller touches
+### 12. Show DNA
+
+On show pages, and behind every recommendation.
+
+- **What it is:** 12 traits of how a show is made and how it plays out, each on a scale between two plain ends: episode
+  and season length, how much there is to watch, weekly or all at once, the wait between seasons, era, acclaim,
+  steady or rollercoaster, whether it gets better or fades, where it peaks, how big its finales are, and whether our
+  users finish it.
+- **Only what sets it apart:** the page tags the traits that set a show apart from a typical one. Breaking Bad is
+  "Acclaimed, Peaks late"; Stranger Things "Drops all at once".
+- **Better recommendations:** similar shows now rank by DNA among shows about similar things.
+  - Breaking Bad finds Mr. Robot, The Wire, The Sopranos and Boardwalk Empire.
+  - Ted Lasso finds Resident Alien, The Marvelous Mrs. Maisel, Hacks and Shrinking.
+- **Reasons:** each says what's shared: "Same DNA: short episodes, long seasons" (The Office → Frasier, Seinfeld).
+
+### 13. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

@@ -1,0 +1,53 @@
+@using TvTracker.IntegrationEvents
+
+@* A show's DNA: the traits that set it apart from the typical show as tags, then every trait on a scale between its two ends. *@
+@if (Dna is { Traits.Count: > 0 })
+{
+    var standout = Dna.Traits
+        .Select(t => (Trait: t, Distinctiveness: DnaTraits.Distinctiveness(t.Key, t.Value)))
+        .Where(t => t.Distinctiveness > 0)
+        .OrderByDescending(t => t.Distinctiveness)
+        .Take(MaxTags)
+        .Select(t => t.Trait)
+        .ToList();
+    <h3>Show DNA</h3>
+    <p class="muted small">How it's made and how it plays out. Recommendations use it to find shows like this one.</p>
+    @if (standout.Count > 0)
+    {
+        <p class="dna-tags">
+            @foreach (var trait in standout)
+            {
+                <span class="tag" title="@trait.Detail">@trait.Label</span>
+            }
+        </p>
+    }
+    <details class="dna">
+        <summary>All @Dna.Traits.Count traits</summary>
+        <dl class="dna-traits">
+            @foreach (var trait in Dna.Traits)
+            {
+                if (!DnaTraits.ByKey.TryGetValue(trait.Key, out var definition))
+                {
+                    continue;
+                }
+                <dt>@definition.Name</dt>
+                <dd>
+                    <div class="dna-scale" role="img" aria-label="@($"{definition.Name}: {Percent(trait.Value)} of the way from {definition.Low.ToLowerInvariant()} to {definition.High.ToLowerInvariant()}")">
+                        <span class="dna-end">@definition.Low</span>
+                        <span class="dna-track"><span class="dna-marker" style="left: @Percent(trait.Value)"></span></span>
+                        <span class="dna-end">@definition.High</span>
+                    </div>
+                    <div class="muted small">@trait.Detail</div>
+                </dd>
+            }
+        </dl>
+    </details>
+}
+
+@code {
+    private const int MaxTags = 5;
+
+    [Parameter, EditorRequired] public ShowDna? Dna { get; set; }
+
+    private static string Percent(double value) => $"{Math.Round(value * 100)}%";
+}

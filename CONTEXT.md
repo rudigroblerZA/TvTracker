@@ -176,6 +176,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **`IShowTagRule`:** one tag. Tags appear in registration order.
   - **`IListInsight`:** a table built across shows (premieres, top episodes, discovery, actor insights). Each run
     starts a fresh `ListBuilder` that sees every finished show document.
+  - **`IInsightPublication`:** a part of the document another service keeps a copy of: tags for the catalog, DNA for
+    Recommendations.
+    - Each run's builder compares the new document with the stored one, and the pipeline publishes what changed
+      through the outbox.
+    - Every show is also sent after start and daily, so lost events heal.
   - **New data:** an insight that needs data nothing loads yet adds it to `InsightSources`.
   - **Why:** it replaced a single 930-line `InsightsComputer`. The split was checked with a fixed clock, and every
     document, list row and tag event came out byte-identical.
@@ -186,6 +191,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, in batches of at most 500.
     They're also sent in full after start and daily.
   - Weekly release is deliberately not a tag, since nearly every show would have it.
+- **Show DNA** (`DnaInsight`): 12 traits of form, rhythm and quality, each scaled to 0-1. Keys, names, labels,
+  weights and typical values are in `DnaTraits` (IntegrationEvents), shared with Recommendations and the UI.
+  - **Fixed anchors:** each trait is scaled between fixed anchors, about the 10th and 90th percentiles of the
+    615-show catalog. Recomputed percentiles would shift as the catalog grows and need every show at once; fixed
+    anchors keep a show's DNA stable and let it be computed alone.
+  - **Log scales:** season size and run length use log scales.
+  - **Specials:** season 0 is left out.
+  - **Distinctive traits:** a trait is named, in tags or recommendation reasons, only when it's at least 0.25 from the
+    typical show's (the median). Most shows are hour-long, weekly and recent, so saying so tells nothing.
+  - **No kind or language:** DNA is about form, not subject, and doesn't include the show's kind or language.
+    Recommendations takes those from the catalog's keywords instead.
+  - **Why kind matters:** without it, Succession's closest DNA was The Kardashians.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
@@ -213,6 +230,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     Treme and Bosch.
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
+
+## Recommendations
+
+- **Signals:** content (the provider's similar shows, genres, keywords, cast), show DNA, and co-follows.
+- **DNA's role** (`RecommendationEngine.Match`): DNA scales the content score by 0.5-1, depending on how alike the
+  two shows' DNAs are. It reorders shows that are already topically similar, and can't make a show about something
+  else similar.
+  - **Why a multiplier:** as an additive share, it filled Ted Lasso's similar shows with dramas made the same way
+    (Silo, Mayor of Kingstown).
+- **Affinity:** DNA similarity clusters between 0.6 and 0.95, so it's rescaled: 0.65 → 0 and 0.95 → 1.
+  - **Kind and language:** a different kind of show (keyword "scripted", "reality", …) multiplies the affinity by 0.4,
+    and a different language by 0.8.
+- **Reasons:** a reason names the DNA ("Same DNA as X: …") when the affinity is at least 0.6 and the two shows share
+  a distinctive trait.
+- **Rebuilds:** a DNA event that changes anything marks every user with signals for a rebuild of their list.
 
 ## Tonight's plan
 
@@ -270,8 +302,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog and Analytics use EF Core migrations, applied at startup by their API. The other services
-  still use `EnsureCreated`.
+- **Migrations:** Catalog, Analytics and Recommendations use EF Core migrations, applied at startup by their API.
+  The other services still use `EnsureCreated`.
+  - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
+    its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
+    as at that migration and migrated from there, rather than refusing to start.
+  - **Checked:** Recommendations' `InitialCreate` script was diffed against a database made by `EnsureCreated`
+    (`pg_dump -s`); the schemas match.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
 

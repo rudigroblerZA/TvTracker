@@ -7,7 +7,7 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
-What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, search by meaning, computed show tags)
+What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, search by meaning, computed show tags)
 is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
 
 ## Prerequisites
@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan and Reunion radar sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar and the Show DNA panel sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -269,6 +269,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `essential-cut` | `/shows/{id}/essential-cut` and its teaser on show pages |
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `reunion-radar` | `/reunions` and its link on For you |
+| `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -310,7 +311,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
-| Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + collaborative), dismissals |
+| Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
@@ -409,6 +410,19 @@ How events flow:
       people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
+  - **Show DNA** (show pages, signed in): how a show is made and how it plays out, as 12 traits on a scale between two
+    plain ends. Examples: "Short episodes" ↔ "Hour-long episodes", "Weekly episodes" ↔ "Drops all at once",
+    "Rollercoaster" ↔ "Steady", "Fades over time" ↔ "Gets better", "Quiet finales" ↔ "Big finales".
+    - **Tags:** the page tags the traits that set the show apart from a typical one. Most shows are hour-long, weekly and
+      recent, so those don't count. Breaking Bad is "Acclaimed, Peaks late".
+    - **Where it comes from:** episode runtimes, season sizes and air dates, TVmaze's show and episode ratings, and
+      our users' completion rate once 5 or more have watched.
+    - **Recommendations:**
+      - Similar shows and For you blend DNA into their ranking. DNA reorders shows about similar things, and never makes
+        a show about something else similar.
+      - A different kind of show (reality against scripted) or language counts for much less.
+      - The reason names the shared distinctive traits: "Same DNA: short episodes, long seasons", or "Same DNA as Severance:
+        long waits between seasons, big finales".
   - **Stats page — your taste:** computed on request from your own data only.
     - How your ratings compare with TVmaze's (stars doubled to its 0-10).
     - The genres you rate highest.
@@ -420,9 +434,11 @@ How events flow:
 
 ## Database schema
 
-Catalog and Analytics use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`); Catalog.API and
-Analytics.API apply them at startup. The other services
-still use `EnsureCreated`, which creates a missing database but never changes an existing one.
+Catalog, Analytics and Recommendations use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`,
+`Recommendations.API/Data/Migrations`); Catalog.API, Analytics.API and Recommendations.API apply them at startup. The
+other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
+Recommendations' first migration (`InitialCreate`) is its `EnsureCreated` schema, so a database made before it moved
+to migrations is marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
@@ -431,6 +447,8 @@ dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 # or, for Analytics:
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
+# or, for Recommendations:
+dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 ```
 
 **Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database
