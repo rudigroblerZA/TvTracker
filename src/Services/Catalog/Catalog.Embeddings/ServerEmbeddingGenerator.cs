@@ -32,9 +32,20 @@ public sealed class ServerEmbeddingGenerator(EmbeddingModel spec, TimeProvider t
     public EmbeddingGeneratorMetadata Metadata { get; } =
         new("openai-compatible", new Uri(spec.Endpoint), spec.Id, spec.Dimensions);
 
-    /// <summary>Embeds a word, so the server loads the model now; logs (once) if it can't.</summary>
+    private static readonly TimeSpan PullRetry = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Embeds a word, so the server loads the model now; logs (once) if it can't. With <see cref="EmbeddingModel.Pull"/>,
+    /// first pulls the model if Docker Model Runner doesn't have it, retrying every minute until it can (the server
+    /// may still be starting, or Docker Hub refusing).
+    /// </summary>
     public async Task WarmUpAsync(CancellationToken ct)
     {
+        if (spec.Pull)
+        {
+            await PullAsync(ct);
+        }
+
         try
         {
             await GenerateAsync(["warm up"], cancellationToken: ct);
@@ -43,6 +54,52 @@ public sealed class ServerEmbeddingGenerator(EmbeddingModel spec, TimeProvider t
         catch (EmbeddingsUnavailableException)
         {
             // Logged below; retried on next use.
+        }
+    }
+
+    private async Task PullAsync(CancellationToken ct)
+    {
+        // Model Runner's own API sits at the root, next to the OpenAI-compatible /engines/v1/.
+        using var api = new HttpClient { BaseAddress = new Uri(new Uri(spec.Endpoint), "/"), Timeout = Timeout.InfiniteTimeSpan };
+        var failures = 0;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                using (var check = await api.GetAsync($"models/{spec.ServedModel}", ct))
+                {
+                    if (check.IsSuccessStatusCode)
+                    {
+                        return;
+                    }
+                }
+
+                logger.LogInformation("Pulling embedding model {Model} into Docker Model Runner; search matches titles only until it's ready",
+                    spec.ServedModel);
+                using var pull = await api.PostAsJsonAsync("models/create", new PullRequest(spec.ServedModel), ct);
+                // The response streams progress, one JSON object a line, ending with "success" or "error"; Model Runner
+                // HTML-escapes the quotes (&#34;).
+                var body = System.Net.WebUtility.HtmlDecode(await pull.Content.ReadAsStringAsync(ct));
+                if (!pull.IsSuccessStatusCode || !body.Contains("\"type\":\"success\"", StringComparison.Ordinal))
+                {
+                    var last = body.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "";
+                    throw new HttpRequestException($"{(int)pull.StatusCode}: {last[..Math.Min(last.Length, 300)]}");
+                }
+
+                logger.LogInformation("Pulled embedding model {Model}", spec.ServedModel);
+                return;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+            {
+                // Logged the first time and then every 10 minutes, so a long outage doesn't fill the log.
+                if (failures++ % 10 == 0)
+                {
+                    logger.LogWarning(ex, "Couldn't pull embedding model {Model} from Docker Model Runner at {Endpoint}; retrying every {Retry}",
+                        spec.ServedModel, api.BaseAddress, PullRetry);
+                }
+            }
+
+            await Task.Delay(PullRetry, time, ct);
         }
     }
 
@@ -123,6 +180,8 @@ public sealed class ServerEmbeddingGenerator(EmbeddingModel spec, TimeProvider t
         serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
 
     public void Dispose() => _http.Dispose();
+
+    private sealed record PullRequest([property: JsonPropertyName("from")] string From);
 
     private sealed record EmbeddingRequest(
         [property: JsonPropertyName("model")] string Model,

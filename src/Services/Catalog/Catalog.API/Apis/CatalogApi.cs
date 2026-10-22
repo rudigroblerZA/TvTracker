@@ -23,6 +23,7 @@ public static class CatalogApi
         api.MapGet("/shows/batch", GetShowsByIdsAsync);
         api.MapGet("/shows/suggest", SuggestShowsAsync);
         api.MapBlendApi();
+        api.MapUniverseApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);

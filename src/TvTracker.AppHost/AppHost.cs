@@ -143,6 +143,36 @@ foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExt
     }
 }
 
+// Docker Model Runner serves the default embedding model (dmr/nomic-embed-text-v1.5). The AppHost runs it as a
+// container (CPU; the model is kept in a volume), unless ModelRunner:Url points at one already running, such as
+// Docker Desktop's (http://localhost:12434, which can use the GPU). The sync worker pulls the model on first start;
+// until it's ready, search matches titles only. Not started for an in-process model: the built-in server models
+// are the dmr/ ones, and a custom one says Source: Server.
+var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
+var servedModel = embeddingModelId.StartsWith("dmr/", StringComparison.Ordinal)
+    || string.Equals(builder.Configuration[$"Embeddings:Models:{embeddingModelId}:Source"], "Server", StringComparison.OrdinalIgnoreCase);
+if (!servedModel)
+{
+    // Nothing to do: Catalog.API and the sync worker run the model themselves.
+}
+else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunnerUrl)
+{
+    var endpoint = modelRunnerUrl.TrimEnd('/') + "/engines/v1/";
+    catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
+    catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
+}
+else
+{
+    var modelRunner = builder.AddContainer("model-runner", "docker/model-runner", "v1.2.9")
+        .WithHttpEndpoint(targetPort: 12434, name: "http")
+        .WithVolume("tvtracker-model-runner", "/models")
+        .WithHttpHealthCheck("/models")
+        .WithLifetime(ContainerLifetime.Persistent);
+    var endpoint = ReferenceExpression.Create($"{modelRunner.GetEndpoint("http")}/engines/v1/");
+    catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
+    catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
+}
+
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
 

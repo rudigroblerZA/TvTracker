@@ -13,11 +13,20 @@ public static class EmbeddingServiceCollectionExtensions
     /// service starts straight away). Fails at startup if the model is unknown, incomplete, or doesn't fit
     /// <paramref name="storedDimensions"/>, the size of the vectors the database holds.
     /// </summary>
-    public static IServiceCollection AddLocalEmbeddings(this IServiceCollection services, IConfiguration configuration, int storedDimensions)
+    /// <param name="pullModel">
+    /// Pull a <see cref="EmbeddingModel.Pull"/> model the server doesn't have, at startup. One service does it (the
+    /// sync worker), so two don't download the same model at once.
+    /// </param>
+    public static IServiceCollection AddLocalEmbeddings(this IServiceCollection services, IConfiguration configuration, int storedDimensions,
+        bool pullModel = false)
     {
         var section = configuration.GetSection("Embeddings");
         services.Configure<EmbeddingOptions>(section);
         var model = ResolveModel(section, storedDimensions);
+        if (!pullModel)
+        {
+            model.Pull = false;
+        }
         services.AddSingleton(model);
         if (model.Source == EmbeddingSource.Server)
         {
@@ -52,6 +61,10 @@ public static class EmbeddingServiceCollectionExtensions
         var model = builtIn?.Copy() ?? new EmbeddingModel();
         overrides.Bind(model);
         model.Id = id;
+        if (model.Source == EmbeddingSource.Server && overrides["Endpoint"] is null && section["Endpoint"] is { Length: > 0 } shared)
+        {
+            model.Endpoint = shared;
+        }
 
         var missing = new List<string>();
         if (model.Source == EmbeddingSource.Server)

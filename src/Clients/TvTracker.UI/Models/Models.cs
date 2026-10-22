@@ -27,6 +27,20 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int
 
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
+/// <summary>Shows linked by shared characters (see Catalog.API's Universes).</summary>
+public record UniverseSummary(Guid Id, string Name, int ShowCount, int CharacterCount, int? FromYear, int? ToYear, IReadOnlyList<ShowSummary> Posters);
+
+/// <param name="Shows">Oldest first.</param>
+public record Universe(Guid Id, string Name, IReadOnlyList<UniverseShow> Shows, IReadOnlyList<UniverseLink> Links);
+
+public record UniverseShow(ShowSummary Show, int Characters);
+
+/// <param name="A">The earlier show.</param>
+/// <param name="Kind">"revival", "continuation" or "crossover".</param>
+public record UniverseLink(Guid A, Guid B, string Kind, IReadOnlyList<SharedCharacter> Characters);
+
+public record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
+
 /// <summary>Shows between two others (see Catalog.API's BlendApi).</summary>
 public record Blend(ShowSummary A, ShowSummary B, int Lean, bool Indexed, IReadOnlyList<BlendMatch> Matches, bool Loose);
 

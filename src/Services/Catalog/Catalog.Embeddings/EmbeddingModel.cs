@@ -46,6 +46,12 @@ public sealed class EmbeddingModel
     public string ServedModel { get; set; } = "";
 
     /// <summary>
+    /// The server is Docker Model Runner, which can pull <see cref="ServedModel"/> from Docker Hub when it doesn't
+    /// have it (its <c>/models/create</c> API, next to <c>/engines/v1/</c>). Only the services allowed to pull do so.
+    /// </summary>
+    public bool Pull { get; set; }
+
+    /// <summary>
     /// Keep the first <see cref="Dimensions"/> of a longer vector and re-normalize it. Only for models trained for it
     /// (Matryoshka models such as nomic-embed-text-v1.5); for others the shortened vectors lose most of their meaning.
     /// </summary>
@@ -141,6 +147,7 @@ public static class EmbeddingModels
             Id = DockerNomic,
             Source = EmbeddingSource.Server,
             ServedModel = "ai/nomic-embed-text-v1.5",
+            Pull = true,
             Dimensions = 384,
             Truncate = true,
             MaxTokens = 512,
