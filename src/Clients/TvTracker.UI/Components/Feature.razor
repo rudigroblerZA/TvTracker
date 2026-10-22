@@ -1,0 +1,24 @@
+@inject FeatureFlagStore Flags
+
+@* Shows its content while the flag is on for the user, and Off (if given) while it's off; nothing until it knows. *@
+@if (enabled == true)
+{
+    @ChildContent
+}
+else if (enabled == false)
+{
+    @Off
+}
+
+@code {
+    /// <summary>One of <see cref="FeatureFlags"/>.</summary>
+    [Parameter, EditorRequired] public string Flag { get; set; } = "";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public RenderFragment? Off { get; set; }
+
+    private bool? enabled;
+
+    protected override async Task OnParametersSetAsync() => enabled = await Flags.IsEnabledAsync(Flag);
+}

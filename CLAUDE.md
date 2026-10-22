@@ -48,6 +48,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 - **Analytics insights:** add a class (`IShowInsight` for part of the show document, `IShowTagRule` for a tag,
   `IListInsight` for a table built across shows) and register it in `AddInsights`. Insights only compute; loading,
   batching, saving and events stay in `InsightsPipeline`.
+- **Feature flags:** a new user-facing feature gets a key in `FeatureFlags` and an entry in `Flags/flagd.json`. Put
+  `RequireFeature(...)` on its endpoints, `[RequiresFeature]` on its pages, and `<Feature>` around links to it.
 - **Privacy:** anything Analytics shows about our users needs 5 or more users or ratings behind it.
 - **Signed-in features:** endpoints that need sign-in return 401 without a valid token, and the UI hides them when
   signed out (tags, the tag filter).

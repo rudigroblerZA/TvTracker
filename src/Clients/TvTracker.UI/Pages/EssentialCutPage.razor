@@ -1,4 +1,5 @@
 @page "/shows/{Id:guid}/essential-cut"
+@attribute [RequiresFeature(FeatureFlags.EssentialCut)]
 @attribute [Authorize]
 @inject AnalyticsClient Analytics
 @inject NavigationManager Navigation

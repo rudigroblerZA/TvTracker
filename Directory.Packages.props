@@ -19,6 +19,8 @@
     <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
     <!-- Community Toolkit: DbGate, a web UI for the Postgres databases. Released separately from Aspire. -->
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" Version="13.6.0" />
+    <!-- Community Toolkit: flagd, the OpenFeature flag server. -->
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="13.6.0" />
   </ItemGroup>
 
   <ItemGroup Label="Aspire client integrations (services)">
@@ -55,6 +57,12 @@
     <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
     <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Feature flags (OpenFeature)">
+    <PackageVersion Include="OpenFeature" Version="2.14.1" />
+    <PackageVersion Include="OpenFeature.Hosting" Version="2.14.1" />
+    <PackageVersion Include="OpenFeature.Providers.Flagd" Version="0.8.0" />
   </ItemGroup>
 
   <ItemGroup Label="Tools">

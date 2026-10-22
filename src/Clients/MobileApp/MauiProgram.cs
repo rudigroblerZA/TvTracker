@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
+using OpenFeature;
+using OpenFeature.Providers.Ofrep.DependencyInjection;
 using TvTracker.Mobile.Services;
 using TvTracker.UI.Services;
 
@@ -39,6 +41,10 @@ public static class MauiProgram
         // Every API call goes through the Mobile BFF, e.g. {bff}/catalog/api/v1/shows.
         var bff = MobileSettings.BffAddress;
         builder.Services.AddTvTrackerUi(name => new Uri(bff, $"{name}/"));
+
+        // Feature flags: flagd's OFREP API, proxied by the BFF ({bff}/features/ofrep/v1/...).
+        builder.Services.AddOpenFeature(openFeature =>
+            openFeature.AddOfrepProvider(options => options.BaseUrl = new Uri(bff, "features/").ToString()));
 
         // Sign-in and tokens
         builder.Services.AddAuthorizationCore();
