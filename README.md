@@ -217,6 +217,7 @@ Useful local addresses:
 | Mobile BFF | http://localhost:5110 |
 | Keycloak admin console | http://localhost:8080 (admin / admin) |
 | RabbitMQ management | link on the Aspire dashboard |
+| flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
 | DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
 ### Bulk import
@@ -254,6 +255,32 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
 Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
 isn't signed in, it and the Analytics stats endpoint are only mapped in Development.
+
+### Feature flags
+
+Blend, Universes, Essential cut and Tonight's plan sit behind [OpenFeature](https://openfeature.dev) feature flags,
+served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
+`src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
+
+| Flag | Gates |
+| --- | --- |
+| `blend` | `/blend`, the Blend nav link and the "Blend … with another show" link on show pages |
+| `universes` | `/universes` and universe pages, the nav link, and the "Shared universe" section on show pages |
+| `essential-cut` | `/shows/{id}/essential-cut` and its teaser on show pages |
+| `tonight-plan` | `/tonight` and its links on Home and Up Next |
+
+- **Turning one off:** set its `defaultVariant` to `"off"`.
+  - The UI then hides its links and sections, and its pages say "Not available".
+  - Its API endpoints answer 404.
+  - The UI keeps an answer for up to 30 seconds.
+- **For some users only:** add flagd `targeting`. The context has `targetingKey` (the user's Keycloak id) and `email`. For example, to keep Universes from one user:
+
+  ```json
+  "targeting": { "if": [ { "==": [ { "var": "email" }, "demo@example.com" ] }, "off" ] }
+  ```
+
+  flagd's `fractional` operator does percentage rollouts on `targetingKey`.
+- **If flagd is down:** every flag is on, so a flag server outage never takes features away.
 
 ### Mobile app
 

@@ -3,6 +3,7 @@ using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.IntegrationEvents;
+using TvTracker;
 
 namespace Catalog.API.Apis;
 
@@ -47,9 +48,9 @@ public static class UniverseApi
 {
     public static void MapUniverseApi(this RouteGroupBuilder api)
     {
-        api.MapGet("/universes", GetUniversesAsync);
-        api.MapGet("/shows/{id:guid}/universe", GetUniverseAsync);
-        api.MapGet("/shows/{id:guid}/universe/watch-order", GetWatchOrderAsync);
+        api.MapGet("/universes", GetUniversesAsync).RequireFeature(FeatureFlags.Universes);
+        api.MapGet("/shows/{id:guid}/universe", GetUniverseAsync).RequireFeature(FeatureFlags.Universes);
+        api.MapGet("/shows/{id:guid}/universe/watch-order", GetWatchOrderAsync).RequireFeature(FeatureFlags.Universes);
     }
 
     private static async Task<Ok<List<UniverseSummaryDto>>> GetUniversesAsync(

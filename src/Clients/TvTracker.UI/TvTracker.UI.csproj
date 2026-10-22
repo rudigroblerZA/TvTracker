@@ -6,6 +6,11 @@
   -->
 
   <ItemGroup>
+    <!-- The flag keys, shared with the services so both gate a feature by the same key. -->
+    <Compile Include="..\..\TvTracker.ServiceDefaults\FeatureFlags.cs" Link="Services\FeatureFlags.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 
@@ -13,6 +18,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="OpenFeature" />
   </ItemGroup>
 
 </Project>

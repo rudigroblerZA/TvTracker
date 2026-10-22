@@ -3,8 +3,8 @@
     <NavLink href="up-next">Up Next</NavLink>
     <NavLink href="calendar">Calendar</NavLink>
     <NavLink href="search">Search</NavLink>
-    <NavLink href="blend">Blend</NavLink>
-    <NavLink href="universes">Universes</NavLink>
+    <Feature Flag="@FeatureFlags.Blend"><NavLink href="blend">Blend</NavLink></Feature>
+    <Feature Flag="@FeatureFlags.Universes"><NavLink href="universes">Universes</NavLink></Feature>
     <AuthorizeView>
         <Authorized>
             <NavLink href="shows">My shows</NavLink>

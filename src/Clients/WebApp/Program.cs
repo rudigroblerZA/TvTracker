@@ -9,6 +9,7 @@ using WebApp.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddFeatureFlags();
 
 // Server-side token store (Redis), so access tokens never go to the browser.
 builder.AddRedisDistributedCache("redis");

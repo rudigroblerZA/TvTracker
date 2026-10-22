@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
+using TvTracker;
 
 namespace Catalog.API.Apis;
 
@@ -37,7 +38,7 @@ public static class BlendApi
     // default) rows per query, so asking for more wouldn't add any.
     private const int Candidates = 40;
 
-    public static void MapBlendApi(this RouteGroupBuilder api) => api.MapGet("/shows/blend", GetBlendAsync);
+    public static void MapBlendApi(this RouteGroupBuilder api) => api.MapGet("/shows/blend", GetBlendAsync).RequireFeature(FeatureFlags.Blend);
 
     /// <param name="lean">0-100, how much like <paramref name="a"/> (default 50); 20-80 keeps both shows in the mix.</param>
     private static async Task<Results<Ok<BlendDto>, NotFound, ValidationProblem>> GetBlendAsync(

@@ -14,8 +14,10 @@
             <div class="section-head">
                 <h2>Up next</h2>
                 <span>
-                    <a href="tonight">Plan tonight</a>
-                    <span class="muted"> · </span>
+                    <Feature Flag="@FeatureFlags.TonightPlan">
+                        <a href="tonight">Plan tonight</a>
+                        <span class="muted"> · </span>
+                    </Feature>
                     <a href="up-next">See all</a>
                 </span>
             </div>

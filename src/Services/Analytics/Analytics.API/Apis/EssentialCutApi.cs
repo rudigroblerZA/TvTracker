@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using TvTracker;
 
 namespace Analytics.API.Apis;
 
@@ -72,7 +73,7 @@ public static class EssentialCutApi
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static void MapEssentialCutApi(this RouteGroupBuilder api) =>
-        api.MapGet("/shows/{showId:guid}/essential-cut", GetEssentialCutAsync);
+        api.MapGet("/shows/{showId:guid}/essential-cut", GetEssentialCutAsync).RequireFeature(FeatureFlags.EssentialCut);
 
     private static async Task<Results<Ok<EssentialCutDto>, NotFound, ValidationProblem>> GetEssentialCutAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, string level = "lean", CancellationToken ct = default)

@@ -8,6 +8,7 @@ using Npgsql;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddFeatureFlags();
 
 // Catalog endpoints are public, but a signed-in caller's token identifies them for search rate limiting.
 builder.AddDefaultAuthentication();

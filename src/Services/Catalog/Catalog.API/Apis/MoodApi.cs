@@ -1,6 +1,7 @@
 using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
+using TvTracker;
 
 namespace Catalog.API.Apis;
 
@@ -25,7 +26,7 @@ public static class MoodApi
     private const int MaxMoodLength = 200;
 
     public static void MapMoodApi(this RouteGroupBuilder api) =>
-        api.MapPost("/shows/mood", ScoreAsync).RequireRateLimiting(SearchRateLimiting.Policy);
+        api.MapPost("/shows/mood", ScoreAsync).RequireRateLimiting(SearchRateLimiting.Policy).RequireFeature(FeatureFlags.TonightPlan);
 
     private static async Task<Results<Ok<MoodResponse>, ValidationProblem>> ScoreAsync(
         MoodRequest request, SemanticSearch semantic, CatalogContext db, CancellationToken ct)

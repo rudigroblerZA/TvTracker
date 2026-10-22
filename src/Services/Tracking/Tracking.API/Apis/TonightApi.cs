@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tracking.API.Data;
 using TvTracker.IntegrationEvents;
+using TvTracker;
 
 namespace Tracking.API.Apis;
 
@@ -33,7 +34,7 @@ public static class TonightApi
     // When a show has no runtimes at all: a typical hour-long slot's content.
     private const int FallbackRuntime = 45;
 
-    public static void MapTonightApi(this RouteGroupBuilder api) => api.MapGet("/tonight/queue", GetQueueAsync);
+    public static void MapTonightApi(this RouteGroupBuilder api) => api.MapGet("/tonight/queue", GetQueueAsync).RequireFeature(FeatureFlags.TonightPlan);
 
     /// <summary>
     /// For each show the user is watching or plans to watch, its next unwatched episodes that have aired (specials
