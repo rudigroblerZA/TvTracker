@@ -124,6 +124,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
   rollercoasters, best finales, bingeable, weekend binges and fan favorites.
+- **Essential cut** (`EssentialCutApi`): computed on request (one show's episodes plus the caller's watches), not hourly.
+  - **Per season:** it skips the lowest-rated episodes at least `Margin` standard deviations below the season
+    average (and at least 0.1), up to `Share` of the season.
+  - **Protected:** the premiere, a finale (only once nothing more of the season is scheduled), the season's best,
+    and two-parters (a "Part 1"/"(2)" title pattern; kept together).
+  - **Why per season:** cutting per season keeps the story moving through weak seasons.
+  - **Why a margin:** without it, evenly rated seasons lost ~30% to noise, e.g. NCIS episodes at 7.7 against a
+    7.8 average.
+  - **Tuning:** One Piece's canonical filler list was the check. Smoothing ratings over neighbouring episodes
+    didn't help, so it's per episode.
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
 

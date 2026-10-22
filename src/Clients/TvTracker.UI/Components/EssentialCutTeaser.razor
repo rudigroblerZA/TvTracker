@@ -1,0 +1,35 @@
+@inject AnalyticsClient Analytics
+
+@* The show page's link to its essential cut: only for long, well-rated shows where the cut saves something. *@
+@if (cut is { Available: true } && cut.Full.Minutes > cut.Cut.Minutes)
+{
+    <p class="cut-teaser small">
+        <a href="shows/@ShowId/essential-cut"><strong>Essential cut</strong></a><span>: @Format.Hours(cut.Cut.Minutes) instead of @Format.Hours(cut.Full.Minutes), </span>
+        <span class="muted">@cut.Cut.Episodes.ToString("N0") of @cut.Full.Episodes.ToString("N0") episodes</span>
+    </p>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private EssentialCut? cut;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        cut = null;
+        try
+        {
+            cut = await Analytics.GetEssentialCutAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Optional on the show page; the rest of it works without.
+        }
+    }
+}
