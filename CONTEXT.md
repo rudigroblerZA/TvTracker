@@ -116,7 +116,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
   - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
 - **Universes** (`Catalog.API/Services/Universes.cs`): shows linked by the same actor playing a same-named
-  character, grouped into connected components.
+  character, or by a franchise name (`SameFranchise`), grouped into connected components.
+  - **Franchise names:** a colon stem ("NCIS: Sydney" ~ "NCIS"), or the same first word plus two or more shared
+    makers ("Chicago Fire" ~ "Chicago Med"). One maker isn't enough ("Tyler Perry's …" shows share a producer).
+    Same-title pairs are left to the cast (revivals), since two unrelated shows can share a title.
+  - **Why names as well:** crossovers made of guest appearances (One Chicago) never reach TVmaze's main casts.
   - **Why names:** TVmaze's character ids are per show; not one of 6,514 credits shared an id across shows. So
     `CharacterExternalIds` can't find crossovers, and Analytics' `SharedCast.SameCharacter` (which compares ids) is
     effectively never true.
@@ -124,7 +128,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     dropped. A match is equal word sets, or one set inside the other with at least two words.
   - **Noise guards:** scripted/animation shows only, no self roles, and a link needs two characters or one
     full-name character. Checked by hand on the 595-show catalog: 30 universes, no false links.
-  - **Naming:** a universe is named and addressed by its hub, the show sharing the most characters.
+  - **Naming:** a universe is addressed by its hub, chosen by these rules in order:
+    1. the root title others extend ("NCIS");
+    2. the show sharing the most characters;
+    3. the show with the most links;
+    4. the earliest.
+
+    It's named after the hub, unless every show shares one name before a colon and none is just that ("Star Wars").
+  - **Timeline:** `UniverseShowDto.Seasons` carries each season's first and last episode dates and aired counts.
+    - **Overlap:** the "on air together" line counts a running show as on air until today, even between seasons.
+  - **Watch order** (`GetWatchOrderAsync`): dated episodes of the universe's shows (season 0 left out, as Tracking
+    does), ordered by air time, then show premiere order.
+    - **Crossover events:** two shows' episodes count as one event when their titles match without part markers
+      ("Infection, Part I" / "Infection, Part II"), within 7 days, ignoring placeholders such as "TBA".
+    - **Why not same night:** same-night airing flagged 534 of One Chicago's 798 episodes, since the shows air back
+      to back weekly.
+    - **Progress:** the UI reads the user's progress from Tracking, one `/progress/{showId}` call per show.
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).

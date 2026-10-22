@@ -8,8 +8,10 @@ namespace Catalog.API.Services;
 /// <summary>A character the same actor plays in two shows.</summary>
 public sealed record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
-/// <summary>Two shows linked by the characters they share.</summary>
-public sealed record UniverseLink(Guid A, Guid B, IReadOnlyList<SharedCharacter> Characters);
+/// <summary>Two shows linked by the characters they share, by belonging to the same named franchise, or both.</summary>
+/// <param name="SameFranchise">Named as one franchise ("NCIS: Sydney" and "NCIS", or "Chicago Fire" and "Chicago Med"
+/// with the same makers); see <see cref="Universes.SameFranchise"/>.</param>
+public sealed record UniverseLink(Guid A, Guid B, IReadOnlyList<SharedCharacter> Characters, bool SameFranchise = false);
 
 /// <summary>Shows connected by shared characters (directly or through each other), and the links between them.</summary>
 public sealed record Universe(IReadOnlyList<Guid> Shows, IReadOnlyList<UniverseLink> Links);
@@ -18,7 +20,13 @@ public sealed record Universe(IReadOnlyList<Guid> Shows, IReadOnlyList<UniverseL
 public sealed record UniverseMap(IReadOnlyList<Universe> Universes, IReadOnlyDictionary<Guid, int> UniverseOfShow);
 
 /// <summary>
-/// Shared universes: spin-offs, sequels, revivals and crossovers, found from the cast. TVmaze gives each show its own
+/// Shared universes: spin-offs, sequels, revivals and crossovers, found from the cast and from franchise names.
+/// <para>
+/// Franchise names: "NCIS: Sydney" belongs with "NCIS", and "Chicago P.D." with "Chicago Fire" when they also share
+/// makers (see <see cref="SameFranchise"/>). This finds the franchises whose crossovers are guest appearances, which the
+/// cast (main cast only on TVmaze) can't show: One Chicago, NCIS, FBI.
+/// </para>
+/// TVmaze gives each show its own
 /// character ids, even for the same character in a spin-off, so a link is the same actor playing a character with
 /// the same name in two scripted or animated shows ("Matt Murdock / Daredevil" in Marvel's Daredevil and "Matt
 /// Murdock" in Daredevil: Born Again). Shows linked directly or through each other form a universe.
@@ -94,9 +102,33 @@ public sealed partial class Universes(IServiceScopeFactory scopeFactory, HybridC
             }
         }
 
-        var links = shared
+        var characterLinks = shared
             .Where(s => s.Value.Count >= 2 || s.Value.Any(c => Tokens(c.Character).Count >= 2))
-            .Select(s => new UniverseLink(s.Key.Item1, s.Key.Item2, s.Value))
+            .ToDictionary(s => s.Key, s => s.Value);
+
+        // Franchise names, over every show (reality franchises count too: "Love Island: USA").
+        var shows = await db.Shows.AsNoTracking().Select(s => new { s.Id, s.Title }).ToListAsync(ct);
+        var makers = (await db.Creatives.AsNoTracking().Select(c => new { c.ShowId, c.PersonId }).ToListAsync(ct))
+            .ToLookup(c => c.ShowId, c => c.PersonId);
+        var franchise = new HashSet<(Guid, Guid)>();
+        foreach (var group in shows.GroupBy(s => FranchiseWord(s.Title)).Where(g => g.Key is not null && g.Count() > 1))
+        {
+            var members = group.ToList();
+            for (var i = 0; i < members.Count; i++)
+            {
+                for (var j = i + 1; j < members.Count; j++)
+                {
+                    var (a, b) = (members[i], members[j]);
+                    if (SameFranchise(a.Title, b.Title, makers[a.Id].Intersect(makers[b.Id]).Count()))
+                    {
+                        franchise.Add(a.Id.CompareTo(b.Id) < 0 ? (a.Id, b.Id) : (b.Id, a.Id));
+                    }
+                }
+            }
+        }
+
+        var links = characterLinks.Keys.Union(franchise)
+            .Select(key => new UniverseLink(key.Item1, key.Item2, characterLinks.GetValueOrDefault(key) ?? [], franchise.Contains(key)))
             .ToList();
 
         // Connected components: shows linked directly or through each other.
@@ -124,6 +156,43 @@ public sealed partial class Universes(IServiceScopeFactory scopeFactory, HybridC
             }
         }
         return new UniverseMap(universes, index);
+    }
+
+    /// <summary>A show title's first word, ignoring a leading article: franchise names start alike.</summary>
+    private static string? FranchiseWord(string title) =>
+        Words().Matches(title.ToLowerInvariant()).Select(m => m.Value).FirstOrDefault(w => w is not ("the" or "a" or "an"));
+
+    /// <summary>
+    /// Whether two titles name one franchise, given how many makers (creators, developers, executive producers) the
+    /// shows share:
+    /// <list type="bullet">
+    /// <item>The same name before a colon, or one is the other's name before a colon: "NCIS: Sydney" with "NCIS" or
+    /// "NCIS: Origins"; "Star Trek: Picard" with "Star Trek: Lower Decks". Spin-offs are named this way.</item>
+    /// <item>The same first word and two or more makers in common: "Chicago Fire", "Chicago P.D." and "Chicago Med"
+    /// (seven in common); "Stargate SG·1" and "Stargate Atlantis". One shared maker isn't enough: a producer's brand
+    /// ("Tyler Perry's ...") isn't a franchise, and "Chicago Hope" shares no makers with "Chicago Fire".</item>
+    /// </list>
+    /// Checked on the 625-show catalog: every pair found was a real franchise.
+    /// </summary>
+    internal static bool SameFranchise(string a, string b, int sharedMakers)
+    {
+        var (titleA, titleB) = (a.Trim(), b.Trim());
+        if (string.Equals(titleA, titleB, StringComparison.OrdinalIgnoreCase))
+        {
+            // Revivals with the same title are found from the cast; two unrelated shows can share a title.
+            return false;
+        }
+
+        static string? Stem(string title) => title.IndexOf(':') is > 0 and var colon ? title[..colon].Trim() : null;
+        var (stemA, stemB) = (Stem(titleA), Stem(titleB));
+        if (stemA is not null && (string.Equals(stemA, stemB, StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(stemA, titleB, StringComparison.OrdinalIgnoreCase))
+            || stemB is not null && string.Equals(stemB, titleA, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return sharedMakers >= 2 && FranchiseWord(titleA) == FranchiseWord(titleB);
     }
 
     private static bool IsSelfRole(string character, string actor) =>

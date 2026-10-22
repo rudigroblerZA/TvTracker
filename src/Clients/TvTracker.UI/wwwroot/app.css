@@ -335,6 +335,8 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .universe-key.continuation, .universe-arc.continuation { background: var(--accent); stroke: var(--accent); }
 .universe-key.crossover, .universe-arc.crossover { background: var(--muted); stroke: var(--muted); }
 .universe-key.revival, .universe-arc.revival { background: var(--star); stroke: var(--star); }
+.universe-key.franchise, .universe-arc.franchise { background: #8b5cf6; stroke: #8b5cf6; }
+.universe-arc.franchise { stroke-dasharray: 5 4; }
 /* Rows down the page, oldest first; arcs in the gutter on the left join shows that share characters. */
 .universe-map { position: relative; padding-left: var(--gutter); margin: 12px 0 20px; }
 .universe-arcs { position: absolute; left: 0; top: 0; overflow: visible; }
@@ -356,3 +358,47 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .nowrap { white-space: nowrap; }
 .universe-posters { display: flex; gap: 6px; margin-bottom: 6px; }
 .universe-posters .poster.small { width: 46px; }
+
+/* Universe timeline: a bar per show across the years, one block per season, with today marked. */
+.timeline { --label: 0px; margin: 12px 0 8px; }
+.timeline-axis { position: relative; height: 20px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.timeline-axis span { position: absolute; bottom: 2px; transform: translateX(-50%); font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timeline-axis span.first { transform: none; }
+.timeline-axis span.first::after { left: 0; }
+.timeline-axis span::after { content: ""; position: absolute; left: 50%; bottom: -4px; height: 4px; border-left: 1px solid var(--border); }
+.timeline-rows { position: relative; }
+.timeline-today { position: absolute; top: 0; bottom: 0; border-left: 2px dashed var(--danger); opacity: 0.6; z-index: 1; pointer-events: none; }
+.timeline-row { padding: 6px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.timeline-label { margin-bottom: 4px; }
+.timeline-gap { color: var(--accent); }
+.timeline-track { position: relative; height: 16px; background: color-mix(in srgb, var(--border) 35%, transparent); border-radius: 4px; }
+.timeline-season { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; box-shadow: inset -1px 0 0 var(--bg); }
+.timeline-season.scheduled { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, transparent) 0 3px, transparent 3px 6px); border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.timeline-season:hover { filter: brightness(1.15); }
+.timeline-ongoing { position: absolute; top: 3px; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--accent); margin-left: 3px; }
+.timeline-key { display: inline-block; width: 18px; height: 10px; border-radius: 2px; background: var(--accent); margin-left: 6px; vertical-align: middle; }
+.timeline-key:first-child { margin-left: 0; }
+.timeline-key.scheduled { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, transparent) 0 3px, transparent 3px 6px); border: 1px solid var(--accent); }
+.timeline-key.today { width: 0; height: 12px; background: none; border-left: 2px dashed var(--danger); border-radius: 0; }
+
+/* Universe watch order: every episode across the shows in air order, coloured by show, grouped by year. */
+.watch-order-shows { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 14px; }
+.watch-order-show { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.watch-order-show.off { color: var(--muted); text-decoration: line-through; }
+.watch-order-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.watch-order-next { display: flex; flex-direction: column; gap: 10px; }
+.watch-order-next-up { display: flex; flex-direction: column; gap: 4px; }
+.watch-order-next-up > span:last-child { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.watch-order-year { border-bottom: 1px solid var(--border); scroll-margin-top: 80px; }
+.watch-order-year-head { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 10px 2px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.watch-order-chevron { margin-left: auto; color: var(--muted); }
+.watch-order-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.watch-order-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-left: 4px solid var(--c); margin-bottom: 2px; border-radius: 0 6px 6px 0; }
+.watch-order-row:nth-child(odd) { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.watch-order-row.watched { opacity: 0.55; }
+.watch-order-row.upcoming .watch-order-body { color: var(--muted); }
+.watch-order-row.crossover { background: color-mix(in srgb, var(--star) 12%, transparent); }
+.watch-order-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.watch-order-show-name { font-size: 0.78rem; font-weight: 600; color: var(--c); margin-right: 6px; }
+.watch-order-upto { white-space: nowrap; color: var(--muted); }
+.watch-order-row:hover .watch-order-upto, .watch-order-upto:focus-visible { color: var(--accent); }
