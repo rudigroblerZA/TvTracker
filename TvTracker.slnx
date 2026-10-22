@@ -6,6 +6,7 @@
     <File Path="README.md" />
     <File Path="CLAUDE.md" />
     <File Path="CONTEXT.md" />
+    <File Path="FEATURES.md" />
   </Folder>
   <Folder Name="/Aspire/">
     <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />

@@ -7,6 +7,9 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
+What sets it apart (universes and their timelines, the essential cut, blend, search by meaning, computed show tags)
+is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
+
 ## Prerequisites
 
 - .NET 10 SDK
@@ -148,6 +151,31 @@ franchises. The 625-show dev catalog has 35, all real:
 
 **API:** `GET /api/v1/universes` and `GET /api/v1/shows/{id}/universe` (Catalog.API, public). The second includes
 each show's season dates for the timeline. The universe map is cached for 30 minutes.
+
+**Tonight's plan** (`/tonight`, linked from Home and Up Next; signed in) fills an evening from the shows you're
+watching and your watchlist.
+- **You choose:** the time (30 minutes to 3 hours, or any number), a mood (a chip such as "Light & funny" or
+  "Mind-bending", or your own words), and Mix it up (up to three shows) or One show.
+- **You get:** which shows, and how many of each one's next episodes, landing close to the time. Each pick says
+  why ("Fits “Light & funny”", "You're in the middle of it", "On your watchlist").
+  - Example: for 2 hours of "Light & funny", it gave two Ted Lasso episodes and two of The Patrick Star Show,
+    exactly 2 hours.
+  - **Swap** drops a show and plans again.
+  - **Start watching** opens the first episode.
+  - **I watched all of this** marks the plan watched.
+  - The address holds the settings (`/tonight?minutes=90&mood=…&one=true`).
+- **How the mood is matched:** with the same vectors as search by meaning. If the embedding model is down, it
+  plans from what you're watching alone and says so.
+- **How it chooses:** see `TonightPlanner`.
+  - **Score:** each show's score mixes its mood fit with continuity. A show watched in the last two weeks beats one
+    left for months, and both beat starting something new.
+  - **Choice:** a small knapsack over each show's next episodes, in order. It may run over by a few minutes (an
+    episode rarely fits exactly), never more.
+  - **Mixes:** in a mix, no show takes more than three-quarters of the evening, unless that would leave it under
+    three-quarters full.
+- **API:** `GET /api/v1/tonight/queue` (Tracking.API, signed in) gives the queue, with runtimes and the show's
+  typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
+  shows against a mood.
 
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and

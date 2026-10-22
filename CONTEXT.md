@@ -183,6 +183,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
 
+## Tonight's plan
+
+- **Split across services:**
+  - Tracking gives the queue (`TonightApi`: next unwatched aired episodes of Watching/PlanToWatch shows).
+  - Catalog scores the mood (`MoodApi` → `SemanticSearch.DistancesAsync`, rate-limited like search).
+  - The UI plans (`TonightPlanner`), so neither service needs the other's data.
+- **Mood fits are relative:** a 0-1 fit within the user's queue (min-max of cosine distance), because absolute
+  distances shift with the model and how the mood is worded. A show not yet embedded gets 0.5.
+- **Planner:** a knapsack over each show's episode prefixes.
+  - **Value:** minutes × (score² + 0.15), less 5 per extra show. The fill term stops a plan from leaving half the
+    evening empty rather than use a weaker fit.
+  - **Mix cap:** in a mix each show is capped at 75% of the budget, so a mix really mixes. The cap is dropped if the
+    plan would come out under 75% full.
+  - **Overrun:** allowed by max(5 min, budget/12).
+- **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
+  previous plan, and the browser showed the old poster until the new one loaded.
+
 ## UI
 
 - **Shared pages:** every page and component is in `TvTracker.UI`. WebApp and MobileApp supply `HostServices`
