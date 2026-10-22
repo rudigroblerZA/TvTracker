@@ -51,13 +51,29 @@ Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The mo
 Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
 to change it). Until it loads, search matches titles only.
 
-The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`, which the AppHost passes to Catalog.API
-and the sync worker so both use the same one. Two are built in:
+The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`. The AppHost passes its whole
+`Embeddings` section to Catalog.API and the sync worker, so both use the same model. Three are built in:
 
-| Model | Download | Notes |
+| Model | Runs | Notes |
 | --- | --- | --- |
-| `all-MiniLM-L6-v2` (default) | ~90 MB | Fast; matches below a cosine distance of 0.65 |
-| `bge-small-en-v1.5` | ~130 MB | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
+| `all-MiniLM-L6-v2` (default) | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
+| `bge-small-en-v1.5` | In-process (ONNX), ~130 MB download | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
+| `dmr/nomic-embed-text-v1.5` | Docker Model Runner | ~10× slower per search and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
+
+**Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API.
+- **Setup:** Docker Desktop: enable Model Runner with host-side TCP support (port 12434). Docker Engine: install
+  the `docker-model-plugin`. Then `docker model pull ai/nomic-embed-text-v1.5`.
+- **Endpoint:** the services call `http://localhost:12434/engines/v1/` by default.
+  Change it with `Embeddings:Models:{id}:Endpoint`.
+- **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
+- **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
+  embeds once it's back. Each service logs one warning per outage.
+- **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
+  `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
+  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as nomic and EmbeddingGemma):
+    its longer vectors are cut to the column's 384 dimensions.
+  - A model that makes 384 dimensions natively needs no truncation. A longer one without `Truncate` is refused,
+    since cutting other models loses most of their meaning.
 
 On 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
 first for 27 and in the top 3 for 35; bge-small did so for 24 and 31, and found slightly more of the expected shows in

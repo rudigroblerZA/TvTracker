@@ -10,17 +10,48 @@ public enum EmbeddingPooling
     Cls
 }
 
+/// <summary>Where a model runs.</summary>
+public enum EmbeddingSource
+{
+    /// <summary>In-process with ONNX Runtime; the files are downloaded from <see cref="EmbeddingModel.BaseUrl"/>.</summary>
+    Onnx,
+
+    /// <summary>
+    /// Served over the OpenAI embeddings API (<c>POST {Endpoint}embeddings</c>): Docker Model Runner, or another
+    /// server with the same API (llama.cpp, Ollama, vLLM).
+    /// </summary>
+    Server
+}
+
 /// <summary>
-/// One embedding model: where its files come from, how to run it, and how close a match must be. The model must be a
-/// BERT-style ONNX export with a WordPiece <c>vocab.txt</c>. Built-in models are in <see cref="EmbeddingModels"/>;
-/// configuration can override their settings or add others under <c>Embeddings:Models:{id}</c>.
+/// One embedding model: where it runs, how to call it, and how close a match must be. An <see cref="EmbeddingSource.Onnx"/>
+/// model must be a BERT-style ONNX export with a WordPiece <c>vocab.txt</c>; a <see cref="EmbeddingSource.Server"/> model
+/// is any model the server has. Built-in models are in <see cref="EmbeddingModels"/>; configuration can override
+/// their settings or add others under <c>Embeddings:Models:{id}</c>.
 /// </summary>
 public sealed class EmbeddingModel
 {
     /// <summary>Stored with each vector, so changing the model re-embeds the catalog. Set from the configuration key.</summary>
     public string Id { get; set; } = "";
 
-    /// <summary>Where the files are downloaded from; pin it to a commit so the checksums hold.</summary>
+    public EmbeddingSource Source { get; set; } = EmbeddingSource.Onnx;
+
+    /// <summary>
+    /// The server's OpenAI-compatible base address, for <see cref="EmbeddingSource.Server"/>. Docker Model Runner's
+    /// from the host (Docker Desktop with host-side TCP enabled, or Docker Engine's model runner) by default.
+    /// </summary>
+    public string Endpoint { get; set; } = EmbeddingModels.DockerModelRunnerEndpoint;
+
+    /// <summary>The model's name on the server, e.g. <c>ai/nomic-embed-text-v1.5</c>.</summary>
+    public string ServedModel { get; set; } = "";
+
+    /// <summary>
+    /// Keep the first <see cref="Dimensions"/> of a longer vector and re-normalize it. Only for models trained for it
+    /// (Matryoshka models such as nomic-embed-text-v1.5); for others the shortened vectors lose most of their meaning.
+    /// </summary>
+    public bool Truncate { get; set; }
+
+    /// <summary>Where the ONNX files are downloaded from; pin it to a commit so the checksums hold.</summary>
     public string BaseUrl { get; set; } = "";
 
     public string OnnxPath { get; set; } = "onnx/model.onnx";
@@ -34,9 +65,13 @@ public sealed class EmbeddingModel
     /// <summary>Length of the vectors; must match the <c>show_embeddings</c> column.</summary>
     public int Dimensions { get; set; }
 
-    /// <summary>Word pieces the model was trained on; longer text is cut off.</summary>
+    /// <summary>
+    /// Tokens the model was trained on; longer text is cut off. For a server model, text is cut at about four
+    /// characters a token before it's sent, since some servers refuse input longer than their batch.
+    /// </summary>
     public int MaxTokens { get; set; } = 256;
 
+    /// <summary>For ONNX models; a server pools by itself.</summary>
     public EmbeddingPooling Pooling { get; set; } = EmbeddingPooling.Mean;
 
     /// <summary>Put in front of search terms (some models are trained to tell queries from documents this way).</summary>
@@ -58,6 +93,10 @@ public static class EmbeddingModels
 {
     public const string MiniLm = "all-MiniLM-L6-v2";
     public const string BgeSmall = "bge-small-en-v1.5";
+    public const string DockerNomic = "dmr/nomic-embed-text-v1.5";
+
+    /// <summary>Docker Model Runner's OpenAI-compatible API, as seen from the host.</summary>
+    public const string DockerModelRunnerEndpoint = "http://localhost:12434/engines/v1/";
 
     /// <summary>The models that work without configuring files; <see cref="EmbeddingOptions.Model"/> picks one.</summary>
     public static IReadOnlyDictionary<string, EmbeddingModel> BuiltIn { get; } = new Dictionary<string, EmbeddingModel>
@@ -90,6 +129,24 @@ public static class EmbeddingModels
             Pooling = EmbeddingPooling.Cls,
             QueryPrefix = "Represent this sentence for searching relevant passages: ",
             MaxDistance = 0.45
+        },
+        // Served by Docker Model Runner (docker model pull ai/nomic-embed-text-v1.5; ~270 MB). 768 dimensions, trained
+        // to be shortened, so it's cut to the column's 384. Trained with these task prefixes. Docker Model Runner's
+        // llama.cpp refuses input longer than its 512-token batch, so show text is cut to that. On the 42 test
+        // searches over 595 shows it ranked below the ONNX models (MRR 0.63, 0.67 uncut) and is ~10x slower per
+        // search; related shows land around 0.25-0.38, unrelated searches from about 0.38 (title words such as
+        // "list" or "location" pull them close).
+        [DockerNomic] = new()
+        {
+            Id = DockerNomic,
+            Source = EmbeddingSource.Server,
+            ServedModel = "ai/nomic-embed-text-v1.5",
+            Dimensions = 384,
+            Truncate = true,
+            MaxTokens = 512,
+            QueryPrefix = "search_query: ",
+            DocumentPrefix = "search_document: ",
+            MaxDistance = 0.38
         }
     };
 }

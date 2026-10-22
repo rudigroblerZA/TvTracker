@@ -7,7 +7,7 @@ using Microsoft.ML.Tokenizers;
 
 namespace Catalog.Embeddings;
 
-/// <summary>Settings for <see cref="LocalEmbeddingGenerator"/>; bound from the "Embeddings" configuration section.</summary>
+/// <summary>Embedding settings; bound from the "Embeddings" configuration section.</summary>
 public sealed class EmbeddingOptions
 {
     /// <summary>
@@ -33,19 +33,27 @@ public static class EmbeddingInput
 
     /// <summary>Options that mark the input as search terms. Without them, input is embedded as documents.</summary>
     public static EmbeddingGenerationOptions QueryOptions => new() { AdditionalProperties = new() { [Key] = Query } };
+
+    /// <summary>The model's prefix for this input: <see cref="EmbeddingModel.QueryPrefix"/> for search terms, else the document one.</summary>
+    internal static string PrefixFor(EmbeddingModel model, EmbeddingGenerationOptions? options) =>
+        options?.AdditionalProperties?.TryGetValue(Key, out var input) == true && Equals(input, Query)
+            ? model.QueryPrefix
+            : model.DocumentPrefix;
 }
 
-/// <summary>The model isn't loaded yet (still downloading, or the download failed). Callers carry on without vectors.</summary>
+/// <summary>
+/// The model isn't available: still downloading or failed to load, or its server is down. Callers carry on without vectors.
+/// </summary>
 public sealed class EmbeddingsUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
-/// Sentence embeddings from the configured <see cref="EmbeddingModel"/> (all-MiniLM-L6-v2 by default), run in-process
+/// Sentence embeddings from an <see cref="EmbeddingSource.Onnx"/> <see cref="EmbeddingModel"/> (all-MiniLM-L6-v2 by default), run in-process
 /// with ONNX Runtime and normalized, so cosine distance compares them. The model is downloaded and checksummed on
 /// first use; until then, and for a few minutes after a failed download, calls throw <see cref="EmbeddingsUnavailableException"/>.
 /// </summary>
 public sealed class LocalEmbeddingGenerator(
     EmbeddingModel spec, IOptions<EmbeddingOptions> options, TimeProvider time, ILogger<LocalEmbeddingGenerator> logger)
-    : IEmbeddingGenerator<string, Embedding<float>>
+    : IEmbeddingGenerator<string, Embedding<float>>, IWarmUp
 {
     private static readonly TimeSpan RetryAfterFailure = TimeSpan.FromMinutes(5);
 
@@ -72,9 +80,7 @@ public sealed class LocalEmbeddingGenerator(
         IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
     {
         var model = await GetModelAsync(cancellationToken);
-        var prefix = options?.AdditionalProperties?.TryGetValue(EmbeddingInput.Key, out var input) == true && Equals(input, EmbeddingInput.Query)
-            ? spec.QueryPrefix
-            : spec.DocumentPrefix;
+        var prefix = EmbeddingInput.PrefixFor(spec, options);
         var texts = values.Select(v => prefix + v).ToList();
         var result = new GeneratedEmbeddings<Embedding<float>>(texts.Count);
         if (texts.Count > 0)

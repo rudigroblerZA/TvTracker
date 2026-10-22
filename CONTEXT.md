@@ -77,11 +77,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
     cutoff). Built in: all-MiniLM-L6-v2 (default; mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
-    an instruction prefix on search terms, cutoff 0.45). The AppHost sets it on Catalog.API and the sync worker
+    an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
+    (task prefixes, truncated from 768, cutoff 0.38). The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
     595 shows (42 searches): MiniLM ranks better (MRR 0.74 against 0.68), so it stays the default.
+  - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
+    `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
+    - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
+      retries to every search. After a failure, calls fail fast for 30 s and one warning is logged per outage.
+    - Docker Hub's embedding models are 768+ dimensions. `Truncate` cuts Matryoshka models to 384 and
+      re-normalises; the column stays as it is.
+    - Text is cut at about 4 characters a token (`MaxTokens`), since Model Runner's llama.cpp refuses input longer
+      than its 512-token batch.
   - **Dimensions:** `ShowEmbedding.Dimensions` (384) is the column size. Services refuse to start with a model of
     another size. Changing it needs a migration of the column and its HNSW index.
   - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
