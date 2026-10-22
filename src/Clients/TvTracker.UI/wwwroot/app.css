@@ -380,3 +380,25 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .timeline-key:first-child { margin-left: 0; }
 .timeline-key.scheduled { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, transparent) 0 3px, transparent 3px 6px); border: 1px solid var(--accent); }
 .timeline-key.today { width: 0; height: 12px; background: none; border-left: 2px dashed var(--danger); border-radius: 0; }
+
+/* Universe watch order: every episode across the shows in air order, coloured by show, grouped by year. */
+.watch-order-shows { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 14px; }
+.watch-order-show { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.watch-order-show.off { color: var(--muted); text-decoration: line-through; }
+.watch-order-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.watch-order-next { display: flex; flex-direction: column; gap: 10px; }
+.watch-order-next-up { display: flex; flex-direction: column; gap: 4px; }
+.watch-order-next-up > span:last-child { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.watch-order-year { border-bottom: 1px solid var(--border); scroll-margin-top: 80px; }
+.watch-order-year-head { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 10px 2px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.watch-order-chevron { margin-left: auto; color: var(--muted); }
+.watch-order-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.watch-order-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-left: 4px solid var(--c); margin-bottom: 2px; border-radius: 0 6px 6px 0; }
+.watch-order-row:nth-child(odd) { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.watch-order-row.watched { opacity: 0.55; }
+.watch-order-row.upcoming .watch-order-body { color: var(--muted); }
+.watch-order-row.crossover { background: color-mix(in srgb, var(--star) 12%, transparent); }
+.watch-order-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.watch-order-show-name { font-size: 0.78rem; font-weight: 600; color: var(--c); margin-right: 6px; }
+.watch-order-upto { white-space: nowrap; color: var(--muted); }
+.watch-order-row:hover .watch-order-upto, .watch-order-upto:focus-visible { color: var(--accent); }

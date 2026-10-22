@@ -32,6 +32,16 @@ public record UniverseLinkDto(Guid A, Guid B, string Kind, IReadOnlyList<SharedC
 
 public record SharedCharacterDto(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
+/// <param name="Shows">The universe's shows, oldest first; episodes refer to them by id.</param>
+/// <param name="Episodes">Every dated episode of those shows (specials aside), in air order.</param>
+/// <param name="Undated">Episodes left out because they have no air date yet.</param>
+public record WatchOrderDto(Guid Id, string Name, IReadOnlyList<ShowSummaryDto> Shows, IReadOnlyList<WatchOrderEpisodeDto> Episodes, int Undated);
+
+/// <param name="Crossover">The crossover event this episode is part of ("Infection"), when another show of the universe
+/// aired an episode with the same title within a week ("Infection, Part I" on Chicago Fire, "Part II" on Chicago Med).</param>
+public record WatchOrderEpisodeDto(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset AirsAtUtc,
+    int? RuntimeMinutes, string? Crossover = null);
+
 /// <summary>Shared universes found from the cast and franchise names; public, like the rest of the catalog (see <see cref="Universes"/>).</summary>
 public static class UniverseApi
 {
@@ -39,6 +49,7 @@ public static class UniverseApi
     {
         api.MapGet("/universes", GetUniversesAsync);
         api.MapGet("/shows/{id:guid}/universe", GetUniverseAsync);
+        api.MapGet("/shows/{id:guid}/universe/watch-order", GetWatchOrderAsync);
     }
 
     private static async Task<Ok<List<UniverseSummaryDto>>> GetUniversesAsync(
@@ -126,6 +137,87 @@ public static class UniverseApi
                 links.Where(l => l.A == s.Id || l.B == s.Id).SelectMany(l => l.Characters).Select(c => c.PersonId).Distinct().Count(),
                 seasons[s.Id].OrderBy(x => x.From).ToList())).ToList(),
             dtoLinks));
+    }
+
+    // A crossover event's parts air within a week, usually the same night.
+    private static readonly TimeSpan CrossoverWindow = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// A universe's episodes in the order they aired, across all its shows, so crossovers land in sequence: One
+    /// Chicago's "Infection" runs Chicago Fire, then Med, then P.D. Crossover events are named where the shows' episode
+    /// titles say so (see <see cref="CrossoverName"/>); airing the same night isn't enough, since One Chicago airs back
+    /// to back every week.
+    /// </summary>
+    private static async Task<Results<Ok<WatchOrderDto>, NotFound>> GetWatchOrderAsync(
+        Guid id, Universes universes, CatalogContext db, CancellationToken ct)
+    {
+        var map = await universes.GetAsync(ct);
+        if (!map.UniverseOfShow.TryGetValue(id, out var index))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var universe = map.Universes[index];
+        var shows = await db.Shows.AsNoTracking().Where(s => universe.Shows.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+        var members = shows.Values.OrderBy(s => s.FirstAirDate ?? DateOnly.MaxValue).ThenByDescending(s => s.Popularity).ToList();
+        var order = members.Select((s, i) => (s.Id, i)).ToDictionary(x => x.Id, x => x.i);
+        var ids = members.Select(s => s.Id).ToList();
+
+        var all = await db.Episodes.AsNoTracking()
+            .Where(e => ids.Contains(e.ShowId) && e.SeasonNumber > 0)
+            .Select(e => new { e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes })
+            .ToListAsync(ct);
+        var dated = all
+            .Where(e => e.AirsAtUtc is not null)
+            .OrderBy(e => e.AirsAtUtc).ThenBy(e => order[e.ShowId]).ThenBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
+            .ToList();
+
+        var crossover = new string?[dated.Count];
+        for (var i = 0; i < dated.Count; i++)
+        {
+            if (CrossoverName(dated[i].Title) is not { } name)
+            {
+                continue;
+            }
+            for (var j = i + 1; j < dated.Count && dated[j].AirsAtUtc - dated[i].AirsAtUtc <= CrossoverWindow; j++)
+            {
+                if (dated[j].ShowId != dated[i].ShowId && string.Equals(CrossoverName(dated[j].Title), name, StringComparison.OrdinalIgnoreCase))
+                {
+                    crossover[i] ??= TrimPart(dated[i].Title);
+                    crossover[j] = crossover[i];
+                }
+            }
+        }
+
+        var hub = Hub(members, universe.Links);
+        return TypedResults.Ok(new WatchOrderDto(
+            hub.Id,
+            Name(members, hub),
+            members.Select(s => s.ToSummary()).ToList(),
+            dated.Select((e, i) => new WatchOrderEpisodeDto(e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc!.Value,
+                e.RuntimeMinutes, crossover[i])).ToList(),
+            all.Count - dated.Count));
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex PartMarker = new(
+        @"[\s,:;-]*(\(\s*(part\s*)?(\d+|i{1,3}|iv)\s*\)|\bpart\s*(\d+|one|two|three|four|i{1,3}|iv)\b)\s*$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly HashSet<string> Placeholders = new(StringComparer.OrdinalIgnoreCase) { "tba", "tbd", "untitled", "pilot" };
+
+    /// <summary>The title without its part marker: "Infection" for "Infection, Part II" or "Sister City (Part I)".</summary>
+    private static string TrimPart(string title) => PartMarker.Replace(title, "").Trim();
+
+    /// <summary>
+    /// What two shows' episodes must share to be one crossover event: the title without its part marker, normalised.
+    /// Null for placeholder titles ("TBA", "Episode 5"), which every show uses.
+    /// </summary>
+    private static string? CrossoverName(string title)
+    {
+        var name = TrimPart(title);
+        return name.Length < 3 || Placeholders.Contains(name) || name.StartsWith("Episode ", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : string.Join(' ', System.Text.RegularExpressions.Regex.Matches(name.ToLowerInvariant(), @"[\p{L}\p{N}']+").Select(m => m.Value));
     }
 
     /// <summary>

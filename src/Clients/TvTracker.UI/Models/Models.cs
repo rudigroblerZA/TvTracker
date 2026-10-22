@@ -45,6 +45,13 @@ public record UniverseLink(Guid A, Guid B, string Kind, IReadOnlyList<SharedChar
 
 public record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
+/// <summary>A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).</summary>
+public record WatchOrder(Guid Id, string Name, IReadOnlyList<ShowSummary> Shows, IReadOnlyList<WatchOrderEpisode> Episodes, int Undated);
+
+/// <param name="Crossover">The crossover event it's part of ("Infection"), when the shows' titles say so.</param>
+public record WatchOrderEpisode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset AirsAtUtc,
+    int? RuntimeMinutes, string? Crossover);
+
 /// <summary>Shows between two others (see Catalog.API's BlendApi).</summary>
 public record Blend(ShowSummary A, ShowSummary B, int Lean, bool Indexed, IReadOnlyList<BlendMatch> Matches, bool Loose);
 

@@ -1,0 +1,288 @@
+@* A universe's episodes in air order across all its shows, so crossovers land in sequence, with the signed-in user's
+   place in it. Grouped by year; only open years are rendered, since a universe like NCIS has over a thousand episodes. *@
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (order is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <p class="muted small">
+        Every episode of these shows in the order it aired, so crossovers land in sequence. Untick a show to leave it out.
+    </p>
+
+    <div class="watch-order-shows" role="group" aria-label="Shows to include">
+        @for (var i = 0; i < order.Shows.Count; i++)
+        {
+            var show = order.Shows[i];
+            var included = !hidden.Contains(show.Id);
+            <label class="watch-order-show @(included ? null : "off")" style="--c: @Color(i)">
+                <input type="checkbox" checked="@included" @onchange="() => ToggleShow(show.Id)" />
+                <span class="watch-order-dot"></span>
+                @show.Title
+            </label>
+        }
+    </div>
+
+    @if (Session.IsSignedIn && watched is not null)
+    {
+        var aired = Visible.Where(e => e.AirsAtUtc <= Now).ToList();
+        var seen = aired.Count(e => watched.Contains(e.Id));
+        var next = aired.FirstOrDefault(e => !watched.Contains(e.Id));
+        <div class="panel watch-order-next">
+            <div>
+                <progress value="@seen" max="@Math.Max(1, aired.Count)"></progress>
+                <div class="small">
+                    <span>@seen of @aired.Count aired episodes watched · </span>
+                    <span class="muted">@Format.Hours(aired.Where(e => !watched.Contains(e.Id)).Sum(e => e.RuntimeMinutes ?? 0)) left</span>
+                </div>
+            </div>
+            @if (next is not null)
+            {
+                <div class="watch-order-next-up">
+                    <span class="muted small">Next up</span>
+                    <span>
+                        <span class="watch-order-dot" style="--c: @ColorOf(next.ShowId)"></span>
+                        <strong>@ShowTitle(next.ShowId)</strong>
+                        <a href="episodes/@next.Id">@Format.EpisodeCode(next.SeasonNumber, next.EpisodeNumber) · @next.Title</a>
+                    </span>
+                    <span>
+                        <button class="btn small" type="button" disabled="@busy" @onclick="() => MarkAsync([next])">Mark watched</button>
+                        <button class="link small" type="button" @onclick="() => Open(next.AirsAtUtc.Year, scroll: true)">Show in list</button>
+                    </span>
+                </div>
+            }
+            else if (aired.Count > 0)
+            {
+                <div class="small">You're caught up on all of it.</div>
+            }
+        </div>
+    }
+    else if (!Session.IsSignedIn)
+    {
+        <SignInPrompt Message="Sign in to keep your place and tick episodes off as you go." />
+    }
+
+    @if (Visible.Count == 0)
+    {
+        <p class="muted">No episodes with air dates for these shows.</p>
+    }
+
+    @foreach (var year in Visible.GroupBy(e => e.AirsAtUtc.Year))
+    {
+        var list = year.ToList();
+        var isOpen = open.Contains(year.Key);
+        var watchedInYear = watched is null ? 0 : list.Count(e => watched.Contains(e.Id));
+        <section class="watch-order-year" id="year-@year.Key">
+            <button type="button" class="watch-order-year-head" aria-expanded="@(isOpen ? "true" : "false")" @onclick="() => Toggle(year.Key)">
+                <span class="strong">@year.Key</span>
+                <span class="muted small">
+                    @list.Count episodes@(watched is null ? "" : $" · {watchedInYear} watched")@(list.Any(e => e.Crossover is not null) ? " · crossover" : "")
+                </span>
+                <span class="watch-order-chevron" aria-hidden="true">@(isOpen ? "▾" : "▸")</span>
+            </button>
+            @if (isOpen)
+            {
+                <ol class="watch-order-list">
+                    @foreach (var episode in list)
+                    {
+                        var isWatched = watched?.Contains(episode.Id) == true;
+                        var upcoming = episode.AirsAtUtc > Now;
+                        <li class="watch-order-row @(isWatched ? "watched" : null) @(upcoming ? "upcoming" : null) @(episode.Crossover is not null ? "crossover" : null)"
+                            style="--c: @ColorOf(episode.ShowId)">
+                            @if (watched is not null && !upcoming)
+                            {
+                                <input type="checkbox" checked="@isWatched" disabled="@busy" aria-label="Watched @ShowTitle(episode.ShowId) @Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)"
+                                       @onchange="() => ToggleWatchedAsync(episode)" />
+                            }
+                            <span class="watch-order-body">
+                                <span>
+                                    <span class="watch-order-show-name">@ShowTitle(episode.ShowId)</span>
+                                    <a href="episodes/@episode.Id">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) · @episode.Title</a>
+                                </span>
+                                <span class="muted small">
+                                    @(upcoming ? "Airs " : "")<LocalTime Utc="episode.AirsAtUtc" Format="d MMM yyyy" />@(episode.RuntimeMinutes is { } minutes ? $" · {Format.Duration(minutes)}" : "")
+                                    @if (episode.Crossover is { } crossover)
+                                    {
+                                        <span class="card-tag"> Crossover: @crossover</span>
+                                    }
+                                </span>
+                            </span>
+                            @if (watched is not null && !upcoming && !isWatched)
+                            {
+                                <button class="link small watch-order-upto" type="button" disabled="@busy" @onclick="() => MarkUpToAsync(episode)"
+                                        title="Mark everything before this, and this one, watched">Up to here</button>
+                            }
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    }
+
+    @if (order.Undated > 0)
+    {
+        <p class="muted small">@order.Undated episode@(order.Undated == 1 ? " has" : "s have") no air date yet and aren't listed.</p>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    // Shows left out, in the address (?hide=…), so a filtered order can be shared.
+    [Parameter] public string? Hide { get; set; }
+
+    private static readonly string[] Palette = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d", "#475569", "#b45309"];
+
+    private static DateTimeOffset Now => DateTimeOffset.UtcNow;
+
+    private WatchOrder? order;
+    private HashSet<Guid>? watched;
+    private HashSet<Guid> hidden = [];
+    private readonly HashSet<int> open = [];
+    private string? error;
+    private bool busy;
+    private Guid loadedFor;
+
+    private List<WatchOrderEpisode> Visible => order is null ? [] : order.Episodes.Where(e => !hidden.Contains(e.ShowId)).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        hidden = (Hide ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => Guid.TryParse(x, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).ToHashSet();
+        if (ShowId != loadedFor)
+        {
+            loadedFor = ShowId;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            order = await Catalog.GetWatchOrderAsync(ShowId);
+            await Session.EnsureLoadedAsync();
+            if (order is not null && Session.IsSignedIn)
+            {
+                var progress = await Task.WhenAll(order.Shows.Select(s => Tracking.GetProgressAsync(s.Id)));
+                watched = progress.Where(p => p is not null).SelectMany(p => p!.WatchedEpisodeIds).ToHashSet();
+            }
+            OpenWhereYouAre();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>Opens the year of the next episode to watch; or the first year, for someone who hasn't started.</summary>
+    private void OpenWhereYouAre()
+    {
+        var visible = Visible;
+        var next = visible.FirstOrDefault(e => e.AirsAtUtc <= Now && watched?.Contains(e.Id) != true) ?? visible.LastOrDefault();
+        if (watched is null || watched.Count == 0)
+        {
+            next = visible.FirstOrDefault();
+        }
+        if (next is not null)
+        {
+            open.Add(next.AirsAtUtc.Year);
+        }
+    }
+
+    private void Toggle(int year)
+    {
+        if (!open.Remove(year))
+        {
+            open.Add(year);
+        }
+    }
+
+    private async Task Open(int year, bool scroll)
+    {
+        open.Add(year);
+        await Task.Yield();
+        if (scroll)
+        {
+            Navigation.NavigateTo($"{Navigation.Uri.Split('#')[0]}#year-{year}");
+        }
+    }
+
+    private void ToggleShow(Guid id)
+    {
+        if (!hidden.Remove(id))
+        {
+            hidden.Add(id);
+        }
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("hide", hidden.Count == 0 ? null : string.Join(',', hidden)), replace: true);
+    }
+
+    private async Task ToggleWatchedAsync(WatchOrderEpisode episode)
+    {
+        if (watched!.Contains(episode.Id))
+        {
+            await RunAsync(async () =>
+            {
+                await Tracking.UnmarkWatchedAsync(episode.Id);
+                watched.Remove(episode.Id);
+            });
+        }
+        else
+        {
+            await MarkAsync([episode]);
+        }
+    }
+
+    /// <summary>Marks this episode and every unwatched aired one before it (in the shows shown) watched.</summary>
+    private Task MarkUpToAsync(WatchOrderEpisode episode)
+    {
+        var visible = Visible;
+        var index = visible.IndexOf(episode);
+        return MarkAsync(visible.Take(index + 1).Where(e => e.AirsAtUtc <= Now && !watched!.Contains(e.Id)).ToList());
+    }
+
+    private Task MarkAsync(IReadOnlyList<WatchOrderEpisode> episodes) => RunAsync(async () =>
+    {
+        // Tracking takes up to 1000 episodes a call.
+        foreach (var chunk in episodes.Chunk(1000))
+        {
+            await Tracking.MarkWatchedAsync(new MarkWatched(chunk.Select(e => e.Id).ToList(), null, null, null, null));
+            watched!.UnionWith(chunk.Select(e => e.Id));
+        }
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private string ShowTitle(Guid id) => order!.Shows.FirstOrDefault(s => s.Id == id)?.Title ?? "";
+
+    private static string Color(int index) => Palette[index % Palette.Length];
+
+    private string ColorOf(Guid showId) => Color(order!.Shows.ToList().FindIndex(s => s.Id == showId));
+}

@@ -77,6 +77,9 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<Universe?> GetUniverseAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<Universe>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe", ct, cacheForOffline: true);
 
+    public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
+
     /// <summary>Catalog shows whose title contains the term, for suggest-as-you-type pickers; no provider import.</summary>
     public Task<List<ShowSummary>?> SuggestAsync(string term, CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, $"api/v1/shows/suggest?q={Uri.EscapeDataString(term)}", ct);

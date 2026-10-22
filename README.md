@@ -114,6 +114,19 @@ franchises. The 625-show dev catalog has 35, all real:
     3 months after Chicago Fire", "Chicago Med · 3 years 1 month after").
   - **Overlap:** a line says how many ran at once ("All 3 on air together since November 2015"; for NCIS, "4 of
     these shows on air together since October 2026").
+- **Watch order:** every episode of the universe's shows in the order it aired, so crossovers land in sequence.
+  - **Show colours:** each row is coloured by show, with the list grouped by year.
+  - **Crossover events** are marked when the shows' episodes share a title within a week. Found so far: One Chicago's
+    "Infection" (Fire, then Med, then P.D.) and "In the Trenches", and NCIS's "Sister City" and "Pandora's Box"
+    with New Orleans. Airing the same night isn't enough, since One Chicago airs back to back every week.
+  - **Leaving shows out:** untick a show to drop it from the order; the address keeps the choice
+    (`?view=order&hide=…`).
+  - **Signed in:** the page tracks your place across all the shows. It shows how many aired episodes you've
+    watched and the hours left, and the next episode with a "Mark watched" button. Ticking an episode marks it
+    watched, and "Up to here" marks everything before it too.
+  - **Opens where you are:** the year of your next episode, or the first year if you haven't started. A universe
+    like NCIS has over 1,100 episodes, so only open years are drawn.
+  - **API:** `GET /api/v1/shows/{id}/universe/watch-order` (public).
 - **Links:** a map of the shows with arcs joining linked ones. Colour shows the kind of link: continues the story,
   crossover, revival, or same franchise (dashed). Thickness shows how many characters they share. Selecting a show
   lists its links, with the characters and actors.
