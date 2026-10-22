@@ -60,6 +60,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   and the show is retried hourly by `CreativesService`.
 - **Careers:** `/people/{id}/crewcredits?embed=show`, refreshed monthly. Fetched for creators and developers, and for
   anyone credited on at least 2 catalog shows.
+- **Cast credits:** `/people/{id}/castcredits?embed=show`, for every actor in a catalog show (`CastCreditsService`).
+  - **Pace:** 30 people a minute, leads of popular shows first, refreshed monthly; about 6,000 people take ~3.5 hours.
+  - **Format:** stored as `PersonCastCredit` and sent as `PeopleCastCreditsUpdatedIntegrationEvent` (each person's
+    list replaces the last); also sent with a replay.
+  - **Character names:** they come in each credit's `_links.character.name`, so no character embed is needed.
+  - **What's left out:** roles as themselves are skipped. TVmaze lists main casts only, so guest roles never appear.
 - **Isolation:** one bad show never stops a loop. The import, refresh and backfill loops catch per show and retry later.
 - **Search imports:** Catalog.API asks the worker (`POST /api/v1/imports/search`) to import TVmaze's top 5 matches.
   - Each term goes to TVmaze at most once every 6 h, and at most 30 new terms a minute overall.
@@ -194,6 +200,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     7.8 average.
   - **Tuning:** One Piece's canonical filler list was the check. Smoothing ratings over neighbouring episodes
     didn't help, so it's per episode.
+- **Reunion radar** (`ReunionsApi`): computed on request from the caller's own data, like "your taste".
+  - **What it is:** shows where two or more actors from one show the user loves are in the main cast again.
+  - **Loved:** 5 stars weighs 1 and 4 stars 0.8. Followed, or 3+ episodes watched, and unrated weighs 0.5. Rated 3 or
+    lower doesn't count.
+  - **Score:** love × Σ 1 / (1 + billing order / 3).
+  - **Not reunions:** a show where any of them plays the same character, using Universes' matching rules (copied, since
+    services don't share code). Those are spin-offs and revivals, not reunions. Also left out: shows the user already
+    knows, and self roles.
+  - **Why the provider's credits:** within the catalog alone (587 shows), only 73 shows had any reunion, and none of
+    the demo user's favourites did. Across TVmaze, NCIS finds Chicago Hope (three of its cast) and The Wire finds Oz,
+    Treme and Bosch.
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
 

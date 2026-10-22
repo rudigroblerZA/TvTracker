@@ -14,6 +14,7 @@ public static class FeatureFlags
     public const string Universes = "universes";
     public const string EssentialCut = "essential-cut";
     public const string TonightPlan = "tonight-plan";
+    public const string ReunionRadar = "reunion-radar";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

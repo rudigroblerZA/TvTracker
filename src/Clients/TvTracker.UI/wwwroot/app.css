@@ -423,3 +423,10 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .tonight-episodes { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
 @media (max-width: 640px) { .tonight-actions { margin-left: 0; } }
 .tonight-result.stale { opacity: 0.5; transition: opacity 0.15s; }
+
+/* Reunion radar */
+.reunions { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.reunion { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
+.reunion .poster.small { width: 64px; flex: none; }
+.reunion-body { flex: 1; min-width: 0; }
+.reunion-people { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 2px; }

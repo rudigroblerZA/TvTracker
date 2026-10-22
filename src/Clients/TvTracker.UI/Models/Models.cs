@@ -265,6 +265,18 @@ public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Epis
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
 
+public record ReunionRadar(int LovedShows, int ActorsPending, IReadOnlyList<Reunion> Reunions);
+
+/// <param name="IsNew">Premiering soon or in the last year.</param>
+public record Reunion(ReunionShow Show, ReunionSource From, IReadOnlyList<ReunionPerson> People, double Score, bool IsNew);
+
+/// <param name="ShowId">Set when the show is in the catalog; otherwise search finds (and imports) it.</param>
+public record ReunionShow(string ExternalId, Guid? ShowId, string Title, string? PosterUrl, ShowStatus Status, DateOnly? Premiered, double? Rating);
+
+public record ReunionSource(Guid ShowId, string Title, string? PosterUrl);
+
+public record ReunionPerson(Guid PersonId, string Name, string? CharacterThen, string? CharacterNow, bool Voice);
+
 public record Taste(RatingBias? Bias, IReadOnlyList<GenreTaste> Genres, IReadOnlyList<MonthWatch> Months, TasteProgress Progress);
 
 /// <param name="Label">"kinder", "harsher" or "in line".</param>

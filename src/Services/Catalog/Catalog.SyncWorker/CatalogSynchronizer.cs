@@ -263,6 +263,17 @@ public sealed class CatalogSynchronizer(
         await db.SaveChangesAsync(ct);
         await outbox.PublishAddedAsync(ct);
 
+        // Actors' roles across the provider (the reunion radar), in batches: there are thousands of rows.
+        var actors = await db.People.AsNoTracking().Where(p => p.CastCreditsRefreshedAtUtc != null).ToListAsync(ct);
+        foreach (var batch in actors.Chunk(PeopleCastCreditsUpdatedIntegrationEvent.MaxPeople))
+        {
+            var personIds = batch.Select(p => p.Id).ToList();
+            var credits = (await db.CastCredits.AsNoTracking().Where(c => personIds.Contains(c.PersonId)).ToListAsync(ct)).ToLookup(c => c.PersonId);
+            outbox.Add(CastCreditsEvent(batch.Select(p => (p, credits[p.Id]))));
+            await db.SaveChangesAsync(ct);
+            await outbox.PublishAddedAsync(ct);
+        }
+
         logger.LogInformation("Replayed {Count} shows", ids.Count);
         return ids.Count;
     }
@@ -690,6 +701,14 @@ public sealed class CatalogSynchronizer(
         .Chunk(PeopleCareersUpdatedIntegrationEvent.MaxPeople)
         .Select(chunk => new PeopleCareersUpdatedIntegrationEvent(chunk))
         .ToList();
+
+    /// <summary>People's roles across the provider; send at most <see cref="PeopleCastCreditsUpdatedIntegrationEvent.MaxPeople"/> at a time.</summary>
+    internal static PeopleCastCreditsUpdatedIntegrationEvent CastCreditsEvent(IEnumerable<(Person Person, IEnumerable<PersonCastCredit> Credits)> people) =>
+        new(people
+            .Select(p => new PersonCastCredits(p.Person.Id, p.Person.Name, p.Credits
+                .Select(c => new ActingRole(c.ShowExternalId, c.ShowId, c.Title, c.PosterUrl, c.Status, c.Premiered, c.Popularity, c.Rating, c.Character, c.Voice))
+                .ToList()))
+            .ToList());
 
     private static ShowUpdatedIntegrationEvent ShowUpdated(Show s)
     {

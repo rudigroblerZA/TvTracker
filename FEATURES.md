@@ -123,7 +123,20 @@ On the Stats page, computed from your own data only.
   "Light & funny"; The Expanse and Severance for "Mind-bending".
 - **Mix it up or one show:** swap a show out, start watching, or mark the whole plan watched afterwards.
 
-### 11. Smaller touches
+### 11. Reunion radar
+
+`/reunions`, linked from For you.
+
+- **What it finds:** shows where two or more actors from a show you love work together again. NCIS leads to Chicago
+  Hope (Mark Harmon, Rocky Carroll and Lauren Holly), The Wire to Oz, Treme and Bosch, and Ted Lasso to Drifters.
+- **Across TVmaze:** it looks at everything the actors have been in, not just the catalog. A show we don't have yet
+  is imported when you open it.
+- **Ranked by how much it should matter to you:** your 5-star shows over your 4-star ones, and leads over supporting
+  cast. "New and coming soon" comes first: that's the radar.
+- **Only real reunions:** a spin-off or revival (anyone playing the same character) belongs to Universes, so it isn't
+  counted. Neither are shows you already know.
+
+### 12. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
@@ -142,6 +155,5 @@ Ranked by value for the effort. Each builds on data and code that already exist.
 | 3 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
 | 4 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
 | 5 | **Previously on…** | Before you resume a show after a break, a spoiler-safe recap built from the summaries of the last few episodes you watched, and nothing after them. | TVmaze episode summaries, your progress | Medium |
-| 6 | **Reunion radar** | From shows you love, find shows where two or more of their actors work together again, ranked by how big the roles are. | Cast and people, your ratings | Medium |
-| 7 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
-| 8 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+| 6 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
+| 7 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |

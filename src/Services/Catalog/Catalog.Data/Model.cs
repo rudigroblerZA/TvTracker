@@ -175,6 +175,42 @@ public class Person
 
     /// <summary>When the career figures were last fetched from the provider.</summary>
     public DateTime? CareerRefreshedAtUtc { get; set; }
+
+    /// <summary>When <see cref="PersonCastCredit"/>s were last fetched for them (actors in catalog shows only).</summary>
+    public DateTime? CastCreditsRefreshedAtUtc { get; set; }
+}
+
+/// <summary>
+/// A show someone is in the main cast of, anywhere on the provider (most aren't in this catalog): what the reunion
+/// radar finds actors working together again in. Replaced whole when the person's credits are refreshed.
+/// </summary>
+public class PersonCastCredit
+{
+    public Guid PersonId { get; set; }
+
+    /// <summary>The provider's id for the show.</summary>
+    public required string ShowExternalId { get; set; }
+
+    /// <summary>The catalog's id, when the show was in the catalog at the last refresh.</summary>
+    public Guid? ShowId { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    public ShowStatus Status { get; set; }
+
+    public DateOnly? Premiered { get; set; }
+
+    /// <summary>The provider's popularity (TVmaze's weight, 0-100).</summary>
+    public double Popularity { get; set; }
+
+    public double? Rating { get; set; }
+
+    /// <summary>The character, or several joined with " / ".</summary>
+    public string? Character { get; set; }
+
+    public bool Voice { get; set; }
 }
 
 /// <summary>A person who made a show, with their roles on it.</summary>

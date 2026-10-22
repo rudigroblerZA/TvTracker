@@ -11,6 +11,7 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
     IIntegrationEventHandler<PeopleCareersUpdatedIntegrationEvent>,
+    IIntegrationEventHandler<PeopleCastCreditsUpdatedIntegrationEvent>,
     IIntegrationEventHandler<ShowStatusChangedIntegrationEvent>,
     IIntegrationEventHandler<EpisodesScheduledIntegrationEvent>,
     IIntegrationEventHandler<SeasonAnnouncedIntegrationEvent>
@@ -38,6 +39,40 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
                 career.Shows = person.Shows;
                 career.Created = person.Created;
                 career.ExecutiveProduced = person.ExecutiveProduced;
+            }
+        });
+
+    /// <summary>Each person's roles replace the ones held for them.</summary>
+    public Task HandleAsync(PeopleCastCreditsUpdatedIntegrationEvent e, CancellationToken ct) =>
+        HandleOnceAsync(e, ct, async () =>
+        {
+            var people = e.People.DistinctBy(p => p.PersonId).ToList();
+            var ids = people.Select(p => p.PersonId).ToList();
+            var existing = (await db.CastCredits.Where(c => ids.Contains(c.PersonId)).ToListAsync(ct)).ToLookup(c => c.PersonId);
+            foreach (var person in people)
+            {
+                var credits = existing[person.PersonId].ToDictionary(c => c.ShowExternalId);
+                foreach (var role in person.Roles.DistinctBy(r => r.ShowExternalId))
+                {
+                    if (!credits.Remove(role.ShowExternalId, out var credit))
+                    {
+                        credit = new PersonCastCreditCopy { PersonId = person.PersonId, ShowExternalId = role.ShowExternalId, Title = role.Title };
+                        db.CastCredits.Add(credit);
+                    }
+
+                    credit.ShowId = role.ShowId;
+                    credit.Title = role.Title;
+                    credit.PosterUrl = role.PosterUrl;
+                    credit.Status = role.Status;
+                    credit.Premiered = role.Premiered;
+                    credit.Popularity = role.Popularity;
+                    credit.Rating = role.Rating;
+                    credit.Character = role.Character;
+                    credit.Voice = role.Voice;
+                }
+
+                // What's left was dropped from the person's credits.
+                db.CastCredits.RemoveRange(credits.Values);
             }
         });
 

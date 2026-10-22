@@ -47,6 +47,7 @@ builder.Services.AddSingleton<BulkImportRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();
 // Creators and executive producers: backfills older shows and keeps career figures current.
 builder.Services.AddHostedService<CreativesService>();
+builder.Services.AddHostedService<CastCreditsService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
 // The sync worker pulls a Docker Model Runner model that isn't there yet; Catalog.API just waits for it.
