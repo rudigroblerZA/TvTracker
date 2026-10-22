@@ -1,0 +1,56 @@
+@page "/nanogenres/{Slug}"
+@attribute [RequiresFeature(FeatureFlags.Nanogenres)]
+@inject CatalogClient Catalog
+
+<PageTitle>@(nanogenre?.Name ?? "Nanogenre") · TV Tracker</PageTitle>
+
+<p class="small"><a href="nanogenres">All nanogenres</a></p>
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (loaded && nanogenre is null && error is null)
+{
+    <h1>Not found</h1>
+    <p>This nanogenre isn't in the catalog any more: they're rediscovered as the catalog changes. <a href="nanogenres">See them all</a>.</p>
+}
+else if (nanogenre is not null)
+{
+    <h1>@nanogenre.Name</h1>
+    <p class="muted">
+        @nanogenre.Shows.Count shows,
+        @(nanogenre.Source == "cluster"
+            ? "grouped by what they're about and what kind of show they are."
+            : $"the catalog's shows that pair these genres.")
+        <a href="search?nanogenre=@nanogenre.Slug">Search within it</a>
+    </p>
+    <div class="card-grid">
+        @foreach (var show in nanogenre.Shows)
+        {
+            <ShowCard @key="show.Id" ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl"
+                      Subtitle="@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network }.Where(s => !string.IsNullOrEmpty(s))))" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+
+    private NanogenreDetail? nanogenre;
+    private bool loaded;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            nanogenre = await Catalog.GetNanogenreAsync(Slug);
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        loaded = true;
+    }
+}

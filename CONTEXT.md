@@ -157,6 +157,27 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire
   doesn't recognise the tag as Postgres 18.
+- **Nanogenres** (`Catalog.SyncWorker/Nanogenres`): discovered, not curated (a decision: no list to maintain, and it
+  finds what's actually in the catalog). `NanogenreService` reruns `NanogenreDiscovery` every 6 hours. It replaces
+  the `nanogenres` table, sets `shows.Nanogenres` (slugs, GIN index, for the search filter), and sends
+  `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start).
+  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38) + 0.6 ×
+    genre/type distance. With text alone, Ted Lasso's nearest shows were Scrubs and The Lincoln Lawyer: the
+    summaries are only loosely topical.
+  - **Clustering:** average-linkage, by the nearest-neighbour chain (O(n²)), cut at 0.25. Groups over 30 shows are
+    re-cut 0.03 tighter; groups under 3 are dropped. A show also joins any group whose members it's as close to,
+    on average, as the group's median member.
+  - **Naming:** the (specific genre, base) pairing covering 60% of a group: "Medical drama", "Animated family comedy".
+    - **Duplicates:** a duplicate name tries a two-genre name; if that's taken too, the two groups merge.
+    - **No vague names:** groups with nothing specific in common are dropped.
+    - **No summary words:** themes taken from summary words were tried and were too noisy to show.
+    - **No language model:** naming clusters with a small local model through Model Runner would read better, but
+      it couldn't be pulled through the sandbox proxy, and naming shouldn't depend on one.
+  - **Small pairings:** pairings of 2 to 15 shows that no cluster covers are added as nanogenres of their own
+    ("genres" source).
+  - **Unstable slugs:** slugs change when the catalog changes, so the UI's nanogenre page says when one has gone.
+  - **Recommendations:** keeps a copy (`show_nanogenres`). Shared nanogenres are 25% of the content score, and the
+    first shared one makes the reason.
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
 - **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
@@ -259,7 +280,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Recommendations
 
-- **Signals:** content (the provider's similar shows, genres, keywords, cast), show DNA, and co-follows.
+- **Signals:** content (the provider's similar shows, genres, keywords, cast, and shared nanogenres), show DNA, and
+  co-follows.
 - **DNA's role** (`RecommendationEngine.Match`): DNA scales the content score by 0.5-1, depending on how alike the
   two shows' DNAs are. It reorders shows that are already topically similar, and can't make a show about something
   else similar.

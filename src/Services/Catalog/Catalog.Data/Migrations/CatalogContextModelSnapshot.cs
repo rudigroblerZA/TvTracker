@@ -104,6 +104,33 @@ namespace Catalog.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.Nanogenre", b =>
+                {
+                    b.Property<string>("Slug")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)");
+
+                    b.Property<DateTime>("ComputedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)");
+
+                    b.Property<int>("ShowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Slug");
+
+                    b.ToTable("nanogenres", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.Person", b =>
                 {
                     b.Property<Guid>("Id")
@@ -280,6 +307,12 @@ namespace Catalog.Data.Migrations
                     b.Property<DateTime>("LastSyncedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.PrimitiveCollection<List<string>>("Nanogenres")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<string>("Network")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -324,6 +357,10 @@ namespace Catalog.Data.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Nanogenres");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Nanogenres"), "gin");
 
                     b.HasIndex("NextRefreshAtUtc");
 

@@ -70,6 +70,18 @@ public record PeopleCareersUpdatedIntegrationEvent(IReadOnlyList<PersonCareer> P
 public record PersonCareer(Guid PersonId, string Name, int Shows, int Created, int ExecutiveProduced);
 
 /// <summary>
+/// Shows whose nanogenres (fine-grained genres the sync worker discovers, like "Sports comedy") changed. Sent in full
+/// after the worker starts, so a lost event heals itself. A show that fits none is sent with an empty list.
+/// </summary>
+public record ShowNanogenresChangedIntegrationEvent(IReadOnlyList<ShowNanogenreNames> Shows) : IntegrationEvent
+{
+    public const int MaxShows = 500;
+}
+
+/// <param name="Nanogenres">Names, most specific (smallest) first.</param>
+public record ShowNanogenreNames(Guid ShowId, IReadOnlyList<string> Nanogenres);
+
+/// <summary>
 /// Actors' roles across the catalog provider (not just this catalog), for actors in catalog shows: the data behind the
 /// reunion radar. Each person's list replaces the one sent before. Sent as the sync worker looks them up (monthly per
 /// person), and with a catalog replay.

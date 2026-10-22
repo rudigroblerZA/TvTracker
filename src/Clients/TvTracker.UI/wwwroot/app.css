@@ -452,3 +452,11 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .finish-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .tag.finish-on-track { color: var(--text); border-color: var(--accent); }
 .tag.finish-stalled { opacity: 0.8; }
+
+/* Nanogenres */
+.nanogenre-tags { margin-top: 6px; }
+.tag.nanogenre { border-color: var(--accent); color: var(--accent); }
+.nanogenre-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+.nanogenre-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; color: var(--text); }
+.nanogenre-posters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.nanogenre-posters img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; }

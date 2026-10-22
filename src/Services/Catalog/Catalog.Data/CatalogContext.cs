@@ -12,6 +12,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<CastMember> Cast => Set<CastMember>();
     public DbSet<ShowCreative> Creatives => Set<ShowCreative>();
     public DbSet<PersonCastCredit> CastCredits => Set<PersonCastCredit>();
+    public DbSet<Nanogenre> Nanogenres => Set<Nanogenre>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
 
@@ -37,6 +38,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(s => s.Network).HasMaxLength(128);
             entity.Property(s => s.Tags).HasDefaultValueSql("'{}'");
             entity.HasIndex(s => s.Tags).HasMethod("gin");
+            entity.Property(s => s.Nanogenres).HasDefaultValueSql("'{}'");
+            entity.HasIndex(s => s.Nanogenres).HasMethod("gin");
 
             entity.HasMany(s => s.Seasons).WithOne().HasForeignKey(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(s => s.Episodes).WithOne().HasForeignKey(e => e.ShowId).OnDelete(DeleteBehavior.Cascade);
@@ -84,6 +87,15 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasKey(c => new { c.ShowId, c.PersonId });
             entity.HasIndex(c => c.PersonId);
             entity.HasOne(c => c.Person).WithMany().HasForeignKey(c => c.PersonId);
+        });
+
+        modelBuilder.Entity<Nanogenre>(entity =>
+        {
+            entity.ToTable("nanogenres");
+            entity.HasKey(n => n.Slug);
+            entity.Property(n => n.Slug).HasMaxLength(96);
+            entity.Property(n => n.Name).HasMaxLength(96);
+            entity.Property(n => n.Source).HasMaxLength(16);
         });
 
         modelBuilder.Entity<PersonCastCredit>(entity =>
