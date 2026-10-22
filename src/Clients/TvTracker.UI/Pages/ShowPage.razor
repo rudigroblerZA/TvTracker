@@ -33,6 +33,17 @@ else
                     <a class="tag" href="search?genre=@Uri.EscapeDataString(genre)">@genre</a>
                 }
             </div>
+            @if (show.Nanogenres is { Count: > 0 } nanogenres)
+            {
+                <Feature Flag="@FeatureFlags.Nanogenres">
+                    <div class="tags nanogenre-tags">
+                        @foreach (var nanogenre in nanogenres)
+                        {
+                            <a class="tag nanogenre" href="nanogenres/@nanogenre.Slug">@nanogenre.Name</a>
+                        }
+                    </div>
+                </Feature>
+            }
             @if (!string.IsNullOrEmpty(show.Overview))
             {
                 <p>@show.Overview</p>

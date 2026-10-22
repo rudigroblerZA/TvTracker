@@ -42,6 +42,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Forecasts: the What's next panel on show pages, and Will you finish it? on show pages and Stats." }
+    },
+    "nanogenres": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Nanogenres: chips on show pages, /nanogenres browse pages, and the search filter. Recommendations use them either way." }
     }
   }
 }

@@ -43,14 +43,24 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
 public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     /// <param name="tag">A show tag key (see <see cref="Components.ShowTagOptions"/>), e.g. "bingeable".</param>
-    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, string? tag = null, CancellationToken ct = default)
+    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, string? tag = null,
+        string? nanogenre = null, CancellationToken ct = default)
     {
         var query = $"api/v1/shows?page={page}&pageSize=24";
         if (!string.IsNullOrWhiteSpace(search)) query += $"&search={Uri.EscapeDataString(search)}";
         if (!string.IsNullOrWhiteSpace(genre)) query += $"&genre={Uri.EscapeDataString(genre)}";
         if (!string.IsNullOrWhiteSpace(tag)) query += $"&tags={Uri.EscapeDataString(tag)}";
+        if (!string.IsNullOrWhiteSpace(nanogenre)) query += $"&nanogenre={Uri.EscapeDataString(nanogenre)}";
         return GetAsync<PagedResult<ShowSummary>>(ApiClients.Catalog, query, ct);
     }
+
+    /// <summary>Every nanogenre the catalog has discovered, largest first.</summary>
+    public Task<List<NanogenreSummary>?> GetNanogenresAsync(CancellationToken ct = default) =>
+        GetAsync<List<NanogenreSummary>>(ApiClients.Catalog, "api/v1/nanogenres", ct, cacheForOffline: true);
+
+    /// <summary>A nanogenre and its shows; null when the slug no longer exists.</summary>
+    public Task<NanogenreDetail?> GetNanogenreAsync(string slug, CancellationToken ct = default) =>
+        GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     public Task<List<ShowSummary>?> GetTrendingAsync(CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, "api/v1/shows/trending", ct, cacheForOffline: true);

@@ -11,8 +11,45 @@ namespace Recommendations.API.IntegrationEvents;
 public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
-    IIntegrationEventHandler<ShowDnaChangedIntegrationEvent>
+    IIntegrationEventHandler<ShowDnaChangedIntegrationEvent>,
+    IIntegrationEventHandler<ShowNanogenresChangedIntegrationEvent>
 {
+    public async Task HandleAsync(ShowNanogenresChangedIntegrationEvent e, CancellationToken ct)
+    {
+        var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
+        var ids = shows.Select(s => s.ShowId).ToList();
+        var existing = await db.Nanogenres.Where(n => ids.Contains(n.ShowId)).ToDictionaryAsync(n => n.ShowId, ct);
+        var changed = false;
+        foreach (var show in shows)
+        {
+            if (!existing.TryGetValue(show.ShowId, out var row))
+            {
+                row = new ShowNanogenres { ShowId = show.ShowId };
+                db.Nanogenres.Add(row);
+            }
+            else if (row.Names.SequenceEqual(show.Nanogenres))
+            {
+                continue;
+            }
+            row.Names = show.Nanogenres.ToList();
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await MarkEveryoneDirtyAsync(ct);
+        }
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Each show's traits replace the ones held; a show sent without traits has none any more.</summary>
     public async Task HandleAsync(ShowDnaChangedIntegrationEvent e, CancellationToken ct)
     {
@@ -44,12 +81,9 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
             changed = true;
         }
 
-        // Any user's picks can depend on any show's DNA: rebuild every list that isn't already queued.
         if (changed)
         {
-            var queued = db.DirtyUsers.Select(d => d.UserId);
-            var users = await db.Signals.Select(s => s.UserId).Distinct().Where(u => !queued.Contains(u)).ToListAsync(ct);
-            db.DirtyUsers.AddRange(users.Select(u => new DirtyUser { UserId = u, MarkedAtUtc = now }));
+            await MarkEveryoneDirtyAsync(ct);
         }
 
         db.MarkProcessed(e, handler);
@@ -61,6 +95,15 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
 
     public Task HandleAsync(ShowUpdatedIntegrationEvent e, CancellationToken ct) =>
         UpsertAsync(e, e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Keywords, e.CastNames, e.SimilarShowIds, e.Popularity, ct);
+
+    /// <summary>Any user's picks can depend on any show's DNA or nanogenres: rebuild every list that isn't already queued.</summary>
+    private async Task MarkEveryoneDirtyAsync(CancellationToken ct)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        var queued = db.DirtyUsers.Select(d => d.UserId);
+        var users = await db.Signals.Select(s => s.UserId).Distinct().Where(u => !queued.Contains(u)).ToListAsync(ct);
+        db.DirtyUsers.AddRange(users.Select(u => new DirtyUser { UserId = u, MarkedAtUtc = now }));
+    }
 
     private async Task UpsertAsync(
         IntegrationEvent e, Guid showId, string title, string? posterUrl, ShowStatus status,

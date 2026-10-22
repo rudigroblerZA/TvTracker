@@ -104,7 +104,15 @@ public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber,
 public record ShowDetail(Guid Id, string Title, string? Overview, string? PosterUrl, string? BackdropUrl, DateOnly? FirstAirDate,
     ShowStatus Status, string? Network, IReadOnlyList<string> Genres, IReadOnlyList<SeasonSummary> Seasons,
     IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode,
-    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null);
+    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null, IReadOnlyList<NanogenreRef>? Nanogenres = null);
+
+/// <summary>A fine-grained genre the catalog discovered ("Sports comedy"), by its slug for /nanogenres/{slug}.</summary>
+public record NanogenreRef(string Slug, string Name);
+
+/// <param name="Posters">Posters of its most popular shows.</param>
+public record NanogenreSummary(string Slug, string Name, int ShowCount, IReadOnlyList<string> Posters);
+
+public record NanogenreDetail(string Slug, string Name, string Source, IReadOnlyList<ShowSummary> Shows);
 
 public record SeasonDetail(Guid ShowId, int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc, IReadOnlyList<Episode> Episodes);
 

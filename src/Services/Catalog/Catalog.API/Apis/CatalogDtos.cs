@@ -80,7 +80,11 @@ public record ShowDetailDto(
     EpisodeDto? NextEpisode,
     EpisodeDto? LastEpisode,
     IReadOnlyList<CreativeDto>? Creatives = null,
-    string? BannerUrl = null);
+    string? BannerUrl = null,
+    IReadOnlyList<NanogenreRefDto>? Nanogenres = null);
+
+/// <summary>A nanogenre the show is in (see <see cref="Catalog.Data.Nanogenre"/>), most specific first.</summary>
+public record NanogenreRefDto(string Slug, string Name);
 
 public record EpisodeDto(
     Guid Id,

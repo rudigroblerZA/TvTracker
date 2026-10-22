@@ -45,6 +45,12 @@ public class Show
     /// </summary>
     public List<string> Tags { get; set; } = [];
 
+    /// <summary>
+    /// Slugs of the show's nanogenres (see <see cref="Nanogenre"/>), most specific first; kept so search can filter by
+    /// them. Empty until the sync worker has discovered them, and for shows that fit none.
+    /// </summary>
+    public List<string> Nanogenres { get; set; } = [];
+
     /// <summary>The provider's "similar shows", as provider ids.</summary>
     public List<string> SimilarExternalIds { get; set; } = [];
 
@@ -80,6 +86,25 @@ public class Show
 /// A show's text (title, genres, network, summary) as a vector, for semantic search. Written by the sync worker,
 /// which re-embeds a show when the text changes or the model does.
 /// </summary>
+/// <summary>
+/// A fine-grained genre ("Sports comedy", "Animated family comedy") discovered by the sync worker from the catalog
+/// itself: shows clustered by their text embeddings and genres, plus small groups sharing an uncommon genre pairing.
+/// Rebuilt whole each time, so a slug can disappear when the catalog changes.
+/// </summary>
+public class Nanogenre
+{
+    public required string Slug { get; set; }
+
+    public required string Name { get; set; }
+
+    /// <summary>"cluster" (found by clustering) or "genres" (a small group sharing a genre pairing).</summary>
+    public required string Source { get; set; }
+
+    public int ShowCount { get; set; }
+
+    public DateTime ComputedAtUtc { get; set; }
+}
+
 public class ShowEmbedding
 {
     /// <summary>The vector column's size; the embedding model has to match it.</summary>

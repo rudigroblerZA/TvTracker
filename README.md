@@ -7,7 +7,7 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
-What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, search by meaning, computed show tags)
+What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, nanogenres, search by meaning, computed show tags)
 is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
 
 ## Prerequisites
@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel and the forecasts sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -270,6 +270,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
+| `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
@@ -424,6 +425,21 @@ How events flow:
       - A different kind of show (reality against scripted) or language counts for much less.
       - The reason names the shared distinctive traits: "Same DNA: short episodes, long seasons", or "Same DNA as Severance:
         long waits between seasons, big finales".
+  - **Nanogenres** (chips on show pages, `/nanogenres`, a search filter; public): fine-grained genres found in the
+    catalog itself, with no list written down. Ted Lasso is a "Sports comedy"; Wednesday both a "Supernatural comedy"
+    and a "Mystery comedy"; The Simpsons an "Animated family comedy".
+    - **Clusters:** the sync worker clusters shows by their text embeddings (what they're about) and their genres and
+      type (what kind of show), 60% the latter. Groups are kept from 3 shows; ones over 30 are split again.
+    - **More than one per show:** a show also joins any group it's as close to as that group's typical member.
+    - **Names:** from the specific genres most of a group shares ("Medical drama", "Cooking reality"). A group with
+      nothing specific in common is dropped rather than given a vague name. That's why pure comedies like The Office
+      have none.
+    - **Small genre pairings:** an uncommon pairing shared by 2 to 15 shows counts too ("Sports comedy": Ted Lasso and
+      The League).
+    - **Refresh:** every 6 hours. On the development catalog: 50 nanogenres, 393 of 625 shows in at least one.
+    - **Recommendations:** shared nanogenres count towards similarity, and give the plainest reason: "Also a sports
+      comedy", or "Another sports comedy, like Ted Lasso".
+    - **API:** `GET /api/v1/nanogenres`, `GET /api/v1/nanogenres/{slug}`, and `nanogenre=` on search (Catalog.API).
   - **What's next** (show pages, signed in): forecasts for running shows, each with how sure it is.
     - **Comes back?** For a show between seasons with nothing announced: the share of comparable seasons (same
       rating band, point in the run and era) that got another one, against the catalog's overall 92%. It's labelled

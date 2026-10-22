@@ -32,21 +32,23 @@ public static class CatalogApi
         api.MapGet("/schedule", GetScheduleAsync);
         api.MapGet("/genres", GetGenresAsync);
         api.MapGet("/genres/{genre}/shows", GetShowsByGenreAsync);
+        api.MapNanogenreApi();
 
         return api;
     }
 
     /// <summary>
     /// Shows whose title contains the search term (most popular first), followed by shows similar in meaning
-    /// (closest first; see <see cref="SemanticSearch"/>). Genre, status and tags filter both.
+    /// (closest first; see <see cref="SemanticSearch"/>). Genre, status, nanogenre and tags filter both.
     /// </summary>
+    /// <param name="nanogenre">A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search.</param>
     /// <param name="tags">
     /// Comma-separated tag keys from Analytics ("bingeable,fan-favorite"); shows must have all of them. Tags are part of
     /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
     /// </param>
     private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
         ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, string? search, string? genre,
-        ShowStatus? status, string? tags = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
+        ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
         {
@@ -59,7 +61,7 @@ public static class CatalogApi
             await importer.ImportSearchMatchesAsync(search, ct);
         }
 
-        return await QueryShowsAsync(db, semantic, search, genre, status, page, pageSize, ct, tags);
+        return await QueryShowsAsync(db, semantic, search, genre, status, page, pageSize, ct, tags, nanogenre);
     }
 
     /// <summary>
@@ -85,7 +87,7 @@ public static class CatalogApi
 
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(
         CatalogContext db, SemanticSearch? semantic, string? search, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct,
-        string? tags = null)
+        string? tags = null, string? nanogenre = null)
     {
         (page, pageSize) = Normalize(page, pageSize);
 
@@ -101,6 +103,10 @@ public static class CatalogApi
         foreach (var tag in (tags ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct())
         {
             filtered = filtered.Where(s => s.Tags.Contains(tag));
+        }
+        if (!string.IsNullOrWhiteSpace(nanogenre))
+        {
+            filtered = filtered.Where(s => s.Nanogenres.Contains(nanogenre));
         }
 
         var titleMatches = filtered;
@@ -257,7 +263,8 @@ public static class CatalogApi
                 .Select(c => new CreativeDto(c.PersonId, c.Person.Name, c.Person.PhotoUrl, c.Roles, CareerDto.For(c.Person, show.Title),
                     otherShows[c.PersonId].OrderByDescending(o => o.Popularity).Select(o => new ShowRefDto(o.Id, o.Title)).ToList()))
                 .ToList(),
-            show.BannerUrl);
+            show.BannerUrl,
+            await NanogenreApi.RefsAsync(db, show.Nanogenres, ct));
     }
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(

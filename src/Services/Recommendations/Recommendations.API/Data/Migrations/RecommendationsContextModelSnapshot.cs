@@ -115,6 +115,20 @@ namespace Recommendations.API.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
+            modelBuilder.Entity("Recommendations.API.Data.ShowNanogenres", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<List<string>>("Names")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.HasKey("ShowId");
+
+                    b.ToTable("show_nanogenres", (string)null);
+                });
+
             modelBuilder.Entity("Recommendations.API.Data.UserRecommendation", b =>
                 {
                     b.Property<string>("UserId")

@@ -168,7 +168,19 @@ On show pages and the Stats page.
   - how you did with other shows from as far in;
   - where other viewers give up.
 
-### 14. Smaller touches
+### 14. Nanogenres
+
+Chips on show pages, `/nanogenres`, and a search filter.
+
+- **Not just comedy:** Ted Lasso is a sports comedy. Wednesday is a supernatural comedy and a mystery comedy. The
+  Simpsons is an animated family comedy.
+- **Found, not listed:** the catalog groups its own shows by what they're about and what kind of show they are, and
+  names each group from the genres most of it shares: medical drama, cooking reality, home-renovation reality,
+  western drama, spy thriller, action horror (The Walking Dead and The Last of Us).
+- **Honest about gaps:** a group with nothing specific in common gets no name rather than a vague one.
+- **Recommendations:** shows in the same nanogenre rank higher, with the plainest reason: "Also a sports comedy".
+
+### 15. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
