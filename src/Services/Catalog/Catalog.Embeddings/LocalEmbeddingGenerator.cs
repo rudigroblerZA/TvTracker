@@ -21,6 +21,12 @@ public sealed class EmbeddingOptions
     /// <c>Models</c>. Catalog.API and the sync worker must use the same one.
     /// </summary>
     public string Model { get; set; } = EmbeddingModels.MiniLm;
+
+    /// <summary>
+    /// The model server's OpenAI-compatible base address for every <see cref="EmbeddingSource.Server"/> model that
+    /// doesn't set its own: the AppHost sets it to its Docker Model Runner.
+    /// </summary>
+    public string? Endpoint { get; set; }
 }
 
 /// <summary>Whether text is a search term or a document (show text); some models embed the two differently.</summary>

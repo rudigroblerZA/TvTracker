@@ -49,7 +49,8 @@ builder.Services.AddHostedService<CatalogSyncService>();
 builder.Services.AddHostedService<CreativesService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
-builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions);
+// The sync worker pulls a Docker Model Runner model that isn't there yet; Catalog.API just waits for it.
+builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions, pullModel: true);
 builder.Services.AddHostedService<ShowEmbeddingIndexer>();
 
 var app = builder.Build();

@@ -71,7 +71,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Search
 
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
-- **Embeddings:** all-MiniLM-L6-v2 by default, run locally with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
+- **Embeddings:** dmr/nomic-embed-text-v1.5 on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
+  or all-MiniLM-L6-v2 / bge-small run in-process with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
   - The model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, with mean pooling and L2 normalisation, 384 dimensions.
   - It's downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
@@ -82,7 +83,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
-    595 shows (42 searches): MiniLM ranks better (MRR 0.74 against 0.68), so it stays the default.
+    595 shows (42 searches): MiniLM ranks best (MRR 0.74; bge-small 0.68, nomic 0.63). The default is nomic on
+    Docker Model Runner anyway, by choice: the model runs out of process and can be swapped for any Docker Hub model.
   - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
     `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
     - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
@@ -91,6 +93,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
       re-normalises; the column stays as it is.
     - Text is cut at about 4 characters a token (`MaxTokens`), since Model Runner's llama.cpp refuses input longer
       than its 512-token batch.
+    - **Where Model Runner comes from:** the AppHost runs `docker/model-runner` as a container (CPU, models in the
+      `tvtracker-model-runner` volume), unless `ModelRunner:Url` names one already running (Docker Desktop's can
+      use the GPU). Either way it sets `Embeddings:Endpoint`, which applies to every server model without its own.
+    - **Pulling:** `Pull` models are pulled through Model Runner's own API (`GET /models/{name}`,
+      `POST /models/create`, next to `/engines/v1/`). Only the sync worker pulls (`AddLocalEmbeddings(pullModel:
+      true)`), so the two services don't download the same model at once. It retries every minute until it works.
+    - **Pull responses:** Model Runner streams progress as JSON lines, with the quotes HTML-escaped (`&#34;`), so
+      the success check decodes first.
+    - **Seeding the volume by hand:** the image runs as `modelrunner`, so the volume's files must be owned by
+      that user. Docker sets this when it creates the volume on first mount; a volume made with
+      `docker volume create` is root-owned.
   - **Dimensions:** `ShowEmbedding.Dimensions` (384) is the column size. Services refuse to start with a model of
     another size. Changing it needs a migration of the column and its HNSW index.
   - **Search terms vs show text:** `EmbeddingInput.QueryOptions` marks search terms, so the model's `QueryPrefix`
