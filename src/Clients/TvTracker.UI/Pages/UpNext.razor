@@ -7,6 +7,7 @@
 
 <AuthorizeView>
     <Authorized>
+        <p><a href="tonight"><strong>Plan tonight</strong></a><span class="muted">: tell it how long you've got and your mood, and it picks the episodes.</span></p>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (items is null)

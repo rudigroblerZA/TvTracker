@@ -1,0 +1,290 @@
+@page "/tonight"
+@inject TrackingClient Tracking
+@inject CatalogClient Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>Tonight · TV Tracker</PageTitle>
+
+<h1>Tonight's plan</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">How long have you got, and what are you in the mood for? The plan comes from the shows you're watching and your watchlist.</p>
+
+        <div class="tonight-controls">
+            <div class="tonight-field">
+                <span class="small strong">Time</span>
+                <div class="chips">
+                    @foreach (var (value, label) in Times)
+                    {
+                        <button type="button" class="chip @(minutes == value ? "active" : null)" @onclick="() => Go(value, mood, oneShow)">@label</button>
+                    }
+                    <label class="inline small">
+                        <input type="number" min="15" max="600" step="15" value="@minutes" aria-label="Minutes"
+                               @onchange="e => Go(int.TryParse(e.Value?.ToString(), out var m) ? m : minutes, mood, oneShow)" />
+                        min
+                    </label>
+                </div>
+            </div>
+
+            <div class="tonight-field">
+                <span class="small strong">Mood</span>
+                <div class="chips">
+                    <button type="button" class="chip @(string.IsNullOrEmpty(mood) ? "active" : null)" @onclick="() => Go(minutes, null, oneShow)">Anything</button>
+                    @foreach (var (label, text) in Moods)
+                    {
+                        <button type="button" class="chip @(mood == text ? "active" : null)" @onclick="() => Go(minutes, text, oneShow)">@label</button>
+                    }
+                </div>
+                <form class="inline" @onsubmit="() => Go(minutes, customMood, oneShow)">
+                    <input type="text" placeholder="Or describe it: “something cosy with a mystery”" @bind="customMood" aria-label="Describe the mood" maxlength="200" />
+                    <button class="btn btn-quiet small" type="submit">Use</button>
+                </form>
+            </div>
+
+            <div class="tonight-field">
+                <span class="small strong">Shows</span>
+                <div class="chips">
+                    <button type="button" class="chip @(!oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, false)">Mix it up</button>
+                    <button type="button" class="chip @(oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, true)">One show</button>
+                </div>
+            </div>
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (queue is null || planning && plan is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Planning…</p>
+            }
+        }
+        else if (queue.Count == 0)
+        {
+            <p class="notice">
+                Nothing to plan from yet: follow some shows, or add them to your watchlist with "Plan to watch".
+                <a href="discover">Discover</a> or <a href="search">search</a> for something.
+            </p>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(mood) && !moodAvailable)
+            {
+                <p class="notice small">Mood matching isn't available right now, so this plan is from what you're watching.</p>
+            }
+
+            @if (plan is null || plan.IsEmpty)
+            {
+                <p class="notice">
+                    Nothing fits in @Format.Duration(minutes)@(Shortest is { } shortest ? $": the shortest next episode is {Format.Duration(shortest)}" : "").
+                    @if (excluded.Count > 0)
+                    {
+                        <button class="link" type="button" @onclick="ResetSwaps">Bring back the shows you swapped out</button>
+                    }
+                </p>
+            }
+            else
+            {
+                <div class="tonight-result @(planning ? "stale" : null)" aria-busy="@(planning ? "true" : "false")">
+                <div class="tonight-summary">
+                    <span class="tonight-total">@Format.Duration(plan.Minutes)</span>
+                    <span class="muted">of @Format.Duration(plan.BudgetMinutes) · @plan.Blocks.Sum(b => b.Episodes.Count) episode@(plan.Blocks.Sum(b => b.Episodes.Count) == 1 ? "" : "s")@(plan.Mood is { } m ? $" · “{m}”" : "")</span>
+                    <span class="tonight-actions">
+                        <a class="btn" href="episodes/@plan.Blocks[0].Episodes[0].EpisodeId">Start watching</a>
+                        @if (excluded.Count > 0)
+                        {
+                            <button class="btn btn-quiet" type="button" @onclick="ResetSwaps">Undo swaps</button>
+                        }
+                    </span>
+                </div>
+
+                <ol class="tonight-plan">
+                    @foreach (var block in plan.Blocks)
+                    {
+                        @* Keyed by show, so a replanned list doesn't reuse another show's poster while the new one loads. *@
+                        <li class="panel tonight-block" @key="block.Show.ShowId">
+                            <a href="shows/@block.Show.ShowId"><Poster Title="@block.Show.Title" Url="@block.Show.PosterUrl" Size="small" /></a>
+                            <div class="tonight-block-body">
+                                <div class="section-head">
+                                    <a class="strong" href="shows/@block.Show.ShowId">@block.Show.Title</a>
+                                    <span class="muted small">@Format.Duration(block.Minutes)</span>
+                                </div>
+                                <div class="muted small">@block.Reason</div>
+                                <ul class="tonight-episodes">
+                                    @foreach (var episode in block.Episodes)
+                                    {
+                                        <li>
+                                            <a href="episodes/@episode.EpisodeId">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) · @episode.Title</a>
+                                            <span class="muted small"> · @(episode.RuntimeEstimated ? "about " : "")@Format.Duration(episode.RuntimeMinutes)</span>
+                                        </li>
+                                    }
+                                </ul>
+                                <button class="link small" type="button" @onclick="() => Swap(block.Show.ShowId)">Swap for something else</button>
+                            </div>
+                        </li>
+                    }
+                </ol>
+
+                <p class="small">
+                    <button class="btn btn-quiet small" type="button" disabled="@marking" @onclick="MarkPlanWatchedAsync">I watched all of this</button>
+                    <span class="muted"> Marks every episode in the plan watched, and plans again.</span>
+                </p>
+                </div>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to plan tonight from the shows you're watching." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // The address holds the settings, so a plan can be bookmarked: ?minutes=120&mood=…&one=true.
+    [SupplyParameterFromQuery(Name = "minutes")] public int? Minutes { get; set; }
+    [SupplyParameterFromQuery(Name = "mood")] public string? Mood { get; set; }
+    [SupplyParameterFromQuery(Name = "one")] public bool? One { get; set; }
+
+    private static readonly (int Value, string Label)[] Times = [(30, "30 min"), (60, "1 h"), (90, "1½ h"), (120, "2 h"), (180, "3 h")];
+
+    // Chips send a fuller description than their label: the mood is compared with shows' text by meaning.
+    private static readonly (string Label, string Text)[] Moods =
+    [
+        ("Light & funny", "light-hearted funny comedy"),
+        ("Cosy", "cosy comforting feel-good"),
+        ("Gripping", "gripping suspenseful thriller"),
+        ("Mind-bending", "mind-bending mystery science fiction"),
+        ("Dark", "dark intense crime drama"),
+        ("Heartfelt", "emotional heartfelt drama about relationships"),
+        ("Action", "action-packed adventure")
+    ];
+
+    private int minutes = 120;
+    private string? mood;
+    private string? customMood;
+    private bool oneShow;
+
+    private List<TonightShow>? queue;
+    private readonly Dictionary<string, Dictionary<Guid, double>?> fitsByMood = [];
+    private bool moodAvailable = true;
+    private readonly HashSet<Guid> excluded = [];
+    private TonightPlan? plan;
+    private bool planning;
+    private bool marking;
+    private string? error;
+
+    private int? Shortest => queue?.SelectMany(s => s.Episodes.Take(1)).Select(e => (int?)e.RuntimeMinutes).Min();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        minutes = Math.Clamp(Minutes ?? 120, 15, 600);
+        mood = string.IsNullOrWhiteSpace(Mood) ? null : Mood.Trim();
+        customMood = mood is not null && Moods.All(m => m.Text != mood) ? mood : customMood;
+        oneShow = One == true;
+        if (queue is null)
+        {
+            await LoadAsync();
+        }
+        else
+        {
+            await PlanAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            queue = await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+            await PlanAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task PlanAsync()
+    {
+        if (queue is null)
+        {
+            return;
+        }
+
+        planning = true;
+        try
+        {
+            Dictionary<Guid, double>? fits = null;
+            moodAvailable = true;
+            if (mood is not null && queue.Count > 0)
+            {
+                if (!fitsByMood.TryGetValue(mood, out fits))
+                {
+                    var response = await Catalog.GetMoodFitsAsync(mood, queue.Select(s => s.ShowId).ToList());
+                    fits = response is { Available: true } ? response.Fits.ToDictionary(f => f.ShowId, f => f.Fit) : null;
+                    fitsByMood[mood] = fits;
+                }
+                moodAvailable = fits is not null;
+            }
+            plan = TonightPlanner.Plan(queue, fits, mood is null ? null : MoodLabel(mood), minutes, oneShow, excluded, DateTimeOffset.UtcNow);
+        }
+        catch (HttpRequestException)
+        {
+            // Mood matching is optional: plan without it.
+            moodAvailable = false;
+            plan = TonightPlanner.Plan(queue, null, null, minutes, oneShow, excluded, DateTimeOffset.UtcNow);
+        }
+        finally
+        {
+            planning = false;
+        }
+    }
+
+    private void Go(int newMinutes, string? newMood, bool newOneShow) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["minutes"] = newMinutes == 120 ? null : Math.Clamp(newMinutes, 15, 600),
+            ["mood"] = string.IsNullOrWhiteSpace(newMood) ? null : newMood.Trim(),
+            ["one"] = newOneShow ? true : null
+        }), replace: true);
+
+    private async Task Swap(Guid showId)
+    {
+        excluded.Add(showId);
+        await PlanAsync();
+    }
+
+    private async Task ResetSwaps()
+    {
+        excluded.Clear();
+        await PlanAsync();
+    }
+
+    private async Task MarkPlanWatchedAsync()
+    {
+        if (plan is null || plan.IsEmpty)
+        {
+            return;
+        }
+
+        marking = true;
+        error = null;
+        try
+        {
+            await Tracking.MarkWatchedAsync(new MarkWatched(plan.Blocks.SelectMany(b => b.Episodes).Select(e => e.EpisodeId).ToList(), null, null, null, null));
+            queue = await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+            await PlanAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            marking = false;
+        }
+    }
+
+    private static string MoodLabel(string text) => Moods.FirstOrDefault(m => m.Text == text).Label ?? text;
+}

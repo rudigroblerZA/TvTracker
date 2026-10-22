@@ -53,7 +53,7 @@
         <div class="card-grid">
             @foreach (var match in blend.Matches)
             {
-                <ShowCard ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl"
+                <ShowCard @key="match.Show.Id" ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl"
                           Subtitle="@(string.Join(" · ", new[] { match.Show.Year?.ToString(), match.Show.Network }.Where(s => !string.IsNullOrEmpty(s))))">
                     <div class="blend-bar" title="@($"{match.LikeA}% {a.Title}, {100 - match.LikeA}% {b.Title}")">
                         <span style="width: @(match.LikeA)%"></span>

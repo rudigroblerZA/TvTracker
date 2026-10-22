@@ -52,4 +52,27 @@ public sealed class SemanticSearch(
             .Select(x => x.Id)
             .ToListAsync(ct);
     }
+
+    /// <summary>
+    /// Each of <paramref name="showIds"/>' cosine distance to <paramref name="text"/> (0 = same meaning), for ranking
+    /// a known set of shows by how well they fit, e.g. a mood. No cutoff: every show with a vector gets a distance.
+    /// Null when the model isn't loaded; shows not embedded yet are missing.
+    /// </summary>
+    public async Task<Dictionary<Guid, double>?> DistancesAsync(IReadOnlyCollection<Guid> showIds, CatalogContext db, string text, CancellationToken ct)
+    {
+        Vector query;
+        try
+        {
+            query = new Vector((await generator.GenerateAsync([text.Trim()], EmbeddingInput.QueryOptions, ct))[0].Vector);
+        }
+        catch (EmbeddingsUnavailableException)
+        {
+            return null;
+        }
+
+        return await db.ShowEmbeddings
+            .Where(e => e.Model == model.Id && showIds.Contains(e.ShowId))
+            .Select(e => new { e.ShowId, Distance = e.Embedding.CosineDistance(query) })
+            .ToDictionaryAsync(x => x.ShowId, x => x.Distance, ct);
+    }
 }

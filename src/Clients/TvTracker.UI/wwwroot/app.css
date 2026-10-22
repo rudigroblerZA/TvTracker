@@ -402,3 +402,24 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .watch-order-show-name { font-size: 0.78rem; font-weight: 600; color: var(--c); margin-right: 6px; }
 .watch-order-upto { white-space: nowrap; color: var(--muted); }
 .watch-order-row:hover .watch-order-upto, .watch-order-upto:focus-visible { color: var(--accent); }
+
+/* Tonight's plan */
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 0.9rem; cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.chip.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; }
+.chips input[type=number] { width: 80px; }
+.tonight-controls { display: flex; flex-direction: column; gap: 14px; margin: 12px 0 20px; }
+.tonight-field { display: flex; flex-direction: column; gap: 6px; }
+.tonight-field form input[type=text] { flex: 1 1 260px; }
+.tonight-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 12px; }
+.tonight-total { font-size: 1.6rem; font-weight: 700; }
+.tonight-actions { margin-left: auto; display: flex; gap: 8px; }
+.tonight-plan { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 10px; }
+.tonight-block { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
+.tonight-block .poster.small { width: 64px; flex: none; }
+.tonight-block-body { flex: 1; min-width: 0; }
+.tonight-episodes { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 640px) { .tonight-actions { margin-left: 0; } }
+.tonight-result.stale { opacity: 0.5; transition: opacity 0.15s; }

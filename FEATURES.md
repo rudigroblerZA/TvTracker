@@ -112,7 +112,18 @@ On the Stats page, computed from your own data only.
 - **Time watched:** over the last 12 months.
 - **Progress:** which shows you're caught up on, still watching, or have quietly dropped.
 
-### 10. Smaller touches
+### 10. Tonight's plan
+
+`/tonight`, linked from Home and Up Next.
+
+- **You give it:** the time and a mood ("2 hours, light & funny", or in your own words).
+- **It picks:** the shows and episodes from what you're watching and your watchlist, landing close to the time.
+  Each pick says why: "Fits “Light & funny”", "You're in the middle of it", "On your watchlist".
+- **How the mood is matched:** with the same meaning vectors as search. It ranks your own shows: Ted Lasso first for
+  "Light & funny"; The Expanse and Severance for "Mind-bending".
+- **Mix it up or one show:** swap a show out, start watching, or mark the whole plan watched afterwards.
+
+### 11. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
@@ -131,7 +142,6 @@ Ranked by value for the effort. Each builds on data and code that already exist.
 | 3 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
 | 4 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
 | 5 | **Previously on…** | Before you resume a show after a break, a spoiler-safe recap built from the summaries of the last few episodes you watched, and nothing after them. | TVmaze episode summaries, your progress | Medium |
-| 6 | **Tonight's plan** | Give it time and a mood ("2 hours, something light"). It fills the time from Up Next and your watchlist, episode by episode. | Up Next, runtimes, search by meaning, tags | Medium |
-| 7 | **Reunion radar** | From shows you love, find shows where two or more of their actors work together again, ranked by how big the roles are. | Cast and people, your ratings | Medium |
-| 8 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
-| 9 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+| 6 | **Reunion radar** | From shows you love, find shows where two or more of their actors work together again, ranked by how big the roles are. | Cast and people, your ratings | Medium |
+| 7 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
+| 8 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
