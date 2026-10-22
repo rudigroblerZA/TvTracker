@@ -23,6 +23,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowInsight, ViewingInsight>();
         services.AddSingleton<IShowInsight, MomentumInsight>();
         services.AddSingleton<IShowInsight, DnaInsight>();
+        services.AddSingleton<IShowInsight, OutlookInsight>();
 
         // Tag rules, in the order tags are shown.
         services.AddSingleton<IShowTagRule, DropsAtOnceRule>();

@@ -43,14 +43,24 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
 public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     /// <param name="tag">A show tag key (see <see cref="Components.ShowTagOptions"/>), e.g. "bingeable".</param>
-    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, string? tag = null, CancellationToken ct = default)
+    public Task<PagedResult<ShowSummary>?> SearchAsync(string? search, string? genre = null, int page = 1, string? tag = null,
+        string? nanogenre = null, CancellationToken ct = default)
     {
         var query = $"api/v1/shows?page={page}&pageSize=24";
         if (!string.IsNullOrWhiteSpace(search)) query += $"&search={Uri.EscapeDataString(search)}";
         if (!string.IsNullOrWhiteSpace(genre)) query += $"&genre={Uri.EscapeDataString(genre)}";
         if (!string.IsNullOrWhiteSpace(tag)) query += $"&tags={Uri.EscapeDataString(tag)}";
+        if (!string.IsNullOrWhiteSpace(nanogenre)) query += $"&nanogenre={Uri.EscapeDataString(nanogenre)}";
         return GetAsync<PagedResult<ShowSummary>>(ApiClients.Catalog, query, ct);
     }
+
+    /// <summary>Every nanogenre the catalog has discovered, largest first.</summary>
+    public Task<List<NanogenreSummary>?> GetNanogenresAsync(CancellationToken ct = default) =>
+        GetAsync<List<NanogenreSummary>>(ApiClients.Catalog, "api/v1/nanogenres", ct, cacheForOffline: true);
+
+    /// <summary>A nanogenre and its shows; null when the slug no longer exists.</summary>
+    public Task<NanogenreDetail?> GetNanogenreAsync(string slug, CancellationToken ct = default) =>
+        GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     public Task<List<ShowSummary>?> GetTrendingAsync(CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, "api/v1/shows/trending", ct, cacheForOffline: true);
@@ -241,6 +251,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     /// <summary>Tags of up to 100 shows; shows without insights yet are missing from the result.</summary>
     public Task<Dictionary<Guid, List<ShowTag>>?> GetTagsAsync(IEnumerable<Guid> showIds, CancellationToken ct = default) =>
         GetAsync<Dictionary<Guid, List<ShowTag>>>(ApiClients.Analytics, $"api/v1/insights/tags?ids={string.Join(',', showIds)}", ct);
+
+    /// <summary>"Will you finish it?" for every show the user is part-way through.</summary>
+    public Task<List<FinishOutlook>?> GetFinishOutlooksAsync(CancellationToken ct = default) =>
+        GetAsync<List<FinishOutlook>>(ApiClients.Analytics, "api/v1/me/finish-outlook", ct);
+
+    /// <summary>"Will you finish it?" for one show; null when the user hasn't started it or is caught up.</summary>
+    public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
     /// <summary>Shows where actors from the user's favourites work together again (the reunion radar).</summary>
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>

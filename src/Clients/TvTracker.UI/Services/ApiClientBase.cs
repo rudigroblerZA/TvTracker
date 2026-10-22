@@ -27,7 +27,7 @@ public abstract class ApiClientBase(
             using var request = await CreateRequestAsync(HttpMethod.Get, url, null, ct);
             using var response = await httpClientFactory.CreateClient(client).SendAsync(request, ct);
 
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NoContent)
             {
                 return default;
             }

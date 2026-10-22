@@ -1,0 +1,61 @@
+@page "/nanogenres"
+@attribute [RequiresFeature(FeatureFlags.Nanogenres)]
+@inject CatalogClient Catalog
+
+<PageTitle>Nanogenres · TV Tracker</PageTitle>
+
+<h1>Nanogenres</h1>
+<p class="muted">Fine-grained genres found in the catalog itself: shows grouped by what they're about and what kind of show they are, and small groups sharing an uncommon pairing of genres. They're rediscovered as the catalog grows.</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (nanogenres is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else if (nanogenres.Count == 0)
+{
+    <p class="muted">None found yet. They're discovered a few minutes after the catalog's shows are indexed.</p>
+}
+else
+{
+    <ul class="nanogenre-grid">
+        @foreach (var nanogenre in nanogenres)
+        {
+            <li @key="nanogenre.Slug">
+                <a class="panel nanogenre-card" href="nanogenres/@nanogenre.Slug">
+                    <span class="nanogenre-posters">
+                        @foreach (var poster in nanogenre.Posters)
+                        {
+                            <img src="@poster" alt="" loading="lazy" />
+                        }
+                    </span>
+                    <span><strong>@nanogenre.Name</strong><span class="muted small"> · @nanogenre.ShowCount shows</span></span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<NanogenreSummary>? nanogenres;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            nanogenres = await Catalog.GetNanogenresAsync() ?? [];
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

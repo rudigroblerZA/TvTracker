@@ -71,10 +71,18 @@ public class ShowDna
     public DateTime UpdatedAtUtc { get; set; }
 }
 
+/// <summary>A show's nanogenres from the catalog ("Sports comedy"), most specific first. Kept apart, like DNA, since it can arrive first.</summary>
+public class ShowNanogenres
+{
+    public Guid ShowId { get; set; }
+    public List<string> Names { get; set; } = [];
+}
+
 public class RecommendationsContext(DbContextOptions<RecommendationsContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<ShowFeatures> Shows => Set<ShowFeatures>();
     public DbSet<ShowDna> Dna => Set<ShowDna>();
+    public DbSet<ShowNanogenres> Nanogenres => Set<ShowNanogenres>();
     public DbSet<UserShowSignal> Signals => Set<UserShowSignal>();
     public DbSet<Dismissal> Dismissals => Set<Dismissal>();
     public DbSet<UserRecommendation> UserRecommendations => Set<UserRecommendation>();
@@ -106,6 +114,13 @@ public class RecommendationsContext(DbContextOptions<RecommendationsContext> opt
                         (a, b) => a!.Count == b!.Count && a.All(t => b.ContainsKey(t.Key) && b[t.Key] == t.Value),
                         traits => traits.Aggregate(0, (hash, t) => HashCode.Combine(hash, t.Key, t.Value)),
                         traits => new Dictionary<string, double>(traits)));
+        });
+
+        modelBuilder.Entity<ShowNanogenres>(entity =>
+        {
+            entity.ToTable("show_nanogenres");
+            entity.HasKey(n => n.ShowId);
+            entity.Property(n => n.ShowId).ValueGeneratedNever();
         });
 
         modelBuilder.Entity<UserShowSignal>(entity =>

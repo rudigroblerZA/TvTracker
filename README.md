@@ -7,7 +7,7 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
-What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, search by meaning, computed show tags)
+What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, nanogenres, search by meaning, computed show tags)
 is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
 
 ## Prerequisites
@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar and the Show DNA panel sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -270,6 +270,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
+| `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
+| `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -423,6 +425,39 @@ How events flow:
       - A different kind of show (reality against scripted) or language counts for much less.
       - The reason names the shared distinctive traits: "Same DNA: short episodes, long seasons", or "Same DNA as Severance:
         long waits between seasons, big finales".
+  - **Nanogenres** (chips on show pages, `/nanogenres`, a search filter; public): fine-grained genres found in the
+    catalog itself, with no list written down. Ted Lasso is a "Sports comedy"; Wednesday both a "Supernatural comedy"
+    and a "Mystery comedy"; The Simpsons an "Animated family comedy".
+    - **Clusters:** the sync worker clusters shows by their text embeddings (what they're about) and their genres and
+      type (what kind of show), 60% the latter. Groups are kept from 3 shows; ones over 30 are split again.
+    - **More than one per show:** a show also joins any group it's as close to as that group's typical member.
+    - **Names:** from the specific genres most of a group shares ("Medical drama", "Cooking reality"). A group with
+      nothing specific in common is dropped rather than given a vague name. That's why pure comedies like The Office
+      have none.
+    - **Small genre pairings:** an uncommon pairing shared by 2 to 15 shows counts too ("Sports comedy": Ted Lasso and
+      The League).
+    - **Refresh:** every 6 hours. On the development catalog: 50 nanogenres, 393 of 625 shows in at least one.
+    - **Recommendations:** shared nanogenres count towards similarity, and give the plainest reason: "Also a sports
+      comedy", or "Another sports comedy, like Ted Lasso".
+    - **API:** `GET /api/v1/nanogenres`, `GET /api/v1/nanogenres/{slug}`, and `nanogenre=` on search (Catalog.API).
+  - **What's next** (show pages, signed in): forecasts for running shows, each with how sure it is.
+    - **Comes back?** For a show between seasons with nothing announced: the share of comparable seasons (same
+      rating band, point in the run and era) that got another one, against the catalog's overall 92%. It's labelled
+      a weak signal, because the catalog is mostly popular shows, which usually return.
+    - **When:** the next season's likely start, from the median of the show's last three waits between seasons, with
+      an 80% range. Past the range, it says the show is overdue.
+    - **How it'll rate:** 0.7 × the latest season's rating + 0.3 × the show's average, with an 80% range that's wider for
+      shows whose seasons vary more.
+    - **Backtested every run:** each model replays the catalog's history (what it would have said after every past
+      season) and keeps the misses as its range. On the development catalog, ratings are off by 0.33 on average
+      (1,440 seasons) and start dates by 22 days at the median (2,291 waits).
+  - **Will you finish it?** (show pages, and "Will you finish them?" on Stats): for shows you're part-way through,
+    from your own watches. It shows facts, not a probability: there isn't enough history per person for an honest one.
+    - **Pace:** your pace over the last four weeks, and when it gets you to the end of what's aired.
+    - **Status:** on track (watched in the last 14 days), slowing, or stalled (nothing for 30 days).
+    - **Your record:** "You finished 2 of the 3 other shows you got this far into", from 3 comparable shows.
+    - **Drop-off:** the episode many of our viewers stop at, when it's still ahead of you (from 5 viewers).
+    - **API:** `GET /api/v1/me/finish-outlook` and `GET /api/v1/shows/{id}/finish-outlook` on Analytics.API.
   - **Stats page — your taste:** computed on request from your own data only.
     - How your ratings compare with TVmaze's (stars doubled to its 0-10).
     - The genres you rate highest.

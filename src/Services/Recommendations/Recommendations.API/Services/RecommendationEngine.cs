@@ -10,6 +10,7 @@ public record ScoredShow(Guid ShowId, double Score, string Reason);
 /// Scoring blends three things:
 /// <list type="bullet">
 /// <item><b>Content:</b> the provider's similar-shows list plus overlap of genres, keywords and cast.</item>
+/// <item><b>Nanogenres:</b> sharing one of the catalog's discovered nanogenres ("Sports comedy").</item>
 /// <item><b>DNA:</b> how alike two shows are made and play out, from Analytics' show DNA (<see cref="DnaTraits"/>).</item>
 /// <item><b>Co-follows:</b> "people who follow X also follow Y".</item>
 /// </list>
@@ -26,13 +27,15 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         }
 
         var candidates = await CandidatesAsync(target, ct);
-        var dna = await DnaAsync(candidates.Select(c => c.ShowId).Append(showId), ct);
+        var extras = await ExtrasAsync(candidates.Select(c => c.ShowId).Append(showId), ct);
 
         return candidates
             .Where(c => c.ShowId != showId)
-            .Select(c => (Show: c, Match: Match(target, c, dna)))
+            .Select(c => (Show: c, Match: Match(target, c, extras)))
             .Select(x => new ScoredShow(x.Show.ShowId, Math.Round(x.Match.Score, 4),
-                x.Match.DnaLed ? $"Same DNA: {x.Match.SharedTraits}" : ReasonFor(target, x.Show)))
+                x.Match.SharedNanogenre is { } nanogenre ? $"Also {Article(nanogenre)} {nanogenre.ToLowerInvariant()}"
+                : x.Match.DnaLed ? $"Same DNA: {x.Match.SharedTraits}"
+                : ReasonFor(target, x.Show)))
             .Where(s => s.Score > 0)
             .OrderByDescending(s => s.Score)
             .Take(limit)
@@ -93,7 +96,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         var maxKeyword = keywordWeights.Values.DefaultIfEmpty(1).Max();
 
         var coFollows = await CoFollowCountsAsync(userId, engaged, candidates.Select(c => c.ShowId).ToList(), ct);
-        var dna = await DnaAsync(candidates.Select(c => c.ShowId).Concat(anchors.Select(a => a.Show.ShowId)), ct);
+        var extras = await ExtrasAsync(candidates.Select(c => c.ShowId).Concat(anchors.Select(a => a.Show.ShowId)), ct);
         var maxCoFollow = coFollows.Values.DefaultIfEmpty(0).Max();
 
         var scored = new List<ScoredShow>();
@@ -105,7 +108,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
 
             // The followed show this candidate is most similar to, for the "Because you watch X" reason.
             var best = anchors
-                .Select(a => (a.Show, Match: Match(a.Show, candidate, dna), a.Weight))
+                .Select(a => (a.Show, Match: Match(a.Show, candidate, extras), a.Weight))
                 .Select(a => (a.Show, a.Match, Score: a.Match.Score * a.Weight))
                 .OrderByDescending(a => a.Score)
                 .FirstOrDefault();
@@ -119,7 +122,9 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             }
 
             var reason = best.Show is not null && best.Score > 0.2
-                ? best.Match.DnaLed ? $"Same DNA as {best.Show.Title}: {best.Match.SharedTraits}" : $"Because you watch {best.Show.Title}"
+                ? best.Match.SharedNanogenre is { } nanogenre ? $"Another {nanogenre.ToLowerInvariant()}, like {best.Show.Title}"
+                    : best.Match.DnaLed ? $"Same DNA as {best.Show.Title}: {best.Match.SharedTraits}"
+                    : $"Because you watch {best.Show.Title}"
                 : coFollowScore > 0.5
                     ? "Popular with people who watch what you watch"
                     : candidate.Genres.OrderByDescending(g => genreWeights.GetValueOrDefault(g)).Select(g => $"Because you like {g}").FirstOrDefault()
@@ -178,7 +183,17 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     /// <param name="Score">0-1: content similarity, scaled by DNA affinity.</param>
     /// <param name="DnaLed">The DNAs are close and share distinctive traits, so they make the better reason.</param>
     /// <param name="SharedTraits">Distinctive traits both shows have, strongest first ("drops all at once, big finales").</param>
-    private sealed record ShowMatch(double Score, bool DnaLed, string? SharedTraits);
+    /// <param name="SharedNanogenre">The most specific nanogenre both shows are in ("Sports comedy"), the plainest reason there is.</param>
+    private sealed record ShowMatch(double Score, bool DnaLed, string? SharedTraits, string? SharedNanogenre = null);
+
+    /// <summary>A show's DNA and nanogenres, by show.</summary>
+    private sealed record Extras(Dictionary<Guid, Dictionary<string, double>> Dna, Dictionary<Guid, List<string>> Nanogenres);
+
+    /// <summary>
+    /// How much of the content score shared nanogenres make up: a nanogenre is a whole group of shows like each other
+    /// (discovered by the catalog), so sharing one says more than overlapping genres or keywords.
+    /// </summary>
+    private const double NanogenreShare = 0.25;
 
     /// <summary>
     /// DNA scales the content score between 1 − <see cref="DnaShare"/> (nothing alike) and 1 (alike): it reorders
@@ -203,13 +218,18 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     private static readonly HashSet<string> Kinds =
         ["scripted", "animation", "reality", "documentary", "talk show", "variety", "game show", "news", "sports", "award show", "panel show"];
 
-    private static ShowMatch Match(ShowFeatures a, ShowFeatures b, IReadOnlyDictionary<Guid, Dictionary<string, double>> dna)
+    private static ShowMatch Match(ShowFeatures a, ShowFeatures b, Extras extras)
     {
-        var content = Similarity(a, b);
+        var nanogenresA = extras.Nanogenres.GetValueOrDefault(a.ShowId) ?? [];
+        var nanogenresB = extras.Nanogenres.GetValueOrDefault(b.ShowId) ?? [];
+        var sharedNanogenre = nanogenresA.FirstOrDefault(nanogenresB.Contains);
+        var content = (1 - NanogenreShare) * Similarity(a, b) + NanogenreShare * Jaccard(nanogenresA, nanogenresB);
+
+        var dna = extras.Dna;
         if (!dna.TryGetValue(a.ShowId, out var dnaA) || !dna.TryGetValue(b.ShowId, out var dnaB)
             || DnaTraits.Similarity(dnaA, dnaB) is not { } similarity)
         {
-            return new ShowMatch(content * (1 - DnaShare + DnaShare * UnknownAffinity), false, null);
+            return new ShowMatch(content * (1 - DnaShare + DnaShare * UnknownAffinity), false, null, sharedNanogenre);
         }
 
         // DNA describes form, not subject: a reality show and a drama can be made alike, so a different kind of show
@@ -238,16 +258,22 @@ public sealed class RecommendationEngine(RecommendationsContext db)
 
         return new ShowMatch(content * (1 - DnaShare + DnaShare * affinity),
             affinity >= DnaReasonAffinity && shared.Count > 0,
-            shared.Count == 0 ? null : string.Join(", ", shared));
+            shared.Count == 0 ? null : string.Join(", ", shared),
+            sharedNanogenre);
     }
+
+    /// <summary>"a sports comedy", "an animated family comedy".</summary>
+    private static string Article(string name) => "aeiouAEIOU".Contains(name[0]) ? "an" : "a";
 
 
     private static string? KindOf(ShowFeatures show) => show.Keywords.FirstOrDefault(Kinds.Contains);
 
-    private async Task<Dictionary<Guid, Dictionary<string, double>>> DnaAsync(IEnumerable<Guid> showIds, CancellationToken ct)
+    private async Task<Extras> ExtrasAsync(IEnumerable<Guid> showIds, CancellationToken ct)
     {
         var ids = showIds.Distinct().ToList();
-        return await db.Dna.AsNoTracking().Where(d => ids.Contains(d.ShowId)).ToDictionaryAsync(d => d.ShowId, d => d.Traits, ct);
+        return new Extras(
+            await db.Dna.AsNoTracking().Where(d => ids.Contains(d.ShowId)).ToDictionaryAsync(d => d.ShowId, d => d.Traits, ct),
+            await db.Nanogenres.AsNoTracking().Where(n => ids.Contains(n.ShowId)).ToDictionaryAsync(n => n.ShowId, n => n.Names, ct));
     }
 
     private static double Similarity(ShowFeatures a, ShowFeatures b)

@@ -104,7 +104,15 @@ public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber,
 public record ShowDetail(Guid Id, string Title, string? Overview, string? PosterUrl, string? BackdropUrl, DateOnly? FirstAirDate,
     ShowStatus Status, string? Network, IReadOnlyList<string> Genres, IReadOnlyList<SeasonSummary> Seasons,
     IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode,
-    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null);
+    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null, IReadOnlyList<NanogenreRef>? Nanogenres = null);
+
+/// <summary>A fine-grained genre the catalog discovered ("Sports comedy"), by its slug for /nanogenres/{slug}.</summary>
+public record NanogenreRef(string Slug, string Name);
+
+/// <param name="Posters">Posters of its most popular shows.</param>
+public record NanogenreSummary(string Slug, string Name, int ShowCount, IReadOnlyList<string> Posters);
+
+public record NanogenreDetail(string Slug, string Name, string Source, IReadOnlyList<ShowSummary> Shows);
 
 public record SeasonDetail(Guid ShowId, int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc, IReadOnlyList<Episode> Episodes);
 
@@ -201,7 +209,27 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null);
+
+/// <summary>Forecasts for a running show; each part is null when the show doesn't qualify.</summary>
+public record Outlook(RatingForecast? NextSeasonRating, RenewalOutlook? Renewal, PremiereForecast? NextSeason);
+
+/// <param name="Low">With High, the range 8 in 10 backtested forecasts landed in.</param>
+public record RatingForecast(int SeasonNumber, double Rating, double Low, double High, int Backtested);
+
+/// <param name="Share">Comparable shows that came back, 0-1.</param>
+/// <param name="Basis">What made them comparable, e.g. "rated 8.0-8.5 after their second season".</param>
+/// <param name="Overall">The share for every show in the catalog.</param>
+public record RenewalOutlook(int AfterSeason, double Share, int Comparable, string Basis, double Overall);
+
+public record PremiereForecast(int SeasonNumber, DateOnly Likely, DateOnly Earliest, DateOnly Latest, bool Overdue, int Backtested);
+
+/// <param name="Status">"on-track", "slowing" or "stalled".</param>
+public record FinishOutlook(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, int MinutesLeft, string Status,
+    DateTime LastWatchedAtUtc, double EpisodesPerWeek, DateOnly? FinishBy, FinishRecord? Record, DropOff? DropOffAhead);
+
+/// <param name="Comparable">The user's other shows they got at least this far into.</param>
+public record FinishRecord(int Comparable, int Finished);
 
 /// <param name="Traits">In <see cref="TvTracker.IntegrationEvents.DnaTraits.All"/> order; traits without enough data are missing.</param>
 public record ShowDna(IReadOnlyList<DnaTrait> Traits);

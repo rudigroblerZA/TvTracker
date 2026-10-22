@@ -85,6 +85,7 @@ public sealed class InsightsPipeline(
 
         logger.LogInformation("Computed insights for {Shows} shows; lists: {Lists}",
             sources.Shows.Count, string.Join(", ", builders.Select(b => $"{b.Name} {b.Count}")));
+        logger.LogInformation("Forecast backtests: {Forecasts}", sources.Forecasts.Summary);
         return sources.Shows.Count;
     }
 

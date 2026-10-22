@@ -25,6 +25,18 @@
             }
         </select>
     </AuthorizeView>
+    <Feature Flag="@FeatureFlags.Nanogenres">
+        @if (nanogenres.Count > 0)
+        {
+            <select @bind="nanogenre" aria-label="Nanogenre">
+                <option value="">Any nanogenre</option>
+                @foreach (var n in nanogenres.OrderBy(n => n.Name))
+                {
+                    <option value="@n.Slug">@n.Name (@n.ShowCount)</option>
+                }
+            </select>
+        }
+    </Feature>
     <button class="btn" type="submit" disabled="@searching">Search</button>
 </form>
 
@@ -56,6 +68,7 @@ else if (results is not null)
     [SupplyParameterFromQuery(Name = "q")] public string? InitialQuery { get; set; }
     [SupplyParameterFromQuery(Name = "genre")] public string? InitialGenre { get; set; }
     [SupplyParameterFromQuery(Name = "tag")] public string? InitialTag { get; set; }
+    [SupplyParameterFromQuery(Name = "nanogenre")] public string? InitialNanogenre { get; set; }
 
     private string? query;
     private string? genre;
@@ -63,6 +76,9 @@ else if (results is not null)
     // The tag the results shown were filtered by (the dropdown may have changed since).
     private string? resultsTag;
     private List<string> genres = [];
+    private string? nanogenre;
+    private string? resultsNanogenre;
+    private List<NanogenreSummary> nanogenres = [];
     private PagedResult<ShowSummary>? results;
     private List<ShowSummary> loaded = [];
     private string? error;
@@ -72,12 +88,14 @@ else if (results is not null)
     {
         query = InitialQuery;
         genre = InitialGenre;
+        nanogenre = InitialNanogenre;
         await Session.EnsureLoadedAsync();
         // The tag filter is for signed-in users (the API refuses it otherwise); a shared ?tag= link just searches without it.
         tag = Session.IsSignedIn ? InitialTag : null;
         try
         {
             genres = await Catalog.GetGenresAsync() ?? [];
+            nanogenres = await Catalog.GetNanogenresAsync() ?? [];
         }
         catch (HttpRequestException)
         {
@@ -92,14 +110,16 @@ else if (results is not null)
         searching = true;
         try
         {
-            results = await Catalog.SearchAsync(query, genre, tag: tag);
+            results = await Catalog.SearchAsync(query, genre, tag: tag, nanogenre: nanogenre);
             resultsTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
+            resultsNanogenre = string.IsNullOrWhiteSpace(nanogenre) ? null : nanogenre;
             loaded = results?.Items.ToList() ?? [];
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
             {
                 ["q"] = string.IsNullOrWhiteSpace(query) ? null : query,
                 ["genre"] = string.IsNullOrWhiteSpace(genre) ? null : genre,
-                ["tag"] = string.IsNullOrWhiteSpace(tag) ? null : tag
+                ["tag"] = string.IsNullOrWhiteSpace(tag) ? null : tag,
+                ["nanogenre"] = string.IsNullOrWhiteSpace(nanogenre) ? null : nanogenre
             }), replace: true);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -119,7 +139,7 @@ else if (results is not null)
             return;
         }
 
-        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, resultsTag);
+        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, resultsTag, resultsNanogenre);
         if (next is not null)
         {
             loaded.AddRange(next.Items);

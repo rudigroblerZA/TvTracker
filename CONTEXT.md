@@ -157,6 +157,27 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire
   doesn't recognise the tag as Postgres 18.
+- **Nanogenres** (`Catalog.SyncWorker/Nanogenres`): discovered, not curated (a decision: no list to maintain, and it
+  finds what's actually in the catalog). `NanogenreService` reruns `NanogenreDiscovery` every 6 hours. It replaces
+  the `nanogenres` table, sets `shows.Nanogenres` (slugs, GIN index, for the search filter), and sends
+  `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start).
+  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38) + 0.6 ×
+    genre/type distance. With text alone, Ted Lasso's nearest shows were Scrubs and The Lincoln Lawyer: the
+    summaries are only loosely topical.
+  - **Clustering:** average-linkage, by the nearest-neighbour chain (O(n²)), cut at 0.25. Groups over 30 shows are
+    re-cut 0.03 tighter; groups under 3 are dropped. A show also joins any group whose members it's as close to,
+    on average, as the group's median member.
+  - **Naming:** the (specific genre, base) pairing covering 60% of a group: "Medical drama", "Animated family comedy".
+    - **Duplicates:** a duplicate name tries a two-genre name; if that's taken too, the two groups merge.
+    - **No vague names:** groups with nothing specific in common are dropped.
+    - **No summary words:** themes taken from summary words were tried and were too noisy to show.
+    - **No language model:** naming clusters with a small local model through Model Runner would read better, but
+      it couldn't be pulled through the sandbox proxy, and naming shouldn't depend on one.
+  - **Small pairings:** pairings of 2 to 15 shows that no cluster covers are added as nanogenres of their own
+    ("genres" source).
+  - **Unstable slugs:** slugs change when the catalog changes, so the UI's nanogenre page says when one has gone.
+  - **Recommendations:** keeps a copy (`show_nanogenres`). Shared nanogenres are 25% of the content score, and the
+    first shared one makes the reason.
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
 - **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
@@ -203,6 +224,32 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **No kind or language:** DNA is about form, not subject, and doesn't include the show's kind or language.
     Recommendations takes those from the catalog's keywords instead.
   - **Why kind matters:** without it, Succession's closest DNA was The Kardashians.
+- **Forecasts** (`Insights/Forecasts/ForecastModels.cs`, `OutlookInsight`): next season's rating, whether a show comes
+  back, and when.
+  - **Training:** the models train each run on `InsightSources.SeasonHistory`, every show's regular seasons summarised
+    by one SQL query.
+  - **Backtesting:** each model replays the past. For every past season, it asks what it would have said, compares
+    that with what happened, and keeps the misses as its 80% range (10th to 90th percentile). The run logs the
+    results ("Forecast backtests: …").
+  - **Rating:** 0.7 × last complete season + 0.3 × show average.
+    - **No trend:** the trend's direction was right for only 45% of next seasons, worse than a coin.
+    - **Mean reversion:** seasons revert towards the show's average (61% of the time when the last one was unusual).
+    - **Ranges:** separate for steady, varied and volatile shows, since the error roughly doubles from one end to
+      the other.
+  - **Renewal:** the share of comparable seasons that were followed by another.
+    - **Comparable:** the same half-point rating band, point in the run and era. Groups need 30 seasons, and back off
+      by dropping the era, then the point in the run.
+    - **Bias:** the catalog is survivor-heavy (92% of seasons came back).
+    - **Accuracy:** in a 5-fold backtest by show, the groups beat that base rate only a little (Brier 0.071 against
+      0.074), so the UI calls it a weak signal.
+  - **Timing:** the median of the last three waits beat the last wait alone (median miss 22 against 28 days). Errors
+    are kept as ratios of (wait + 30 days), since they grow with the wait. It needs two past waits.
+  - **When there's no forecast:** none for ended shows. Renewal and timing are only forecast between seasons with
+    nothing scheduled or announced; a scheduled season is a fact (`NextPremiere`).
+- **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches.
+  - **No probability:** per-person history is too thin for an honest one.
+  - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
+    the user's record from as far in, and the show's drop-off point when it's ahead of them.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
@@ -233,7 +280,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Recommendations
 
-- **Signals:** content (the provider's similar shows, genres, keywords, cast), show DNA, and co-follows.
+- **Signals:** content (the provider's similar shows, genres, keywords, cast, and shared nanogenres), show DNA, and
+  co-follows.
 - **DNA's role** (`RecommendationEngine.Match`): DNA scales the content score by 0.5-1, depending on how alike the
   two shows' DNAs are. It reorders shows that are already topically similar, and can't make a show about something
   else similar.

@@ -1,6 +1,7 @@
 using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.SyncWorker;
+using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
@@ -53,6 +54,7 @@ builder.Services.AddHostedService<CastCreditsService>();
 // The sync worker pulls a Docker Model Runner model that isn't there yet; Catalog.API just waits for it.
 builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions, pullModel: true);
 builder.Services.AddHostedService<ShowEmbeddingIndexer>();
+builder.Services.AddHostedService<NanogenreService>();
 
 var app = builder.Build();
 

@@ -151,7 +151,36 @@ On show pages, and behind every recommendation.
   - Ted Lasso finds Resident Alien, The Marvelous Mrs. Maisel, Hacks and Shrinking.
 - **Reasons:** each says what's shared: "Same DNA: short episodes, long seasons" (The Office → Frasier, Seinfeld).
 
-### 13. Smaller touches
+### 13. What's next, with honest forecasts
+
+On show pages and the Stats page.
+
+- **For a running show:** whether it's likely to come back, when the next season starts, and how it'll rate. Ted
+  Lasso: 86% of 135 comparable seasons got another one; if it does, season 5 is likely around March 2028; it's likely
+  to rate about 8.1.
+- **Backtested every hour:** each forecast is checked against what actually happened in the catalog's past seasons, and
+  its range is where 8 in 10 of those checks landed. Where the data says little (renewal), it says so.
+- **What it found:** a show's trend does *not* predict its next season (right only 45% of the time); seasons drift back
+  towards the show's average instead, so that's how ratings are forecast.
+- **Will you finish it?** For every show you're part-way through:
+  - your pace, and the date it gets you to the end;
+  - whether you've stalled;
+  - how you did with other shows from as far in;
+  - where other viewers give up.
+
+### 14. Nanogenres
+
+Chips on show pages, `/nanogenres`, and a search filter.
+
+- **Not just comedy:** Ted Lasso is a sports comedy. Wednesday is a supernatural comedy and a mystery comedy. The
+  Simpsons is an animated family comedy.
+- **Found, not listed:** the catalog groups its own shows by what they're about and what kind of show they are, and
+  names each group from the genres most of it shares: medical drama, cooking reality, home-renovation reality,
+  western drama, spy thriller, action horror (The Walking Dead and The Last of Us).
+- **Honest about gaps:** a group with nothing specific in common gets no name rather than a vague one.
+- **Recommendations:** shows in the same nanogenre rank higher, with the plainest reason: "Also a sports comedy".
+
+### 15. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
