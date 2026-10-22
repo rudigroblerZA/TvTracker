@@ -102,6 +102,7 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
     .WithReference(recommendationsDb).WaitFor(recommendationsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(redis).WaitFor(redis)
+    .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 

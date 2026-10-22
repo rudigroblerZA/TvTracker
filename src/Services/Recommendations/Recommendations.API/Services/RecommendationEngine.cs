@@ -6,6 +6,10 @@ namespace Recommendations.API.Services;
 
 public record ScoredShow(Guid ShowId, double Score, string Reason);
 
+/// <param name="SharedTraits">Distinctive traits both shows have, strongest first ("Drops all at once").</param>
+/// <param name="OtherGenres">The twin's genres the show doesn't have: what it's about instead.</param>
+public record DnaTwin(Guid ShowId, double Similarity, IReadOnlyList<string> SharedTraits, IReadOnlyList<string> OtherGenres);
+
 /// <summary>
 /// Scoring blends three things:
 /// <list type="bullet">
@@ -41,6 +45,55 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             .Take(limit)
             .ToList();
     }
+
+    /// <summary>
+    /// DNA twins: shows made like <paramref name="showId"/> but about something else. The DNAs are close, the two share
+    /// at least <see cref="TwinMinSharedTraits"/> traits that set them apart from the typical show, and they're the same
+    /// kind of show (a drama's twin isn't a reality show). "About something else" means few genres in common and at
+    /// least one of its own, no shared nanogenre, and neither on the provider's similar-shows list of the other: "Shows
+    /// like this" covers those.
+    /// </summary>
+    public async Task<List<DnaTwin>> GetDnaTwinsAsync(Guid showId, int limit, CancellationToken ct)
+    {
+        var dna = await db.Dna.AsNoTracking().ToDictionaryAsync(d => d.ShowId, d => d.Traits, ct);
+        if (!dna.TryGetValue(showId, out var targetDna))
+        {
+            return [];
+        }
+
+        var shows = await db.Shows.AsNoTracking().Where(s => dna.Keys.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
+        if (!shows.TryGetValue(showId, out var target))
+        {
+            return [];
+        }
+
+        var nanogenres = await db.Nanogenres.AsNoTracking().ToDictionaryAsync(n => n.ShowId, n => n.Names, ct);
+        var targetNanogenres = nanogenres.GetValueOrDefault(showId) ?? [];
+
+        return shows.Values
+            .Where(s => s.ShowId != showId && KindOf(s) == KindOf(target))
+            .Where(s => Jaccard(s.Genres, target.Genres) <= TwinMaxGenreOverlap
+                && s.Genres.Except(target.Genres, StringComparer.OrdinalIgnoreCase).Any()
+                && !target.SimilarShowIds.Contains(s.ShowId) && !s.SimilarShowIds.Contains(showId)
+                && !(nanogenres.GetValueOrDefault(s.ShowId) ?? []).Intersect(targetNanogenres).Any())
+            .Select(s => (Show: s, Similarity: DnaTraits.Similarity(targetDna, dna[s.ShowId]), Shared: SharedTraits(targetDna, dna[s.ShowId])))
+            .Where(c => c.Similarity >= TwinMinSimilarity && c.Shared.Count >= TwinMinSharedTraits)
+            .OrderByDescending(c => c.Similarity)
+            .ThenByDescending(c => c.Show.Popularity)
+            .Take(limit)
+            .Select(c => new DnaTwin(c.Show.ShowId, Math.Round(c.Similarity!.Value, 3), c.Shared,
+                c.Show.Genres.Except(target.Genres, StringComparer.OrdinalIgnoreCase).ToList()))
+            .ToList();
+    }
+
+    /// <summary>A twin's DNA is at least this similar: about the closest tenth of pairs.</summary>
+    private const double TwinMinSimilarity = 0.85;
+
+    /// <summary>Twins share at least this many distinctive traits, so the likeness is in what sets the show apart.</summary>
+    private const int TwinMinSharedTraits = 2;
+
+    /// <summary>Genre overlap (Jaccard) above this, and it's a show like this one, not a twin about something else.</summary>
+    private const double TwinMaxGenreOverlap = 0.34;
 
     /// <summary>Personalised picks for a user, excluding shows they follow or dismissed.</summary>
     public async Task<List<ScoredShow>> ComputeForUserAsync(string userId, int limit, CancellationToken ct)
@@ -244,23 +297,28 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             affinity *= 0.8;
         }
 
-        // Traits both shows have, and that set both apart from the typical show, most distinctive first.
-        var shared = DnaTraits.All
-            .Where(t => dnaA.ContainsKey(t.Key) && dnaB.ContainsKey(t.Key))
-            .Select(t => (Label: DnaTraits.LabelFor(t.Key, dnaA[t.Key]), Other: DnaTraits.LabelFor(t.Key, dnaB[t.Key]),
-                Distinctiveness: Math.Min(DnaTraits.Distinctiveness(t.Key, dnaA[t.Key]), DnaTraits.Distinctiveness(t.Key, dnaB[t.Key])),
-                t.Weight))
-            .Where(t => t.Label == t.Other && t.Distinctiveness > 0)
-            .OrderByDescending(t => t.Weight * t.Distinctiveness)
-            .Take(2)
-            .Select(t => t.Label!.ToLowerInvariant())
-            .ToList();
+        var shared = SharedTraits(dnaA, dnaB).Take(2).Select(t => t.ToLowerInvariant()).ToList();
 
         return new ShowMatch(content * (1 - DnaShare + DnaShare * affinity),
             affinity >= DnaReasonAffinity && shared.Count > 0,
             shared.Count == 0 ? null : string.Join(", ", shared),
             sharedNanogenre);
     }
+
+    /// <summary>
+    /// Labels of the traits both shows have and that set both apart from the typical show ("Drops all at once"), most
+    /// distinctive first.
+    /// </summary>
+    private static List<string> SharedTraits(IReadOnlyDictionary<string, double> a, IReadOnlyDictionary<string, double> b) =>
+        DnaTraits.All
+            .Where(t => a.ContainsKey(t.Key) && b.ContainsKey(t.Key))
+            .Select(t => (Label: DnaTraits.LabelFor(t.Key, a[t.Key]), Other: DnaTraits.LabelFor(t.Key, b[t.Key]),
+                Distinctiveness: Math.Min(DnaTraits.Distinctiveness(t.Key, a[t.Key]), DnaTraits.Distinctiveness(t.Key, b[t.Key])),
+                t.Weight))
+            .Where(t => t.Label == t.Other && t.Distinctiveness > 0)
+            .OrderByDescending(t => t.Weight * t.Distinctiveness)
+            .Select(t => t.Label!)
+            .ToList();
 
     /// <summary>"a sports comedy", "an animated family comedy".</summary>
     private static string Article(string name) => "aeiouAEIOU".Contains(name[0]) ? "an" : "a";

@@ -164,6 +164,9 @@ public record Reactions(IReadOnlyList<ReactionCount> Counts, string? Mine);
 
 public record RecommendedShow(Guid ShowId, string Title, string? PosterUrl, double Score, string Reason);
 
+/// <summary>A show made like another but about something else: the distinctive traits they share, and its other genres.</summary>
+public record DnaTwin(Guid ShowId, string Title, string? PosterUrl, double Similarity, List<string> SharedTraits, List<string> OtherGenres);
+
 // Notifications
 
 public record NotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
