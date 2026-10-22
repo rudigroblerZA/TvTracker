@@ -11,12 +11,15 @@ namespace TvTracker.Persistence;
 /// Creates or upgrades the schema at startup (and optionally seeds data) before the service starts taking requests.
 /// Contexts with EF Core migrations are migrated; the others still use EnsureCreated, which never changes an
 /// existing schema, until they move to migrations before the first production release.
+/// A context that moves to migrations names its first migration as the <c>baseline</c>: a database EnsureCreated made
+/// from the same model is then marked as having it, and migrated from there.
 /// Only one process per database should run this (for catalogdb that's Catalog.API).
 /// </summary>
 public sealed class DatabaseInitializer<TContext>(
     IServiceScopeFactory scopeFactory,
     ILogger<DatabaseInitializer<TContext>> logger,
-    Func<TContext, IServiceProvider, CancellationToken, Task>? seed) : IHostedService
+    Func<TContext, IServiceProvider, CancellationToken, Task>? seed,
+    string? baseline = null) : IHostedService
     where TContext : DbContext
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -64,8 +67,18 @@ public sealed class DatabaseInitializer<TContext>(
         var (tables, hasHistory) = await GetSchemaStateAsync(db, cancellationToken);
         if (!hasHistory && tables > 0)
         {
-            // Created by EnsureCreated before this context had migrations: there's no history to migrate from.
-            throw new PreMigrationsDatabaseException(typeof(TContext).Name);
+            // Created by EnsureCreated before this context had migrations: there's no history to migrate from, unless
+            // the context's first migration is that same schema.
+            if (baseline is null || db.Database.GetMigrations().FirstOrDefault() is not { } first || !first.EndsWith($"_{baseline}", StringComparison.Ordinal))
+            {
+                throw new PreMigrationsDatabaseException(typeof(TContext).Name);
+            }
+
+            var history = db.GetService<IHistoryRepository>();
+            await db.Database.ExecuteSqlRawAsync(history.GetCreateIfNotExistsScript(), cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(history.GetInsertScript(new HistoryRow(first, ProductInfo.GetVersion())), cancellationToken);
+            logger.LogInformation("Database for {Context} was made by EnsureCreated; marked as at migration {Baseline}", typeof(TContext).Name, first);
+            hasHistory = true;
         }
 
         List<string> pending;

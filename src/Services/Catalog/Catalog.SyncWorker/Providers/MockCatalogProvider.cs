@@ -20,6 +20,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
     public Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default) =>
         Task.FromResult<ProviderCareer?>(null);
 
+    public Task<IReadOnlyList<ProviderActingRole>?> GetCastCreditsAsync(string personExternalId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ProviderActingRole>?>(null);
+
     public Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default)
     {
         onPage?.Invoke(1);

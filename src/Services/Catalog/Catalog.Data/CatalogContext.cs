@@ -11,6 +11,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<Person> People => Set<Person>();
     public DbSet<CastMember> Cast => Set<CastMember>();
     public DbSet<ShowCreative> Creatives => Set<ShowCreative>();
+    public DbSet<PersonCastCredit> CastCredits => Set<PersonCastCredit>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
 
@@ -83,6 +84,16 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasKey(c => new { c.ShowId, c.PersonId });
             entity.HasIndex(c => c.PersonId);
             entity.HasOne(c => c.Person).WithMany().HasForeignKey(c => c.PersonId);
+        });
+
+        modelBuilder.Entity<PersonCastCredit>(entity =>
+        {
+            entity.ToTable("person_cast_credits");
+            entity.HasKey(c => new { c.PersonId, c.ShowExternalId });
+            entity.HasOne<Person>().WithMany().HasForeignKey(c => c.PersonId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(c => c.ShowExternalId).HasMaxLength(64);
+            entity.Property(c => c.Title).HasMaxLength(256);
+            entity.Property(c => c.Character).HasMaxLength(512);
         });
 
         modelBuilder.Entity<CastMember>(entity =>

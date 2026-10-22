@@ -11,7 +11,7 @@ public sealed class SeasonsInsight : IShowInsight
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
     {
         var (best, worst) = BestAndWorst(show.Seasons);
-        return insights with { Seasons = show.SeasonStats, BestSeason = best, WorstSeason = worst, Trend = Trend(show.Seasons) };
+        return insights with { Seasons = show.SeasonStats, BestSeason = best, WorstSeason = worst, Trend = Trend(show.SeasonSlope) };
     }
 
     /// <summary>
@@ -39,21 +39,12 @@ public sealed class SeasonsInsight : IShowInsight
             worst.Rating < best.Rating ? new SeasonHighlight(worst.Number, worst.Rating, source) : null);
     }
 
-    /// <summary>Least-squares slope of season ratings against season order; null with fewer than three rated seasons.</summary>
-    private static string? Trend(IReadOnlyList<SeasonSummary> seasons)
+    /// <summary>"rising", "falling" or "steady" from <see cref="ShowInsightContext.SeasonSlope"/>; null with fewer than three rated seasons.</summary>
+    private static string? Trend(double? slope) => slope switch
     {
-        var points = seasons
-            .Where(s => s.Stats.Rating.External is not null && s.RatingCounts)
-            .Select((s, i) => (X: (double)i, Y: s.Stats.Rating.External!.Value))
-            .ToList();
-        if (points.Count < 3)
-        {
-            return null;
-        }
-
-        var meanX = points.Average(p => p.X);
-        var meanY = points.Average(p => p.Y);
-        var slope = points.Sum(p => (p.X - meanX) * (p.Y - meanY)) / points.Sum(p => (p.X - meanX) * (p.X - meanX));
-        return slope > TrendThreshold ? "rising" : slope < -TrendThreshold ? "falling" : "steady";
-    }
+        null => null,
+        > TrendThreshold => "rising",
+        < -TrendThreshold => "falling",
+        _ => "steady"
+    };
 }

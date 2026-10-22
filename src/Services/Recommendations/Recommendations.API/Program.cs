@@ -10,7 +10,8 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 
 builder.AddNpgsqlDbContext<RecommendationsContext>("recommendationsdb");
-builder.Services.AddDatabaseInitializer<RecommendationsContext>();
+// Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
+builder.Services.AddDatabaseInitializer<RecommendationsContext>(baseline: "InitialCreate");
 
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
@@ -18,6 +19,7 @@ builder.Services.AddHybridCache();
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowAddedIntegrationEvent, ShowFeaturesHandler>()
     .AddSubscription<ShowUpdatedIntegrationEvent, ShowFeaturesHandler>()
+    .AddSubscription<ShowDnaChangedIntegrationEvent, ShowFeaturesHandler>()
     .AddSubscription<ShowFollowedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<EpisodeWatchedIntegrationEvent, UserSignalHandler>()

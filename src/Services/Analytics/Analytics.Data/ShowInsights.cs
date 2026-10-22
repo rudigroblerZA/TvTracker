@@ -10,6 +10,7 @@ namespace Analytics.Data;
 /// <param name="Momentum">Our users' follows; null below the minimum number of followers.</param>
 /// <param name="Patterns">How the show's episode ratings behave, from the provider's ratings; null before they were added.</param>
 /// <param name="Tags">Short labels for how the show is released and watched (see <see cref="ShowTags"/>); null before they were added.</param>
+/// <param name="Dna">The show's DNA; null before it was added.</param>
 public record ShowInsights(
     Guid ShowId,
     string Title,
@@ -27,7 +28,19 @@ public record ShowInsights(
     Viewing? Viewing = null,
     Momentum? Momentum = null,
     EpisodePatterns? Patterns = null,
-    IReadOnlyList<ShowTag>? Tags = null);
+    IReadOnlyList<ShowTag>? Tags = null,
+    ShowDna? Dna = null);
+
+/// <summary>
+/// The show's DNA: traits of its form, rhythm and quality (see <see cref="TvTracker.IntegrationEvents.DnaTraits"/>),
+/// in that list's order. Traits without enough data are left out.
+/// </summary>
+public record ShowDna(IReadOnlyList<DnaTrait> Traits);
+
+/// <param name="Value">0-1, between the trait's two ends.</param>
+/// <param name="Label">The end it leans to ("Hour-long episodes"); null in the middle.</param>
+/// <param name="Detail">The fact behind it, e.g. "About 47 min an episode".</param>
+public record DnaTrait(string Key, double Value, string? Label, string Detail);
 
 /// <param name="Key">One of <see cref="ShowTags"/>.</param>
 /// <param name="Detail">The facts behind it, e.g. "8 episodes a season · all 34 in 33 h".</param>

@@ -12,9 +12,9 @@ namespace Analytics.Worker.Insights;
 /// <list type="number">
 /// <item>Loads the <see cref="InsightSources"/>, then the shows in batches of <see cref="ShowBatchSize"/>.</item>
 /// <item>Builds each show's document by running the <see cref="IShowInsight"/> stages in order.</item>
-/// <item>Stores the document, and notes the show when its tags changed.</item>
+/// <item>Stores the document, and hands it with the stored one to every <see cref="IInsightPublication"/>.</item>
 /// <item>Hands the finished document to every <see cref="IListInsight"/>.</item>
-/// <item>Publishes the changed tags, then replaces every list in one transaction.</item>
+/// <item>Publishes what changed (tags, DNA), then replaces every list in one transaction.</item>
 /// </list>
 /// The insights only compute; loading, batching, storage and events all happen here.
 /// </summary>
@@ -23,6 +23,7 @@ public sealed class InsightsPipeline(
     IIntegrationEventOutbox outbox,
     IEnumerable<IShowInsight> stages,
     IEnumerable<IListInsight> lists,
+    IEnumerable<IInsightPublication> publications,
     TimeProvider time,
     ILogger<InsightsPipeline> logger)
 {
@@ -32,13 +33,13 @@ public sealed class InsightsPipeline(
 
     private static readonly RunFacts NoRun = new(0, 0, 0, null, null, null);
 
-    /// <param name="publishAllTags">Send every show's tags to the catalog, not just the ones that changed.</param>
+    /// <param name="publishAll">Publish every show's tags and DNA, not just the ones that changed.</param>
     /// <returns>How many shows were computed.</returns>
-    public async Task<int> RunAsync(CancellationToken ct, bool publishAllTags = false)
+    public async Task<int> RunAsync(CancellationToken ct, bool publishAll = false)
     {
         var sources = await InsightSources.LoadAsync(db, time.GetUtcNow(), ct);
         var builders = lists.Select(l => l.Begin(sources)).ToList();
-        var tagChanges = new List<ShowTagKeys>();
+        var published = publications.Select(p => p.Begin(publishAll)).ToList();
 
         foreach (var batch in sources.Shows.Keys.Chunk(ShowBatchSize))
         {
@@ -50,11 +51,13 @@ public sealed class InsightsPipeline(
                 var insights = stages.Aggregate(Blank(show), (document, stage) => stage.Apply(show, document));
 
                 var document = JsonSerializer.Serialize(insights, JsonOptions);
-                var tagKeys = (insights.Tags ?? []).Select(t => t.Key).ToList();
                 existing.TryGetValue(show.ShowId, out var row);
-                if (publishAllTags || row is null || !TagKeysOf(row.Document).SequenceEqual(tagKeys))
+                using (var previous = row is null ? null : JsonDocument.Parse(row.Document))
                 {
-                    tagChanges.Add(new ShowTagKeys(show.ShowId, tagKeys));
+                    foreach (var publication in published)
+                    {
+                        publication.Add(insights, previous?.RootElement);
+                    }
                 }
 
                 if (row is not null)
@@ -77,7 +80,7 @@ public sealed class InsightsPipeline(
             db.ChangeTracker.Clear();
         }
 
-        await PublishTagsAsync(tagChanges, ct);
+        await PublishAsync(published, ct);
         await ReplaceListsAsync(builders, ct);
 
         logger.LogInformation("Computed insights for {Shows} shows; lists: {Lists}",
@@ -89,30 +92,23 @@ public sealed class InsightsPipeline(
     private static ShowInsights Blank(ShowInsightContext show) =>
         new(show.ShowId, show.Show.Title, show.Sources.ComputedAtUtc, show.Rating, [], null, null, null, [], NoRun, null, []);
 
-    /// <summary>Sends the changed tags to the catalog through the outbox, in events of at most <see cref="ShowTagsChangedIntegrationEvent.MaxShows"/> shows.</summary>
-    private async Task PublishTagsAsync(List<ShowTagKeys> changes, CancellationToken ct)
+    /// <summary>Sends what changed through the outbox, in one save (see <see cref="IInsightPublication"/>).</summary>
+    private async Task PublishAsync(List<PublicationBuilder> published, CancellationToken ct)
     {
-        foreach (var chunk in changes.Chunk(ShowTagsChangedIntegrationEvent.MaxShows))
+        var events = published.SelectMany(p => p.Events()).ToList();
+        if (events.Count == 0)
         {
-            outbox.Add(new ShowTagsChangedIntegrationEvent(chunk));
+            return;
         }
 
-        if (changes.Count > 0)
+        foreach (var @event in events)
         {
-            await db.SaveChangesAsync(ct);
-            db.ChangeTracker.Clear();
-            await outbox.PublishAddedAsync(ct);
-            logger.LogInformation("Published tags for {Shows} shows", changes.Count);
+            outbox.Add(@event);
         }
-    }
-
-    /// <summary>The tag keys in a stored insights document (none in documents from before tags).</summary>
-    private static List<string> TagKeysOf(string document)
-    {
-        using var json = JsonDocument.Parse(document);
-        return json.RootElement.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
-            ? tags.EnumerateArray().Select(t => t.GetProperty("key").GetString()!).ToList()
-            : [];
+        await db.SaveChangesAsync(ct);
+        db.ChangeTracker.Clear();
+        await outbox.PublishAddedAsync(ct);
+        logger.LogInformation("Published {Changes}", string.Join(", ", published.Where(p => p.Count > 0).Select(p => $"{p.Name} for {p.Count} shows")));
     }
 
     private Task ReplaceListsAsync(List<ListBuilder> builders, CancellationToken ct) =>

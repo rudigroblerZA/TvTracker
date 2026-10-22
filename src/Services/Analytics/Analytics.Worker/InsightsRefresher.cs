@@ -8,8 +8,8 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
     /// <summary>Gives the event consumers (and a catalog replay) a head start before the first run.</summary>
     private static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(1);
 
-    /// <summary>How often every show's tags are sent, not just the changed ones (and on the first run after starting).</summary>
-    private static readonly TimeSpan FullTagSyncInterval = TimeSpan.FromDays(1);
+    /// <summary>How often every show's tags and DNA are sent, not just the changed ones (and on the first run after starting).</summary>
+    private static readonly TimeSpan FullSyncInterval = TimeSpan.FromDays(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -17,17 +17,17 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
         await Task.Delay(configuration.GetValue("Analytics:StartupDelay", StartupDelay), stoppingToken);
 
         using var timer = new PeriodicTimer(interval);
-        var lastFullTagSync = DateTime.MinValue;
+        var lastFullSync = DateTime.MinValue;
         do
         {
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var allTags = DateTime.UtcNow - lastFullTagSync >= FullTagSyncInterval;
-                await scope.ServiceProvider.GetRequiredService<InsightsPipeline>().RunAsync(stoppingToken, allTags);
-                if (allTags)
+                var publishAll = DateTime.UtcNow - lastFullSync >= FullSyncInterval;
+                await scope.ServiceProvider.GetRequiredService<InsightsPipeline>().RunAsync(stoppingToken, publishAll);
+                if (publishAll)
                 {
-                    lastFullTagSync = DateTime.UtcNow;
+                    lastFullSync = DateTime.UtcNow;
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

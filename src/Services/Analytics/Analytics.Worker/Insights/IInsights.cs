@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using TvTracker.EventBus;
 
 namespace Analytics.Worker.Insights;
 
@@ -62,5 +64,61 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
         await table(db).ExecuteDeleteAsync(ct);
         table(db).AddRange(rows);
         Count = rows.Count;
+    }
+}
+
+/// <summary>
+/// A part of the show document that another service keeps a copy of: tags for the catalog's search filter, DNA for
+/// recommendations. Each run starts a fresh <see cref="PublicationBuilder"/>, which compares every show's new document
+/// with the stored one; the pipeline publishes what changed through the outbox.
+/// </summary>
+public interface IInsightPublication
+{
+    /// <param name="publishAll">Send every show's value, not only changed ones (after start and daily, so lost events heal).</param>
+    PublicationBuilder Begin(bool publishAll);
+}
+
+/// <summary>A publication being collected during one run.</summary>
+public abstract class PublicationBuilder
+{
+    /// <summary>For the log: "tags", "DNA".</summary>
+    public abstract string Name { get; }
+
+    /// <summary>Shows sent by the last <see cref="Events"/>.</summary>
+    public int Count { get; protected set; }
+
+    /// <param name="previous">The show's stored document from the last run; null for a show computed for the first time.</param>
+    public abstract void Add(ShowInsights insights, JsonElement? previous);
+
+    public abstract IReadOnlyList<IntegrationEvent> Events();
+}
+
+/// <summary>A publication of one value per show, sent in events of at most <paramref name="maxPerEvent"/> shows.</summary>
+public abstract class PublicationBuilder<TValue>(bool publishAll, int maxPerEvent) : PublicationBuilder where TValue : class
+{
+    private readonly List<TValue> changed = [];
+
+    protected abstract TValue ValueOf(ShowInsights insights);
+
+    /// <summary>The value in a stored document.</summary>
+    protected abstract TValue PreviousValueOf(JsonElement document);
+
+    protected abstract bool Same(TValue previous, TValue current);
+
+    protected abstract IntegrationEvent EventFor(IReadOnlyList<TValue> values);
+
+    public override void Add(ShowInsights insights, JsonElement? previous)
+    {
+        var value = ValueOf(insights);
+        if (publishAll || previous is not { } document || !Same(PreviousValueOf(document), value))
+        {
+            changed.Add(value);
+        }
+    }
+
+    public override IReadOnlyList<IntegrationEvent> Events()
+    {
+        Count = changed.Count;
+        return changed.Chunk(maxPerEvent).Select(chunk => EventFor(chunk)).ToList();
     }
 }

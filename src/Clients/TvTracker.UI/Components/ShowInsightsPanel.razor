@@ -204,6 +204,8 @@
             }
         }
 
+        <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
+
         @if (insights.Histograms is { } histograms && (histograms.OurStars is not null || histograms.ExternalEpisodes.Count > 1))
         {
             <h3>How it's rated</h3>

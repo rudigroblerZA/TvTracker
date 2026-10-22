@@ -201,7 +201,14 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null);
+
+/// <param name="Traits">In <see cref="TvTracker.IntegrationEvents.DnaTraits.All"/> order; traits without enough data are missing.</param>
+public record ShowDna(IReadOnlyList<DnaTrait> Traits);
+
+/// <param name="Value">0-1, between the trait's two ends.</param>
+/// <param name="Label">The end it leans to; null in the middle.</param>
+public record DnaTrait(string Key, double Value, string? Label, string Detail);
 
 /// <param name="Key">e.g. "bingeable", "drops-at-once", "fan-favorite".</param>
 public record ShowTag(string Key, string Label, string Detail);
@@ -264,6 +271,18 @@ public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double
 public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double AverageRating, double SeasonAverage);
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
+
+public record ReunionRadar(int LovedShows, int ActorsPending, IReadOnlyList<Reunion> Reunions);
+
+/// <param name="IsNew">Premiering soon or in the last year.</param>
+public record Reunion(ReunionShow Show, ReunionSource From, IReadOnlyList<ReunionPerson> People, double Score, bool IsNew);
+
+/// <param name="ShowId">Set when the show is in the catalog; otherwise search finds (and imports) it.</param>
+public record ReunionShow(string ExternalId, Guid? ShowId, string Title, string? PosterUrl, ShowStatus Status, DateOnly? Premiered, double? Rating);
+
+public record ReunionSource(Guid ShowId, string Title, string? PosterUrl);
+
+public record ReunionPerson(Guid PersonId, string Name, string? CharacterThen, string? CharacterNow, bool Voice);
 
 public record Taste(RatingBias? Bias, IReadOnlyList<GenreTaste> Genres, IReadOnlyList<MonthWatch> Months, TasteProgress Progress);
 

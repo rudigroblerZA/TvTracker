@@ -423,3 +423,26 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .tonight-episodes { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 2px; }
 @media (max-width: 640px) { .tonight-actions { margin-left: 0; } }
 .tonight-result.stale { opacity: 0.5; transition: opacity 0.15s; }
+
+/* Reunion radar */
+.reunions { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
+.reunion { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
+.reunion .poster.small { width: 64px; flex: none; }
+.reunion-body { flex: 1; min-width: 0; }
+.reunion-people { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 2px; }
+
+/* Show DNA */
+.dna-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.dna summary { cursor: pointer; color: var(--accent); }
+.dna-traits { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 10px 0 0; align-items: start; }
+.dna-traits dt { font-weight: 600; font-size: 0.9rem; }
+.dna-traits dd { margin: 0; min-width: 0; }
+.dna-scale { display: grid; grid-template-columns: minmax(0, 9rem) 1fr minmax(0, 9rem); gap: 8px; align-items: center; font-size: 0.8rem; color: var(--muted); }
+.dna-scale .dna-end:last-child { text-align: right; }
+.dna-track { position: relative; height: 6px; border-radius: 3px; background: var(--border); }
+.dna-marker { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); transform: translate(-50%, -50%); }
+@media (max-width: 640px) {
+    .dna-traits { grid-template-columns: 1fr; gap: 2px; }
+    .dna-traits dd { margin-bottom: 8px; }
+    .dna-scale { grid-template-columns: minmax(0, 6rem) 1fr minmax(0, 6rem); }
+}

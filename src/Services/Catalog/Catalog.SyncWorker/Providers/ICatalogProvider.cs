@@ -32,6 +32,12 @@ public interface ICatalogProvider
 
     /// <summary>A person's whole career behind the camera, from the provider; null when it has nothing for them.</summary>
     Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The shows a person is in the main cast of, across the provider, without appearances as themselves; null when
+    /// the provider doesn't know the person.
+    /// </summary>
+    Task<IReadOnlyList<ProviderActingRole>?> GetCastCreditsAsync(string personExternalId, CancellationToken cancellationToken = default);
 }
 
 /// <param name="CastMissing">The provider failed to return the cast this time (an outage): Cast is empty, and the catalog keeps the cast it has.</param>
@@ -69,6 +75,11 @@ public record ProviderCreative(string Name, string? PhotoUrl, IReadOnlyList<stri
 /// <param name="ExecutiveProduced">Shows they were an executive producer on.</param>
 /// <param name="NotableShows">Their best-known shows (the provider's most popular), at most 10.</param>
 public record ProviderCareer(int Shows, int Created, int ExecutiveProduced, IReadOnlyList<string> NotableShows);
+
+/// <param name="Character">The character, or several joined with " / " when they play more than one.</param>
+public record ProviderActingRole(
+    string ShowExternalId, string Title, string? PosterUrl, ShowStatus Status, DateOnly? Premiered, double Popularity, double? Rating,
+    string? Character, bool Voice);
 
 public record ProviderSeason(int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc);
 
