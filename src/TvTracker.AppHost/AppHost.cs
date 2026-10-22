@@ -15,6 +15,10 @@ var postgres = builder.AddPostgres("postgres")
 // from the image tag, and doesn't recognise pgvector's tags as Postgres 18.
 postgres.WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql");
 
+// DbGate (Community Toolkit): a web UI for browsing and querying every database, already connected. Open it from the
+// dashboard's "dbgate" resource.
+postgres.WithDbGate(dbGate => dbGate.WithLifetime(ContainerLifetime.Persistent));
+
 // One database per service: no service reads another's tables.
 var identityDb = postgres.AddDatabase("identitydb");
 var catalogDb = postgres.AddDatabase("catalogdb");
