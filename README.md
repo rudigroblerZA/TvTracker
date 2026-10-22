@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar and the Show DNA panel sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel and the forecasts sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -270,6 +270,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
+| `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -423,6 +424,24 @@ How events flow:
       - A different kind of show (reality against scripted) or language counts for much less.
       - The reason names the shared distinctive traits: "Same DNA: short episodes, long seasons", or "Same DNA as Severance:
         long waits between seasons, big finales".
+  - **What's next** (show pages, signed in): forecasts for running shows, each with how sure it is.
+    - **Comes back?** For a show between seasons with nothing announced: the share of comparable seasons (same
+      rating band, point in the run and era) that got another one, against the catalog's overall 92%. It's labelled
+      a weak signal, because the catalog is mostly popular shows, which usually return.
+    - **When:** the next season's likely start, from the median of the show's last three waits between seasons, with
+      an 80% range. Past the range, it says the show is overdue.
+    - **How it'll rate:** 0.7 × the latest season's rating + 0.3 × the show's average, with an 80% range that's wider for
+      shows whose seasons vary more.
+    - **Backtested every run:** each model replays the catalog's history (what it would have said after every past
+      season) and keeps the misses as its range. On the development catalog, ratings are off by 0.33 on average
+      (1,440 seasons) and start dates by 22 days at the median (2,291 waits).
+  - **Will you finish it?** (show pages, and "Will you finish them?" on Stats): for shows you're part-way through,
+    from your own watches. It shows facts, not a probability: there isn't enough history per person for an honest one.
+    - **Pace:** your pace over the last four weeks, and when it gets you to the end of what's aired.
+    - **Status:** on track (watched in the last 14 days), slowing, or stalled (nothing for 30 days).
+    - **Your record:** "You finished 2 of the 3 other shows you got this far into", from 3 comparable shows.
+    - **Drop-off:** the episode many of our viewers stop at, when it's still ahead of you (from 5 viewers).
+    - **API:** `GET /api/v1/me/finish-outlook` and `GET /api/v1/shows/{id}/finish-outlook` on Analytics.API.
   - **Stats page — your taste:** computed on request from your own data only.
     - How your ratings compare with TVmaze's (stars doubled to its 0-10).
     - The genres you rate highest.

@@ -203,6 +203,32 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **No kind or language:** DNA is about form, not subject, and doesn't include the show's kind or language.
     Recommendations takes those from the catalog's keywords instead.
   - **Why kind matters:** without it, Succession's closest DNA was The Kardashians.
+- **Forecasts** (`Insights/Forecasts/ForecastModels.cs`, `OutlookInsight`): next season's rating, whether a show comes
+  back, and when.
+  - **Training:** the models train each run on `InsightSources.SeasonHistory`, every show's regular seasons summarised
+    by one SQL query.
+  - **Backtesting:** each model replays the past. For every past season, it asks what it would have said, compares
+    that with what happened, and keeps the misses as its 80% range (10th to 90th percentile). The run logs the
+    results ("Forecast backtests: …").
+  - **Rating:** 0.7 × last complete season + 0.3 × show average.
+    - **No trend:** the trend's direction was right for only 45% of next seasons, worse than a coin.
+    - **Mean reversion:** seasons revert towards the show's average (61% of the time when the last one was unusual).
+    - **Ranges:** separate for steady, varied and volatile shows, since the error roughly doubles from one end to
+      the other.
+  - **Renewal:** the share of comparable seasons that were followed by another.
+    - **Comparable:** the same half-point rating band, point in the run and era. Groups need 30 seasons, and back off
+      by dropping the era, then the point in the run.
+    - **Bias:** the catalog is survivor-heavy (92% of seasons came back).
+    - **Accuracy:** in a 5-fold backtest by show, the groups beat that base rate only a little (Brier 0.071 against
+      0.074), so the UI calls it a weak signal.
+  - **Timing:** the median of the last three waits beat the last wait alone (median miss 22 against 28 days). Errors
+    are kept as ratios of (wait + 30 days), since they grow with the wait. It needs two past waits.
+  - **When there's no forecast:** none for ended shows. Renewal and timing are only forecast between seasons with
+    nothing scheduled or announced; a scheduled season is a fact (`NextPremiere`).
+- **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches.
+  - **No probability:** per-person history is too thin for an honest one.
+  - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
+    the user's record from as far in, and the show's drop-off point when it's ahead of them.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,

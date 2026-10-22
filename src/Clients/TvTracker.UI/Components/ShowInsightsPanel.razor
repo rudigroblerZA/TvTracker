@@ -205,6 +205,7 @@
         }
 
         <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
+        <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>
 
         @if (insights.Histograms is { } histograms && (histograms.OurStars is not null || histograms.ExternalEpisodes.Count > 1))
         {

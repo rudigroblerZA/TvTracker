@@ -42,6 +42,15 @@ public sealed class InsightSources
 
     public required ILookup<Guid, AnnouncedSeason> AnnouncedSeasons { get; init; }
 
+    /// <summary>
+    /// Every show's regular seasons in order, summarised: the history the forecasts learn from and backtest on
+    /// (see <see cref="Forecasts"/>).
+    /// </summary>
+    public required ILookup<Guid, SeasonRecord> SeasonHistory { get; init; }
+
+    /// <summary>The forecast models, trained on <see cref="SeasonHistory"/> on first use in a run.</summary>
+    public ForecastModels Forecasts => field ??= ForecastModels.Train(this);
+
     public required ILookup<Guid, DateTime> FollowDates { get; init; }
 
     public required ILookup<Guid, string> FollowersByShow { get; init; }
@@ -83,6 +92,25 @@ public sealed class InsightSources
                     .ToListAsync(ct))
                 .ToLookup(r => r.ShowId, r => (r.Stars, r.Count)),
             AnnouncedSeasons = (await db.AnnouncedSeasons.AsNoTracking().ToListAsync(ct)).ToLookup(a => a.ShowId),
+            SeasonHistory = (await db.Episodes.AsNoTracking()
+                    .Where(e => e.SeasonNumber > 0)
+                    .GroupBy(e => new { e.ShowId, e.SeasonNumber })
+                    .Select(g => new
+                    {
+                        g.Key.ShowId,
+                        g.Key.SeasonNumber,
+                        Episodes = g.Count(),
+                        Aired = g.Count(e => e.AirsAtUtc <= now),
+                        First = g.Min(e => e.AirsAtUtc),
+                        LastAired = g.Where(e => e.AirsAtUtc <= now).Max(e => e.AirsAtUtc),
+                        Rated = g.Count(e => e.AirsAtUtc <= now && e.ExternalRating != null),
+                        RatingSum = g.Where(e => e.AirsAtUtc <= now && e.ExternalRating != null).Sum(e => e.ExternalRating)
+                    })
+                    .ToListAsync(ct))
+                .OrderBy(s => s.SeasonNumber)
+                .Select(s => new SeasonRecord(s.ShowId, s.SeasonNumber, s.Episodes, s.Aired, s.First, s.LastAired,
+                    s.Rated >= SeasonSummary.MinRatedEpisodes ? Math.Round(s.RatingSum!.Value / s.Rated, 2) : null))
+                .ToLookup(s => s.ShowId),
             FollowDates = follows.ToLookup(f => f.ShowId, f => f.FollowedAtUtc),
             FollowersByShow = follows.ToLookup(f => f.ShowId, f => f.UserId)
         };
@@ -101,4 +129,13 @@ public sealed class InsightSources
     /// for credits stored before ids were sent (the next catalog replay fills those in).
     /// </summary>
     public static string PersonKey(CastCopy credit) => credit.PersonId?.ToString() ?? $"name:{credit.PersonName}";
+}
+
+/// <summary>A regular season, summarised for the forecasts.</summary>
+/// <param name="LastAired">The latest aired episode's air time; null before any aired.</param>
+/// <param name="Rating">The provider's average for its aired episodes; null with fewer than <see cref="SeasonSummary.MinRatedEpisodes"/> rated.</param>
+public record SeasonRecord(Guid ShowId, int Number, int Episodes, int Aired, DateTimeOffset? First, DateTimeOffset? LastAired, double? Rating)
+{
+    /// <summary>Every episode has aired.</summary>
+    public bool Complete => Aired > 0 && Aired == Episodes;
 }

@@ -36,6 +36,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Show DNA: the trait profile on show pages. Recommendations use DNA either way." }
+    },
+    "forecasts": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Forecasts: the What's next panel on show pages, and Will you finish it? on show pages and Stats." }
     }
   }
 }

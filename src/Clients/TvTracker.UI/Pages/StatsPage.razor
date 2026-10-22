@@ -139,6 +139,22 @@
                     </div>
                 }
 
+                <Feature Flag="@FeatureFlags.Forecasts">
+                    @if (finishing is { Count: > 0 })
+                    {
+                        <h3>Will you finish them?</h3>
+                        <ul class="finish-list">
+                            @foreach (var outlook in finishing)
+                            {
+                                <li @key="outlook.ShowId">
+                                    <a class="strong" href="shows/@outlook.ShowId">@outlook.Title</a>
+                                    <FinishOutlookText Outlook="outlook" />
+                                </li>
+                            }
+                        </ul>
+                    }
+                </Feature>
+
                 @if (taste.Progress is { } progress && progress.Finished + progress.Watching + progress.Dropped > 0)
                 {
                     <h3>Finished, watching, dropped</h3>
@@ -172,6 +188,7 @@
 @code {
     private Stats? stats;
     private Taste? taste;
+    private List<FinishOutlook>? finishing;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -191,6 +208,7 @@
         try
         {
             taste = await Analytics.GetTasteAsync();
+            finishing = await Analytics.GetFinishOutlooksAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

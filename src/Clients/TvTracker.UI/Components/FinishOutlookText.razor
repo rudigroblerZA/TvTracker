@@ -1,0 +1,35 @@
+@* "Will you finish it?" for one show, in sentences: progress, pace or stall, your record from this far in, and the drop-off ahead. *@
+<div class="finish-outlook">
+    <div>
+        <span class="tag finish-@Outlook.Status">@StatusLabel</span>
+        <span class="small"> @Outlook.Watched of @Outlook.Aired episodes · @Format.Hours(Outlook.MinutesLeft) left</span>
+    </div>
+    <div class="small">@PaceText</div>
+    @if (Outlook.Record is { } record)
+    {
+        <div class="small muted">You finished @record.Finished of the @record.Comparable other shows you got this far into.</div>
+    }
+    @if (Outlook.DropOffAhead is { } dropOff)
+    {
+        <div class="small muted">@Format.Percent(dropOff.Share) of our viewers stopped after @Format.EpisodeCode(dropOff.SeasonNumber, dropOff.EpisodeNumber) “@dropOff.Title”, which is still ahead of you.</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public FinishOutlook Outlook { get; set; } = null!;
+
+    private string StatusLabel => Outlook.Status switch
+    {
+        "on-track" => "On track",
+        "slowing" => "Slowing down",
+        _ => "Stalled"
+    };
+
+    private string PaceText => Outlook switch
+    {
+        { FinishBy: { } finishBy, EpisodesPerWeek: var pace } =>
+            $"At {pace:0.#} episode{(pace == 1 ? "" : "s")} a week, you'd finish what's aired by {finishBy:d MMMM yyyy}.",
+        { Status: "stalled" } => $"Nothing watched since {Outlook.LastWatchedAtUtc:d MMMM yyyy}.",
+        _ => $"Last watched {Format.Relative(new DateTimeOffset(DateTime.SpecifyKind(Outlook.LastWatchedAtUtc, DateTimeKind.Utc)))}."
+    };
+}

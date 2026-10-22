@@ -1,0 +1,61 @@
+@inject AnalyticsClient Analytics
+
+@* What's next for a running show (forecasts, with how sure they are) and, for a show you've started, whether you're likely to finish it. *@
+@if (Outlook is not null || finish is not null)
+{
+    <h3>What's next</h3>
+    @if (finish is not null)
+    {
+        <FinishOutlookText Outlook="finish" />
+    }
+    @if (Outlook?.Renewal is { } renewal)
+    {
+        <p>
+            <span>Coming back? <strong>@Format.Percent(renewal.Share)</strong> of @renewal.Comparable comparable seasons got another one</span><span class="muted"> (@renewal.Basis; @Format.Percent(renewal.Overall) across the catalog). A weak signal: the catalog is mostly popular shows, which usually return.</span>
+        </p>
+    }
+    @if (Outlook?.NextSeason is { } next)
+    {
+        <p>
+            @if (next.Overdue)
+            {
+                <span class="tag">Overdue</span><span> Season @next.SeasonNumber would usually have started by @next.Latest.ToString("MMMM yyyy"): the wait is now longer than 9 in 10 forecasts like this allowed for.</span>
+            }
+            else
+            {
+                <span>@(Outlook.Renewal is null ? "Season" : "If it comes back, season") @next.SeasonNumber is likely around <strong>@next.Likely.ToString("MMMM yyyy")</strong></span><span class="muted"> (@next.Earliest.ToString("MMM yyyy") to @next.Latest.ToString("MMM yyyy"), from the show's past waits between seasons).</span>
+            }
+        </p>
+    }
+    @if (Outlook?.NextSeasonRating is { } rating)
+    {
+        <p>
+            <span>Season @rating.SeasonNumber is likely to rate about <strong>@Format.Rating(rating.Rating)</strong></span><span class="muted"> (@Format.Rating(rating.Low) to @Format.Rating(rating.High) on TVmaze). Seasons tend to land near the last one, pulled towards the show's average.</span>
+        </p>
+    }
+    @if (Outlook is not null)
+    {
+        <p class="muted small">Forecasts are checked against the catalog's past seasons every hour; the ranges are where 8 in 10 of those checks landed.</p>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    [Parameter] public Outlook? Outlook { get; set; }
+
+    private FinishOutlook? finish;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            finish = await Analytics.GetFinishOutlookAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra: the forecasts don't depend on it.
+            finish = null;
+        }
+    }
+}

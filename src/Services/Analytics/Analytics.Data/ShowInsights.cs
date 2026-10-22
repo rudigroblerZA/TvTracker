@@ -11,6 +11,7 @@ namespace Analytics.Data;
 /// <param name="Patterns">How the show's episode ratings behave, from the provider's ratings; null before they were added.</param>
 /// <param name="Tags">Short labels for how the show is released and watched (see <see cref="ShowTags"/>); null before they were added.</param>
 /// <param name="Dna">The show's DNA; null before it was added.</param>
+/// <param name="Outlook">Forecasts for a running show; null for ended shows and before they were added.</param>
 public record ShowInsights(
     Guid ShowId,
     string Title,
@@ -29,7 +30,31 @@ public record ShowInsights(
     Momentum? Momentum = null,
     EpisodePatterns? Patterns = null,
     IReadOnlyList<ShowTag>? Tags = null,
-    ShowDna? Dna = null);
+    ShowDna? Dna = null,
+    Outlook? Outlook = null);
+
+/// <summary>
+/// What's likely next for a running show, from models trained and backtested on the catalog's own season history each
+/// run. Each part is null when the show doesn't qualify (ended, too little history, or the answer is already known).
+/// </summary>
+public record Outlook(RatingForecast? NextSeasonRating, RenewalOutlook? Renewal, PremiereForecast? NextSeason);
+
+/// <summary>The next season's average episode rating on the provider.</summary>
+/// <param name="Low">With <paramref name="High"/>, the 80% range: in backtests, 8 in 10 forecasts like it landed inside.</param>
+/// <param name="Backtested">How many past seasons the model was checked against.</param>
+public record RatingForecast(int SeasonNumber, double Rating, double Low, double High, int Backtested);
+
+/// <summary>How often comparable shows came back after the season this show is on: a weak signal, stated as such.</summary>
+/// <param name="Share">Comparable shows that got another season, 0-1.</param>
+/// <param name="Comparable">How many seasons of comparable shows it's based on.</param>
+/// <param name="Basis">What made them comparable, e.g. "rated 8-8.5 after their second season, since 2020".</param>
+/// <param name="Overall">The share for every show in the catalog, for comparison.</param>
+public record RenewalOutlook(int AfterSeason, double Share, int Comparable, string Basis, double Overall);
+
+/// <summary>When the next season is likely to start, from the show's own waits between seasons.</summary>
+/// <param name="Earliest">With <paramref name="Latest"/>, the 80% range from backtests.</param>
+/// <param name="Overdue">Already past <paramref name="Latest"/>: a longer wait than 9 in 10 comparable ones.</param>
+public record PremiereForecast(int SeasonNumber, DateOnly Likely, DateOnly Earliest, DateOnly Latest, bool Overdue, int Backtested);
 
 /// <summary>
 /// The show's DNA: traits of its form, rhythm and quality (see <see cref="TvTracker.IntegrationEvents.DnaTraits"/>),
