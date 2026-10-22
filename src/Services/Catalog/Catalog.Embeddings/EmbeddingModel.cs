@@ -34,7 +34,7 @@ public sealed class EmbeddingModel
     /// <summary>Stored with each vector, so changing the model re-embeds the catalog. Set from the configuration key.</summary>
     public string Id { get; set; } = "";
 
-    public EmbeddingSource Source { get; set; } = EmbeddingSource.Onnx;
+    public EmbeddingSource Source { get; set; } = EmbeddingSource.Server;
 
     /// <summary>
     /// The server's OpenAI-compatible base address, for <see cref="EmbeddingSource.Server"/>. Docker Model Runner's
