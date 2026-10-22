@@ -24,7 +24,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Ratings.API | ratings, comments, reactions | |
 | Recommendations.API | picks, dismissals | |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
-| Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsComputer`; publishes show tags |
+| Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ...) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
@@ -159,6 +159,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 - **Copy of the world:** Analytics builds its own copy of the catalog and of users' ratings, watches and follows from
   events. Activity from before Analytics existed isn't replayed.
+- **Insights pipeline** (`Analytics.Worker/Insights`): `InsightsPipeline` does the plumbing, and each insight is its
+  own small class that only computes. All of them are registered in `AddInsights`, where order matters.
+  - **Plumbing:** loads `InsightSources` once (catalog copy, ratings, follows, cast, makers), then shows in batches of
+    100 (episodes, watches). It stores each document, publishes changed tags, and replaces every list in one
+    transaction.
+  - **`IShowInsight`:** a stage of the show document (seasons, top episodes, run, next premiere, shared cast,
+    patterns, tags, histograms, viewing, momentum). Stages run in registration order on `ShowInsightContext`, which
+    works out the shared figures once: seasons, visible ratings, `WellRated`, `ListScore`.
+  - **`IShowTagRule`:** one tag. Tags appear in registration order.
+  - **`IListInsight`:** a table built across shows (premieres, top episodes, discovery, actor insights). Each run
+    starts a fresh `ListBuilder` that sees every finished show document.
+  - **New data:** an insight that needs data nothing loads yet adds it to `InsightSources`.
+  - **Why:** it replaced a single 930-line `InsightsComputer`. The split was checked with a fixed clock, and every
+    document, list row and tag event came out byte-identical.
 - **Privacy rule:** a figure derived from our users needs at least 5 users or ratings behind it (`MinUsersToShow`,
   `MinRatingsToShow`). The exception is "your taste" (`TasteApi`), which uses only the caller's own data.
 - **Show tags** (keys in `ShowTags`): `drops-at-once` (or "drops in parts"), `bingeable`, `weekend-binge`,

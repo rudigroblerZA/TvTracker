@@ -1,5 +1,6 @@
 using Analytics.Data;
 using Analytics.Worker;
+using Analytics.Worker.Insights;
 using Analytics.Worker.IntegrationEvents;
 using TvTracker.IntegrationEvents;
 
@@ -31,7 +32,7 @@ builder.AddRabbitMQEventBus("eventbus")
 builder.Services.AddIntegrationEventOutbox<AnalyticsContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<InsightsComputer>();
+builder.Services.AddInsights();
 builder.Services.AddHostedService<InsightsRefresher>();
 
 // Backfill on first start; the sync worker's internal replay endpoint.

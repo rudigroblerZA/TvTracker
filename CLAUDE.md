@@ -45,6 +45,9 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 - **Ids the app sets** need `ValueGeneratedNever()` in the model.
 - **TVmaze calls** share one 20-per-10 s limiter. Background work must be throttled, and a failure for one show must not
   stop a loop (catch per item, retry later).
+- **Analytics insights:** add a class (`IShowInsight` for part of the show document, `IShowTagRule` for a tag,
+  `IListInsight` for a table built across shows) and register it in `AddInsights`. Insights only compute; loading,
+  batching, saving and events stay in `InsightsPipeline`.
 - **Privacy:** anything Analytics shows about our users needs 5 or more users or ratings behind it.
 - **Signed-in features:** endpoints that need sign-in return 401 without a valid token, and the UI hides them when
   signed out (tags, the tag filter).

@@ -1,3 +1,5 @@
+using Analytics.Worker.Insights;
+
 namespace Analytics.Worker;
 
 /// <summary>Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour).</summary>
@@ -22,7 +24,7 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var allTags = DateTime.UtcNow - lastFullTagSync >= FullTagSyncInterval;
-                await scope.ServiceProvider.GetRequiredService<InsightsComputer>().ComputeAllAsync(stoppingToken, allTags);
+                await scope.ServiceProvider.GetRequiredService<InsightsPipeline>().RunAsync(stoppingToken, allTags);
                 if (allTags)
                 {
                     lastFullTagSync = DateTime.UtcNow;
