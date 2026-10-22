@@ -17,6 +17,8 @@
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
+    <!-- Community Toolkit: DbGate, a web UI for the Postgres databases. Released separately from Aspire. -->
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" Version="13.6.0" />
   </ItemGroup>
 
   <ItemGroup Label="Aspire client integrations (services)">

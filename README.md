@@ -217,6 +217,7 @@ Useful local addresses:
 | Mobile BFF | http://localhost:5110 |
 | Keycloak admin console | http://localhost:8080 (admin / admin) |
 | RabbitMQ management | link on the Aspire dashboard |
+| DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
 ### Bulk import
 
