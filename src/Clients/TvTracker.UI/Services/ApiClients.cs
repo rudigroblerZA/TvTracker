@@ -242,6 +242,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<Dictionary<Guid, List<ShowTag>>?> GetTagsAsync(IEnumerable<Guid> showIds, CancellationToken ct = default) =>
         GetAsync<Dictionary<Guid, List<ShowTag>>>(ApiClients.Analytics, $"api/v1/insights/tags?ids={string.Join(',', showIds)}", ct);
 
+    /// <summary>"Will you finish it?" for every show the user is part-way through.</summary>
+    public Task<List<FinishOutlook>?> GetFinishOutlooksAsync(CancellationToken ct = default) =>
+        GetAsync<List<FinishOutlook>>(ApiClients.Analytics, "api/v1/me/finish-outlook", ct);
+
+    /// <summary>"Will you finish it?" for one show; null when the user hasn't started it or is caught up.</summary>
+    public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
+
     /// <summary>Shows where actors from the user's favourites work together again (the reunion radar).</summary>
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
         GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
