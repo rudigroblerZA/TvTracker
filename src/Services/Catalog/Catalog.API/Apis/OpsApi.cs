@@ -1,7 +1,11 @@
+using System.Reflection;
 using System.Text.Json;
+using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
+using OpenFeature;
+using TvTracker;
 
 namespace Catalog.API.Apis;
 
@@ -21,7 +25,30 @@ public record CatalogOpsStats(
     DateTime? LastSyncedAtUtc,
     IReadOnlyList<OpsGenre> TopGenres,
     IReadOnlyList<OpsRecentShow> RecentShows,
-    IReadOnlyList<OpsActor> TopActors);
+    IReadOnlyList<OpsActor> TopActors,
+    OpsBackfills Backfills,
+    OpsNanogenres Nanogenres,
+    OpsUniverses? Universes,
+    IReadOnlyList<OpsFlag> Flags);
+
+/// <summary>The sync worker's slow background fetches from the provider, and how far through they are.</summary>
+/// <param name="Actors">People in a catalog show's cast with a provider id: the ones the cast-credit backfill fetches.</param>
+/// <param name="ActorsWithCredits">Of those, fetched within the month (the reunion radar's data).</param>
+/// <param name="ShowsWithCrew">Shows whose creators and producers have been imported.</param>
+/// <param name="PeopleWithCareers">People whose career figures (shows created, produced) have been fetched.</param>
+public record OpsBackfills(int Actors, int ActorsWithCredits, int ProviderCastCredits, DateTime? LastCastCreditsAtUtc,
+    int ShowsWithCrew, int PeopleWithCareers);
+
+/// <param name="Clusters">Found by clustering; the rest are small genre pairings.</param>
+public record OpsNanogenres(int Count, int Clusters, int ShowsCovered, DateTime? ComputedAtUtc, IReadOnlyList<OpsNamedCount> Largest);
+
+/// <summary>Null until the universe map has been built (it's cached for 30 minutes).</summary>
+public record OpsUniverses(int Count, int ShowsCovered, IReadOnlyList<OpsNamedCount> Largest);
+
+public record OpsNamedCount(string Name, int Count);
+
+/// <param name="On">Evaluated without a user, so a flag targeting particular users shows its default here.</param>
+public record OpsFlag(string Key, bool On);
 
 /// <param name="Current">Shows embedded with the current model since their last sync.</param>
 /// <param name="Stale">Embedded, but synced since or by another model; the sync worker redoes these within a minute.</param>
@@ -34,8 +61,9 @@ public record OpsRecentShow(Guid Id, string Title, string? PosterUrl, string? Ne
 public record OpsActor(Guid Id, string Name, string? PhotoUrl, int Shows, IReadOnlyList<string> ShowTitles);
 
 /// <summary>
-/// A developer dashboard at /ops: what the catalog holds, how much of it is indexed for semantic search, what
-/// Analytics has computed, the busiest actors, and the bulk import job. It refreshes itself every 10 seconds.
+/// A developer dashboard at /ops: what the catalog holds, how much of it is indexed for semantic search, the background
+/// backfills, nanogenres and universes, what Analytics has computed, the feature flags, the busiest actors, and the bulk
+/// import job. It refreshes itself every 10 seconds.
 /// Development only: it isn't signed in and the mobile gateway forwards /catalog/** here.
 /// </summary>
 public static class OpsApi
@@ -47,19 +75,21 @@ public static class OpsApi
     }
 
     private static async Task<OpsStats> GetStatsAsync(
-        CatalogContext db, EmbeddingModel model, IHttpClientFactory httpFactory, TimeProvider time, ILogger<OpsStats> logger, CancellationToken ct)
+        CatalogContext db, EmbeddingModel model, Universes universes, IFeatureClient features, IHttpClientFactory httpFactory, TimeProvider time,
+        ILogger<OpsStats> logger, CancellationToken ct)
     {
         var now = time.GetUtcNow();
 
         // The other services' sections are optional: if one is down the page shows the rest.
         var analytics = FetchAsync(httpFactory, "analytics", "api/v1/ops/stats", logger, ct);
         var bulkImport = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/bulk/current", logger, ct);
-        var catalog = await GetCatalogStatsAsync(db, model.Id, now, ct);
+        var catalog = await GetCatalogStatsAsync(db, model.Id, universes, features, now, ct);
 
         return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport);
     }
 
-    private static async Task<CatalogOpsStats> GetCatalogStatsAsync(CatalogContext db, string model, DateTimeOffset now, CancellationToken ct)
+    private static async Task<CatalogOpsStats> GetCatalogStatsAsync(
+        CatalogContext db, string model, Universes universes, IFeatureClient features, DateTimeOffset now, CancellationToken ct)
     {
         var shows = await db.Shows.CountAsync(ct);
         var current = await db.ShowEmbeddings
@@ -110,7 +140,65 @@ public static class OpsApi
                 .Where(a => people.ContainsKey(a.PersonId))
                 .Select(a => new OpsActor(a.PersonId, people[a.PersonId].Name, people[a.PersonId].PhotoUrl, a.Shows,
                     credits.Where(c => c.PersonId == a.PersonId).OrderByDescending(c => c.Popularity).Select(c => c.Title).Take(4).ToList()))
+                .ToList(),
+            Backfills: await GetBackfillsAsync(db, now, ct),
+            Nanogenres: new OpsNanogenres(
+                await db.Nanogenres.CountAsync(ct),
+                await db.Nanogenres.CountAsync(n => n.Source == "cluster", ct),
+                await db.Shows.CountAsync(s => s.Nanogenres.Count > 0, ct),
+                await db.Nanogenres.MaxAsync(n => (DateTime?)n.ComputedAtUtc, ct),
+                await db.Nanogenres.OrderByDescending(n => n.ShowCount).ThenBy(n => n.Name).Take(6)
+                    .Select(n => new OpsNamedCount(n.Name, n.ShowCount)).ToListAsync(ct)),
+            Universes: await GetUniversesAsync(db, universes, ct),
+            Flags: await GetFlagsAsync(features, ct));
+    }
+
+    private static async Task<OpsBackfills> GetBackfillsAsync(CatalogContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var monthAgo = now.UtcDateTime.AddDays(-30);
+        var actors = db.People.Where(p => p.ExternalId != null && db.Cast.Any(c => c.PersonId == p.Id));
+        return new OpsBackfills(
+            await actors.CountAsync(ct),
+            await actors.CountAsync(p => p.CastCreditsRefreshedAtUtc >= monthAgo, ct),
+            await db.CastCredits.CountAsync(ct),
+            await db.People.MaxAsync(p => p.CastCreditsRefreshedAtUtc, ct),
+            await db.Shows.CountAsync(s => s.CreativesImported, ct),
+            await db.People.CountAsync(p => p.CareerRefreshedAtUtc != null, ct));
+    }
+
+    /// <summary>The universe map's size and largest universes; null if it can't be built right now.</summary>
+    private static async Task<OpsUniverses?> GetUniversesAsync(CatalogContext db, Universes universes, CancellationToken ct)
+    {
+        var map = await universes.GetAsync(ct);
+        var largest = map.Universes.OrderByDescending(u => u.Shows.Count).Take(6).ToList();
+        var ids = largest.SelectMany(u => u.Shows).ToList();
+        var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+        return new OpsUniverses(
+            map.Universes.Count,
+            map.UniverseOfShow.Count,
+            largest
+                .Where(u => u.Shows.All(shows.ContainsKey))
+                .Select(u =>
+                {
+                    var members = u.Shows.Select(id => shows[id]).ToList();
+                    return new OpsNamedCount(UniverseApi.Name(members, UniverseApi.Hub(members, u.Links)), members.Count);
+                })
                 .ToList());
+    }
+
+    /// <summary>Every flag in <see cref="FeatureFlags"/>, as flagd answers for a signed-out caller.</summary>
+    private static async Task<List<OpsFlag>> GetFlagsAsync(IFeatureClient features, CancellationToken ct)
+    {
+        var keys = typeof(FeatureFlags).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+        var flags = new List<OpsFlag>();
+        foreach (var key in keys)
+        {
+            flags.Add(new OpsFlag(key, await features.GetBooleanValueAsync(key, FeatureFlags.DefaultValue, cancellationToken: ct)));
+        }
+        return flags;
     }
 
     /// <summary>The JSON another service returns, or null when it's down, slow, or has nothing (404).</summary>
