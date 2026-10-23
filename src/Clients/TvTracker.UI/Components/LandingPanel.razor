@@ -1,0 +1,39 @@
+@* Does an ended show stick the landing? Its finale and final season against the rest, without naming the finale. *@
+@if (Landing is { } landing)
+{
+    <h3>Does it stick the landing?</h3>
+    <p><span class="tag landing-@landing.Verdict">@Headline(landing)</span><span>@($" {Detail(landing)}")</span></p>
+    <p class="small muted">Spoiler-free: from TVmaze's ratings of the last episode and season against the rest.</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public Landing? Landing { get; set; }
+
+    private static string Headline(Landing landing) => landing.Verdict switch
+    {
+        "sticks" => "Sticks the landing",
+        "great-finale" => "Great finale, weaker last season",
+        "finale-lets-down" => "The finale lets it down",
+        "fizzles" => "Fizzles out",
+        _ => "Ends as it ran"
+    };
+
+    private static string Detail(Landing landing)
+    {
+        var typical = Format.Rating(landing.ShowMedian);
+        var finale = landing.Verdict == "as-it-ran"
+            ? $"The finale rates {Format.Rating(landing.FinaleRating)}, close to its typical episode ({typical})"
+            : landing.FinaleBeats >= 0.995 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, higher than any other episode (typical: {typical})"
+            : landing.FinaleBeats <= 0.005 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, lower than any other episode (typical: {typical})"
+            : landing.FinaleBeats >= 0.5 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, above {Format.Percent(landing.FinaleBeats)} of its episodes (typical: {typical})"
+            : $"The finale rates {Format.Rating(landing.FinaleRating)}, below {Format.Percent(1 - landing.FinaleBeats)} of its episodes (typical: {typical})";
+        var season = landing.FinalSeasonRank is { } rank
+            ? rank == 1 ? "the final season is its best"
+            : rank == landing.RankedSeasons ? "the final season is its weakest"
+            : $"the final season is its {Ordinal(rank)} best of {landing.RankedSeasons}"
+            : null;
+        return season is null ? $"{finale}." : $"{finale}, and {season}.";
+    }
+
+    private static string Ordinal(int n) => n + (n % 100 is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
+}

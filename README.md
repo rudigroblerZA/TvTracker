@@ -263,7 +263,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -276,6 +276,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
+| `endings` | "Does it stick the landing?" on ended shows' pages, and the Great endings list on Discover |
 | `time-machine` | `/time-machine`, its teaser on Home and link on Insights, and its endpoint |
 | `creator-fingerprint` | The "Creator fingerprint" section on person pages, and its endpoint |
 | `gets-good` | "When it gets good" on show pages, its line in "Will you finish it?", and the Worth the wait list on Discover |
@@ -376,6 +377,7 @@ How events flow:
     - hidden gems: rated 7.5+, outside the catalog's most popular 40% on TVmaze, and few of our users follow them;
     - most consistent and biggest rollercoasters, among well-rated shows;
     - best season finales;
+    - great endings: well-rated (7.5+) ended shows that stick the landing, most popular first;
     - worth the wait: well-rated shows (7.5+) with a slow start that rate at least 0.4 higher from the episode where
       they get good, most popular first (Person of Interest, Dark, Slow Horses, Severance).
   - **Show page — prolific creators and producers:** who made the show, featuring the most prolific person.
@@ -423,6 +425,14 @@ How events flow:
       people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
+  - **Does it stick the landing?** (ended shows' pages, signed in; spoiler-free): the finale and final season against
+    the rest of the show, from TVmaze's ratings, without naming the finale.
+    - **Verdicts:** "Sticks the landing" (The Americans, Succession, Better Call Saul), "Great finale, weaker last
+      season" (The Office), "The finale lets it down" (Seinfeld), "Fizzles out" (Game of Thrones, Dexter, How I Met Your
+      Mother), and "Ends as it ran" (Breaking Bad, Friends).
+    - **How:** the finale 0.3+ above or below the median episode is strong or weak; the final season 0.3+ below the
+      median season is weak; the season's rank needs three rated seasons. 235 of 289 ended shows get a verdict.
+    - **Great endings:** a Discover list of well-rated (7.5+) ended shows that stick the landing, most popular first.
   - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
     - **This week in TV history** (the default): what premiered and what ended this week in past years, and the
       best-rated episode of each year that week. Home shows four of the best-known milestones ("Once Upon a Time
