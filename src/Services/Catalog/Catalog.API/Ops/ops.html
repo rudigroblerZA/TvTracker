@@ -49,6 +49,8 @@
   .down { color: var(--bad); }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--good); margin-right: 6px; }
   .dot.off { background: var(--bad); }
+  .flags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge.bad { color: var(--bad); border-color: currentColor; }
   @media (max-width: 600px) {
     header, main { padding-left: 16px; padding-right: 16px; }
     .grid2, .grid3 { grid-template-columns: 1fr; }
@@ -71,10 +73,17 @@
     <div class="panel"><h2>Upcoming premieres</h2><ul class="rows" id="premieres"></ul></div>
     <div class="panel"><h2>Most shared cast</h2><ul class="rows" id="connected"></ul></div>
   </section>
+  <section class="grid3">
+    <div class="panel"><h2>Largest nanogenres</h2><ul class="rows" id="nanogenres"></ul></div>
+    <div class="panel"><h2>Largest universes</h2><ul class="rows" id="universes"></ul></div>
+    <div class="panel"><h2>Worth the wait</h2><ul class="rows" id="worth-the-wait"></ul></div>
+  </section>
   <section class="grid2">
     <div class="panel"><h2>Genres</h2><div id="genres"></div></div>
     <div class="panel"><h2>Bulk import</h2><div id="bulk"></div></div>
   </section>
+  <section class="panel"><h2>Feature flags</h2><div class="flags" id="flags"></div>
+    <div class="muted small" style="margin-top:8px">As flagd answers a signed-out caller; edit <code>src/TvTracker.AppHost/Flags/flagd.json</code> to change one while everything runs.</div></section>
 </main>
 <script>
 "use strict";
@@ -105,6 +114,8 @@ const meter = parts => `<div class="meter">${parts.map(([v, total, color]) => `<
 
 function render(data) {
   const c = data.catalog, a = data.analytics, b = data.bulkImport, ix = c.semanticIndex;
+  const bf = c.backfills, ng = c.nanogenres, u = c.universes;
+  const unavailable = empty("Analytics.API unavailable");
   const statuses = Object.entries(c.showsByStatus).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${n(v)} ${esc(k.toLowerCase())}`).join(" · ");
 
   $("tiles").innerHTML = [
@@ -121,7 +132,32 @@ function render(data) {
       : tile("Insights", `<span class="down">—</span>`, "Analytics.API unavailable"),
     a ? tile("Activity", n(a.activeUsers), `users · ${n(a.follows)} follows · ${n(a.watches)} watches<br>${n(a.showRatings + a.episodeRatings)} ratings`)
       : tile("Activity", `<span class="down">—</span>`, "Analytics.API unavailable"),
+    tile("Cast credits", `${pct(bf.actorsWithCredits, bf.actors)}%`,
+      `${n(bf.actorsWithCredits)} / ${n(bf.actors)} actors fetched this month · ${n(bf.providerCastCredits)} credits<br>last ${ago(bf.lastCastCreditsAtUtc)} · for the reunion radar`,
+      meter([[bf.actorsWithCredits, bf.actors, "var(--good)"]])),
+    tile("Crew", `${pct(bf.showsWithCrew, c.shows)}%`,
+      `${n(bf.showsWithCrew)} shows with makers · ${n(bf.peopleWithCareers)} careers`,
+      meter([[bf.showsWithCrew, c.shows, "var(--good)"]])),
+    tile("Nanogenres", n(ng.count), `${n(ng.clusters)} clusters · ${n(ng.count - ng.clusters)} pairings<br>${n(ng.showsCovered)} shows (${pct(ng.showsCovered, c.shows)}%) · ${ago(ng.computedAtUtc)}`),
+    u ? tile("Universes", n(u.count), `${n(u.showsCovered)} shows in one`)
+      : tile("Universes", `<span class="down">—</span>`, "map not built"),
+    a ? tile("Show DNA", `${n(a.computed.showsWithDna)}<span class="muted small"> / ${n(a.shows)}</span>`,
+          `shows with DNA · ${n(a.computed.creatorFingerprints)} creator fingerprints<br>${n(a.computed.actorInsights)} actor insights · ${n(a.computed.castCreditCopies)} reunion credits`,
+          meter([[a.computed.showsWithDna, a.shows, "var(--accent)"]]))
+      : tile("Show DNA", `<span class="down">—</span>`, "Analytics.API unavailable"),
+    a ? tile("Forecasts & turns", n(a.computed.forecasts),
+          `running shows forecast<br>${n(a.computed.getsGoodTurns)} get good later · ${n(a.computed.goodFromTheStart)} good from the start`)
+      : tile("Forecasts & turns", `<span class="down">—</span>`, "Analytics.API unavailable"),
   ].join("");
+
+  $("nanogenres").innerHTML = ng.largest.length ? ng.largest.map(x => `
+    <li><div class="grow clip">${esc(x.name)}</div><span class="num">${n(x.count)} shows</span></li>`).join("") : empty("Not discovered yet");
+  $("universes").innerHTML = !u ? empty("Map not built") : u.largest.length ? u.largest.map(x => `
+    <li><div class="grow clip">${esc(x.name)}</div><span class="num">${n(x.count)} shows</span></li>`).join("") : empty("None found");
+  $("worth-the-wait").innerHTML = !a ? unavailable : a.worthTheWait.length ? a.worthTheWait.map(w => `
+    <li><span class="num muted small">${code(w.seasonNumber, w.episodeNumber)}</span><div class="grow clip">${esc(w.showTitle)}</div>
+      <span class="num">+${w.lift.toFixed(1)}</span></li>`).join("") : empty("Not computed yet");
+  $("flags").innerHTML = c.flags.map(f => `<span class="badge ${f.on ? "good" : "bad"}">${esc(f.key)} ${f.on ? "on" : "off"}</span>`).join("");
 
   $("actors").innerHTML = c.topActors.length ? c.topActors.map(p => `
     <li>${img(p.photoUrl, "face")}
@@ -133,7 +169,6 @@ function render(data) {
       <div class="grow"><div class="clip">${esc(s.title)}</div><div class="muted small clip">${esc([s.network, s.status].filter(Boolean).join(" · "))} · added ${ago(s.addedAtUtc)}</div></div>
       <span class="badge ${s.indexed ? "good" : "warn"}">${s.indexed ? "indexed" : "not indexed"}</span></li>`).join("") : empty("No shows yet");
 
-  const unavailable = empty("Analytics.API unavailable");
   $("top-episodes").innerHTML = !a ? unavailable : a.topEpisodes.length ? a.topEpisodes.map(e => `
     <li><span class="num muted small">${code(e.seasonNumber, e.episodeNumber)}</span>
       <div class="grow"><div class="clip">${esc(e.title)}</div><div class="muted small clip">${esc(e.showTitle)}</div></div>

@@ -191,6 +191,8 @@ namespace Analytics.Data.Migrations
 
                     b.HasKey("EpisodeId");
 
+                    b.HasIndex("AirsAtUtc");
+
                     b.HasIndex("ShowId");
 
                     b.ToTable("episodes", (string)null);

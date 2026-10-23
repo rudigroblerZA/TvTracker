@@ -64,6 +64,7 @@ public static class InsightsApi
         api.MapEssentialCutApi();
         api.MapReunionsApi();
         api.MapFinishOutlookApi();
+        api.MapTimeMachineApi();
 
         return api;
     }

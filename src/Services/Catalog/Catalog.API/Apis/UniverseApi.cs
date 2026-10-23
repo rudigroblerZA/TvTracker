@@ -225,7 +225,7 @@ public static class UniverseApi
     /// The franchise name when every show has it before a colon and none is called just that ("Star Wars" for "Star
     /// Wars: Visions" and "Star Wars: Skeleton Crew"); otherwise the hub's title.
     /// </summary>
-    private static string Name(List<Show> members, Show hub)
+    internal static string Name(List<Show> members, Show hub)
     {
         var stems = members.Select(s => s.Title.IndexOf(':') is > 0 and var colon ? s.Title[..colon].Trim() : null).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         return stems is [{ } stem] ? stem : hub.Title;
@@ -240,7 +240,7 @@ public static class UniverseApi
     /// <item>else the one with the most links, then the earliest (Chicago Fire).</item>
     /// </list>
     /// </summary>
-    private static Show Hub(List<Show> members, IReadOnlyList<UniverseLink> links) =>
+    internal static Show Hub(List<Show> members, IReadOnlyList<UniverseLink> links) =>
         members
             .OrderByDescending(s => members.Count(o => o.Title.StartsWith(s.Title.Trim() + ":", StringComparison.OrdinalIgnoreCase)))
             .ThenByDescending(s => links.Where(l => l.A == s.Id || l.B == s.Id).Sum(l => l.Characters.Count))

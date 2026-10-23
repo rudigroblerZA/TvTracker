@@ -1,0 +1,57 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+@* Home's line from the time machine: this week's best-known premieres and finales from past years. *@
+@if (moments.Count > 0)
+{
+    <section>
+        <div class="section-head">
+            <h2>This week in TV history</h2>
+            <a href="time-machine">Time machine</a>
+        </div>
+        <ul class="time-moments">
+            @foreach (var (episode, what) in moments)
+            {
+                <li>
+                    <a href="shows/@episode.ShowId"><strong>@episode.ShowTitle</strong></a><span>@($" {what} {YearsAgo(episode)}")</span><span class="muted">@($" ({Session.ToLocal(episode.AiredAtUtc):d MMMM yyyy})")</span>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private const int Max = 4;
+
+    private string YearsAgo(TimeMachineEpisode episode) =>
+        Format.YearsAgo(DateOnly.FromDateTime(Session.ToLocal(episode.AiredAtUtc).DateTime), DateOnly.FromDateTime(Session.Now.DateTime)) ?? "this year";
+
+    private List<(TimeMachineEpisode Episode, string What)> moments = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (await Analytics.GetTimeMachineAsync(null, Session.Profile?.TimeZone) is { } machine)
+            {
+                // Alternate premieres and finales, best known first, until there are enough.
+                for (var i = 0; moments.Count < Max && (i < machine.Premieres.Count || i < machine.Finales.Count); i++)
+                {
+                    if (i < machine.Premieres.Count)
+                    {
+                        moments.Add((machine.Premieres[i], "premiered"));
+                    }
+                    if (i < machine.Finales.Count && moments.Count < Max)
+                    {
+                        moments.Add((machine.Finales[i], "ended"));
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra on Home.
+        }
+    }
+}

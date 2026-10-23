@@ -66,6 +66,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Creator fingerprint: a creator's signature style, shows made their way and kindred creators, on person pages." }
+    },
+    "time-machine": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "TV time machine: /time-machine (this week in TV history, or any date's week), its teaser on Home and link on Insights." }
     }
   }
 }

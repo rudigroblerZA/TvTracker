@@ -211,7 +211,17 @@ On person pages.
 - **Similar creators:** Mike Flanagan's style is closest to Guy Ritchie's and Neil Gaiman's; Steven Knight's to Jed
   Mercurio's and David Farr's.
 
-### 17. Smaller touches
+### 17. TV time machine
+
+`/time-machine`, with a teaser on Home.
+
+- **This week in TV history:** what premiered and ended this week in past years ("Once Upon a Time premiered 15 years
+  ago", "Doc Martin ended 4 years ago"), and each year's best episode from this week.
+- **Travel to any date:** a birthday, an anniversary. The week of 22 September 1994: Friends and ER premiered, and
+  Seinfeld, Frasier and The X-Files were on air. The date is in the link, so a trip can be shared.
+- **Personal:** episodes you've already watched are marked.
+
+### 18. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
