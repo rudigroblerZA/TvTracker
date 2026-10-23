@@ -1,0 +1,39 @@
+@* A list of episodes from the time machine: show, episode, when it aired (and how long ago), rating, and whether you've seen it. *@
+<ol class="discovery">
+    @foreach (var episode in Episodes)
+    {
+        <li @key="episode.EpisodeId">
+            <Poster Title="@episode.ShowTitle" Url="@episode.PosterUrl" Size="small" />
+            <div>
+                <a href="shows/@episode.ShowId"><strong>@episode.ShowTitle</strong></a>
+                <div>
+                    <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                    <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                </div>
+                <div class="muted small">
+                    <span>@When(episode)</span>
+                    @if (episode.Rating is { } rating)
+                    {
+                        <span> · rated @Format.Rating(rating)</span>
+                    }
+                    @if (episode.Watched)
+                    {
+                        <span>@(" · ")</span><span class="tag">Watched</span>
+                    }
+                </div>
+            </div>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TimeMachineEpisode> Episodes { get; set; } = [];
+
+    /// <summary>"23 October 2008 · 18 years ago".</summary>
+    private static string When(TimeMachineEpisode episode)
+    {
+        var aired = episode.AiredAtUtc.UtcDateTime;
+        var years = DateTime.UtcNow.Year - aired.Year;
+        return $"{aired:d MMMM yyyy}" + (years > 1 ? $" · {years} years ago" : years == 1 ? " · a year ago" : "");
+    }
+}

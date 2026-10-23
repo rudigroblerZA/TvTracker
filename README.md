@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -271,6 +271,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
+| `time-machine` | `/time-machine`, its teaser on Home and link on Insights, and its endpoint |
 | `creator-fingerprint` | The "Creator fingerprint" section on person pages, and its endpoint |
 | `gets-good` | "When it gets good" on show pages, its line in "Will you finish it?", and the Worth the wait list on Discover |
 | `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
@@ -417,6 +418,16 @@ How events flow:
       people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
+  - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
+    - **This week in TV history** (the default): what premiered and what ended this week in past years, and the
+      best-rated episode of each year that week. Home shows four of the best-known milestones ("Once Upon a Time
+      premiered 15 years ago").
+    - **Travel to a date** (a birthday, say; the date is in the address): that week's premieres, finales, best
+      episodes, and the shows on air then with their season. The week of 22 September 1994: Friends and ER premiered;
+      Seinfeld, Frasier and The X-Files were on.
+    - **Marks** the episodes you've watched. Episodes rated 1.5+ above their show are left out of the best ones (a
+      few fans' 10s on thinly rated shows).
+    - **API:** `GET /api/v1/insights/time-machine[?date=yyyy-MM-dd]` on Analytics.API, computed on request.
   - **Creator fingerprint** (person pages, signed in): a creator's style, from the DNA of the shows they created or
     developed (two or more with DNA; 110 people in the development catalog).
     - **Signature:** distinctive traits most of their shows share. Mike Flanagan: "Drops all at once · 3 of 3, A short

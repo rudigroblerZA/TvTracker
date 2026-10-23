@@ -1,0 +1,124 @@
+@page "/time-machine"
+@attribute [RequiresFeature(FeatureFlags.TimeMachine)]
+@inject AnalyticsClient Analytics
+@inject NavigationManager Navigation
+
+<PageTitle>TV time machine · TV Tracker</PageTitle>
+
+<h1>TV time machine</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <form class="time-travel" @onsubmit="Travel">
+            <label for="travel-date">Travel to a date</label>
+            <input id="travel-date" type="date" min="1950-01-01" max="@DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd")" @bind="picked" />
+            <button type="submit" class="btn" disabled="@(picked is null)">Go</button>
+            @if (Date is not null)
+            {
+                <a href="time-machine">Back to this week in TV history</a>
+            }
+        </form>
+        <p class="muted small">A birthday, an anniversary, the day you moved house: see what premiered, ended and was on that week.</p>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (machine is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else
+        {
+            <h2>@Heading</h2>
+            @if (machine.Premieres.Count + machine.Finales.Count + machine.BestEpisodes.Count == 0)
+            {
+                <p class="muted">Nothing in the catalog aired that week.</p>
+            }
+            @if (machine.Premieres.Count > 0)
+            {
+                <section>
+                    <h3>Premiered</h3>
+                    <TimeMachineEpisodes Episodes="machine.Premieres" />
+                </section>
+            }
+            @if (machine.Finales.Count > 0)
+            {
+                <section>
+                    <h3>Ended</h3>
+                    <TimeMachineEpisodes Episodes="machine.Finales" />
+                </section>
+            }
+            @if (machine.BestEpisodes.Count > 0)
+            {
+                <section>
+                    <h3>@(machine.EveryYear ? "Best episode of each year" : "Best episodes that week")</h3>
+                    <TimeMachineEpisodes Episodes="machine.BestEpisodes" />
+                </section>
+            }
+            @if (machine.OnAir.Count > 0)
+            {
+                <section>
+                    <h3>On air then</h3>
+                    <div class="card-row">
+                        @foreach (var show in machine.OnAir)
+                        {
+                            <ShowCard @key="show.ShowId" ShowId="show.ShowId" Title="@show.Title" PosterUrl="@show.PosterUrl" Subtitle="@($"Season {show.SeasonNumber}")" />
+                        }
+                    </div>
+                </section>
+            }
+            <p class="muted small">Air dates and ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>, for shows in the catalog.</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to travel through TV history." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // The date is in the address, so a trip can be shared or bookmarked.
+    [SupplyParameterFromQuery(Name = "date")] public string? Date { get; set; }
+
+    private TimeMachine? machine;
+    private DateTime? picked;
+    private string? error;
+    private string? loadedFor;
+
+    private string Heading => machine!.EveryYear
+        ? $"This week in TV history: {machine.Date.AddDays(-3):d MMM} – {machine.Date.AddDays(3):d MMM}"
+        : $"The week of {machine.Date:d MMMM yyyy}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = Date ?? "";
+        if (key != loadedFor)
+        {
+            loadedFor = key;
+            picked = DateOnly.TryParse(Date, out var d) ? d.ToDateTime(TimeOnly.MinValue) : null;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        machine = null;
+        try
+        {
+            machine = await Analytics.GetTimeMachineAsync(DateOnly.TryParse(Date, out var d) ? d : null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Travel()
+    {
+        if (picked is { } date)
+        {
+            Navigation.NavigateTo($"time-machine?date={date:yyyy-MM-dd}");
+        }
+    }
+}
