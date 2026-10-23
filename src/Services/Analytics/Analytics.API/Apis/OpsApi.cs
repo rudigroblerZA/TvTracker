@@ -16,7 +16,20 @@ public record AnalyticsOpsStats(
     int ActiveUsers,
     IReadOnlyList<OpsTopEpisode> TopEpisodes,
     IReadOnlyList<OpsPremiere> UpcomingPremieres,
-    IReadOnlyList<OpsConnectedShow> MostConnected);
+    IReadOnlyList<OpsConnectedShow> MostConnected,
+    OpsComputed Computed,
+    IReadOnlyList<OpsWorthTheWait> WorthTheWait);
+
+/// <summary>How many shows each part of the insights covers, and the other computed tables.</summary>
+/// <param name="GetsGoodTurns">Slow starters with a turn ("gets good at S01E06").</param>
+/// <param name="GoodFromTheStart">Shows whose first episodes already rate as well as the rest.</param>
+/// <param name="Forecasts">Running shows with at least one forecast (rating, renewal or timing).</param>
+/// <param name="CastCreditCopies">The provider's cast credits copied for the reunion radar.</param>
+public record OpsComputed(int ShowsWithDna, int GetsGoodTurns, int GoodFromTheStart, int Forecasts, int CreatorFingerprints,
+    int ActorInsights, int CastCreditCopies);
+
+/// <param name="Lift">How much better it rates from the turn than before it.</param>
+public record OpsWorthTheWait(Guid ShowId, string ShowTitle, int SeasonNumber, int EpisodeNumber, double Lift);
 
 public record OpsTopEpisode(Guid ShowId, string ShowTitle, int SeasonNumber, int EpisodeNumber, string Title, double ExternalRating);
 
@@ -77,8 +90,33 @@ public static class OpsApi
                 .ToListAsync(ct),
             MostConnected: connectedIds
                 .Select(c => new OpsConnectedShow(c.ShowId, titles.GetValueOrDefault(c.ShowId, "?"), c.Links))
-                .ToList());
+                .ToList(),
+            Computed: await GetComputedAsync(db, ct),
+            WorthTheWait: await db.Discovery
+                .Where(d => d.List == DiscoveryLists.WorthTheWait && d.Genre == "")
+                .OrderBy(d => d.Rank)
+                .Take(5)
+                .Select(d => new OpsWorthTheWait(d.ShowId, d.ShowTitle, d.SeasonNumber ?? 0, d.EpisodeNumber ?? 0, d.Value))
+                .ToListAsync(ct));
+    }
+
+    private static async Task<OpsComputed> GetComputedAsync(AnalyticsContext db, CancellationToken ct)
+    {
+        // One pass over the documents; the parts are JSON objects when present and null otherwise.
+        var parts = await db.Database
+            .SqlQueryRaw<DocumentParts>(
+                "SELECT COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'dna') = 'object')::int AS \"Dna\", " +
+                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'getsGood'->'turn') = 'object')::int AS \"Turns\", " +
+                "COUNT(*) FILTER (WHERE (\"Document\"->'getsGood'->>'fromTheStart') = 'true')::int AS \"FromTheStart\", " +
+                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'outlook') = 'object')::int AS \"Forecasts\" " +
+                "FROM show_insights")
+            .SingleAsync(ct);
+
+        return new OpsComputed(parts.Dna, parts.Turns, parts.FromTheStart, parts.Forecasts,
+            await db.CreatorFingerprints.CountAsync(ct), await db.PersonInsights.CountAsync(ct), await db.CastCredits.CountAsync(ct));
     }
 
     private sealed record ShowLinks(Guid ShowId, int Links);
+
+    private sealed record DocumentParts(int Dna, int Turns, int FromTheStart, int Forecasts);
 }

@@ -249,8 +249,13 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
 - **Sync:** shows due for refresh and when the last sync ran.
 - **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
   and the shows with the most shared cast.
+- **Backfills:** cast credits fetched this month (the reunion radar's data), shows with their makers, and careers.
+- **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest) and universes (the largest).
+- **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, and the top of
+  Worth the wait.
 - **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
 - **Bulk import:** the latest bulk import job.
+- **Feature flags:** every flag, on or off, as flagd answers a signed-out caller.
 
 Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
