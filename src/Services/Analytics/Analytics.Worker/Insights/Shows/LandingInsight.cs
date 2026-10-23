@@ -72,14 +72,7 @@ public sealed class LandingInsight : IShowInsight
         // A strong finale whose final season can't be checked (too few rated episodes) isn't called a landing either way.
         return verdict is null
             ? null
-            : new Landing(verdict, aired.Select(e => e.SeasonNumber).Distinct().Count(), finale, Round(median),
+            : new Landing(verdict, finale, Round(median),
                 Round((double)lower / others), rank, rank is null ? 0 : seasons.Count, higher, lower, others);
-    }
-
-    private static double Median(List<double> values)
-    {
-        var sorted = values.Order().ToList();
-        var middle = sorted.Count / 2;
-        return sorted.Count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
     }
 }

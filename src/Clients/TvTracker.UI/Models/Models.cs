@@ -219,7 +219,7 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
 /// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles", "weaker-last-season" or "as-it-ran".</param>
 /// <param name="FinalSeasonRank">The final season's rank among RankedSeasons (1 = best); null with fewer than three.</param>
 /// <param name="RatedHigher">Other episodes rated above the finale; RatedLower below; ties in neither.</param>
-public record Landing(string Verdict, int Seasons, double FinaleRating, double ShowMedian, double FinaleBeats, int? FinalSeasonRank, int RankedSeasons,
+public record Landing(string Verdict, double FinaleRating, double ShowMedian, double FinaleBeats, int? FinalSeasonRank, int RankedSeasons,
     int RatedHigher = 0, int RatedLower = 0, int OtherEpisodes = 0);
 
 /// <summary>When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.</summary>

@@ -41,7 +41,6 @@ public record ShowInsights(
 /// with a strong finale whose final season has too few rated episodes to check.
 /// </summary>
 /// <param name="Verdict">One of <see cref="LandingVerdicts"/>.</param>
-/// <param name="Seasons">Regular seasons it ran.</param>
 /// <param name="FinaleRating">The finale's provider rating.</param>
 /// <param name="ShowMedian">The median rating of its episodes.</param>
 /// <param name="FinaleBeats">The share of its other episodes the finale rates strictly above, 0-1.</param>
@@ -50,7 +49,7 @@ public record ShowInsights(
 /// <param name="RatedHigher">Other episodes rated above the finale; ties are in neither count.</param>
 /// <param name="RatedLower">Other episodes rated below the finale.</param>
 /// <param name="OtherEpisodes">Its other rated episodes.</param>
-public record Landing(string Verdict, int Seasons, double FinaleRating, double ShowMedian, double FinaleBeats,
+public record Landing(string Verdict, double FinaleRating, double ShowMedian, double FinaleBeats,
     int? FinalSeasonRank, int RankedSeasons, int RatedHigher = 0, int RatedLower = 0, int OtherEpisodes = 0);
 
 public static class LandingVerdicts
