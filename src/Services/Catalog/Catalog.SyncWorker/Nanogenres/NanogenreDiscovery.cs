@@ -66,12 +66,24 @@ public static partial class NanogenreDiscovery
         var scale = ReferenceMaxDistance / modelMaxDistance;
         var embedded = Enumerable.Range(0, shows.Count).Where(i => shows[i].Embedding is not null).ToList();
 
-        double Distance(int a, int b)
+        // Every pair's distance, worked out once: clustering, re-cuts, the typical member and joining all reuse them.
+        var position = new int[shows.Count];
+        for (var p = 0; p < embedded.Count; p++)
         {
-            var text = 1 - Dot(shows[a].Embedding!, shows[b].Embedding!);
-            var kind = 1 - Dot(features[a], features[b]);
-            return (1 - GenreWeight) * text * scale + GenreWeight * kind;
+            position[embedded[p]] = p;
         }
+        var distances = new double[embedded.Count, embedded.Count];
+        for (var p = 0; p < embedded.Count; p++)
+        {
+            for (var q = p + 1; q < embedded.Count; q++)
+            {
+                var (a, b) = (embedded[p], embedded[q]);
+                var text = 1 - Dot(shows[a].Embedding!, shows[b].Embedding!);
+                var kind = 1 - Dot(features[a], features[b]);
+                distances[p, q] = distances[q, p] = (1 - GenreWeight) * text * scale + GenreWeight * kind;
+            }
+        }
+        double Distance(int a, int b) => distances[position[a], position[b]];
 
         var genreFrequency = shows.SelectMany(s => s.Genres).GroupBy(g => g).ToDictionary(g => g.Key, g => g.Count());
         var pairings = Pairings(shows, kinds);
@@ -138,13 +150,18 @@ public static partial class NanogenreDiscovery
 
         if (covering.Count == 0)
         {
-            return animated ? [Capitalize($"{prefix}comedy")] : [];
+            // Animated comedies with nothing more specific in common are still a group worth naming; an animated group
+            // that isn't mostly comedy has nothing honest to be called.
+            var comedies = core.Count(i => BaseOf(shows[i].Genres, kinds[i]) == "comedy");
+            return animated && comedies >= NameCover * core.Count ? [Capitalize($"{prefix}comedy")] : [];
         }
 
+        // A two-genre name must describe the group as well as a one-genre name does: most of it has both genres.
         var first = covering[0];
         var names = new List<string> { Capitalize($"{prefix}{first.Modifier} {first.Base}") };
         names.AddRange(covering.Skip(1)
-            .Where(p => p.Base == first.Base && p.Modifier != first.Modifier)
+            .Where(p => p.Base == first.Base && p.Modifier != first.Modifier
+                && core.Count(i => pairings[first].Contains(i) && pairings[p].Contains(i)) >= NameCover * core.Count)
             .Select(p => Capitalize($"{prefix}{p.Modifier} {first.Modifier} {first.Base}")));
         return names;
     }

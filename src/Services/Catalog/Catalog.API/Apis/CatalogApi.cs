@@ -4,6 +4,8 @@ using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using OpenFeature;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Apis;
@@ -41,18 +43,27 @@ public static class CatalogApi
     /// Shows whose title contains the search term (most popular first), followed by shows similar in meaning
     /// (closest first; see <see cref="SemanticSearch"/>). Genre, status, nanogenre and tags filter both.
     /// </summary>
-    /// <param name="nanogenre">A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search.</param>
+    /// <param name="nanogenre">
+    /// A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search. Ignored while the nanogenres
+    /// flag is off for the caller, as the UI then has no way to show or clear it.
+    /// </param>
     /// <param name="tags">
     /// Comma-separated tag keys from Analytics ("bingeable,fan-favorite"); shows must have all of them. Tags are part of
     /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
     /// </param>
     private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
-        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, string? search, string? genre,
-        ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
+        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, IFeatureClient features, string? search,
+        string? genre, ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
         {
             return TypedResults.Unauthorized();
+        }
+
+        if (!string.IsNullOrWhiteSpace(nanogenre)
+            && !await features.GetBooleanValueAsync(FeatureFlags.Nanogenres, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct))
+        {
+            nanogenre = null;
         }
 
         if (page <= 1 && !string.IsNullOrWhiteSpace(search))
