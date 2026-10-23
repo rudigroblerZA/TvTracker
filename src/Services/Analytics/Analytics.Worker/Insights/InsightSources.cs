@@ -32,6 +32,9 @@ public sealed class InsightSources
     /// </summary>
     public required Dictionary<Guid, (CreativeCopy Creative, PersonCareerCopy Career)> ProlificMakerByShow { get; init; }
 
+    /// <summary>Everyone credited as making a show (creators, developers, executive producers).</summary>
+    public required List<CreativeCopy> Creatives { get; init; }
+
     /// <summary>Our users' episode stars, summed and counted per episode, before the privacy rule (see <see cref="ShowInsightContext.OurEpisodeRatings"/>).</summary>
     public required Dictionary<Guid, (int Sum, int Count)> EpisodeRatings { get; init; }
 
@@ -60,6 +63,7 @@ public sealed class InsightSources
         var cast = await db.Cast.AsNoTracking().ToListAsync(ct);
         var careers = await db.Careers.AsNoTracking().ToDictionaryAsync(c => c.PersonId, ct);
         var follows = await db.Follows.AsNoTracking().Select(f => new { f.ShowId, f.UserId, f.FollowedAtUtc }).ToListAsync(ct);
+        var creatives = await db.Creatives.AsNoTracking().ToListAsync(ct);
 
         return new InsightSources
         {
@@ -71,7 +75,8 @@ public sealed class InsightSources
             CastByCharacter = cast
                 .SelectMany(c => c.CharacterExternalIds.Select(id => (Id: id, Credit: c)))
                 .ToLookup(x => x.Id, x => x.Credit),
-            ProlificMakerByShow = (await db.Creatives.AsNoTracking().ToListAsync(ct))
+            Creatives = creatives,
+            ProlificMakerByShow = creatives
                 .Where(c => careers.TryGetValue(c.PersonId, out var career) && career.Shows >= ShowTags.ProlificMinShows)
                 .GroupBy(c => c.ShowId)
                 .ToDictionary(g => g.Key, g => g

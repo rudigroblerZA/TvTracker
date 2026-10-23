@@ -45,6 +45,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IListInsight, TopEpisodesList>();
         services.AddSingleton<IListInsight, DiscoveryList>();
         services.AddSingleton<IListInsight, PersonInsightsList>();
+        services.AddSingleton<IListInsight, CreatorFingerprintList>();
 
         return services;
     }

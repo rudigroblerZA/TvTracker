@@ -20,6 +20,7 @@ public static class FeatureFlags
     public const string Nanogenres = "nanogenres";
     public const string DnaTwins = "dna-twins";
     public const string GetsGood = "gets-good";
+    public const string CreatorFingerprint = "creator-fingerprint";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

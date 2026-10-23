@@ -197,7 +197,21 @@ On show pages, in "Will you finish it?", and a Discover list.
 - **Worth the wait:** a Discover list of well-rated slow starters and where they turn: Person of Interest (S01E04),
   Dark (S01E05), Slow Horses (S02E04), Severance (S01E06).
 
-### 16. Smaller touches
+### 16. Creator fingerprint
+
+On person pages.
+
+- **A creator's style, measured:** the DNA of everything they created or developed, averaged into a fingerprint.
+  Mike Flanagan's shows all drop at once and are a short watch; Dick Wolf's have long seasons, run for years and come
+  back every year; Vince Gilligan's are acclaimed and peak late.
+- **Honest about range:** Ryan Murphy has no single style; the page shows their range instead (a short watch to a long
+  commitment, weekly to all at once, steady to rollercoaster).
+- **Made the Mike Flanagan way:** shows by other people with the same fingerprint, like 3 Body Problem and Time. Made
+  the Chuck Lorre way: The Goldbergs, Last Man Standing, Superstore.
+- **Similar creators:** Mike Flanagan's style is closest to Guy Ritchie's and Neil Gaiman's; Steven Knight's to Jed
+  Mercurio's and David Farr's.
+
+### 17. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

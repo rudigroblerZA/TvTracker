@@ -2,6 +2,7 @@ using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using TvTracker;
 
 namespace Analytics.API.Apis;
 
@@ -58,6 +59,7 @@ public static class InsightsApi
         api.MapGet("/insights/discover/{list}", GetDiscoveryAsync);
         api.MapGet("/insights/tags", GetTagsAsync);
         api.MapGet("/people/{personId:guid}/insights", GetPersonInsightsAsync);
+        api.MapGet("/people/{personId:guid}/fingerprint", GetCreatorFingerprintAsync).RequireFeature(FeatureFlags.CreatorFingerprint);
         api.MapGet("/me/taste", TasteApi.GetTasteAsync);
         api.MapEssentialCutApi();
         api.MapReunionsApi();
@@ -136,6 +138,20 @@ public static class InsightsApi
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private sealed record TagsRow(Guid ShowId, string? Tags);
+
+    /// <summary>
+    /// A creator's fingerprint, as stored (<see cref="CreatorFingerprint"/> JSON). 404 for anyone who didn't create or
+    /// develop at least two catalog shows with DNA.
+    /// </summary>
+    private static async Task<Results<ContentHttpResult, NotFound>> GetCreatorFingerprintAsync(Guid personId, AnalyticsContext db, CancellationToken ct)
+    {
+        var document = await db.CreatorFingerprints.AsNoTracking()
+            .Where(f => f.PersonId == personId)
+            .Select(f => f.Document)
+            .SingleOrDefaultAsync(ct);
+
+        return document is null ? TypedResults.NotFound() : TypedResults.Text(document, "application/json");
+    }
 
     /// <summary>The stored document is returned as-is: it is already the <see cref="PersonInsights"/> JSON.</summary>
     private static async Task<Results<ContentHttpResult, NotFound>> GetPersonInsightsAsync(Guid personId, AnalyticsContext db, CancellationToken ct)

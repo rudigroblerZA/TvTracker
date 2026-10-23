@@ -83,10 +83,6 @@ public class Show
 }
 
 /// <summary>
-/// A show's text (title, genres, network, summary) as a vector, for semantic search. Written by the sync worker,
-/// which re-embeds a show when the text changes or the model does.
-/// </summary>
-/// <summary>
 /// A fine-grained genre ("Sports comedy", "Animated family comedy") discovered by the sync worker from the catalog
 /// itself: shows clustered by their text embeddings and genres, plus small groups sharing an uncommon genre pairing.
 /// Rebuilt whole each time, so a slug can disappear when the catalog changes.
@@ -105,6 +101,10 @@ public class Nanogenre
     public DateTime ComputedAtUtc { get; set; }
 }
 
+/// <summary>
+/// A show's text (title, genres, network, summary) as a vector, for semantic search. Written by the sync worker,
+/// which re-embeds a show when the text changes or the model does.
+/// </summary>
 public class ShowEmbedding
 {
     /// <summary>The vector column's size; the embedding model has to match it.</summary>
