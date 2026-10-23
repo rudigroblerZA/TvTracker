@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -271,6 +271,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
+| `creator-fingerprint` | The "Creator fingerprint" section on person pages, and its endpoint |
 | `gets-good` | "When it gets good" on show pages, its line in "Will you finish it?", and the Worth the wait list on Discover |
 | `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
@@ -416,6 +417,16 @@ How events flow:
       people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
+  - **Creator fingerprint** (person pages, signed in): a creator's style, from the DNA of the shows they created or
+    developed (two or more with DNA; 110 people in the development catalog).
+    - **Signature:** distinctive traits most of their shows share. Mike Flanagan: "Drops all at once · 3 of 3, A short
+      watch · 3 of 3"; Dick Wolf: "Long seasons, A long commitment, Back every year"; Vince Gilligan: "Acclaimed, Peaks
+      late". Creators with no shared trait say so ("No single style"), and every fingerprint lists its range: the
+      traits where their shows sit at opposite ends.
+    - **Made the X way:** other people's shows with the same fingerprint (DNA similarity 0.85+, sharing the signature):
+      Mike Flanagan → 3 Body Problem, Time; Chuck Lorre → The Goldbergs, Superstore.
+    - **Creators with a similar style:** Mike Flanagan → Guy Ritchie, Neil Gaiman; Dick Wolf → Julie Plec, Bruno Heller.
+    - **API:** `GET /api/v1/people/{id}/fingerprint` on Analytics.API (404 for anyone without one).
   - **When it gets good** (show pages, signed in): the episode where a slow-starting show turns, how long it takes to
     get there, and how much better it rates from there. Severance: "Gets good at S01E06 “Hide and Seek”, 4 h in (5
     episodes). The episodes before it average 7.2 on TVmaze; from there, 7.8." Shows that don't need warming up say

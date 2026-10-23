@@ -22,6 +22,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<TopEpisodeRow> TopEpisodes => Set<TopEpisodeRow>();
     public DbSet<DiscoveryRow> Discovery => Set<DiscoveryRow>();
     public DbSet<PersonInsightsRow> PersonInsights => Set<PersonInsightsRow>();
+    public DbSet<CreatorFingerprintRow> CreatorFingerprints => Set<CreatorFingerprintRow>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -145,6 +146,13 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.Property(d => d.Genre).HasMaxLength(64);
             entity.Property(d => d.ShowTitle).HasMaxLength(256);
             entity.Property(d => d.EpisodeTitle).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<CreatorFingerprintRow>(entity =>
+        {
+            entity.ToTable("creator_fingerprints");
+            entity.HasKey(p => p.PersonId);
+            entity.Property(p => p.Document).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<PersonInsightsRow>(entity =>

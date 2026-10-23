@@ -1,0 +1,80 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+@* A creator's fingerprint for signed-in users: their signature style from their shows' DNA, shows by others made the
+   same way, and creators with a similar style. Only for people who created or developed two or more shows. *@
+@if (fingerprint is not null)
+{
+    <section class="insights fingerprint">
+        <h2>Creator fingerprint</h2>
+        <p class="muted small">How @fingerprint.Name's shows are made, from the DNA of the @fingerprint.Shows.Count they created or developed.</p>
+
+        @if (fingerprint.Signature.Count > 0)
+        {
+            <p class="dna-tags">
+                @foreach (var trait in fingerprint.Signature)
+                {
+                    <span class="tag" title="@($"{trait.Shows} of {trait.Of} shows")">@trait.Label<span class="muted"> · @trait.Shows of @trait.Of</span></span>
+                }
+            </p>
+        }
+        else
+        {
+            <p>No single style: their shows don't share a trait that sets them apart.</p>
+        }
+        @if (fingerprint.Range.Count > 0)
+        {
+            <p class="small"><span class="muted">Range: </span>@string.Join("; ", fingerprint.Range.Select((r, i) => i == 0 ? r : r.ToLowerInvariant())).</p>
+        }
+
+        @if (fingerprint.MadeThisWay.Count > 0)
+        {
+            <h3>Made the @fingerprint.Name way</h3>
+            <p class="muted small">Shows by other people with the same fingerprint.</p>
+            <div class="card-row">
+                @foreach (var match in fingerprint.MadeThisWay)
+                {
+                    <ShowCard @key="match.ShowId" ShowId="match.ShowId" Title="@match.Title" PosterUrl="@match.PosterUrl" Subtitle="@string.Join(", ", match.SharedTraits.Select((t, i) => i == 0 ? t : t.ToLowerInvariant()))" />
+                }
+            </div>
+        }
+
+        @if (fingerprint.Kindred.Count > 0)
+        {
+            <h3>Creators with a similar style</h3>
+            <ul class="kindred">
+                @foreach (var kindred in fingerprint.Kindred)
+                {
+                    <li>
+                        <a class="strong" href="people/@kindred.PersonId">@kindred.Name</a>
+                        <span class="muted small"> · @string.Join(", ", kindred.SharedTraits.Select((t, i) => i == 0 ? t : t.ToLowerInvariant()))</span>
+                        <div class="small muted">@string.Join(", ", kindred.ShowTitles.Take(4))</div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PersonId { get; set; }
+
+    private CreatorFingerprint? fingerprint;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        fingerprint = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (Session.IsSignedIn)
+            {
+                fingerprint = await Analytics.GetCreatorFingerprintAsync(PersonId);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra: the rest of the page works without it.
+        }
+    }
+}

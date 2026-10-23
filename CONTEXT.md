@@ -264,6 +264,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Checked** against what viewers say: The Office S02E03, Succession S02E01, The Wire S01E07, Community and The Good
     Place S01E07, Severance S01E06.
   - **Personal:** `FinishOutlookApi` adds `GetsGoodAhead` when the turn is past the user's furthest episode.
+- **Creator fingerprint** (`CreatorFingerprintList`, table `creator_fingerprints`): each trait of DNA averaged over the
+  shows a person created or developed (two or more with DNA).
+  - **Executive producers are left out:** their credits follow a production company, not a style.
+  - **Signature:** a trait that's distinctive on average and that two-thirds of their shows lean towards. Range: traits
+    where their shows sit at both ends.
+  - **Made this way:** other people's shows with similarity ≥ 0.85 that share two signature traits (or the only one).
+    Only shows with a creator or developer credit count: TVmaze rarely credits one on reality, talk and news shows,
+    and Analytics has no kind of show to tell them apart otherwise.
+  - **Kindred creators:** fingerprint similarity ≥ 0.85 and a shared signature trait, never having made a show together.
 - **Essential cut** (`EssentialCutApi`): computed on request (one show's episodes plus the caller's watches), not hourly.
   - **Per season:** it skips the lowest-rated episodes at least `Margin` standard deviations below the season
     average (and at least 0.1), up to `Share` of the season.

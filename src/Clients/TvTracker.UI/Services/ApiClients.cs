@@ -248,6 +248,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         return GetAsync<List<DiscoveryItem>>(ApiClients.Analytics, url, ct, cacheForOffline: true);
     }
 
+    /// <summary>Null for anyone without a fingerprint (fewer than two shows created or developed).</summary>
+    public Task<CreatorFingerprint?> GetCreatorFingerprintAsync(Guid personId, CancellationToken ct = default) =>
+        GetAsync<CreatorFingerprint>(ApiClients.Analytics, $"api/v1/people/{personId}/fingerprint", ct, cacheForOffline: true);
+
     public Task<PersonInsights?> GetPersonInsightsAsync(Guid personId, CancellationToken ct = default) =>
         GetAsync<PersonInsights>(ApiClients.Analytics, $"api/v1/people/{personId}/insights", ct, cacheForOffline: true);
 

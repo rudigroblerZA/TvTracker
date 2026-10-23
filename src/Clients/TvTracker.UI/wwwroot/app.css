@@ -328,6 +328,7 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .universe-links li, .universe-characters li { display: flex; gap: 10px; align-items: center; }
 .universe-links .poster.small { width: 40px; }
 .universe-characters .poster.small { width: 36px; border-radius: 50%; aspect-ratio: 1; }
+.kindred { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 10px; }
 .universe-characters li > span { display: flex; flex-direction: column; }
 .universe-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .universe-key { display: inline-block; width: 22px; height: 4px; border-radius: 2px; margin-left: 6px; }

@@ -200,6 +200,14 @@ public class DiscoveryRow
     public string? EpisodeTitle { get; set; }
 }
 
+/// <summary>A creator's fingerprint (<see cref="CreatorFingerprint"/> as JSON), recomputed hourly with the shows'.</summary>
+public class CreatorFingerprintRow
+{
+    public Guid PersonId { get; set; }
+    public required string Document { get; set; }
+    public DateTime ComputedAtUtc { get; set; }
+}
+
 /// <summary>An actor's insights (<see cref="PersonInsights"/> as JSON), recomputed hourly with the shows'.</summary>
 public class PersonInsightsRow
 {
