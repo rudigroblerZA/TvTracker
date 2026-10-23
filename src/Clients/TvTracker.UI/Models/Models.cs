@@ -290,7 +290,6 @@ public record TopEpisodeItem(Guid EpisodeId, Guid ShowId, string ShowTitle, stri
 public record DiscoveryItem(Guid ShowId, string ShowTitle, string? PosterUrl, double? ShowExternalRating, double Value,
     Guid? EpisodeId, int? SeasonNumber, int? EpisodeNumber, string? EpisodeTitle);
 
-/// <param name="Followers">Our users following at least one of their shows; null until there are enough.</param>
 /// <summary>A week of TV history: this week in every past year (EveryYear), or one date's week.</summary>
 public record TimeMachine(DateOnly Date, bool EveryYear, List<TimeMachineEpisode> Premieres, List<TimeMachineEpisode> Finales,
     List<TimeMachineEpisode> BestEpisodes, List<TimeMachineShow> OnAir);
@@ -314,6 +313,7 @@ public record FingerprintMatch(Guid ShowId, string Title, string? PosterUrl, dou
 
 public record KindredCreator(Guid PersonId, string Name, double Similarity, List<string> SharedTraits, List<string> ShowTitles);
 
+/// <param name="Followers">Our users following at least one of their shows; null until there are enough.</param>
 public record PersonInsights(Guid PersonId, string Name, DateTime ComputedAtUtc, int ShowCount, double? AverageShowRating,
     PersonShow? BestShow, int? FirstYear, int? LastYear, IReadOnlyList<CoStar> FrequentCoStars, int? Followers);
 

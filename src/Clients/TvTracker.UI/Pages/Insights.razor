@@ -5,12 +5,12 @@
 <PageTitle>Insights · TV Tracker</PageTitle>
 
 <h1>Insights</h1>
-<Feature Flag="@FeatureFlags.TimeMachine">
-    <p><a href="time-machine"><strong>TV time machine</strong></a><span class="muted">: what premiered, ended and stood out this week in TV history, or the week of any date.</span></p>
-</Feature>
 
 <AuthorizeView>
     <Authorized>
+        <Feature Flag="@FeatureFlags.TimeMachine">
+            <p><a href="time-machine"><strong>TV time machine</strong></a><span class="muted">: what premiered, ended and stood out this week in TV history, or the week of any date.</span></p>
+        </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         <section>

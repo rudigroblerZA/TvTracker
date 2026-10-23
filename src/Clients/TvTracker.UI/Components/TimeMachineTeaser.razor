@@ -35,14 +35,18 @@
             await Session.EnsureLoadedAsync();
             if (await Analytics.GetTimeMachineAsync(null, Session.Profile?.TimeZone) is { } machine)
             {
-                // Alternate premieres and finales, best known first.
-                moments = machine.Premieres.Select(e => (e, "premiered"))
-                    .Zip(machine.Finales.Select(e => (e, "ended")), (a, b) => new[] { a, b })
-                    .SelectMany(x => x)
-                    .Concat(machine.Premieres.Skip(machine.Finales.Count).Select(e => (e, "premiered")))
-                    .Concat(machine.Finales.Skip(machine.Premieres.Count).Select(e => (e, "ended")))
-                    .Take(Max)
-                    .ToList();
+                // Alternate premieres and finales, best known first, until there are enough.
+                for (var i = 0; moments.Count < Max && (i < machine.Premieres.Count || i < machine.Finales.Count); i++)
+                {
+                    if (i < machine.Premieres.Count)
+                    {
+                        moments.Add((machine.Premieres[i], "premiered"));
+                    }
+                    if (i < machine.Finales.Count && moments.Count < Max)
+                    {
+                        moments.Add((machine.Finales[i], "ended"));
+                    }
+                }
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
