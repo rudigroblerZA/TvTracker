@@ -291,6 +291,20 @@ public record DiscoveryItem(Guid ShowId, string ShowTitle, string? PosterUrl, do
     Guid? EpisodeId, int? SeasonNumber, int? EpisodeNumber, string? EpisodeTitle);
 
 /// <param name="Followers">Our users following at least one of their shows; null until there are enough.</param>
+/// <summary>A creator's style from their shows' DNA; see Analytics' CreatorFingerprint.</summary>
+public record CreatorFingerprint(Guid PersonId, string Name, DateTime ComputedAtUtc, List<FingerprintShow> Shows,
+    Dictionary<string, double> Traits, List<SignatureTrait> Signature, List<string> Range, List<FingerprintMatch> MadeThisWay,
+    List<KindredCreator> Kindred);
+
+public record FingerprintShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <param name="Shows">How many of their shows lean this way, of Of with the trait.</param>
+public record SignatureTrait(string Key, string Label, int Shows, int Of);
+
+public record FingerprintMatch(Guid ShowId, string Title, string? PosterUrl, double Similarity, List<string> SharedTraits);
+
+public record KindredCreator(Guid PersonId, string Name, double Similarity, List<string> SharedTraits, List<string> ShowTitles);
+
 public record PersonInsights(Guid PersonId, string Name, DateTime ComputedAtUtc, int ShowCount, double? AverageShowRating,
     PersonShow? BestShow, int? FirstYear, int? LastYear, IReadOnlyList<CoStar> FrequentCoStars, int? Followers);
 

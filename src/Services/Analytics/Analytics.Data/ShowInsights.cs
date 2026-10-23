@@ -319,5 +319,37 @@ public record PersonInsights(
 
 public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? Rating, string? Character);
 
+/// <summary>
+/// A creator's style, from the DNA of the shows they created or developed: the traits those shows share (their
+/// signature), where the shows differ most (their range), shows by other people made the same way, and the creators
+/// whose style is closest.
+/// </summary>
+/// <param name="Shows">Their shows with DNA, most popular first.</param>
+/// <param name="Traits">Each trait averaged over their shows (only traits at least two of them have): the fingerprint itself.</param>
+/// <param name="Signature">Distinctive traits most of their shows share, strongest first.</param>
+/// <param name="Range">Traits where their shows sit at opposite ends, e.g. "Short episodes to hour-long episodes".</param>
+public record CreatorFingerprint(
+    Guid PersonId,
+    string Name,
+    DateTime ComputedAtUtc,
+    IReadOnlyList<FingerprintShow> Shows,
+    IReadOnlyDictionary<string, double> Traits,
+    IReadOnlyList<SignatureTrait> Signature,
+    IReadOnlyList<string> Range,
+    IReadOnlyList<FingerprintMatch> MadeThisWay,
+    IReadOnlyList<KindredCreator> Kindred);
+
+public record FingerprintShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <param name="Shows">How many of their shows lean this way, of <paramref name="Of"/> with the trait.</param>
+public record SignatureTrait(string Key, string Label, int Shows, int Of);
+
+/// <param name="SharedTraits">Their signature traits the show has too.</param>
+public record FingerprintMatch(Guid ShowId, string Title, string? PosterUrl, double Similarity, IReadOnlyList<string> SharedTraits);
+
+/// <param name="SharedTraits">Signature traits both creators have.</param>
+/// <param name="ShowTitles">Their shows, most popular first.</param>
+public record KindredCreator(Guid PersonId, string Name, double Similarity, IReadOnlyList<string> SharedTraits, IReadOnlyList<string> ShowTitles);
+
 /// <param name="PersonId">The catalog's id for the co-star, for linking to their page.</param>
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);

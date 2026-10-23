@@ -45,6 +45,7 @@ else
     </section>
 
     <PersonInsightsPanel PersonId="Id" />
+    <Feature Flag="@FeatureFlags.CreatorFingerprint"><CreatorFingerprintPanel PersonId="Id" /></Feature>
 
     @if (person.Made is { Count: > 0 } made)
     {

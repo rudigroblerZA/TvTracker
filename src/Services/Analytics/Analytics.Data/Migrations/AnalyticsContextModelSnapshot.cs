@@ -94,6 +94,24 @@ namespace Analytics.Data.Migrations
                     b.ToTable("creatives", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.CreatorFingerprintRow", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ComputedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("PersonId");
+
+                    b.ToTable("creator_fingerprints", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.DiscoveryRow", b =>
                 {
                     b.Property<string>("List")
