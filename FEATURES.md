@@ -184,7 +184,20 @@ Chips on show pages, `/nanogenres`, and a search filter.
 - **Honest about gaps:** a group with nothing specific in common gets no name rather than a vague one.
 - **Recommendations:** shows in the same nanogenre rank higher, with the plainest reason: "Also a sports comedy".
 
-### 15. Smaller touches
+### 15. When it gets good
+
+On show pages, in "Will you finish it?", and a Discover list.
+
+- **The question everyone asks:** "how long until it gets good?" Answered from the episode ratings, not from forums:
+  The Office gets good at S02E03 "Office Olympics" (4 hours in), Succession at S02E01, The Wire at S01E07 "One
+  Arrest", Community and The Good Place at their seventh episodes, Severance at S01E06 "Hide and Seek".
+- **Honest both ways:** Breaking Bad and Stranger Things are "Good from the first episode". A show whose start is only
+  a little weaker, or that never clearly turns, gets nothing said about it.
+- **Personal:** if you've stalled before the turn, "Hang on: it gets good in 2 episodes (1 h 29 min)".
+- **Worth the wait:** a Discover list of well-rated slow starters and where they turn: Person of Interest (S01E04),
+  Dark (S01E05), Slow Horses (S02E04), Severance (S01E06).
+
+### 16. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

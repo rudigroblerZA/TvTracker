@@ -2,6 +2,7 @@
 @inject AnalyticsClient Analytics
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation
+@inject FeatureFlagStore Flags
 
 <PageTitle>@(Selected.Label) · Discover · TV Tracker</PageTitle>
 
@@ -16,7 +17,7 @@
 
         <div class="section-header">
             <div class="tabs" role="tablist">
-                @foreach (var tab in Lists)
+                @foreach (var tab in visible)
                 {
                     <button role="tab" aria-selected="@(tab.Key == list)" class="@(tab.Key == list ? "active" : "")"
                             @onclick="() => Go(tab.Key, genre)">@tab.Label</button>
@@ -88,8 +89,12 @@
         ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes."),
         ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for."),
         ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less."),
-        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more).")
+        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more)."),
+        ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good.")
     ];
+
+    /// <summary>The lists shown: all of them, less those behind a feature flag that's off.</summary>
+    private (string Key, string Label, string Description)[] visible = Lists.Where(l => l.Key != "worth-the-wait").ToArray();
 
     private string list = Lists[0].Key;
     private string genre = "";
@@ -102,6 +107,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (await Flags.IsEnabledAsync(FeatureFlags.GetsGood))
+        {
+            visible = Lists;
+        }
+
         try
         {
             genres = await Catalog.GetGenresAsync() ?? [];
@@ -114,7 +124,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        list = Lists.Any(t => t.Key == List) ? List! : Lists[0].Key;
+        list = visible.Any(t => t.Key == List) ? List! : Lists[0].Key;
         genre = Genre ?? "";
         var key = $"{list}|{genre}";
         if (key != loadedFor)
@@ -154,6 +164,7 @@
             "best-finales" => $"Finale rated {Format.Rating(item.Value)}",
             "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
             "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from TV Tracker users",
+            "worth-the-wait" => $"Gets good here: rated {item.Value:0.0} higher from this episode on",
             _ => null
         };
         return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));

@@ -54,6 +54,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages." }
+    },
+    "gets-good": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "When it gets good: the section on show pages, the nudge in Will you finish it?, and the Worth the wait discovery list." }
     }
   }
 }
