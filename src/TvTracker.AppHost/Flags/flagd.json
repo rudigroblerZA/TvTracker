@@ -72,6 +72,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "TV time machine: /time-machine (this week in TV history, or any date's week), its teaser on Home and link on Insights." }
+    },
+    "endings": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Does it stick the landing?: the section on ended shows' pages, and the Great endings discovery list." }
     }
   }
 }

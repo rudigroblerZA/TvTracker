@@ -212,7 +212,14 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
+    Landing? Landing = null);
+
+/// <summary>Whether an ended show sticks the landing; spoiler-free (no titles).</summary>
+/// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles" or "as-it-ran".</param>
+/// <param name="FinaleBeats">The share of its other episodes the finale rates above, 0-1.</param>
+/// <param name="FinalSeasonRank">The final season's rank among RankedSeasons (1 = best); null with fewer than three.</param>
+public record Landing(string Verdict, int Seasons, double FinaleRating, double ShowMedian, double FinaleBeats, int? FinalSeasonRank, int RankedSeasons);
 
 /// <summary>When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.</summary>
 public record GetsGood(bool FromTheStart, double Opening, double Settled, GetsGoodTurn? Turn);

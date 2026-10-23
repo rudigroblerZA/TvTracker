@@ -221,7 +221,18 @@ On person pages.
   Seinfeld, Frasier and The X-Files were on air. The date is in the link, so a trip can be shared.
 - **Personal:** episodes you've already watched are marked.
 
-### 18. Smaller touches
+### 18. Does it stick the landing?
+
+On ended shows' pages, and a Discover list.
+
+- **The question before starting a finished show:** is the ending worth it? Answered from the ratings, without
+  spoilers: the finale is never named.
+- **It agrees with the reputations:** Game of Thrones, Dexter and How I Met Your Mother fizzle out (their finales rate
+  lower than any other episode, in their weakest seasons). The Americans, Succession and Better Call Saul stick the
+  landing. The Office has a great finale after a weaker last season; Seinfeld's finale lets it down.
+- **Great endings:** finished shows to start with confidence, on Discover.
+
+### 19. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

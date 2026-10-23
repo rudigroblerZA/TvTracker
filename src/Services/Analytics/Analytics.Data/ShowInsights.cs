@@ -32,7 +32,40 @@ public record ShowInsights(
     IReadOnlyList<ShowTag>? Tags = null,
     ShowDna? Dna = null,
     Outlook? Outlook = null,
-    GetsGood? GetsGood = null);
+    GetsGood? GetsGood = null,
+    Landing? Landing = null);
+
+/// <summary>
+/// Whether an ended show sticks the landing, from the provider's ratings of its finale (its last aired episode) and
+/// final season against the rest. Spoiler-free: no titles. Null for shows still running, or without enough ratings.
+/// </summary>
+/// <param name="Verdict">One of <see cref="LandingVerdicts"/>.</param>
+/// <param name="Seasons">Regular seasons it ran.</param>
+/// <param name="FinaleRating">The finale's provider rating.</param>
+/// <param name="ShowMedian">The median rating of its episodes.</param>
+/// <param name="FinaleBeats">The share of its other episodes the finale rates above, 0-1.</param>
+/// <param name="FinalSeasonRank">Where the final season ranks among its rated seasons (1 = best); null with fewer than three.</param>
+/// <param name="RankedSeasons">How many seasons were ranked.</param>
+public record Landing(string Verdict, int Seasons, double FinaleRating, double ShowMedian, double FinaleBeats,
+    int? FinalSeasonRank, int RankedSeasons);
+
+public static class LandingVerdicts
+{
+    /// <summary>A strong finale, and a final season that holds up.</summary>
+    public const string Sticks = "sticks";
+
+    /// <summary>A strong finale after one of its weakest seasons (The Office).</summary>
+    public const string GreatFinale = "great-finale";
+
+    /// <summary>The final season holds up, but the finale rates well below the show (Seinfeld).</summary>
+    public const string FinaleLetsDown = "finale-lets-down";
+
+    /// <summary>A weak finale at the end of one of its weakest seasons (Game of Thrones, Dexter).</summary>
+    public const string Fizzles = "fizzles";
+
+    /// <summary>Finale and final season rate about as the rest did (Breaking Bad, Friends).</summary>
+    public const string AsItRan = "as-it-ran";
+}
 
 /// <summary>
 /// When a show gets good, from the provider's episode ratings over its opening run. Null when the ratings say nothing
@@ -295,8 +328,11 @@ public static class DiscoveryLists
     /// <summary>Well-rated slow starters (<see cref="GetsGoodTurn"/>) that get much better, most popular first.</summary>
     public const string WorthTheWait = "worth-the-wait";
 
+    /// <summary>Well-rated ended shows that stick the landing (<see cref="LandingVerdicts.Sticks"/>), most popular first.</summary>
+    public const string GreatEndings = "great-endings";
+
     public static readonly IReadOnlyList<string> All =
-        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites, WorthTheWait];
+        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites, WorthTheWait, GreatEndings];
 }
 
 /// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>

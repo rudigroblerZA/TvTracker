@@ -280,6 +280,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     Only shows with a creator or developer credit count: TVmaze rarely credits one on reality, talk and news shows,
     and Analytics has no kind of show to tell them apart otherwise.
   - **Kindred creators:** fingerprint similarity ≥ 0.85 and a shared signature trait, never having made a show together.
+- **Does it stick the landing?** (`LandingInsight`): ended shows only (TVmaze has no "cancelled", so a cut-short show
+  can't be told from a planned ending, and nothing is said about it).
+  - **Finale:** the last aired regular episode against the median episode: 0.3 above is strong, 0.3 below weak.
+  - **Final season:** against the median season (seasons with 3+ rated episodes; ranked only among 3+ seasons): 0.3
+    below is weak.
+  - **Verdicts:** strong finale → sticks (or great finale, weaker last season); weak finale → fizzles (weak season too)
+    or the finale lets it down; else ends as it ran.
+  - **Spoiler-free:** no titles, in the panel or the Great endings list.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
   - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a

@@ -90,11 +90,12 @@
         ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for."),
         ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less."),
         ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more)."),
-        ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good.")
+        ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good."),
+        ("great-endings", "Great endings", "Finished shows that stick the landing: a strong finale, and a final season that holds up.")
     ];
 
     /// <summary>The lists shown: all of them, less those behind a feature flag that's off.</summary>
-    private (string Key, string Label, string Description)[] visible = Lists.Where(l => l.Key != "worth-the-wait").ToArray();
+    private (string Key, string Label, string Description)[] visible = Lists.Where(l => l.Key is not ("worth-the-wait" or "great-endings")).ToArray();
 
     private string list = Lists[0].Key;
     private string genre = "";
@@ -107,10 +108,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (await Flags.IsEnabledAsync(FeatureFlags.GetsGood))
-        {
-            visible = Lists;
-        }
+        var getsGood = await Flags.IsEnabledAsync(FeatureFlags.GetsGood);
+        var endings = await Flags.IsEnabledAsync(FeatureFlags.Endings);
+        visible = Lists.Where(l => l.Key switch { "worth-the-wait" => getsGood, "great-endings" => endings, _ => true }).ToArray();
 
         try
         {
@@ -165,6 +165,7 @@
             "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
             "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from TV Tracker users",
             "worth-the-wait" => $"Gets good here: rated {item.Value:0.0} higher from this episode on",
+            "great-endings" => $"Finale rated {Format.Rating(item.Value)}",
             _ => null
         };
         return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));

@@ -453,6 +453,8 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .finish-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .tag.finish-on-track { color: var(--text); border-color: var(--accent); }
 .tag.finish-stalled { opacity: 0.8; }
+.tag.landing-sticks, .tag.landing-great-finale { color: var(--text); border-color: var(--accent); }
+.tag.landing-fizzles { opacity: 0.8; }
 
 /* Nanogenres */
 .nanogenre-tags { margin-top: 6px; }
