@@ -21,11 +21,18 @@ public sealed class DiscoveryList : IListInsight
 
     private const double RollercoasterMinRating = 7.0;
 
+    /// <summary>Worth the wait: slow starters rated at least this as a show...</summary>
+    private const double WorthTheWaitMinRating = 7.5;
+
+    /// <summary>...that rate at least this much better from the turn than before it.</summary>
+    private const double WorthTheWaitMinLift = 0.4;
+
     public ListBuilder Begin(InsightSources sources) => new Builder();
 
     private sealed record Candidate(
         ShowCopy Show, int AiredEpisodes, bool WellRated, Consistency? Consistency, int Followers,
-        List<(EpisodeCopy Finale, double Score)> Finales, IReadOnlyList<ShowTag> Tags, double? OurRating, int RuntimeMinutes)
+        List<(EpisodeCopy Finale, double Score)> Finales, IReadOnlyList<ShowTag> Tags, double? OurRating, int RuntimeMinutes,
+        GetsGoodTurn? Turn)
     {
         public bool Has(string tag) => Tags.Any(t => t.Key == tag);
     }
@@ -47,7 +54,7 @@ public sealed class DiscoveryList : IListInsight
                 : [];
             candidates.Add(new Candidate(show.Show, show.Aired.Count, show.WellRated, insights.Patterns?.Consistency,
                 show.Sources.FollowersByShow[show.ShowId].Count(), finales, insights.Tags ?? [], insights.Rating.Ours,
-                insights.Run.RuntimeMinutes));
+                insights.Run.RuntimeMinutes, insights.GetsGood?.Turn));
         }
 
         /// <summary>Each fully aired season's last episode, when it's rated and the season has enough rated episodes.</summary>
@@ -117,6 +124,21 @@ public sealed class DiscoveryList : IListInsight
                     .ThenByDescending(c => c.Show.ExternalRating ?? 0)
                     .ThenByDescending(c => c.Show.Popularity)
                     .Select(c => Row(c.Show, c.OurRating is >= ShowTags.FanFavoriteMinStars ? c.OurRating.Value : 0)));
+
+                // Value: how much better it rates from the turn; the episode is where it gets good. Most popular first:
+                // ordered by the lift instead, thinly rated old shows with a few 9.5s led the list.
+                Add(DiscoveryLists.WorthTheWait, genre, inGenre
+                    .Where(c => c.Turn is { } turn && turn.After - turn.Before >= WorthTheWaitMinLift && c.Show.ExternalRating >= WorthTheWaitMinRating)
+                    .OrderByDescending(c => c.Show.Popularity)
+                    .Select(c =>
+                    {
+                        var row = Row(c.Show, Math.Round(c.Turn!.After - c.Turn.Before, 2));
+                        row.EpisodeId = c.Turn.EpisodeId;
+                        row.SeasonNumber = c.Turn.SeasonNumber;
+                        row.EpisodeNumber = c.Turn.EpisodeNumber;
+                        row.EpisodeTitle = c.Turn.Title;
+                        return row;
+                    }));
             }
 
             return rows;

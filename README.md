@@ -258,7 +258,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -271,6 +271,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
+| `gets-good` | "When it gets good" on show pages, its line in "Will you finish it?", and the Worth the wait list on Discover |
 | `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 
@@ -367,7 +368,9 @@ How events flow:
     list and genre are in the address (`/discover?list=bingeable&genre=Drama`), so a list can be shared:
     - hidden gems: rated 7.5+, outside the catalog's most popular 40% on TVmaze, and few of our users follow them;
     - most consistent and biggest rollercoasters, among well-rated shows;
-    - best season finales.
+    - best season finales;
+    - worth the wait: well-rated shows (7.5+) with a slow start that rate at least 0.4 higher from the episode where
+      they get good, most popular first (Person of Interest, Dark, Slow Horses, Severance).
   - **Show page — prolific creators and producers:** who made the show, featuring the most prolific person.
     - **Prolific** means credited behind the camera on 10 or more shows on TVmaze. Dick Wolf has 57 and Chuck Lorre 19.
     - **What it shows:** their totals, best-known shows, and their other shows in the catalog.
@@ -413,6 +416,17 @@ How events flow:
       people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
+  - **When it gets good** (show pages, signed in): the episode where a slow-starting show turns, how long it takes to
+    get there, and how much better it rates from there. Severance: "Gets good at S01E06 “Hide and Seek”, 4 h in (5
+    episodes). The episodes before it average 7.2 on TVmaze; from there, 7.8." Shows that don't need warming up say
+    "Good from the first episode".
+    - **How:** TVmaze's episode ratings over the opening run (the first 40 rated episodes). A slow start opens 0.3+
+      below that run's median; it turns at the first episode where the next three reach the median and the next ten
+      hold it, within the first 25 episodes, and only when that's 0.3+ better than before.
+    - **Checked:** The Office turns at S02E03, Succession at S02E01, The Wire at S01E07, Community and The Good Place
+      at S01E07. 102 of 625 shows have a turn and 206 are good from the start; the rest say nothing.
+    - **Personal:** "Will you finish it?" says "Hang on: it gets good in 2 episodes (1 h 29 min), at S01E06 …" when
+      you've not reached the turn. If our viewers most often stop before the turn, the show page says so.
   - **Show DNA** (show pages, signed in): how a show is made and how it plays out, as 12 traits on a scale between two
     plain ends. Examples: "Short episodes" ↔ "Hour-long episodes", "Weekly episodes" ↔ "Drops all at once",
     "Rollercoaster" ↔ "Steady", "Fades over time" ↔ "Gets better", "Quiet finales" ↔ "Big finales".
