@@ -21,8 +21,7 @@ public sealed class LandingInsight : IShowInsight
     /// <summary>A final season this far below the median season is a weak one; at or above it, it holds up.</summary>
     private const double SeasonMargin = 0.3;
 
-    /// <summary>Seasons rank only with this many rated episodes, and the final season only among three or more.</summary>
-    private const int MinSeasonEpisodes = 3;
+    /// <summary>The final season is ranked only among this many seasons that count.</summary>
     private const int MinRankedSeasons = 3;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights) =>
@@ -44,34 +43,36 @@ public sealed class LandingInsight : IShowInsight
 
         var ratings = rated.Select(e => e.ExternalRating!.Value).ToList();
         var median = Median(ratings);
-        var beats = (double)ratings.Count(r => r < finale) / (ratings.Count - 1);
 
-        var seasons = rated.GroupBy(e => e.SeasonNumber)
-            .Where(g => g.Count() >= MinSeasonEpisodes)
-            .ToDictionary(g => g.Key, g => g.Average(e => e.ExternalRating!.Value));
-        var finalSeason = aired[^1].SeasonNumber;
-        int? rank = null;
-        var seasonWeak = false;
-        if (seasons.Count >= MinRankedSeasons && seasons.TryGetValue(finalSeason, out var finalAverage))
-        {
-            rank = seasons.Values.Count(v => v > finalAverage) + 1;
-            seasonWeak = finalAverage <= Median(seasons.Values.ToList()) - SeasonMargin;
-        }
+        // Counted, not as a share: ratings have one decimal, so ties are common, and "lower than any other episode"
+        // must mean none rates the same or lower.
+        var others = ratings.Count - 1;
+        var higher = ratings.Count(r => r > finale);
+        var lower = ratings.Count(r => r < finale);
 
-        var verdict = (finale - median) switch
+        // The seasons that count (3+ rated episodes; see SeasonSummary), specials left out. The final season is
+        // checked whenever it counts, even with only two seasons; it's ranked only among three or more.
+        var seasons = show.RatedSeasons.Where(s => s.Number > 0).ToList();
+        var finalSeason = seasons.FirstOrDefault(s => s.Number == aired[^1].SeasonNumber);
+        bool? seasonWeak = seasons.Count == 1 ? false
+            : finalSeason == default ? null
+            : Round(finalSeason.Rating - Median(seasons.Select(s => s.Rating).ToList())) <= -SeasonMargin;
+        int? rank = seasons.Count >= MinRankedSeasons && finalSeason != default
+            ? seasons.Count(s => s.Rating > finalSeason.Rating) + 1
+            : null;
+
+        // Rounded first: on one-decimal ratings, 8.1 - 7.8 is 0.29999999999999982.
+        var verdict = Round(finale - median) switch
         {
-            >= FinaleMargin => seasonWeak ? LandingVerdicts.GreatFinale : LandingVerdicts.Sticks,
-            <= -FinaleMargin => seasonWeak ? LandingVerdicts.Fizzles : LandingVerdicts.FinaleLetsDown,
-            _ => LandingVerdicts.AsItRan
+            >= FinaleMargin => seasonWeak switch { true => LandingVerdicts.GreatFinale, false => LandingVerdicts.Sticks, null => null },
+            <= -FinaleMargin => seasonWeak switch { true => LandingVerdicts.Fizzles, _ => LandingVerdicts.FinaleLetsDown },
+            _ => seasonWeak == true ? LandingVerdicts.WeakerLastSeason : LandingVerdicts.AsItRan
         };
 
-        return new Landing(verdict, aired.Select(e => e.SeasonNumber).Distinct().Count(), finale, Round(median), Round(beats), rank, seasons.Count);
-    }
-
-    private static double Median(List<double> values)
-    {
-        var sorted = values.Order().ToList();
-        var middle = sorted.Count / 2;
-        return sorted.Count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+        // A strong finale whose final season can't be checked (too few rated episodes) isn't called a landing either way.
+        return verdict is null
+            ? null
+            : new Landing(verdict, finale, Round(median),
+                Round((double)lower / others), rank, rank is null ? 0 : seasons.Count, higher, lower, others);
     }
 }

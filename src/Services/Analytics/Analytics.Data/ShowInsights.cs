@@ -37,17 +37,20 @@ public record ShowInsights(
 
 /// <summary>
 /// Whether an ended show sticks the landing, from the provider's ratings of its finale (its last aired episode) and
-/// final season against the rest. Spoiler-free: no titles. Null for shows still running, or without enough ratings.
+/// final season against the rest. Spoiler-free: no titles. Null for shows still running, without enough ratings, or
+/// with a strong finale whose final season has too few rated episodes to check.
 /// </summary>
 /// <param name="Verdict">One of <see cref="LandingVerdicts"/>.</param>
-/// <param name="Seasons">Regular seasons it ran.</param>
 /// <param name="FinaleRating">The finale's provider rating.</param>
 /// <param name="ShowMedian">The median rating of its episodes.</param>
-/// <param name="FinaleBeats">The share of its other episodes the finale rates above, 0-1.</param>
+/// <param name="FinaleBeats">The share of its other episodes the finale rates strictly above, 0-1.</param>
 /// <param name="FinalSeasonRank">Where the final season ranks among its rated seasons (1 = best); null with fewer than three.</param>
-/// <param name="RankedSeasons">How many seasons were ranked.</param>
-public record Landing(string Verdict, int Seasons, double FinaleRating, double ShowMedian, double FinaleBeats,
-    int? FinalSeasonRank, int RankedSeasons);
+/// <param name="RankedSeasons">How many seasons were ranked; 0 when the final season wasn't.</param>
+/// <param name="RatedHigher">Other episodes rated above the finale; ties are in neither count.</param>
+/// <param name="RatedLower">Other episodes rated below the finale.</param>
+/// <param name="OtherEpisodes">Its other rated episodes.</param>
+public record Landing(string Verdict, double FinaleRating, double ShowMedian, double FinaleBeats,
+    int? FinalSeasonRank, int RankedSeasons, int RatedHigher = 0, int RatedLower = 0, int OtherEpisodes = 0);
 
 public static class LandingVerdicts
 {
@@ -65,6 +68,9 @@ public static class LandingVerdicts
 
     /// <summary>Finale and final season rate about as the rest did (Breaking Bad, Friends).</summary>
     public const string AsItRan = "as-it-ran";
+
+    /// <summary>A finale in line with the show, at the end of one of its weakest seasons.</summary>
+    public const string WeakerLastSeason = "weaker-last-season";
 }
 
 /// <summary>

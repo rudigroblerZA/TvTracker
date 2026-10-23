@@ -15,18 +15,21 @@
         "great-finale" => "Great finale, weaker last season",
         "finale-lets-down" => "The finale lets it down",
         "fizzles" => "Fizzles out",
+        "weaker-last-season" => "Weaker last season",
         _ => "Ends as it ran"
     };
 
     private static string Detail(Landing landing)
     {
         var typical = Format.Rating(landing.ShowMedian);
-        var finale = landing.Verdict == "as-it-ran"
-            ? $"The finale rates {Format.Rating(landing.FinaleRating)}, close to its typical episode ({typical})"
-            : landing.FinaleBeats >= 0.995 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, higher than any other episode (typical: {typical})"
-            : landing.FinaleBeats <= 0.005 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, lower than any other episode (typical: {typical})"
-            : landing.FinaleBeats >= 0.5 ? $"The finale rates {Format.Rating(landing.FinaleRating)}, above {Format.Percent(landing.FinaleBeats)} of its episodes (typical: {typical})"
-            : $"The finale rates {Format.Rating(landing.FinaleRating)}, below {Format.Percent(1 - landing.FinaleBeats)} of its episodes (typical: {typical})";
+        var rated = $"The finale rates {Format.Rating(landing.FinaleRating)}";
+        var finale = landing.Verdict is "as-it-ran" or "weaker-last-season"
+            ? $"{rated}, close to its typical episode ({typical})"
+            : landing.OtherEpisodes == 0 ? $"{rated} (typical: {typical})"
+            : landing.RatedHigher == 0 && landing.RatedLower == landing.OtherEpisodes ? $"{rated}, higher than any other episode (typical: {typical})"
+            : landing.RatedLower == 0 && landing.RatedHigher == landing.OtherEpisodes ? $"{rated}, lower than any other episode (typical: {typical})"
+            : landing.RatedLower >= landing.RatedHigher ? $"{rated}, above {Share(landing.RatedLower, landing.OtherEpisodes)} of its episodes (typical: {typical})"
+            : $"{rated}, below {Share(landing.RatedHigher, landing.OtherEpisodes)} of its episodes (typical: {typical})";
         var season = landing.FinalSeasonRank is { } rank
             ? rank == 1 ? "the final season is its best"
             : rank == landing.RankedSeasons ? "the final season is its weakest"
@@ -34,6 +37,9 @@
             : null;
         return season is null ? $"{finale}." : $"{finale}, and {season}.";
     }
+
+    /// <summary>A share that never rounds to 100% unless it is: 298 of 299 is "99%".</summary>
+    private static string Share(int count, int of) => $"{Math.Min(Math.Round(100.0 * count / of), count == of ? 100 : 99):0}%";
 
     private static string Ordinal(int n) => n + (n % 100 is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
 }

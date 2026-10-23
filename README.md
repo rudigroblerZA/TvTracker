@@ -429,7 +429,8 @@ How events flow:
     the rest of the show, from TVmaze's ratings, without naming the finale.
     - **Verdicts:** "Sticks the landing" (The Americans, Succession, Better Call Saul), "Great finale, weaker last
       season" (The Office), "The finale lets it down" (Seinfeld), "Fizzles out" (Game of Thrones, Dexter, How I Met Your
-      Mother), and "Ends as it ran" (Breaking Bad, Friends).
+      Mother), "Weaker last season" (a finale in line, at the end of a weak season), and "Ends as it ran" (Breaking
+      Bad, Friends).
     - **How:** the finale 0.3+ above or below the median episode is strong or weak; the final season 0.3+ below the
       median season is weak; the season's rank needs three rated seasons. 235 of 289 ended shows get a verdict.
     - **Great endings:** a Discover list of well-rated (7.5+) ended shows that stick the landing, most popular first.
