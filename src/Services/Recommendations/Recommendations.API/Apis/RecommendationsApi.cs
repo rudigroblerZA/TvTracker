@@ -4,10 +4,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Recommendations.API.Data;
 using Recommendations.API.Services;
+using TvTracker;
 
 namespace Recommendations.API.Apis;
 
 public record RecommendedShowDto(Guid ShowId, string Title, string? PosterUrl, double Score, string Reason);
+
+/// <param name="Similarity">How alike the two DNAs are, 0-1.</param>
+/// <param name="SharedTraits">Distinctive traits both shows have, strongest first ("Drops all at once").</param>
+/// <param name="OtherGenres">The twin's genres the show doesn't have: what it's about instead.</param>
+public record DnaTwinDto(Guid ShowId, string Title, string? PosterUrl, double Similarity, IReadOnlyList<string> SharedTraits, IReadOnlyList<string> OtherGenres);
 
 public static class RecommendationsApi
 {
@@ -16,6 +22,7 @@ public static class RecommendationsApi
         var api = app.MapGroup("/api/v1");
 
         api.MapGet("/shows/{showId:guid}/similar", GetSimilarAsync);
+        api.MapGet("/shows/{showId:guid}/dna-twins", GetDnaTwinsAsync).RequireFeature(FeatureFlags.DnaTwins);
 
         var mine = api.MapGroup("").RequireAuthorization();
         mine.MapGet("/for-you", GetForYouAsync);
@@ -38,6 +45,30 @@ public static class RecommendationsApi
             cancellationToken: ct);
 
         return TypedResults.Ok(similar);
+    }
+
+    /// <summary>Shows made like this one but about something else; empty when the show has no DNA yet.</summary>
+    private static async Task<Ok<List<DnaTwinDto>>> GetDnaTwinsAsync(
+        Guid showId, RecommendationEngine engine, RecommendationsContext db, HybridCache cache, int limit = 6, CancellationToken ct = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+
+        var twins = await cache.GetOrCreateAsync(
+            $"recs:dna-twins:{showId}:{limit}",
+            async token =>
+            {
+                var found = await engine.GetDnaTwinsAsync(showId, limit, token);
+                var ids = found.Select(t => t.ShowId).ToList();
+                var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, token);
+                return found
+                    .Where(t => shows.ContainsKey(t.ShowId))
+                    .Select(t => new DnaTwinDto(t.ShowId, shows[t.ShowId].Title, shows[t.ShowId].PosterUrl, t.Similarity, t.SharedTraits, t.OtherGenres))
+                    .ToList();
+            },
+            new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(30), LocalCacheExpiration = TimeSpan.FromMinutes(5) },
+            cancellationToken: ct);
+
+        return TypedResults.Ok(twins);
     }
 
     private static async Task<Ok<List<RecommendedShowDto>>> GetForYouAsync(

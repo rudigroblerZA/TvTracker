@@ -18,6 +18,8 @@ public static class FeatureFlags
     public const string ShowDna = "show-dna";
     public const string Forecasts = "forecasts";
     public const string Nanogenres = "nanogenres";
+    public const string DnaTwins = "dna-twins";
+    public const string GetsGood = "gets-good";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

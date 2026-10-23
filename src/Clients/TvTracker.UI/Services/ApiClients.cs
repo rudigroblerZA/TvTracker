@@ -214,6 +214,9 @@ public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProv
     public Task<List<RecommendedShow>?> GetSimilarAsync(Guid showId, int limit = 10, CancellationToken ct = default) =>
         GetAsync<List<RecommendedShow>>(ApiClients.Recommendations, $"api/v1/shows/{showId}/similar?limit={limit}", ct, cacheForOffline: true);
 
+    public Task<List<DnaTwin>?> GetDnaTwinsAsync(Guid showId, int limit = 6, CancellationToken ct = default) =>
+        GetAsync<List<DnaTwin>>(ApiClients.Recommendations, $"api/v1/shows/{showId}/dna-twins?limit={limit}", ct, cacheForOffline: true);
+
     public Task<List<RecommendedShow>?> GetForYouAsync(int limit = 20, CancellationToken ct = default) =>
         GetAsync<List<RecommendedShow>>(ApiClients.Recommendations, $"api/v1/for-you?limit={limit}", ct, cacheForOffline: true);
 

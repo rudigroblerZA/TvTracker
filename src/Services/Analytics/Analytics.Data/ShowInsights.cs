@@ -31,7 +31,25 @@ public record ShowInsights(
     EpisodePatterns? Patterns = null,
     IReadOnlyList<ShowTag>? Tags = null,
     ShowDna? Dna = null,
-    Outlook? Outlook = null);
+    Outlook? Outlook = null,
+    GetsGood? GetsGood = null);
+
+/// <summary>
+/// When a show gets good, from the provider's episode ratings over its opening run. Null when the ratings say nothing
+/// clear: too few, a mild start, or no lasting turn.
+/// </summary>
+/// <param name="FromTheStart">Its first episodes already rate as well as the rest of its opening run.</param>
+/// <param name="Opening">Its first three rated episodes' average.</param>
+/// <param name="Settled">The median of its opening run (its first 40 rated episodes): the level it settles at.</param>
+/// <param name="Turn">The episode where it reaches that level and stays there; null when it's good from the start.</param>
+public record GetsGood(bool FromTheStart, double Opening, double Settled, GetsGoodTurn? Turn);
+
+/// <param name="EpisodesBefore">Aired regular episodes before it.</param>
+/// <param name="MinutesBefore">Their runtime: how long it takes to get there.</param>
+/// <param name="Before">The average rating of the rated episodes before it.</param>
+/// <param name="After">The average rating of it and the next nine rated episodes.</param>
+public record GetsGoodTurn(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int EpisodesBefore, int MinutesBefore,
+    double Before, double After);
 
 /// <summary>
 /// What's likely next for a running show, from models trained and backtested on the catalog's own season history each
@@ -274,8 +292,11 @@ public static class DiscoveryLists
     /// <summary>Shows tagged <see cref="ShowTags.FanFavorite"/>: our users' favourites first, then the provider's.</summary>
     public const string FanFavorites = "fan-favorites";
 
+    /// <summary>Well-rated slow starters (<see cref="GetsGoodTurn"/>) that get much better, most popular first.</summary>
+    public const string WorthTheWait = "worth-the-wait";
+
     public static readonly IReadOnlyList<string> All =
-        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites];
+        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites, WorthTheWait];
 }
 
 /// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>

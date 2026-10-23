@@ -13,6 +13,7 @@ namespace Analytics.API.Apis;
 /// <param name="FinishBy">When you'd finish what has aired at that pace; null without a pace.</param>
 /// <param name="Record">How you did with your other shows from this far in; null with too few to go on.</param>
 /// <param name="DropOffAhead">Where most of our viewers stop, when it's still ahead of you; null otherwise.</param>
+/// <param name="GetsGoodAhead">Where a slow-starting show gets good, when you haven't got there yet; null otherwise.</param>
 public record FinishOutlookDto(
     Guid ShowId,
     string Title,
@@ -25,7 +26,12 @@ public record FinishOutlookDto(
     double EpisodesPerWeek,
     DateOnly? FinishBy,
     FinishRecordDto? Record,
-    DropOff? DropOffAhead);
+    DropOff? DropOffAhead,
+    GetsGoodAheadDto? GetsGoodAhead = null);
+
+/// <param name="EpisodesAway">Episodes between your furthest one and it.</param>
+/// <param name="MinutesAway">Their runtime.</param>
+public record GetsGoodAheadDto(int SeasonNumber, int EpisodeNumber, string Title, int EpisodesAway, int MinutesAway);
 
 /// <param name="Comparable">Your other shows you got at least as far into (as a share of what had aired).</param>
 /// <param name="Finished">Of those, how many you watched to the end of what had aired.</param>
@@ -99,7 +105,7 @@ public static class FinishOutlookApi
             .ToList();
 
         var inProgress = progress.Where(p => p.Watched < p.Aired && shows.ContainsKey(p.ShowId) && (only is null || p.ShowId == only)).ToList();
-        var dropOffs = await DropOffsAsync(db, inProgress.Select(p => p.ShowId).ToList(), ct);
+        var insights = await InsightsAsync(db, inProgress.Select(p => p.ShowId).ToList(), ct);
 
         return inProgress
             .Select(p =>
@@ -118,11 +124,20 @@ public static class FinishOutlookApi
                 // The drop-off is ahead when it's past the furthest episode the user has watched.
                 var ordered = p.Episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
                 var furthest = ordered.FindLastIndex(e => p.Ids.Contains(e.EpisodeId));
+                var showInsights = insights.GetValueOrDefault(p.ShowId);
                 DropOff? ahead = null;
-                if (dropOffs.GetValueOrDefault(p.ShowId) is { } dropOff
+                if (showInsights?.Viewing?.DropOff is { } dropOff
                     && ordered.FindIndex(e => e.SeasonNumber == dropOff.SeasonNumber && e.EpisodeNumber == dropOff.EpisodeNumber) > furthest)
                 {
                     ahead = dropOff;
+                }
+
+                GetsGoodAheadDto? getsGood = null;
+                if (showInsights?.GetsGood?.Turn is { } turn
+                    && ordered.FindIndex(e => e.EpisodeId == turn.EpisodeId) is var turnIndex && turnIndex > furthest)
+                {
+                    var between = ordered.Skip(furthest + 1).Take(turnIndex - furthest - 1).ToList();
+                    getsGood = new GetsGoodAheadDto(turn.SeasonNumber, turn.EpisodeNumber, turn.Title, between.Count, between.Sum(e => e.RuntimeMinutes ?? 0));
                 }
 
                 return new FinishOutlookDto(
@@ -132,20 +147,21 @@ public static class FinishOutlookApi
                     perWeek,
                     perWeek > 0 ? DateOnly.FromDateTime(now.UtcDateTime.AddDays(Math.Ceiling(left.Count / perWeek * 7))) : null,
                     record,
-                    ahead);
+                    ahead,
+                    getsGood);
             })
             .OrderBy(o => o.Status switch { "on-track" => 0, "slowing" => 1, _ => 2 })
             .ThenByDescending(o => o.LastWatchedAtUtc)
             .ToList();
     }
 
-    /// <summary>The shows' drop-off points from their insights documents (there only with enough viewers).</summary>
-    private static async Task<Dictionary<Guid, DropOff>> DropOffsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct)
+    /// <summary>The shows' insights documents, for their drop-off points (there only with enough viewers) and turns.</summary>
+    private static async Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct)
     {
         var documents = await db.ShowInsights.AsNoTracking().Where(i => showIds.Contains(i.ShowId)).Select(i => new { i.ShowId, i.Document }).ToListAsync(ct);
         return documents
             .Select(d => (d.ShowId, Insights: JsonSerializer.Deserialize<ShowInsights>(d.Document, JsonSerializerOptions.Web)))
-            .Where(d => d.Insights?.Viewing?.DropOff is not null)
-            .ToDictionary(d => d.ShowId, d => d.Insights!.Viewing!.DropOff!);
+            .Where(d => d.Insights is not null)
+            .ToDictionary(d => d.ShowId, d => d.Insights!);
     }
 }

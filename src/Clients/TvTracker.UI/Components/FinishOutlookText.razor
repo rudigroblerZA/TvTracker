@@ -9,6 +9,12 @@
     {
         <div class="small muted">You finished @record.Finished of the @record.Comparable other shows you got this far into.</div>
     }
+    @if (Outlook.GetsGoodAhead is { } getsGood)
+    {
+        <Feature Flag="@FeatureFlags.GetsGood">
+            <div class="small">@GetsGoodText(getsGood)</div>
+        </Feature>
+    }
     @if (Outlook.DropOffAhead is { } dropOff)
     {
         <div class="small muted">@Format.Percent(dropOff.Share) of our viewers stopped after @Format.EpisodeCode(dropOff.SeasonNumber, dropOff.EpisodeNumber) “@dropOff.Title”, which is still ahead of you.</div>
@@ -17,6 +23,16 @@
 
 @code {
     [Parameter, EditorRequired] public FinishOutlook Outlook { get; set; } = null!;
+
+    /// <summary>"Hang on: it gets good in 2 episodes (1 h 30 min), at S01E06 “Hide and Seek”."</summary>
+    private string GetsGoodText(GetsGoodAhead ahead)
+    {
+        var where = $"{Format.EpisodeCode(ahead.SeasonNumber, ahead.EpisodeNumber)} “{ahead.Title}”";
+        var lead = Outlook.Status == "on-track" ? "Keep going" : "Hang on";
+        return ahead.EpisodesAway == 0
+            ? $"{lead}: it gets good with the next episode, {where}."
+            : $"{lead}: it gets good in {ahead.EpisodesAway} episode{(ahead.EpisodesAway == 1 ? "" : "s")} ({Format.Hours(ahead.MinutesAway)}), at {where}.";
+    }
 
     private string StatusLabel => Outlook.Status switch
     {

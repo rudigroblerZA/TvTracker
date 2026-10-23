@@ -253,7 +253,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
-  rollercoasters, best finales, bingeable, weekend binges and fan favorites.
+  rollercoasters, best finales, bingeable, weekend binges, fan favorites and worth the wait.
+  - **Worth the wait** is ordered by popularity: ordered by the lift, thinly rated old shows with a few 9.5s led it.
+- **When it gets good** (`GetsGoodInsight`): the episode where a slow start turns, from the provider's episode ratings.
+  - **Bar:** the median of the opening run (first 40 rated episodes), not the whole show. Long-running shows' ratings
+    drift up over the years, which put Friends' turn in season 2 and Last Week Tonight's in season 5.
+  - **Rules:** a slow start opens (first 3) 0.3+ below the bar; good from the start within 0.1; in between, nothing is
+    said. The turn is the first episode where the next 3 average the bar and the next 10 stay within 0.05, in the first
+    25 episodes, with a lift of 0.3+ over the episodes before.
+  - **Checked** against what viewers say: The Office S02E03, Succession S02E01, The Wire S01E07, Community and The Good
+    Place S01E07, Severance S01E06.
+  - **Personal:** `FinishOutlookApi` adds `GetsGoodAhead` when the turn is past the user's furthest episode.
 - **Essential cut** (`EssentialCutApi`): computed on request (one show's episodes plus the caller's watches), not hourly.
   - **Per season:** it skips the lowest-rated episodes at least `Margin` standard deviations below the season
     average (and at least 0.1), up to `Share` of the season.
@@ -293,6 +303,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Reasons:** a reason names the DNA ("Same DNA as X: …") when the affinity is at least 0.6 and the two shows share
   a distinctive trait.
 - **Rebuilds:** a DNA event that changes anything marks every user with signals for a rebuild of their list.
+- **DNA twins** (`GetDnaTwinsAsync`): the reverse of DNA's role in ranking. Shows made alike (similarity ≥ 0.85, two or
+  more shared distinctive traits, same kind) but about something else: genre overlap ≤ 0.34 with a genre of its own,
+  no shared nanogenre, and not on either's provider similar-shows list. Those would be "Shows like this".
+  - **Why distinctive traits:** similarity alone pairs every hour-long weekly drama with every other one.
+  - **Computed on request** from all DNA rows (a few hundred), cached 30 minutes like similar shows.
 
 ## Tonight's plan
 

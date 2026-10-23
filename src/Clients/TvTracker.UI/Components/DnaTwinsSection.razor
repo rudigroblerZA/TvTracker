@@ -1,0 +1,49 @@
+@inject RecommendationsClient Recommendations
+
+@* DNA twins: shows made like this one (the distinctive traits they share) but about something else (their other genres). *@
+@if (twins is { Count: > 0 })
+{
+    <section>
+        <h2>Made like this, about something else</h2>
+        <p class="muted small">DNA twins: shows built the same way as @Title, in other genres.</p>
+        <div class="card-row">
+            @foreach (var twin in twins)
+            {
+                <ShowCard @key="twin.ShowId" ShowId="twin.ShowId" Title="@twin.Title" PosterUrl="@twin.PosterUrl" Subtitle="@Subtitle(twin)" />
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    private List<DnaTwin>? twins;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        twins = null;
+        try
+        {
+            twins = await Recommendations.GetDnaTwinsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Optional on the show page.
+        }
+    }
+
+    /// <summary>"Drops all at once, big finales · but crime and mystery".</summary>
+    private static string Subtitle(DnaTwin twin)
+    {
+        var traits = string.Join(", ", twin.SharedTraits.Take(2).Select((t, i) => i == 0 ? t : t.ToLowerInvariant()));
+        return twin.OtherGenres.Count == 0 ? traits : $"{traits} · but {string.Join(" and ", twin.OtherGenres.Take(2)).ToLowerInvariant()}";
+    }
+}

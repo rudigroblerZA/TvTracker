@@ -164,6 +164,9 @@ public record Reactions(IReadOnlyList<ReactionCount> Counts, string? Mine);
 
 public record RecommendedShow(Guid ShowId, string Title, string? PosterUrl, double Score, string Reason);
 
+/// <summary>A show made like another but about something else: the distinctive traits they share, and its other genres.</summary>
+public record DnaTwin(Guid ShowId, string Title, string? PosterUrl, double Similarity, List<string> SharedTraits, List<string> OtherGenres);
+
 // Notifications
 
 public record NotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
@@ -209,7 +212,17 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null);
+
+/// <summary>When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.</summary>
+public record GetsGood(bool FromTheStart, double Opening, double Settled, GetsGoodTurn? Turn);
+
+/// <param name="Before">The average rating of the episodes before it; After, of it and the next nine.</param>
+public record GetsGoodTurn(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int EpisodesBefore, int MinutesBefore,
+    double Before, double After);
+
+/// <param name="EpisodesAway">Episodes between the user's furthest one and it.</param>
+public record GetsGoodAhead(int SeasonNumber, int EpisodeNumber, string Title, int EpisodesAway, int MinutesAway);
 
 /// <summary>Forecasts for a running show; each part is null when the show doesn't qualify.</summary>
 public record Outlook(RatingForecast? NextSeasonRating, RenewalOutlook? Renewal, PremiereForecast? NextSeason);
@@ -226,7 +239,8 @@ public record PremiereForecast(int SeasonNumber, DateOnly Likely, DateOnly Earli
 
 /// <param name="Status">"on-track", "slowing" or "stalled".</param>
 public record FinishOutlook(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, int MinutesLeft, string Status,
-    DateTime LastWatchedAtUtc, double EpisodesPerWeek, DateOnly? FinishBy, FinishRecord? Record, DropOff? DropOffAhead);
+    DateTime LastWatchedAtUtc, double EpisodesPerWeek, DateOnly? FinishBy, FinishRecord? Record, DropOff? DropOffAhead,
+    GetsGoodAhead? GetsGoodAhead = null);
 
 /// <param name="Comparable">The user's other shows they got at least this far into.</param>
 public record FinishRecord(int Comparable, int Finished);

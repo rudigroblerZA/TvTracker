@@ -150,6 +150,10 @@ On show pages, and behind every recommendation.
   - Breaking Bad finds Mr. Robot, The Wire, The Sopranos and Boardwalk Empire.
   - Ted Lasso finds Resident Alien, The Marvelous Mrs. Maisel, Hacks and Shrinking.
 - **Reasons:** each says what's shared: "Same DNA: short episodes, long seasons" (The Office → Frasier, Seinfeld).
+- **DNA twins:** "Made like this, about something else". Shows built the same way in other genres, each with what
+  they share and what it's about instead. Ted Lasso finds Silo and Andor (long waits, big finales); The Office finds
+  Scrubs and Brooklyn Nine-Nine (short episodes, long seasons); Game of Thrones finds Boardwalk Empire and Justified
+  (acclaimed, fades over time); Stranger Things finds MINDHUNTER and Narcos (drops all at once, acclaimed).
 
 ### 13. What's next, with honest forecasts
 
@@ -180,7 +184,20 @@ Chips on show pages, `/nanogenres`, and a search filter.
 - **Honest about gaps:** a group with nothing specific in common gets no name rather than a vague one.
 - **Recommendations:** shows in the same nanogenre rank higher, with the plainest reason: "Also a sports comedy".
 
-### 15. Smaller touches
+### 15. When it gets good
+
+On show pages, in "Will you finish it?", and a Discover list.
+
+- **The question everyone asks:** "how long until it gets good?" Answered from the episode ratings, not from forums:
+  The Office gets good at S02E03 "Office Olympics" (4 hours in), Succession at S02E01, The Wire at S01E07 "One
+  Arrest", Community and The Good Place at their seventh episodes, Severance at S01E06 "Hide and Seek".
+- **Honest both ways:** Breaking Bad and Stranger Things are "Good from the first episode". A show whose start is only
+  a little weaker, or that never clearly turns, gets nothing said about it.
+- **Personal:** if you've stalled before the turn, "Hang on: it gets good in 2 episodes (1 h 29 min)".
+- **Worth the wait:** a Discover list of well-rated slow starters and where they turn: Person of Interest (S01E04),
+  Dark (S01E05), Slow Horses (S02E04), Severance (S01E06).
+
+### 16. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

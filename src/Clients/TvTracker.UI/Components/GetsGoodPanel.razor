@@ -1,0 +1,27 @@
+@* When the show gets good, from TVmaze's episode ratings: good from the start, or the episode where a slow start turns. *@
+@if (GetsGood is { } getsGood)
+{
+    <h3>When it gets good</h3>
+    @if (getsGood.Turn is { } turn)
+    {
+        <p>
+            <span>Gets good at </span><strong>@Format.EpisodeCode(turn.SeasonNumber, turn.EpisodeNumber) <a href="episodes/@turn.EpisodeId">“@turn.Title”</a></strong><span>, @Format.Hours(turn.MinutesBefore) in (@turn.EpisodesBefore episode@(turn.EpisodesBefore == 1 ? "" : "s")).</span>
+            <span class="muted"> The episodes before it average @Format.Rating(turn.Before) on TVmaze; from there, @Format.Rating(turn.After).</span>
+        </p>
+        @if (DropOff is { } dropOff && (dropOff.SeasonNumber, dropOff.EpisodeNumber).CompareTo((turn.SeasonNumber, turn.EpisodeNumber)) < 0)
+        {
+            <p class="small muted">@Format.Percent(dropOff.Share) of our viewers who stopped did so after @Format.EpisodeCode(dropOff.SeasonNumber, dropOff.EpisodeNumber), before it gets good.</p>
+        }
+    }
+    else
+    {
+        <p><span>Good from the first episode:</span><span class="muted"> its opening episodes rate @Format.Rating(getsGood.Opening) on TVmaze, as well as the ones that follow.</span></p>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public GetsGood? GetsGood { get; set; }
+
+    /// <summary>Where our viewers most often stop, to say when that's before the turn.</summary>
+    [Parameter] public DropOff? DropOff { get; set; }
+}
