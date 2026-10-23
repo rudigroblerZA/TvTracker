@@ -427,7 +427,9 @@ How events flow:
       Seinfeld, Frasier and The X-Files were on.
     - **Marks** the episodes you've watched. Episodes rated 1.5+ above their show are left out of the best ones (a
       few fans' 10s on thinly rated shows).
-    - **API:** `GET /api/v1/insights/time-machine[?date=yyyy-MM-dd]` on Analytics.API, computed on request.
+    - **Your calendar:** weeks and dates are in your profile's time zone.
+    - **API:** `GET /api/v1/insights/time-machine[?date=yyyy-MM-dd][&tz=IANA id]` on Analytics.API, computed on request
+      and cached for the day.
   - **Creator fingerprint** (person pages, signed in): a creator's style, from the DNA of the shows they created or
     developed (two or more with DNA; 110 people in the development catalog).
     - **Signature:** distinctive traits most of their shows share. Mike Flanagan: "Drops all at once · 3 of 3, A short

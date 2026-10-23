@@ -1,4 +1,5 @@
 @inject AnalyticsClient Analytics
+@inject UserSession Session
 
 @* Home's line from the time machine: this week's best-known premieres and finales from past years. *@
 @if (moments.Count > 0)
@@ -12,7 +13,7 @@
             @foreach (var (episode, what) in moments)
             {
                 <li>
-                    <a href="shows/@episode.ShowId"><strong>@episode.ShowTitle</strong></a><span>@($" {what} {YearsAgo(episode)}")</span><span class="muted">@($" ({episode.AiredAtUtc.UtcDateTime:d MMMM yyyy})")</span>
+                    <a href="shows/@episode.ShowId"><strong>@episode.ShowTitle</strong></a><span>@($" {what} {YearsAgo(episode)}")</span><span class="muted">@($" ({Session.ToLocal(episode.AiredAtUtc):d MMMM yyyy})")</span>
                 </li>
             }
         </ul>
@@ -22,11 +23,8 @@
 @code {
     private const int Max = 4;
 
-    private static string YearsAgo(TimeMachineEpisode episode)
-    {
-        var years = DateTime.UtcNow.Year - episode.AiredAtUtc.Year;
-        return years > 1 ? $"{years} years ago" : years == 1 ? "a year ago" : "this year";
-    }
+    private string YearsAgo(TimeMachineEpisode episode) =>
+        Format.YearsAgo(DateOnly.FromDateTime(Session.ToLocal(episode.AiredAtUtc).DateTime), DateOnly.FromDateTime(Session.Now.DateTime)) ?? "this year";
 
     private List<(TimeMachineEpisode Episode, string What)> moments = [];
 
@@ -34,7 +32,8 @@
     {
         try
         {
-            if (await Analytics.GetTimeMachineAsync(null) is { } machine)
+            await Session.EnsureLoadedAsync();
+            if (await Analytics.GetTimeMachineAsync(null, Session.Profile?.TimeZone) is { } machine)
             {
                 // Alternate premieres and finales, best known first.
                 moments = machine.Premieres.Select(e => (e, "premiered"))

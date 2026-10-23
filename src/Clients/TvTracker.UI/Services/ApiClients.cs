@@ -265,8 +265,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
 
     /// <summary>"Will you finish it?" for one show; null when the user hasn't started it or is caught up.</summary>
     /// <param name="date">A past date to travel to; null for this week in every past year.</param>
-    public Task<TimeMachine?> GetTimeMachineAsync(DateOnly? date, CancellationToken ct = default) =>
-        GetAsync<TimeMachine>(ApiClients.Analytics, date is { } d ? $"api/v1/insights/time-machine?date={d:yyyy-MM-dd}" : "api/v1/insights/time-machine", ct);
+    /// <param name="timeZone">The user's profile time zone, whose calendar days make up the weeks; null for UTC.</param>
+    public Task<TimeMachine?> GetTimeMachineAsync(DateOnly? date, string? timeZone, CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (date is { } d) query.Add($"date={d:yyyy-MM-dd}");
+        if (!string.IsNullOrEmpty(timeZone)) query.Add($"tz={Uri.EscapeDataString(timeZone)}");
+        return GetAsync<TimeMachine>(ApiClients.Analytics, "api/v1/insights/time-machine" + (query.Count > 0 ? "?" + string.Join('&', query) : ""), ct);
+    }
 
     public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
