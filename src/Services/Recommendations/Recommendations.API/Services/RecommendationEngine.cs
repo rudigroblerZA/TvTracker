@@ -243,10 +243,12 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     private sealed record Extras(Dictionary<Guid, Dictionary<string, double>> Dna, Dictionary<Guid, List<string>> Nanogenres);
 
     /// <summary>
-    /// How much of the content score shared nanogenres make up: a nanogenre is a whole group of shows like each other
-    /// (discovered by the catalog), so sharing one says more than overlapping genres or keywords.
+    /// Added to the content score for shared nanogenres (scaled by their overlap): a nanogenre is a whole group of shows
+    /// like each other (discovered by the catalog), so sharing one says more than overlapping genres or keywords. A
+    /// bonus, not a share of the score: most shows are in no nanogenre, and a share cost every such pair a quarter of
+    /// its score, enough to drop it below the "Because you watch" reason.
     /// </summary>
-    private const double NanogenreShare = 0.25;
+    private const double NanogenreBonus = 0.25;
 
     /// <summary>
     /// DNA scales the content score between 1 − <see cref="DnaShare"/> (nothing alike) and 1 (alike): it reorders
@@ -276,7 +278,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         var nanogenresA = extras.Nanogenres.GetValueOrDefault(a.ShowId) ?? [];
         var nanogenresB = extras.Nanogenres.GetValueOrDefault(b.ShowId) ?? [];
         var sharedNanogenre = nanogenresA.FirstOrDefault(nanogenresB.Contains);
-        var content = (1 - NanogenreShare) * Similarity(a, b) + NanogenreShare * Jaccard(nanogenresA, nanogenresB);
+        var content = Math.Min(1, Similarity(a, b) + NanogenreBonus * Jaccard(nanogenresA, nanogenresB));
 
         var dna = extras.Dna;
         if (!dna.TryGetValue(a.ShowId, out var dnaA) || !dna.TryGetValue(b.ShowId, out var dnaB)

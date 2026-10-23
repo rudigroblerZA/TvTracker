@@ -160,7 +160,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Nanogenres** (`Catalog.SyncWorker/Nanogenres`): discovered, not curated (a decision: no list to maintain, and it
   finds what's actually in the catalog). `NanogenreService` reruns `NanogenreDiscovery` every 6 hours. It replaces
   the `nanogenres` table, sets `shows.Nanogenres` (slugs, GIN index, for the search filter), and sends
-  `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start).
+  `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start and daily, so lost events heal).
+  - **Waits for embeddings:** it runs only once 80% of shows are embedded by the current model, else retries in 15
+    minutes. Run on a fresh catalog or just after a model change, it found almost no clusters and wiped them all.
   - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38) + 0.6 ×
     genre/type distance. With text alone, Ted Lasso's nearest shows were Scrubs and The Lincoln Lawyer: the
     summaries are only loosely topical.
@@ -168,16 +170,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     re-cut 0.03 tighter; groups under 3 are dropped. A show also joins any group whose members it's as close to,
     on average, as the group's median member.
   - **Naming:** the (specific genre, base) pairing covering 60% of a group: "Medical drama", "Animated family comedy".
-    - **Duplicates:** a duplicate name tries a two-genre name; if that's taken too, the two groups merge.
-    - **No vague names:** groups with nothing specific in common are dropped.
+    - **Duplicates:** a duplicate name tries a two-genre name, which needs 60% of the group to have both genres; if
+      that's taken too, the two groups merge.
+    - **No vague names:** groups with nothing specific in common are dropped. Animated groups with nothing specific
+      are "Animated comedy" only when mostly comedies; animated action series were getting that name.
     - **No summary words:** themes taken from summary words were tried and were too noisy to show.
     - **No language model:** naming clusters with a small local model through Model Runner would read better, but
       it couldn't be pulled through the sandbox proxy, and naming shouldn't depend on one.
   - **Small pairings:** pairings of 2 to 15 shows that no cluster covers are added as nanogenres of their own
     ("genres" source).
   - **Unstable slugs:** slugs change when the catalog changes, so the UI's nanogenre page says when one has gone.
-  - **Recommendations:** keeps a copy (`show_nanogenres`). Shared nanogenres are 25% of the content score, and the
-    first shared one makes the reason.
+  - **Recommendations:** keeps a copy (`show_nanogenres`). Shared nanogenres add up to 0.25 to the content score, and
+    the first shared one makes the reason. A bonus, not a share: most shows are in no nanogenre, and as a 25% share
+    every such pair lost a quarter of its score.
+  - **Flag:** the search filter is ignored while the `nanogenres` flag is off for the caller, since the UI then can't
+    show or clear it.
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
 - **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
