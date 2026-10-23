@@ -280,6 +280,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     Only shows with a creator or developer credit count: TVmaze rarely credits one on reality, talk and news shows,
     and Analytics has no kind of show to tell them apart otherwise.
   - **Kindred creators:** fingerprint similarity ≥ 0.85 and a shared signature trait, never having made a show together.
+- **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
+  ratings; nothing stored.
+  - **Every year:** episodes whose UTC month and day fall within 3 days of today's, in years before this one.
+  - **Premiere / finale:** a show's first / last regular episode by air time; a finale only for ended shows. Episodes
+    that aired together (a streaming drop) resolve to the lowest / highest episode number.
+  - **Best episodes:** episodes rated more than 1.5 above their show are left out, since thinly rated shows get a few
+    fans' 10s.
 - **Essential cut** (`EssentialCutApi`): computed on request (one show's episodes plus the caller's watches), not hourly.
   - **Per season:** it skips the lowest-rated episodes at least `Margin` standard deviations below the season
     average (and at least 0.1), up to `Share` of the season.

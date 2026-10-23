@@ -264,6 +264,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<List<FinishOutlook>>(ApiClients.Analytics, "api/v1/me/finish-outlook", ct);
 
     /// <summary>"Will you finish it?" for one show; null when the user hasn't started it or is caught up.</summary>
+    /// <param name="date">A past date to travel to; null for this week in every past year.</param>
+    public Task<TimeMachine?> GetTimeMachineAsync(DateOnly? date, CancellationToken ct = default) =>
+        GetAsync<TimeMachine>(ApiClients.Analytics, date is { } d ? $"api/v1/insights/time-machine?date={d:yyyy-MM-dd}" : "api/v1/insights/time-machine", ct);
+
     public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
