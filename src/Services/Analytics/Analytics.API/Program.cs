@@ -11,6 +11,8 @@ builder.AddDefaultAuthentication();
 builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb");
 builder.Services.AddDatabaseInitializer<AnalyticsContext>();
 
+// In memory only: the time machine's weeks, the same for everyone in a time zone on a given day.
+builder.Services.AddHybridCache();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

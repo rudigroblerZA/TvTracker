@@ -2,6 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.TimeMachine)]
 @inject AnalyticsClient Analytics
 @inject NavigationManager Navigation
+@inject UserSession Session
 
 <PageTitle>TV time machine · TV Tracker</PageTitle>
 
@@ -11,7 +12,7 @@
     <Authorized>
         <form class="time-travel" @onsubmit="Travel">
             <label for="travel-date">Travel to a date</label>
-            <input id="travel-date" type="date" min="1950-01-01" max="@DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd")" @bind="picked" />
+            <input id="travel-date" type="date" min="1950-01-01" max="@Session.Now.AddDays(-1).ToString("yyyy-MM-dd")" @bind="picked" />
             <button type="submit" class="btn" disabled="@(picked is null)">Go</button>
             @if (Date is not null)
             {
@@ -106,7 +107,8 @@
         machine = null;
         try
         {
-            machine = await Analytics.GetTimeMachineAsync(DateOnly.TryParse(Date, out var d) ? d : null);
+            await Session.EnsureLoadedAsync();
+            machine = await Analytics.GetTimeMachineAsync(DateOnly.TryParse(Date, out var d) ? d : null, Session.Profile?.TimeZone);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

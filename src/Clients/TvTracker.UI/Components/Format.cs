@@ -51,6 +51,16 @@ public static class Format
     /// <summary>Watching time in whole hours ("365 h") for long stretches, where days would be misleading.</summary>
     public static string Hours(int minutes) => minutes < 120 ? Duration(minutes) : $"{Math.Round(minutes / 60.0):N0} h";
 
+    /// <summary>
+    /// Whole years elapsed from <paramref name="then"/> to <paramref name="today"/> ("18 years ago", "a year ago"), not the
+    /// difference of calendar years; null under a year.
+    /// </summary>
+    public static string? YearsAgo(DateOnly then, DateOnly today)
+    {
+        var years = today.Year - then.Year - (today < then.AddYears(today.Year - then.Year) ? 1 : 0);
+        return years > 1 ? $"{years} years ago" : years == 1 ? "a year ago" : null;
+    }
+
     /// <summary>A provider rating (0-10), e.g. "7.9".</summary>
     public static string Rating(double rating) => rating.ToString("0.0");
 

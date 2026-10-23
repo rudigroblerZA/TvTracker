@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 
@@ -31,13 +32,18 @@ public record TimeMachineShowDto(Guid ShowId, string Title, string? PosterUrl, i
 
 /// <summary>
 /// The TV time machine: what premiered, ended and stood out in a week of TV history, from the catalog copy's air dates
-/// and the provider's episode ratings. With no date, it's this week across every past year; with one, that date's week
-/// (a birthday, say). Computed on request: one indexed scan of a week of episodes, or one week per past year.
+/// and the provider's episode ratings. With no date, it's this week in every past year; with one, that date's week (a
+/// birthday, say). Weeks are calendar days in the caller's time zone, so an evening premiere in New York counts on its
+/// own day. Each week is a range scan of the air-time index, and a result is cached for everyone in that time zone that
+/// day; only the Watched marks are per caller.
 /// </summary>
 public static class TimeMachineApi
 {
     /// <summary>Days either side of the date that count as its week.</summary>
     private const int HalfWeek = 3;
+
+    /// <summary>One date's "on air then": shows with an episode within this many days either side.</summary>
+    private const int OnAirDays = 7;
 
     private const int MaxMilestones = 12;
     private const int MaxBestEpisodes = 12;
@@ -51,35 +57,47 @@ public static class TimeMachineApi
 
     private static readonly DateOnly Earliest = new(1950, 1, 1);
 
+    private static readonly HybridCacheEntryOptions CacheFor = new() { Expiration = TimeSpan.FromHours(1), LocalCacheExpiration = TimeSpan.FromHours(1) };
+
     public static void MapTimeMachineApi(this RouteGroupBuilder api) =>
         api.MapGet("/insights/time-machine", GetAsync).RequireFeature(FeatureFlags.TimeMachine);
 
     /// <param name="date">A past date (yyyy-MM-dd) to travel to; leave out for this week in every past year.</param>
+    /// <param name="tz">The caller's time zone (IANA id, from their profile); UTC when missing or unknown.</param>
     private static async Task<Results<Ok<TimeMachineDto>, BadRequest<string>>> GetAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, DateOnly? date = null, CancellationToken ct = default)
+        ClaimsPrincipal user, AnalyticsContext db, HybridCache cache, TimeProvider time, DateOnly? date = null, string? tz = null,
+        CancellationToken ct = default)
     {
-        var now = time.GetUtcNow();
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(time.GetUtcNow(), zone).DateTime);
         if (date is { } asked && (asked < Earliest || asked >= today))
         {
             return TypedResults.BadRequest($"Pick a date from {Earliest:yyyy} up to yesterday.");
         }
 
-        var everyYear = date is null;
-        var middle = date ?? today;
-        var days = Enumerable.Range(-HalfWeek, HalfWeek * 2 + 1).Select(d => middle.AddDays(d)).ToList();
+        var machine = await cache.GetOrCreateAsync(
+            $"analytics:time-machine:{date?.ToString("yyyy-MM-dd") ?? $"every-year:{today:yyyy-MM-dd}"}:{zone.Id}",
+            token => new ValueTask<TimeMachineDto>(ComputeAsync(db, zone, today, date, token)),
+            CacheFor, cancellationToken: ct);
 
-        // Every year: the same days of the year, in years before this one. One date: just that week.
-        var dayKeys = days.Select(d => d.Month * 100 + d.Day).ToList();
-        var from = new DateTimeOffset(days[0].ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var to = new DateTimeOffset(days[^1].ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
-        var thisYear = today.Year;
-        var episodes = await db.Episodes.AsNoTracking()
-            .Where(e => e.SeasonNumber > 0 && e.AirsAtUtc != null)
-            .Where(e => everyYear
-                ? e.AirsAtUtc!.Value.Year < thisYear && dayKeys.Contains(e.AirsAtUtc!.Value.Month * 100 + e.AirsAtUtc!.Value.Day)
-                : e.AirsAtUtc >= from && e.AirsAtUtc <= to)
-            .ToListAsync(ct);
+        var ids = machine.Premieres.Concat(machine.Finales).Concat(machine.BestEpisodes).Select(e => e.EpisodeId).Distinct().ToList();
+        var watched = user.FindFirst("sub")?.Value is { } userId
+            ? (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet()
+            : [];
+        List<TimeMachineEpisodeDto> Mark(IEnumerable<TimeMachineEpisodeDto> list) => list.Select(e => e with { Watched = watched.Contains(e.EpisodeId) }).ToList();
+
+        return TypedResults.Ok(machine with { Premieres = Mark(machine.Premieres), Finales = Mark(machine.Finales), BestEpisodes = Mark(machine.BestEpisodes) });
+    }
+
+    private static async Task<TimeMachineDto> ComputeAsync(AnalyticsContext db, TimeZoneInfo zone, DateOnly today, DateOnly? date, CancellationToken ct)
+    {
+        // Every year: the same day in each past year, its week taken whole. Near New Year that week spans two years
+        // (29 December to 4 January), and the latest one is still a year back.
+        var everyYear = date is null;
+        var middles = everyYear
+            ? Enumerable.Range(Earliest.Year, today.Year - Earliest.Year).Select(year => SameDay(today, year)).ToList()
+            : [date!.Value];
+        var episodes = await InWeeksAsync(db, zone, middles, HalfWeek, ct);
 
         var showIds = episodes.Select(e => e.ShowId).Distinct().ToList();
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
@@ -91,21 +109,14 @@ public static class TimeMachineApi
             .Select(g => new { ShowId = g.Key, First = g.Min(e => e.AirsAtUtc), Last = g.Max(e => e.AirsAtUtc) })
             .ToDictionaryAsync(s => s.ShowId, ct);
 
-        var watched = user.FindFirst("sub")?.Value is { } userId
-            ? (await db.Watches.AsNoTracking()
-                .Where(w => w.UserId == userId && showIds.Contains(w.ShowId))
-                .Select(w => w.EpisodeId)
-                .ToListAsync(ct)).ToHashSet()
-            : [];
-
-        // In air order, so when several episodes aired at once (a streaming drop), a premiere is the first of them and a
-        // finale the last.
+        // By episode number, so when several episodes aired at once (a streaming drop) the premiere is the first of them
+        // and the finale the last; which episodes those are comes from the air-time spans.
         var known = episodes.Where(e => shows.ContainsKey(e.ShowId)).OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
         TimeMachineEpisodeDto Dto(EpisodeCopy e)
         {
             var show = shows[e.ShowId];
             return new TimeMachineEpisodeDto(show.ShowId, show.Title, show.PosterUrl, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.Title,
-                e.AirsAtUtc!.Value, e.ExternalRating, watched.Contains(e.EpisodeId));
+                e.AirsAtUtc!.Value, e.ExternalRating, false);
         }
         IEnumerable<EpisodeCopy> BestKnownFirst(IEnumerable<EpisodeCopy> list) => list
             .OrderByDescending(e => shows[e.ShowId].Popularity)
@@ -123,20 +134,19 @@ public static class TimeMachineApi
             .OrderByDescending(e => e.ExternalRating)
             .ThenByDescending(e => shows[e.ShowId].Popularity)
             .ToList();
+
+        // Every year: one per year's week (by the week's middle day, as a week can span New Year), latest first.
         var best = everyYear
-            ? rated.GroupBy(e => e.AirsAtUtc!.Value.Year).OrderByDescending(g => g.Key).Select(g => g.First()).Take(MaxBestEpisodes)
+            ? rated.GroupBy(e => WeekOf(e, zone, middles)).OrderByDescending(g => g.Key).Select(g => g.First()).Take(MaxBestEpisodes)
             : rated.DistinctBy(e => e.ShowId).Take(MaxBestEpisodes);
 
         var onAir = new List<TimeMachineShowDto>();
         if (!everyYear)
         {
-            var wideFrom = from.AddDays(-7 + HalfWeek);
-            var wideTo = to.AddDays(7 - HalfWeek);
-            var airing = await db.Episodes.AsNoTracking()
-                .Where(e => e.SeasonNumber > 0 && e.AirsAtUtc >= wideFrom && e.AirsAtUtc <= wideTo)
+            var airing = (await InWeeksAsync(db, zone, middles, OnAirDays, ct))
                 .GroupBy(e => e.ShowId)
-                .Select(g => new { ShowId = g.Key, Season = g.Max(e => e.SeasonNumber) })
-                .ToListAsync(ct);
+                .Select(g => (ShowId: g.Key, Season: g.Max(e => e.SeasonNumber)))
+                .ToList();
             var airingIds = airing.Select(a => a.ShowId).ToList();
             var airingShows = await db.Shows.AsNoTracking().Where(s => airingIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
             onAir = airing
@@ -149,6 +159,43 @@ public static class TimeMachineApi
                 .ToList();
         }
 
-        return TypedResults.Ok(new TimeMachineDto(middle, everyYear, premieres, finales, best.Select(Dto).ToList(), onAir));
+        return new TimeMachineDto(date ?? today, everyYear, premieres, finales, best.Select(Dto).ToList(), onAir);
+    }
+
+    /// <summary>
+    /// Regular episodes that aired within <paramref name="halfWidth"/> days of any of <paramref name="middles"/>, in
+    /// <paramref name="zone"/>'s calendar: one range scan of the air-time index per day.
+    /// </summary>
+    private static Task<List<EpisodeCopy>> InWeeksAsync(AnalyticsContext db, TimeZoneInfo zone, List<DateOnly> middles, int halfWidth, CancellationToken ct)
+    {
+        var starts = middles.Select(m => StartOfDayUtc(m.AddDays(-halfWidth), zone)).ToArray();
+        var ends = middles.Select(m => StartOfDayUtc(m.AddDays(halfWidth + 1), zone)).ToArray();
+        return db.Episodes
+            .FromSqlRaw(
+                "SELECT e.* FROM episodes e JOIN unnest({0}, {1}) AS w(starts, ends) " +
+                "ON e.\"AirsAtUtc\" >= w.starts AND e.\"AirsAtUtc\" < w.ends WHERE e.\"SeasonNumber\" > 0", starts, ends)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
+    /// <summary>The same month and day in <paramref name="year"/>; 29 February becomes the 28th in other years.</summary>
+    private static DateOnly SameDay(DateOnly day, int year) => new(year, day.Month, Math.Min(day.Day, DateTime.DaysInMonth(year, day.Month)));
+
+    /// <summary>Midnight starting <paramref name="day"/> in <paramref name="zone"/>, as UTC (or the first valid time after it).</summary>
+    private static DateTime StartOfDayUtc(DateOnly day, TimeZoneInfo zone)
+    {
+        var local = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        while (zone.IsInvalidTime(local))
+        {
+            local = local.AddMinutes(30);
+        }
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+
+    /// <summary>The middle day of the week an episode fell in.</summary>
+    private static DateOnly WeekOf(EpisodeCopy episode, TimeZoneInfo zone, List<DateOnly> middles)
+    {
+        var aired = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(episode.AirsAtUtc!.Value, zone).DateTime);
+        return middles.MinBy(m => Math.Abs(m.DayNumber - aired.DayNumber));
     }
 }

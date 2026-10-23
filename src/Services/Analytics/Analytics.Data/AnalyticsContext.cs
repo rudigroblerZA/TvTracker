@@ -41,6 +41,8 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.ToTable("episodes");
             entity.HasKey(e => e.EpisodeId);
             entity.HasIndex(e => e.ShowId);
+            // The time machine's weeks are ranges of air time.
+            entity.HasIndex(e => e.AirsAtUtc);
             entity.Property(e => e.Title).HasMaxLength(256);
         });
 

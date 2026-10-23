@@ -282,7 +282,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Kindred creators:** fingerprint similarity ≥ 0.85 and a shared signature trait, never having made a show together.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
-  - **Every year:** episodes whose UTC month and day fall within 3 days of today's, in years before this one.
+  - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a
+    New York premiere at 20:00 counts on its own day, not the next UTC one.
+  - **Every year:** the same day in each past year, its week taken whole: 29 December to 4 January near New Year, and
+    always at least a year back. (Matching month and day with "an earlier year" pulled in last week's episodes from
+    late December as "TV history".)
+  - **Cost:** each week is a range scan of `IX_episodes_AirsAtUtc` (76 for every year, ~3 ms), and the result is cached
+    in memory for the day per time zone; only the Watched marks are looked up per caller.
   - **Premiere / finale:** a show's first / last regular episode by air time; a finale only for ended shows. Episodes
     that aired together (a streaming drop) resolve to the lowest / highest episode number.
   - **Best episodes:** episodes rated more than 1.5 above their show are left out, since thinly rated shows get a few
