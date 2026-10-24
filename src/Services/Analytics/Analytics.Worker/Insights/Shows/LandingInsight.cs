@@ -50,29 +50,33 @@ public sealed class LandingInsight : IShowInsight
         var higher = ratings.Count(r => r > finale);
         var lower = ratings.Count(r => r < finale);
 
-        // The seasons that count (3+ rated episodes; see SeasonSummary), specials left out. The final season is
-        // checked whenever it counts, even with only two seasons; it's ranked only among three or more.
+        // The seasons that count (3+ rated episodes; see SeasonSummary), specials left out. Every verdict says
+        // something about the final season, so the final season must count: otherwise there's no verdict at all. With
+        // only the final season counting, it's the whole show and can't be weak; it's ranked only among three or more.
         var seasons = show.RatedSeasons.Where(s => s.Number > 0).ToList();
         var finalSeason = seasons.FirstOrDefault(s => s.Number == aired[^1].SeasonNumber);
-        bool? seasonWeak = seasons.Count == 1 ? false
-            : finalSeason == default ? null
-            : Round(finalSeason.Rating - Median(seasons.Select(s => s.Rating).ToList())) <= -SeasonMargin;
-        int? rank = seasons.Count >= MinRankedSeasons && finalSeason != default
-            ? seasons.Count(s => s.Rating > finalSeason.Rating) + 1
-            : null;
+        if (finalSeason == default)
+        {
+            return null;
+        }
+
+        var seasonWeak = seasons.Count > 1 && Round(finalSeason.Rating - Median(seasons.Select(s => s.Rating))) <= -SeasonMargin;
+        var ranked = seasons.Count >= MinRankedSeasons;
 
         // Rounded first: on one-decimal ratings, 8.1 - 7.8 is 0.29999999999999982.
         var verdict = Round(finale - median) switch
         {
-            >= FinaleMargin => seasonWeak switch { true => LandingVerdicts.GreatFinale, false => LandingVerdicts.Sticks, null => null },
-            <= -FinaleMargin => seasonWeak switch { true => LandingVerdicts.Fizzles, _ => LandingVerdicts.FinaleLetsDown },
-            _ => seasonWeak == true ? LandingVerdicts.WeakerLastSeason : LandingVerdicts.AsItRan
+            >= FinaleMargin => seasonWeak ? LandingVerdicts.GreatFinale : LandingVerdicts.Sticks,
+            <= -FinaleMargin => seasonWeak ? LandingVerdicts.Fizzles : LandingVerdicts.FinaleLetsDown,
+            _ => seasonWeak ? LandingVerdicts.WeakerLastSeason : LandingVerdicts.AsItRan
         };
 
-        // A strong finale whose final season can't be checked (too few rated episodes) isn't called a landing either way.
-        return verdict is null
-            ? null
-            : new Landing(verdict, finale, Round(median),
-                Round((double)lower / others), rank, rank is null ? 0 : seasons.Count, higher, lower, others);
+        // The final season's place as counts, like the finale's, so a tie reads as one.
+        return new Landing(verdict, finale, Round(median), Round((double)lower / others),
+            ranked ? seasons.Count(s => s.Rating > finalSeason.Rating) + 1 : null, ranked ? seasons.Count : 0,
+            higher, lower, others,
+            SeasonsCompared: seasons.Count - 1,
+            SeasonsHigher: seasons.Count(s => s.Rating > finalSeason.Rating),
+            SeasonsLower: seasons.Count(s => s.Rating < finalSeason.Rating));
     }
 }

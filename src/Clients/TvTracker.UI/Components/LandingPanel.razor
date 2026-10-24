@@ -25,18 +25,44 @@
         var rated = $"The finale rates {Format.Rating(landing.FinaleRating)}";
         var finale = landing.Verdict is "as-it-ran" or "weaker-last-season"
             ? $"{rated}, close to its typical episode ({typical})"
-            : landing.OtherEpisodes == 0 ? $"{rated} (typical: {typical})"
+            // Stored before the counts existed: the share of episodes it beats is all there is, until the next hourly run.
+            : landing.OtherEpisodes == 0 ? landing.FinaleBeats >= 0.5
+                ? $"{rated}, above {Format.Percent(landing.FinaleBeats)} of its episodes (typical: {typical})"
+                : $"{rated}, below {Format.Percent(1 - landing.FinaleBeats)} of its episodes (typical: {typical})"
             : landing.RatedHigher == 0 && landing.RatedLower == landing.OtherEpisodes ? $"{rated}, higher than any other episode (typical: {typical})"
             : landing.RatedLower == 0 && landing.RatedHigher == landing.OtherEpisodes ? $"{rated}, lower than any other episode (typical: {typical})"
             : landing.RatedLower >= landing.RatedHigher ? $"{rated}, above {Share(landing.RatedLower, landing.OtherEpisodes)} of its episodes (typical: {typical})"
             : $"{rated}, below {Share(landing.RatedHigher, landing.OtherEpisodes)} of its episodes (typical: {typical})";
-        var season = landing.FinalSeasonRank is { } rank
-            ? rank == 1 ? "the final season is its best"
-            : rank == landing.RankedSeasons ? "the final season is its weakest"
-            : $"the final season is its {Ordinal(rank)} best of {landing.RankedSeasons}"
-            : null;
-        return season is null ? $"{finale}." : $"{finale}, and {season}.";
+        return Season(landing) is { } season ? $"{finale}, and {season}." : $"{finale}.";
     }
+
+    /// <summary>
+    /// The final season against the others: its rank among three or more ("its 2nd best of 6"), ties said as ties;
+    /// with two, whether it held up. Null when it was the only season, or stored before the counts existed.
+    /// </summary>
+    private static string? Season(Landing landing)
+    {
+        var weak = landing.Verdict is "great-finale" or "weaker-last-season" or "fizzles";
+        if (landing.SeasonsCompared == 0)
+        {
+            // Older documents: the rank, if any, without ties.
+            return landing.FinalSeasonRank is { } rank ? Rank(rank, landing.RankedSeasons) : null;
+        }
+        if (landing.SeasonsCompared == 1)
+        {
+            return weak ? "the final season rates well below the first" : "the final season holds up";
+        }
+
+        var (higher, lower, others) = (landing.SeasonsHigher, landing.SeasonsLower, landing.SeasonsCompared);
+        return higher == 0 && lower == others ? "the final season is its best"
+            : higher == 0 ? "the final season ties for its best"
+            : lower == 0 && higher == others ? "the final season is its weakest"
+            : lower == 0 ? "the final season ties for its weakest"
+            : Rank(higher + 1, others + 1);
+    }
+
+    private static string Rank(int rank, int of) =>
+        rank == 1 ? "the final season is its best" : rank == of ? "the final season is its weakest" : $"the final season is its {Ordinal(rank)} best of {of}";
 
     /// <summary>A share that never rounds to 100% unless it is: 298 of 299 is "99%".</summary>
     private static string Share(int count, int of) => $"{Math.Min(Math.Round(100.0 * count / of), count == of ? 100 : 99):0}%";
