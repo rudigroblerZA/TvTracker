@@ -1,15 +1,18 @@
 @* Does an ended show stick the landing? Its finale and final season against the rest, without naming the finale. *@
 @if (Landing is { } landing)
 {
-    <h3>Does it stick the landing?</h3>
-    <p><span class="tag landing-@landing.Verdict">@Headline(landing)</span><span>@($" {Detail(landing)}")</span></p>
-    <p class="small muted">Spoiler-free: from TVmaze's ratings of the last episode and season against the rest.</p>
+    <div class="insight-card">
+        <h3>Does it stick the landing?</h3>
+        <p><span class="tag landing-@landing.Verdict">@Headline(landing)</span><span>@($" {Detail(landing)}")</span></p>
+        <p class="small muted">Spoiler-free: from TVmaze's ratings of the last episode and season against the rest.</p>
+    </div>
 }
 
 @code {
     [Parameter, EditorRequired] public Landing? Landing { get; set; }
 
-    private static string Headline(Landing landing) => landing.Verdict switch
+    /// <summary>The verdict in words; also the highlight card's headline.</summary>
+    public static string Headline(Landing landing) => landing.Verdict switch
     {
         "sticks" => "Sticks the landing",
         "great-finale" => "Great finale, weaker last season",
