@@ -283,14 +283,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Does it stick the landing?** (`LandingInsight`): ended shows only (TVmaze has no "cancelled", so a cut-short show
   can't be told from a planned ending, and nothing is said about it).
   - **Finale:** the last aired regular episode against the median episode: 0.3 above is strong, 0.3 below weak.
-  - **Final season:** against the median season (`RatedSeasons`: 3+ rated episodes), 0.3 below is weak. It's checked
-    whenever it counts, even with two seasons, and ranked only among 3+. Differences are rounded first, since 8.1 − 7.8
-    is 0.2999… in floating point.
+  - **Final season:** against the median season (`RatedSeasons`: 3+ rated episodes), 0.3 below is weak, even with two
+    seasons; ranked only among 3+. Differences are rounded first, since 8.1 − 7.8 is 0.2999… in floating point.
   - **Verdicts:** strong finale → sticks (or great finale, weaker last season); weak finale → fizzles (weak season too)
-    or the finale lets it down; in-line finale → weaker last season, or ends as it ran. A strong finale whose final
-    season can't be checked gets no verdict, so Great endings only lists shows whose last season held up.
-  - **Ties:** the finale's place is stored as counts (rated higher, lower), not a share, so "higher than any other
-    episode" is never said of a finale that ties.
+    or the finale lets it down; in-line finale → weaker last season, or ends as it ran.
+  - **No unchecked claims:** every verdict says how the final season did, so a show whose final season has too few
+    rated episodes to count gets no verdict at all (and never reaches Great endings).
+  - **Ties:** the finale's and the final season's places are stored as counts (rated higher, lower), not a share or a
+    rank alone, so a tie reads as one ("ties for its best") rather than "higher than any other episode".
   - **Spoiler-free:** no titles, in the panel or the Great endings list.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
