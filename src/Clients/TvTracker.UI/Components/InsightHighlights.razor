@@ -1,0 +1,114 @@
+@inject UserSession Session
+
+@* The show's insights at a glance: the few findings worth knowing first, each a coloured card with a big headline.
+   Green is good news, amber a caveat, red a warning, blue neutral. The sections below explain each one. *@
+@if (Highlights() is { Count: > 0 } highlights)
+{
+    <ul class="insight-highlights" aria-label="Highlights">
+        @foreach (var highlight in highlights)
+        {
+            if (highlight.Flag is { } flag)
+            {
+                <Feature Flag="@flag">@Card(highlight)</Feature>
+            }
+            else
+            {
+                @Card(highlight)
+            }
+        }
+    </ul>
+}
+
+@code {
+    private const int Max = 6;
+
+    [Parameter, EditorRequired] public ShowInsights Insights { get; set; } = null!;
+
+    /// <param name="Tone">"good", "warn", "bad" or "info".</param>
+    /// <param name="Flag">The feature flag the finding belongs to, if any.</param>
+    private sealed record Highlight(string Kicker, string Headline, string Sub, string Tone, string? Flag = null);
+
+    private RenderFragment Card(Highlight highlight) =>
+        @<li class="highlight tone-@highlight.Tone">
+            <div class="highlight-kicker">@highlight.Kicker</div>
+            <div class="highlight-headline">@highlight.Headline</div>
+            <div class="highlight-sub">@highlight.Sub</div>
+        </li>;
+
+    /// <summary>The findings in order of how much they change whether, or how, someone watches.</summary>
+    private List<Highlight> Highlights()
+    {
+        var list = new List<Highlight>();
+        var i = Insights;
+
+        if (i.GetsGood is { } getsGood)
+        {
+            list.Add(getsGood.Turn is { } turn
+                ? new("Gets good", $"At {Format.EpisodeCode(turn.SeasonNumber, turn.EpisodeNumber)}",
+                    $"{Format.Hours(turn.MinutesBefore)} in · rated {Format.Rating(turn.Before)} → {Format.Rating(turn.After)}", "info", FeatureFlags.GetsGood)
+                : new("Gets good", "From episode 1", $"Opens at {Format.Rating(getsGood.Opening)}, as good as what follows", "good", FeatureFlags.GetsGood));
+        }
+
+        if (i.Landing is { } landing)
+        {
+            list.Add(new("The ending", LandingPanel.Headline(landing),
+                $"Finale {Format.Rating(landing.FinaleRating)} · typical episode {Format.Rating(landing.ShowMedian)}",
+                landing.Verdict switch
+                {
+                    "sticks" or "great-finale" => "good",
+                    "fizzles" or "finale-lets-down" => "bad",
+                    "weaker-last-season" => "warn",
+                    _ => "info"
+                },
+                FeatureFlags.Endings));
+        }
+
+        if (i.NextPremiere is { } premiere)
+        {
+            var catchUp = premiere.CatchUpEpisodes > 0
+                ? $" · catch up: {premiere.CatchUpEpisodes} episodes, {Format.Duration(premiere.CatchUpRuntimeMinutes)}"
+                : "";
+            list.Add(new($"Season {premiere.SeasonNumber}", Capitalize(Format.Relative(premiere.PremieresAtUtc)),
+                $"{Session.ToLocal(premiere.PremieresAtUtc):d MMM yyyy}{catchUp}", "info"));
+        }
+        else if (i.Outlook?.NextSeason is { } next)
+        {
+            list.Add(next.Overdue
+                ? new($"Season {next.SeasonNumber}", "Overdue", $"Would usually have started by {next.Latest:MMM yyyy}", "warn", FeatureFlags.Forecasts)
+                : new($"Season {next.SeasonNumber}, likely", $"{next.Likely:MMM yyyy}", $"{next.Earliest:MMM yyyy} to {next.Latest:MMM yyyy}", "info", FeatureFlags.Forecasts));
+        }
+
+        if (i.Outlook?.Renewal is { } renewal)
+        {
+            list.Add(new("Coming back?", Format.Percent(renewal.Share), $"of {renewal.Comparable} comparable seasons got another · a weak signal",
+                "info", FeatureFlags.Forecasts));
+        }
+
+        if (i.Patterns?.Consistency is { } consistency)
+        {
+            list.Add(new("Episode to episode", Capitalize(consistency.Label), $"Rating spread {consistency.Spread:0.00}",
+                consistency.Label switch { "steady" => "good", "rollercoaster" => "warn", _ => "info" }));
+        }
+
+        if (i.Patterns?.Arc is { } arc)
+        {
+            if (arc.PeakIsLatest)
+            {
+                list.Add(new("The arc", "Still peaking", $"Season {arc.PeakSeason} is its best yet ({Format.Rating(arc.PeakRating)})", "good"));
+            }
+            else if (arc.DeclineFromSeason is { } from)
+            {
+                list.Add(new("The arc", $"Peaked in season {arc.PeakSeason}", $"From season {from} on, it never got back there", "warn"));
+            }
+        }
+
+        if (i.Patterns?.Finales is { Seasons: >= 2 } finales && finales.BeatSeasonAverage * 2 > finales.Seasons && finales.AverageDifference >= 0.2)
+        {
+            list.Add(new("Season finales", "Big finales", $"{finales.BeatSeasonAverage} of {finales.Seasons} beat the rest of their season", "good"));
+        }
+
+        return list.Take(Max).ToList();
+    }
+
+    private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+}

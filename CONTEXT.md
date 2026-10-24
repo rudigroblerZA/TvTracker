@@ -399,6 +399,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Both images are optional parts of a sync: with `ImagesMissing`, the catalog keeps the ones it has.
 - **Tags on cards:** `ShowCard` gets tags from the scoped `ShowTagStore`. It batches every card on a page into one
   `GET /api/v1/insights/tags?ids=…` call within a 50 ms window. Tags are shown only to signed-in users.
+- **Show insights layout:** `InsightHighlights` leads with up to six findings (gets good, the ending, next season,
+  coming back, consistency, the arc, finales) as cards toned good/warn/bad/info (`--good`, `--warn`, `--bad`, `--info`,
+  dark enough to read on their own 10% tint). Ratings are toned by `Format.RatingTone` (8.5+ great, 8+ good, 7+ ok).
+  The season chart marks best and weakest only among 3+ seasons, and over 12 seasons squeezes to fit (values on the
+  marked seasons only, labels every fifth).
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why

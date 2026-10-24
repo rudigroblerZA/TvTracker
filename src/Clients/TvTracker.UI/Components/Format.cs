@@ -61,6 +61,9 @@ public static class Format
         return years > 1 ? $"{years} years ago" : years == 1 ? "a year ago" : null;
     }
 
+    /// <summary>How a provider rating reads, for colour: "great" (8.5+), "good" (8+), "ok" (7+) or "low".</summary>
+    public static string RatingTone(double rating) => rating >= 8.5 ? "great" : rating >= 8 ? "good" : rating >= 7 ? "ok" : "low";
+
     /// <summary>A provider rating (0-10), e.g. "7.9".</summary>
     public static string Rating(double rating) => rating.ToString("0.0");
 
