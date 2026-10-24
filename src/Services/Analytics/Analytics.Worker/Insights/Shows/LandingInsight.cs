@@ -34,7 +34,10 @@ public sealed class LandingInsight : IShowInsight
             return null;
         }
 
-        var aired = show.Aired.Where(e => e.SeasonNumber > 0).OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
+        // In air order, so the finale is the last regular episode to air, even if one was held back or numbered out of
+        // order; episodes that aired together (a streaming drop) go by number.
+        var aired = show.Aired.Where(e => e.SeasonNumber > 0)
+            .OrderBy(e => e.AirsAtUtc).ThenBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
         var rated = aired.Where(e => e.ExternalRating is not null).ToList();
         if (rated.Count < MinRatedEpisodes || rated.Count < aired.Count * MinRatedShare || aired[^1].ExternalRating is not { } finale)
         {
@@ -60,16 +63,12 @@ public sealed class LandingInsight : IShowInsight
             return null;
         }
 
-        var seasonWeak = seasons.Count > 1 && Round(finalSeason.Rating - Median(seasons.Select(s => s.Rating))) <= -SeasonMargin;
+        var seasonWeak = seasons.Count > 1 && Reaches(Median(seasons.Select(s => s.Rating)) - finalSeason.Rating, SeasonMargin);
         var ranked = seasons.Count >= MinRankedSeasons;
 
-        // Rounded first: on one-decimal ratings, 8.1 - 7.8 is 0.29999999999999982.
-        var verdict = Round(finale - median) switch
-        {
-            >= FinaleMargin => seasonWeak ? LandingVerdicts.GreatFinale : LandingVerdicts.Sticks,
-            <= -FinaleMargin => seasonWeak ? LandingVerdicts.Fizzles : LandingVerdicts.FinaleLetsDown,
-            _ => seasonWeak ? LandingVerdicts.WeakerLastSeason : LandingVerdicts.AsItRan
-        };
+        var verdict = Reaches(finale - median, FinaleMargin) ? seasonWeak ? LandingVerdicts.GreatFinale : LandingVerdicts.Sticks
+            : Reaches(median - finale, FinaleMargin) ? seasonWeak ? LandingVerdicts.Fizzles : LandingVerdicts.FinaleLetsDown
+            : seasonWeak ? LandingVerdicts.WeakerLastSeason : LandingVerdicts.AsItRan;
 
         // The final season's place as counts, like the finale's, so a tie reads as one.
         return new Landing(verdict, finale, Round(median), Round((double)lower / others),

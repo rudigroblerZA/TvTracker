@@ -64,8 +64,9 @@
     private static string Rank(int rank, int of) =>
         rank == 1 ? "the final season is its best" : rank == of ? "the final season is its weakest" : $"the final season is its {Ordinal(rank)} best of {of}";
 
-    /// <summary>A share that never rounds to 100% unless it is: 298 of 299 is "99%".</summary>
-    private static string Share(int count, int of) => $"{Math.Min(Math.Round(100.0 * count / of), count == of ? 100 : 99):0}%";
+    /// <summary>A share that never rounds to 100% or 0% unless it is: 298 of 299 is "99%", 1 of 250 is "1%".</summary>
+    private static string Share(int count, int of) =>
+        $"{Math.Clamp(Math.Round(100.0 * count / of), count == 0 ? 0 : 1, count == of ? 100 : 99):0}%";
 
     private static string Ordinal(int n) => n + (n % 100 is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
 }

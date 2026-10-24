@@ -431,8 +431,10 @@ How events flow:
       season" (The Office), "The finale lets it down" (Seinfeld), "Fizzles out" (Game of Thrones, Dexter, How I Met Your
       Mother), "Weaker last season" (a finale in line, at the end of a weak season), and "Ends as it ran" (Breaking
       Bad, Friends).
-    - **How:** the finale 0.3+ above or below the median episode is strong or weak; the final season 0.3+ below the
-      median season is weak; the season's rank needs three rated seasons. 235 of 289 ended shows get a verdict.
+    - **How:** the finale (the last regular episode to air) 0.3+ above or below the median episode is strong or
+      weak; the final season 0.3+ below the median season is weak, even with two seasons; its rank ("2nd best of 6")
+      needs three. Ties read as ties ("ties for its best"). A show whose final season has too few rated episodes to
+      check gets no verdict: 232 of 289 ended shows get one.
     - **Great endings:** a Discover list of well-rated (7.5+) ended shows that stick the landing, most popular first.
   - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
     - **This week in TV history** (the default): what premiered and what ended this week in past years, and the

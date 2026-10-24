@@ -152,8 +152,8 @@ public sealed class DnaInsight : IShowInsight
             .OrderBy(g => g.Key)
             .Select(g => (First: g.Min(e => e.AirsAtUtc!.Value), Last: g.Max(e => e.AirsAtUtc!.Value)))
             .ToList();
-        var gaps = seasons.Zip(seasons.Skip(1), (a, b) => (b.First - a.Last).TotalDays).Where(d => d >= 0).Order().ToList();
-        return gaps.Count == 0 ? null : gaps.Count % 2 == 1 ? gaps[gaps.Count / 2] : (gaps[gaps.Count / 2 - 1] + gaps[gaps.Count / 2]) / 2;
+        var gaps = seasons.Zip(seasons.Skip(1), (a, b) => (b.First - a.Last).TotalDays).Where(d => d >= 0).ToList();
+        return gaps.Count == 0 ? null : Median(gaps);
     }
 
     private static double Linear(double value, (double Low, double High) anchors) =>

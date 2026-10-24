@@ -43,7 +43,10 @@ public record ShowInsights(
 /// <param name="Verdict">One of <see cref="LandingVerdicts"/>.</param>
 /// <param name="FinaleRating">The finale's provider rating.</param>
 /// <param name="ShowMedian">The median rating of its episodes.</param>
-/// <param name="FinaleBeats">The share of its other episodes the finale rates strictly above, 0-1.</param>
+/// <param name="FinaleBeats">
+/// <paramref name="RatedLower"/> / <paramref name="OtherEpisodes"/>, rounded. Kept for documents stored before the counts
+/// existed, which the UI reads it from until they're recomputed; new readers should use the counts.
+/// </param>
 /// <param name="FinalSeasonRank">Where the final season ranks among its rated seasons (1 = best); null with fewer than three.</param>
 /// <param name="RankedSeasons">How many seasons were ranked; 0 when the final season wasn't.</param>
 /// <param name="RatedHigher">Other episodes rated above the finale; ties are in neither count.</param>
