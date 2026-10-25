@@ -69,7 +69,7 @@ public static class EssentialCutApi
     private const double MinMargin = 0.1;
 
     // "Part 1", "Part Two", "(1)", "Pt. 2": two-parters are kept or skipped together.
-    private static readonly Regex PartPattern = new(@"(\bpart\s*(\d+|one|two|three|i{1,3})\b|\bpt\.?\s*\d\b|\(\s*\d\s*\))",
+    internal static readonly Regex PartPattern = new(@"(\bpart\s*(\d+|one|two|three|i{1,3})\b|\bpt\.?\s*\d\b|\(\s*\d\s*\))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static void MapEssentialCutApi(this RouteGroupBuilder api) =>

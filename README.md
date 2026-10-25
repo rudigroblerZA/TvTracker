@@ -263,7 +263,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -412,6 +412,18 @@ How events flow:
     - **Ratings:** TVmaze's, averaged with our users' once 5 rate an episode.
     - **Which shows:** it needs 20 or more aired episodes, 80% of them rated.
     - **API:** `GET /api/v1/shows/{id}/essential-cut?level=lean` on Analytics.API, signed in, computed on request.
+  - **Previously on…** (show page, signed in; "Back after a break" on Up Next): a short rewatch for coming back to
+    a show after a break of 4 months or more, when there's more to watch or a new season or episode is scheduled.
+    - **What it picks:** only episodes you've watched, so nothing new is given away. Where you left off, that season's
+      premiere and the episode before you stopped, then the season's best, last season's finale and best.
+    - **Your ratings first:** an episode you rated counts by your stars (×2), others by TVmaze's rating.
+    - **Time:** 1, 2 or 4 hours (a chip each). Picks are taken in that order while they fit, with Tonight's plan's
+      small overrun; where you left off is always in. Two-parters come together.
+    - **Context:** when you last watched and what, and the season premiere it's for ("Season 3 starts in 16 days"), or
+      what's still to watch.
+    - **Up Next:** followed shows due one, the ones coming back soonest first, each linking to its refresher.
+    - **API:** `GET /api/v1/shows/{id}/refresher?minutes=120` (204 when there's nothing to go back to) and
+      `GET /api/v1/me/refreshers` on Analytics.API, signed in, computed on request from your own watches.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

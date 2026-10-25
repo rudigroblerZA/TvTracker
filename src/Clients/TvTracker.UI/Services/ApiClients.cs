@@ -285,6 +285,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
         GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
 
+    /// <summary>"Previously on…" for one show, cut to <paramref name="minutes"/>; null when the user hasn't watched it, or has seen it all and nothing more is coming.</summary>
+    public Task<Refresher?> GetRefresherAsync(Guid showId, int minutes = 120, CancellationToken ct = default) =>
+        GetAsync<Refresher>(ApiClients.Analytics, $"api/v1/shows/{showId}/refresher?minutes={minutes}", ct);
+
+    /// <summary>Followed shows the user has had a long break from, with something to go back to.</summary>
+    public Task<List<Refresher>?> GetRefreshersAsync(CancellationToken ct = default) =>
+        GetAsync<List<Refresher>>(ApiClients.Analytics, "api/v1/me/refreshers", ct);
+
     /// <param name="level">"light", "lean" or "essentials".</param>
     public Task<EssentialCut?> GetEssentialCutAsync(Guid showId, string level = "lean", CancellationToken ct = default) =>
         GetAsync<EssentialCut>(ApiClients.Analytics, $"api/v1/shows/{showId}/essential-cut?level={level}", ct, cacheForOffline: true);

@@ -257,6 +257,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **No probability:** per-person history is too thin for an honest one.
   - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
     the user's record from as far in, and the show's drop-off point when it's ahead of them.
+- **Previously on…** (`RefresherApi`): a rewatch for coming back after a break, computed on request from the caller's
+  own watches.
+  - **Due:** 120+ days since the last watch, with aired episodes ahead or a new episode or season scheduled. Up Next's
+    list looks only at followed shows.
+  - **Only watched episodes:** picking from what the user has seen is what makes it spoiler-proof, so titles show.
+    (Recaps from TVmaze's summaries were the other idea; summaries of past episodes would have needed trimming.)
+  - **Picks, in order:** where they left off (always in), that season's premiere, the episode before, the season's top
+    two, last season's finale and top two, then the rest by rating. Taken greedily while they fit the budget plus
+    Tonight's overrun (max(5 min, budget/12)). Two-parters use the essential cut's pattern.
+  - **Ratings:** the user's own stars × 2 outrank the provider's; a refresher is about what they remember.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,

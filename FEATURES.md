@@ -232,7 +232,18 @@ On ended shows' pages, and a Discover list.
   landing. The Office has a great finale after a weaker last season; Seinfeld's finale lets it down.
 - **Great endings:** finished shows to start with confidence, on Discover.
 
-### 19. Smaller touches
+### 19. Previously on…
+
+On the show page and Up Next, after a break.
+
+- **The moment it's for:** you stopped a show months ago and a new season starts soon, or you want to pick it up
+  again. It says where you were ("S03E06 · Sunset, 7 months ago") and picks a rewatch that fits 1, 2 or 4 hours.
+- **What it picks:** that season's premiere, the episode before you stopped, its best episodes and last season's
+  finale, with your own 5-star episodes first. Breaking Bad at 4 hours: No Más, I.F.T., Más and Sunset.
+- **Spoiler-proof:** it only picks from episodes you've watched.
+- **Back after a break:** Up Next lists the shows due a refresher, the ones returning soonest first.
+
+### 20. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
@@ -250,6 +261,5 @@ Ranked by value for the effort. Each builds on data and code that already exist.
 | 2 | **Catch-up planner** | Before a season premiere, work out a pace that gets you there: "3 episodes a week from now catches you up before Season 5 on 12 January". Optionally use the essential cut to make it fit. | Premieres with catch-up time, your watches, essential cut | Small |
 | 3 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
 | 4 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
-| 5 | **Previously on…** | Before you resume a show after a break, a spoiler-safe recap built from the summaries of the last few episodes you watched, and nothing after them. | TVmaze episode summaries, your progress | Medium |
-| 6 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
-| 7 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+| 5 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
+| 6 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |

@@ -1,0 +1,132 @@
+@inject AnalyticsClient Analytics
+@inject NavigationManager Navigation
+
+@* "Previously on…": shown on the show page only after a long break with something to go back to. Every episode in it is
+   one the user has already seen, so titles are safe to show. *@
+@if (refresher is { Due: true } r)
+{
+    <section class="refresher" id="previously-on" aria-labelledby="previously-on-title">
+        <div class="insight-card">
+            <h2 id="previously-on-title" tabindex="-1" @ref="heading">Previously on @r.Title</h2>
+            <p>
+                <span>You last watched </span><a href="episodes/@r.LeftOff.EpisodeId">@Format.EpisodeCode(r.LeftOff.SeasonNumber, r.LeftOff.EpisodeNumber) · @r.LeftOff.Title</a><span>, @Ago(r.DaysSince).</span>
+            </p>
+            <p class="refresher-why">@Context(r)</p>
+
+            <div class="chips" role="group" aria-label="Time for the refresher">
+                @foreach (var (value, label) in Budgets)
+                {
+                    <button type="button" class="chip @(minutes == value ? "active" : null)" aria-pressed="@(minutes == value)"
+                            @onclick="() => LoadAsync(value)">@label</button>
+                }
+            </div>
+
+            <ol class="refresher-plan">
+                @foreach (var episode in r.Plan)
+                {
+                    <li @key="episode.EpisodeId">
+                        <span class="refresher-code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                        <span class="refresher-body">
+                            <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                            <span class="muted small">@WhyLabel(episode.Why) · @Format.Duration(episode.Minutes)</span>
+                        </span>
+                        @if (episode.YourStars is { } stars)
+                        {
+                            <span class="rating-pill rating-@Format.RatingTone(stars * 2.0)" title="Your rating">★ @stars</span>
+                        }
+                        else if (episode.Rating is { } rating)
+                        {
+                            <span class="rating-pill rating-@Format.RatingTone(rating)">@Format.Rating(rating)</span>
+                        }
+                    </li>
+                }
+            </ol>
+            <p class="muted small">
+                @(r.Plan.Count == 1 ? "1 episode" : $"{r.Plan.Count} episodes")<span> · @Format.Duration(r.PlanMinutes) · only episodes you've already seen</span>
+            </p>
+        </div>
+    </section>
+}
+
+@code {
+    private static readonly (int Minutes, string Label)[] Budgets = [(60, "1 h"), (120, "2 h"), (240, "4 h")];
+
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private Refresher? refresher;
+    private int minutes = 120;
+    private Guid loadedFor;
+    private ElementReference heading;
+    private bool scrollPending;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        refresher = null;
+        scrollPending = Navigation.Uri.EndsWith("#previously-on", StringComparison.Ordinal);
+        await LoadAsync(120);
+    }
+
+    private async Task LoadAsync(int budget)
+    {
+        minutes = budget;
+        try
+        {
+            refresher = await Analytics.GetRefresherAsync(ShowId, budget);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Optional on the show page; the rest of it works without.
+        }
+    }
+
+    /// <summary>
+    /// Up Next links to #previously-on, but the section appears only once loaded, after the browser looked for it.
+    /// Focusing the heading brings it into view (and tells screen readers where they are).
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (scrollPending && refresher is { Due: true })
+        {
+            scrollPending = false;
+            await heading.FocusAsync();
+        }
+    }
+
+    /// <summary>"7 months ago", "a year ago", "2 years ago".</summary>
+    public static string Ago(int days) =>
+        days >= 730 ? $"{days / 365} years ago"
+        : days >= 365 ? "a year ago"
+        : $"{Math.Max(1, days / 30)} months ago";
+
+    /// <summary>Why now: the show coming back, or how much is left to watch.</summary>
+    private static string Context(Refresher r)
+    {
+        var left = r.Ahead.Episodes > 0
+            ? $"{(r.Ahead.Episodes == 1 ? "1 episode" : $"{r.Ahead.Episodes} episodes")} ({Format.Hours(r.Ahead.Minutes)}) still to watch."
+            : null;
+        if (r.Returns is { } returns)
+        {
+            var when = Format.Relative(returns.PremieresAtUtc);
+            var news = returns.NewSeason ? $"Season {returns.SeasonNumber} starts {when}" : $"The next new episode airs {when}";
+            return left is null ? $"{news}. A quick rewatch first:" : $"{news}, and you have {char.ToLowerInvariant(left[0])}{left[1..]}";
+        }
+        return $"You have {char.ToLowerInvariant(left![0])}{left[1..]} A quick rewatch before you carry on:";
+    }
+
+    private static string WhyLabel(string why) => why switch
+    {
+        "left-off" => "Where you left off",
+        "season-premiere" => "Season premiere",
+        "before-you-stopped" => "Just before you stopped",
+        "season-best" => "Season highlight",
+        "last-season-finale" => "Last season's finale",
+        "last-season-best" => "Last season's highlight",
+        "two-parter" => "Other half of a two-parter",
+        _ => why
+    };
+}
