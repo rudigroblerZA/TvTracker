@@ -499,6 +499,19 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .insight-card > h3:first-child { margin-top: 0; }
 .insight-card h4 { margin: 16px 0 6px; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .insight-card > :last-child { margin-bottom: 0; }
+
+/* "Previously on…" refresher on the show page */
+.refresher { margin: 20px 0; }
+.refresher .insight-card { border-left: 4px solid var(--info); background: color-mix(in srgb, var(--info) 6%, var(--surface)); }
+.refresher .insight-card > h2:first-child { margin-top: 0; scroll-margin-top: 16px; }
+.refresher h2:focus { outline: none; }
+.refresher-why { color: var(--muted); }
+.refresher-plan { list-style: none; padding: 0; margin: 12px 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.refresher-plan li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.refresher-code { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--info); flex: none; }
+.refresher-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.refresher-body a { overflow-wrap: anywhere; }
+.refresher-plan .rating-pill { flex: none; }
 .rating-pill { display: inline-block; min-width: 2.6em; text-align: center; font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 6px; border: 1px solid transparent; }
 .rating-pill.rating-great { background: var(--good-fill); color: var(--on-good-fill); }
 .rating-pill.rating-good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, var(--border)); }

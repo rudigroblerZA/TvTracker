@@ -371,3 +371,17 @@ public record MonthWatch(int Year, int Month, int Episodes, int Minutes);
 public record TasteProgress(int Finished, int Watching, int Dropped, IReadOnlyList<ProgressShow> RecentlyDropped);
 
 public record ProgressShow(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc);
+
+/// <summary>"Previously on…": a rewatch for coming back after a long break (see Analytics.API's RefresherApi).</summary>
+public record Refresher(Guid ShowId, string Title, string? PosterUrl, bool Due, DateTime LastWatchedAtUtc, int DaysSince,
+    RefresherEpisode LeftOff, RefresherAhead Ahead, RefresherReturn? Returns, int BudgetMinutes, int PlanMinutes,
+    IReadOnlyList<RefresherEpisode> Plan);
+
+/// <param name="Why">"left-off", "season-premiere", "before-you-stopped", "season-best", "last-season-finale",
+/// "last-season-best" or "two-parter".</param>
+public record RefresherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes, double? Rating,
+    int? YourStars, string Why);
+
+public record RefresherAhead(int Episodes, int Minutes, Guid? NextEpisodeId, int? NextSeason, int? NextEpisode);
+
+public record RefresherReturn(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);

@@ -1,5 +1,6 @@
 @page "/up-next"
 @inject TrackingClient Tracking
+@inject AnalyticsClient Analytics
 
 <PageTitle>Up Next · TV Tracker</PageTitle>
 
@@ -11,6 +12,38 @@
             <p><a href="tonight"><strong>Plan tonight</strong></a><span class="muted">: tell it how long you've got and your mood, and it picks the episodes.</span></p>
         </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (refreshers is { Count: > 0 })
+        {
+            <Feature Flag="@FeatureFlags.Refresher">
+                <section class="back-after-break">
+                    <h2>Back after a break</h2>
+                    <ul class="up-next">
+                        @foreach (var r in refreshers)
+                        {
+                            <li @key="r.ShowId">
+                                <a href="shows/@r.ShowId"><Poster Title="@r.Title" Url="@r.PosterUrl" Size="small" /></a>
+                                <div class="up-next-body">
+                                    <a class="strong" href="shows/@r.ShowId">@r.Title</a>
+                                    <div class="muted small">
+                                        <span>Last watched @RefresherSection.Ago(r.DaysSince)</span>
+                                        @if (r.Returns is { NewSeason: true } returns)
+                                        {
+                                            <span> · season @returns.SeasonNumber starts @Format.Relative(returns.PremieresAtUtc)</span>
+                                        }
+                                        else if (r.Ahead.Episodes > 0)
+                                        {
+                                            <span> · @(r.Ahead.Episodes == 1 ? "1 episode" : $"{r.Ahead.Episodes} episodes") to go</span>
+                                        }
+                                    </div>
+                                    <a class="small" href="shows/@r.ShowId#previously-on">Previously on…: a @Format.Duration(r.PlanMinutes) refresher</a>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            </Feature>
+        }
 
         @if (items is null)
         {
@@ -60,9 +93,23 @@
 
 @code {
     private List<UpNextItem>? items;
+    private List<Refresher>? refreshers;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>Optional: Up Next works without it (flag off, or Analytics unavailable).</summary>
+    private async Task<List<Refresher>?> LoadRefreshersAsync()
+    {
+        try
+        {
+            return await Analytics.GetRefreshersAsync();
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -70,6 +117,7 @@
         try
         {
             items = await Tracking.GetUpNextAsync() ?? [];
+            refreshers = await LoadRefreshersAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

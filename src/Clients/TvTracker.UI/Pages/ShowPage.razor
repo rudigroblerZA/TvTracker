@@ -119,6 +119,12 @@ else
         </div>
     </section>
 
+    <AuthorizeView>
+        <Authorized>
+            <Feature Flag="@FeatureFlags.Refresher"><RefresherSection ShowId="show.Id" /></Feature>
+        </Authorized>
+    </AuthorizeView>
+
     <section class="episodes-at-a-glance">
         @if (show.NextEpisode is { } next)
         {
