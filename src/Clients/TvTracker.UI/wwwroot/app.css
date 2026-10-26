@@ -512,6 +512,20 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .refresher-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .refresher-body a { overflow-wrap: anywhere; }
 .refresher-plan .rating-pill { flex: none; }
+
+/* Catch-up planner on the show page */
+.catch-up { margin: 20px 0; }
+.catch-up .insight-card { border-left: 4px solid var(--accent); }
+.catch-up .insight-card > h2:first-child { margin-top: 0; scroll-margin-top: 16px; }
+.catch-up h2:focus { outline: none; }
+.catch-up-verdict { padding: 8px 12px; border-radius: 8px; color: var(--tone); background: color-mix(in srgb, var(--tone) 10%, var(--surface)); }
+.catch-up-verdict span { color: var(--text); }
+.before-premiere .tag { color: var(--tone); border-color: color-mix(in srgb, var(--tone) 35%, var(--border)); background: color-mix(in srgb, var(--tone) 10%, var(--surface)); }
+.catch-up-weeks { list-style: none; padding: 0; margin: 12px 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.catch-up-weeks li { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.catch-up-week-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.catch-up-weeks .small { overflow-wrap: anywhere; }
+.catch-up-more summary { cursor: pointer; color: var(--accent); }
 .rating-pill { display: inline-block; min-width: 2.6em; text-align: center; font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 6px; border: 1px solid transparent; }
 .rating-pill.rating-great { background: var(--good-fill); color: var(--on-good-fill); }
 .rating-pill.rating-good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, var(--border)); }

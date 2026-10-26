@@ -267,6 +267,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     two, last season's finale and top two, then the rest by rating. Taken greedily while they fit the budget plus
     Tonight's overrun (max(5 min, budget/12)). Two-parters use the essential cut's pattern.
   - **Ratings:** the user's own stars × 2 outrank the provider's; a refresher is about what they remember.
+- **Catch-up planner** (`CatchUpApi`): for a followed show with a season premiere (a scheduled episode 1, or an
+  announced season) within 120 days, the aired episodes after the furthest watched, spread over the weeks left.
+  - **Pace:** the user's minutes over the last 8 weeks, across all shows, with each day capped at 4 hours. Bulk marks
+    ("watched up to S05E10") share one timestamp and land on one day; uncapped, seeding three shows read as 15 h a week.
+  - **Verdicts** compare the minutes a week needed with that pace: ≤ 0.5× comfortable, ≤ 1× doable, ≤ 1.5× tight.
+  - **Cut path:** `EssentialCutApi.Decide` at "lean", offered when it saves 10%+. The cut's loading, runtimes and
+    decisions were split out of its endpoint for this; its responses for seven shows at all three levels came out
+    byte-identical.
+  - **Weeks:** split by cumulative running time, an episode going to the week where its midpoint falls.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,

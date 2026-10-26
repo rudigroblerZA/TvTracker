@@ -243,7 +243,17 @@ On the show page and Up Next, after a break.
 - **Spoiler-proof:** it only picks from episodes you've watched.
 - **Back after a break:** Up Next lists the shows due a refresher, the ones returning soonest first.
 
-### 20. Smaller touches
+### 20. Catch-up planner
+
+On the show page and Up Next, before a followed show's new season.
+
+- **The question:** "can I be caught up before it starts?" It says what's left ("58 episodes, 58 h"), the pace that
+  gets you there ("about 6 a week"), and how that compares with how much you actually watch.
+- **Honest verdicts:** comfortable, doable, tight or behind, with how late you'd finish at your own pace.
+- **A shorter path:** the essential cut, when it saves real time, with the weeks replanned along it.
+- **Week by week:** "This week: S05E11–E16", split by running time.
+
+### 21. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
@@ -258,8 +268,7 @@ Ranked by value for the effort. Each builds on data and code that already exist.
 | # | Idea | What it does | Builds on | Effort |
 | --- | --- | --- | --- | --- |
 | 1 | **Crossover alerts** | Tell you when a crossover event is scheduled in a universe you're watching ("Reckoning airs across Fire, Med and P.D. on Wednesday"), so you're caught up on all three shows first. | Watch order's crossover detection, follows, Notifications | Small |
-| 2 | **Catch-up planner** | Before a season premiere, work out a pace that gets you there: "3 episodes a week from now catches you up before Season 5 on 12 January". Optionally use the essential cut to make it fit. | Premieres with catch-up time, your watches, essential cut | Small |
-| 3 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
-| 4 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
-| 5 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
-| 6 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+| 2 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
+| 3 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
+| 4 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
+| 5 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |

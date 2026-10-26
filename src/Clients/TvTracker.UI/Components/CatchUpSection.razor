@@ -1,0 +1,173 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+@* The catch-up planner: shown on the show page when a new season is coming and there's something to watch first. *@
+@if (plan is { } p)
+{
+    var path = p.Path == "cut" && p.Cut is not null ? p.Cut : p.Full;
+    <section class="catch-up" id="catch-up" aria-labelledby="catch-up-title">
+        <div class="insight-card">
+            <h2 id="catch-up-title" tabindex="-1" @ref="heading">Catch up before season @p.Premiere.SeasonNumber</h2>
+            <p>
+                <span>Season @p.Premiere.SeasonNumber starts @Session.ToLocal(p.Premiere.PremieresAtUtc).ToString("d MMMM") (@Format.Relative(p.Premiere.PremieresAtUtc)). </span>
+                <span>You have <strong>@Episodes(p.Full.Episodes) (@Format.Hours(p.Full.Minutes))</strong> to watch first.</span>
+            </p>
+
+            @if (p.Cut is { } cut)
+            {
+                <div class="chips" role="group" aria-label="Which path">
+                    <button type="button" class="chip @(p.Path == "full" ? "active" : null)" aria-pressed="@(p.Path == "full")"
+                            @onclick="() => LoadAsync(false)">Every episode · @Format.Hours(p.Full.Minutes)</button>
+                    <button type="button" class="chip @(p.Path == "cut" ? "active" : null)" aria-pressed="@(p.Path == "cut")"
+                            @onclick="() => LoadAsync(true)">Essential cut · @Format.Hours(cut.Minutes)</button>
+                </div>
+            }
+
+            <p class="catch-up-verdict tone-@Tone(path.Verdict)">
+                <strong>@PerWeek(path)</strong><span>@(" " + Advice(p, path))</span>
+            </p>
+
+            <ol class="catch-up-weeks">
+                @foreach (var (week, i) in p.Weeks.Select((w, i) => (w, i)).Take(Shown))
+                {
+                    @Week(week, i)
+                }
+            </ol>
+            @if (p.Weeks.Count > Shown)
+            {
+                <details class="catch-up-more">
+                    <summary>All @p.Weeks.Count weeks</summary>
+                    <ol class="catch-up-weeks" start="@(Shown + 1)">
+                        @foreach (var (week, i) in p.Weeks.Select((w, i) => (w, i)).Skip(Shown))
+                        {
+                            @Week(week, i)
+                        }
+                    </ol>
+                </details>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    /// <summary>Weeks shown before "All weeks".</summary>
+    private const int Shown = 2;
+
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private CatchUpPlan? plan;
+    private Guid loadedFor;
+    private ElementReference heading;
+    private bool scrollPending;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        plan = null;
+        scrollPending = Navigation.Uri.EndsWith("#catch-up", StringComparison.Ordinal);
+        await LoadAsync(false);
+    }
+
+    /// <summary>Up Next links to #catch-up; the section appears only once loaded, so its heading is focused then.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (scrollPending && plan is not null)
+        {
+            scrollPending = false;
+            await heading.FocusAsync();
+        }
+    }
+
+    private async Task LoadAsync(bool cut)
+    {
+        try
+        {
+            plan = await Analytics.GetCatchUpAsync(ShowId, cut);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Optional on the show page; the rest of it works without.
+        }
+    }
+
+    private RenderFragment Week(CatchUpWeek week, int index) =>
+        @<li @key="week.Starts">
+            <div class="catch-up-week-head">
+                <strong>@(index == 0 ? "This week" : $"Week of {week.Starts:d MMM}")</strong>
+                <span class="muted small">@Episodes(week.Episodes.Count) · @Format.Duration(week.Minutes)</span>
+            </div>
+            <div class="small">@Range(week.Episodes)</div>
+        </li>;
+
+    public static string Episodes(int count) => count == 1 ? "1 episode" : $"{count:N0} episodes";
+
+    /// <summary>"About 3 episodes (2 h 30 min) a week".</summary>
+    public static string PerWeek(CatchUpPath path)
+    {
+        var episodes = Math.Max(1, (int)Math.Round(path.EpisodesPerWeek, MidpointRounding.AwayFromZero));
+        return $"About {Episodes(episodes)} ({Format.Hours(path.MinutesPerWeek)}) a week.";
+    }
+
+    /// <summary>How that compares with the user's own pace, and the cut when it changes the answer.</summary>
+    private static string Advice(CatchUpPlan p, CatchUpPath path)
+    {
+        var pace = Format.Hours(p.YourMinutesPerWeek);
+        var cutHelps = p.Path == "full" && p.Cut?.Verdict is { } cutVerdict && Rank(cutVerdict) < Rank(path.Verdict);
+        var text = path.Verdict switch
+        {
+            "comfortable" => $"Comfortable: about half of what you usually watch ({pace} a week).",
+            "doable" => $"Doable at your usual pace ({pace} a week).",
+            "tight" => $"Tight: more than your usual {pace} a week.",
+            "behind" => $"At your usual {pace} a week, you'd finish {WeeksLate(p, path)} after it starts.",
+            _ => "Spread over the weeks until it starts."
+        };
+        if (path.StartBy is { } startBy && path.Verdict is "comfortable" or "doable")
+        {
+            text += $" Or start by {startBy:d MMM}.";
+        }
+        return cutHelps ? $"{text} The essential cut makes it {p.Cut!.Verdict}." : text;
+    }
+
+    /// <summary>"about 3 weeks": how long after the premiere the user would finish at their pace.</summary>
+    private static string WeeksLate(CatchUpPlan p, CatchUpPath path)
+    {
+        var days = Math.Ceiling(path.Minutes * 7.0 / Math.Max(1, p.YourMinutesPerWeek)) - p.DaysLeft;
+        var weeks = Math.Max(1, (int)Math.Ceiling(days / 7));
+        return weeks == 1 ? "about a week" : $"about {weeks:N0} weeks";
+    }
+
+    private static int Rank(string? verdict) => verdict switch { "comfortable" => 0, "doable" => 1, "tight" => 2, "behind" => 3, _ => 4 };
+
+    public static string Tone(string? verdict) => verdict switch
+    {
+        "comfortable" or "doable" => "good",
+        "tight" => "warn",
+        "behind" => "bad",
+        _ => "info"
+    };
+
+    /// <summary>A week's episodes as compact ranges: "S02E01–E04, E06 · S03E01".</summary>
+    public static string Range(IReadOnlyList<CatchUpEpisode> episodes) => string.Join(" · ", episodes
+        .GroupBy(e => e.SeasonNumber)
+        .Select(season =>
+        {
+            var runs = new List<string>();
+            var list = season.Select(e => e.EpisodeNumber).ToList();
+            for (var i = 0; i < list.Count;)
+            {
+                var j = i;
+                while (j + 1 < list.Count && list[j + 1] == list[j] + 1)
+                {
+                    j++;
+                }
+                runs.Add(j > i ? $"E{list[i]:00}–E{list[j]:00}" : $"E{list[i]:00}");
+                i = j + 1;
+            }
+            return $"S{season.Key:00}{string.Join(", ", runs)}";
+        }));
+}

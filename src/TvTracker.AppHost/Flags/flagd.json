@@ -84,6 +84,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Previously on…: a rewatch refresher on the show page after a long break, and the Back after a break list on Up Next." }
+    },
+    "catch-up": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next." }
     }
   }
 }

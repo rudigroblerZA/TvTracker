@@ -66,6 +66,7 @@ public static class InsightsApi
         api.MapFinishOutlookApi();
         api.MapTimeMachineApi();
         api.MapRefresherApi();
+        api.MapCatchUpApi();
 
         return api;
     }

@@ -385,3 +385,17 @@ public record RefresherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumb
 public record RefresherAhead(int Episodes, int Minutes, Guid? NextEpisodeId, int? NextSeason, int? NextEpisode);
 
 public record RefresherReturn(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
+
+/// <summary>The catch-up planner: what to watch, and at what pace, before a new season (see Analytics.API's CatchUpApi).</summary>
+/// <param name="Path">"full" or "cut": which path <paramref name="Weeks"/> follow.</param>
+public record CatchUpPlan(Guid ShowId, string Title, string? PosterUrl, CatchUpPremiere Premiere, int DaysLeft, CatchUpPath Full,
+    CatchUpPath? Cut, int YourMinutesPerWeek, string Path, IReadOnlyList<CatchUpWeek> Weeks);
+
+public record CatchUpPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc);
+
+/// <param name="Verdict">"comfortable", "doable", "tight", "behind", or null without a pace.</param>
+public record CatchUpPath(int Episodes, int Minutes, double EpisodesPerWeek, int MinutesPerWeek, string? Verdict, DateOnly? StartBy);
+
+public record CatchUpWeek(DateOnly Starts, int Minutes, IReadOnlyList<CatchUpEpisode> Episodes);
+
+public record CatchUpEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes);

@@ -13,6 +13,32 @@
         </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
+        @if (catchUps is { Count: > 0 })
+        {
+            <Feature Flag="@FeatureFlags.CatchUp">
+                <section class="before-premiere">
+                    <h2>Before the premiere</h2>
+                    <ul class="up-next">
+                        @foreach (var c in catchUps)
+                        {
+                            <li @key="c.ShowId">
+                                <a href="shows/@c.ShowId"><Poster Title="@c.Title" Url="@c.PosterUrl" Size="small" /></a>
+                                <div class="up-next-body">
+                                    <a class="strong" href="shows/@c.ShowId">@c.Title</a>
+                                    <div class="muted small">
+                                        <span>Season @c.Premiere.SeasonNumber @Format.Relative(c.Premiere.PremieresAtUtc) · @CatchUpSection.Episodes(c.Full.Episodes) (@Format.Hours(c.Full.Minutes)) to go</span>
+                                    </div>
+                                    <a class="small" href="shows/@c.ShowId#catch-up">
+                                        <span class="tag tone-@CatchUpSection.Tone(c.Full.Verdict)">@(c.Full.Verdict is { } v ? char.ToUpperInvariant(v[0]) + v[1..] : "Plan")</span><span>@(" " + CatchUpSection.PerWeek(c.Full))</span>
+                                    </a>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            </Feature>
+        }
+
         @if (refreshers is { Count: > 0 })
         {
             <Feature Flag="@FeatureFlags.Refresher">
@@ -94,9 +120,23 @@
 @code {
     private List<UpNextItem>? items;
     private List<Refresher>? refreshers;
+    private List<CatchUpPlan>? catchUps;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>Optional, like the refreshers.</summary>
+    private async Task<List<CatchUpPlan>?> LoadCatchUpsAsync()
+    {
+        try
+        {
+            return await Analytics.GetCatchUpsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>Optional: Up Next works without it (flag off, or Analytics unavailable).</summary>
     private async Task<List<Refresher>?> LoadRefreshersAsync()
@@ -118,6 +158,7 @@
         {
             items = await Tracking.GetUpNextAsync() ?? [];
             refreshers = await LoadRefreshersAsync();
+            catchUps = await LoadCatchUpsAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
