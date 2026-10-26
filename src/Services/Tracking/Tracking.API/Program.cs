@@ -28,6 +28,7 @@ builder.Services.AddIntegrationEventOutbox<TrackingContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<UserCache>();
 builder.Services.AddScoped<TrackingService>();
+builder.Services.AddHostedService<ActivitySnapshotPublisher>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

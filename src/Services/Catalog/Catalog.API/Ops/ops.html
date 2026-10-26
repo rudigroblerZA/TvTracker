@@ -82,6 +82,8 @@
     <div class="panel"><h2>Genres</h2><div id="genres"></div></div>
     <div class="panel"><h2>Bulk import</h2><div id="bulk"></div></div>
   </section>
+  <section class="panel"><h2>Data quality</h2><ul class="rows" id="quality"></ul>
+    <div class="muted small" style="margin-top:8px">Gaps are mostly TVmaze's own: daily, reality and anime shows go unrated and untitled. Users' follows, watches and ratings are re-sent daily by Tracking and Ratings, so copies that missed an event repair themselves.</div></section>
   <section class="panel"><h2>Feature flags</h2><div class="flags" id="flags"></div>
     <div class="muted small" style="margin-top:8px">As flagd answers a signed-out caller; edit <code>src/TvTracker.AppHost/Flags/flagd.json</code> to change one while everything runs.</div></section>
 </main>
@@ -157,6 +159,20 @@ function render(data) {
   $("worth-the-wait").innerHTML = !a ? unavailable : a.worthTheWait.length ? a.worthTheWait.map(w => `
     <li><span class="num muted small">${code(w.seasonNumber, w.episodeNumber)}</span><div class="grow clip">${esc(w.showTitle)}</div>
       <span class="num">+${w.lift.toFixed(1)}</span></li>`).join("") : empty("Not computed yet");
+  const q = c.dataQuality;
+  const qrow = (label, value, detail, tone) => `<li><div class="grow"><div class="clip">${esc(label)}</div><div class="muted small">${detail}</div></div>`
+    + `<span class="badge ${tone}">${value}</span></li>`;
+  const inStep = a && a.shows === c.shows && a.episodes === c.episodes;
+  $("quality").innerHTML = [
+    qrow("Episode ratings", `${pct(q.rated, q.airedEpisodes)}% rated`, `${n(q.airedEpisodes - q.rated)} of ${n(q.airedEpisodes)} aired episodes unrated on TVmaze`, pct(q.rated, q.airedEpisodes) >= 50 ? "good" : "warn"),
+    qrow("Runtimes", n(q.withoutRuntime), "aired episodes without one (counted as the show's typical runtime)", q.withoutRuntime ? "warn" : "good"),
+    qrow("Placeholder titles", n(q.placeholderTitles), "aired episodes titled TBA or \"Episode N\" (ignored when matching crossovers)", q.placeholderTitles ? "warn" : "good"),
+    qrow("Numbering", n(q.duplicateNumbers + q.seasonsWithGaps), `${n(q.duplicateNumbers)} duplicate episode numbers · ${n(q.seasonsWithGaps)} seasons with gaps`, q.duplicateNumbers + q.seasonsWithGaps ? "warn" : "good"),
+    qrow("Show details", n(q.showsWithoutGenres + q.showsWithoutEpisodes), `${n(q.showsWithoutGenres)} without genres · ${n(q.showsWithoutEpisodes)} without episodes`, q.showsWithoutEpisodes ? "warn" : "good"),
+    a ? qrow("Analytics' copy", inStep ? "in step" : "behind", `${n(a.shows)} / ${n(c.shows)} shows · ${n(a.episodes)} / ${n(c.episodes)} episodes`, inStep ? "good" : "warn")
+      : qrow("Analytics' copy", "—", "Analytics.API unavailable", "bad"),
+  ].join("");
+
   $("flags").innerHTML = c.flags.map(f => `<span class="badge ${f.on ? "good" : "bad"}">${esc(f.key)} ${f.on ? "on" : "off"}</span>`).join("");
 
   $("actors").innerHTML = c.topActors.length ? c.topActors.map(p => `

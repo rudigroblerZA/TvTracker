@@ -40,7 +40,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Consuming:** an `IIntegrationEventHandler<T>` starts with `db.HasProcessedAsync(@event, nameof(Handler))`, and
   calls `db.MarkProcessed(...)` before saving. This is the inbox; redeliveries become no-ops.
 - **RabbitMQ:** one queue per service; a failing message is retried once, then dropped (no DLQ yet). Lost-event
-  healing is therefore done by periodic full syncs (tags daily) or replays (catalog).
+  healing is therefore done by periodic full syncs (tags daily), replays (catalog) or snapshots (user activity).
+- **User-activity snapshots:** Tracking (`ActivitySnapshotPublisher`) and Ratings (`RatingsSnapshotPublisher`) send
+  every user's follows and watches, and ratings, as one event per user, 2 minutes after start and then daily.
+  - **Why:** a lost watch or follow left Analytics' copy wrong for good. One user's follow, watch and unwatch from
+    20 October never arrived; the first snapshot repaired them.
+  - **Consumers:** Analytics (`SnapshotHandlers`) adds what's missing and removes what's gone; Recommendations
+    (`SnapshotHandler`) resets each show's signal. Anything recorded after `TakenAtUtc` is kept: Analytics compares
+    watch and follow times, Recommendations each signal's `UpdatedAtUtc`.
+  - **Known gap:** Analytics stores no rating times, so a rating changed between a snapshot and its delivery can be
+    undone until the next day's snapshot. A user with no follows, watches or ratings left gets no snapshot.
 - **Startup order:** the sync worker `WaitFor`s every consumer, whose health includes "queue bound and consuming".
 - **Catalog replay:** `POST /api/v1/imports/replay` on the sync worker republishes the catalog. It covers shows,
   creatives and careers. Analytics requests it on first start, and when its copy lacks creatives.
@@ -66,6 +75,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     list replaces the last); also sent with a replay.
   - **Character names:** they come in each credit's `_links.character.name`, so no character embed is needed.
   - **What's left out:** roles as themselves are skipped. TVmaze lists main casts only, so guest roles never appear.
+- **Presumed ended:** TVmaze leaves some finished shows "Running" for years (Girls, last aired 2017; Peaky Blinders,
+  2022), often with an empty, undated next season. `CatalogSynchronizer.StatusOf` calls a show the provider says is
+  airing ended when nothing aired for 4 years and nothing is scheduled (a dated or TBA episode, or a dated season);
+  undated empty seasons don't count. A new episode brings it back on the next refresh. It moved 9 shows; Shōgun and
+  Fargo (2024) stay airing.
+- **Summaries:** HTML is stripped and entities decoded until stable, since some TVmaze summaries are escaped twice.
+- **Data quality** (`/ops`): what TVmaze leaves out (half of aired episodes unrated, mostly daily and reality shows;
+  "Episode N" titles on anime and daily shows; duplicate numbers on same-night crossovers), and whether Analytics'
+  copy matches the catalog.
 - **Isolation:** one bad show never stops a loop. The import, refresh and backfill loops catch per show and retry later.
 - **Search imports:** Catalog.API asks the worker (`POST /api/v1/imports/search`) to import TVmaze's top 5 matches.
   - Each term goes to TVmaze at most once every 6 h, and at most 30 new terms a minute overall.

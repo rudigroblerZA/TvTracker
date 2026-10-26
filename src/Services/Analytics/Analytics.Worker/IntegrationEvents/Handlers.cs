@@ -324,6 +324,109 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
     }
 }
 
+/// <summary>
+/// Repairs a user's watches, follows and ratings from Tracking's and Ratings' daily snapshots: adds what's missing and
+/// removes what's gone. A row recorded after the snapshot was taken is kept, since the snapshot can't know about it.
+/// Ratings have no time here, so a rating changed in the seconds between a snapshot and its delivery can be undone
+/// until the next day's snapshot; that's the price of healing lost events without a dead-letter queue.
+/// </summary>
+public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandlers> logger) :
+    IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>,
+    IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
+{
+    public async Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
+    {
+        const string handler = $"{nameof(SnapshotHandlers)}.{nameof(TrackingSnapshotIntegrationEvent)}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var takenAt = e.TakenAtUtc.UtcDateTime;
+        var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
+        var watched = watches.Select(w => w.EpisodeId).ToHashSet();
+        var snapshotWatches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
+        var addWatches = snapshotWatches.Values.Where(w => !watched.Contains(w.EpisodeId))
+            .Select(w => new UserEpisodeWatch { UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime })
+            .ToList();
+        var removeWatches = watches.Where(w => !snapshotWatches.ContainsKey(w.EpisodeId) && w.WatchedAtUtc < takenAt).ToList();
+        db.Watches.AddRange(addWatches);
+        db.Watches.RemoveRange(removeWatches);
+
+        var follows = await db.Follows.Where(f => f.UserId == e.UserId).ToListAsync(ct);
+        var followed = follows.Select(f => f.ShowId).ToHashSet();
+        var snapshotFollows = e.Follows.DistinctBy(f => f.ShowId).ToDictionary(f => f.ShowId);
+        var addFollows = snapshotFollows.Values.Where(f => !followed.Contains(f.ShowId))
+            .Select(f => new UserFollow { UserId = e.UserId, ShowId = f.ShowId, FollowedAtUtc = f.FollowedAtUtc.UtcDateTime })
+            .ToList();
+        var removeFollows = follows.Where(f => !snapshotFollows.ContainsKey(f.ShowId) && f.FollowedAtUtc < takenAt).ToList();
+        db.Follows.AddRange(addFollows);
+        db.Follows.RemoveRange(removeFollows);
+
+        if (addWatches.Count + removeWatches.Count + addFollows.Count + removeFollows.Count > 0)
+        {
+            logger.LogInformation(
+                "Repaired {UserId}'s activity from Tracking's snapshot: watches +{AddedWatches} -{RemovedWatches}, follows +{AddedFollows} -{RemovedFollows}",
+                e.UserId, addWatches.Count, removeWatches.Count, addFollows.Count, removeFollows.Count);
+        }
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct)
+    {
+        const string handler = $"{nameof(SnapshotHandlers)}.{nameof(RatingsSnapshotIntegrationEvent)}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var changes = 0;
+        var shows = await db.ShowRatings.Where(r => r.UserId == e.UserId).ToDictionaryAsync(r => r.ShowId, ct);
+        foreach (var rating in e.Shows.DistinctBy(r => r.ShowId))
+        {
+            if (!shows.Remove(rating.ShowId, out var existing))
+            {
+                db.ShowRatings.Add(new UserShowRating { UserId = e.UserId, ShowId = rating.ShowId, Stars = rating.Stars });
+                changes++;
+            }
+            else if (existing.Stars != rating.Stars)
+            {
+                existing.Stars = rating.Stars;
+                changes++;
+            }
+        }
+        db.ShowRatings.RemoveRange(shows.Values);
+        changes += shows.Count;
+
+        var episodes = await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ToDictionaryAsync(r => r.EpisodeId, ct);
+        foreach (var rating in e.Episodes.DistinctBy(r => r.EpisodeId))
+        {
+            if (!episodes.Remove(rating.EpisodeId, out var existing))
+            {
+                db.EpisodeRatings.Add(new UserEpisodeRating { UserId = e.UserId, EpisodeId = rating.EpisodeId, ShowId = rating.ShowId, Stars = rating.Stars });
+                changes++;
+            }
+            else if (existing.Stars != rating.Stars)
+            {
+                existing.Stars = rating.Stars;
+                changes++;
+            }
+        }
+        db.EpisodeRatings.RemoveRange(episodes.Values);
+        changes += episodes.Count;
+
+        if (changes > 0)
+        {
+            logger.LogInformation("Repaired {UserId}'s ratings from Ratings' snapshot: {Changes} changed", e.UserId, changes);
+        }
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+}
+
 /// <summary>Deletes everything a deleted user left here; the next hourly run drops them from every aggregate.</summary>
 public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {

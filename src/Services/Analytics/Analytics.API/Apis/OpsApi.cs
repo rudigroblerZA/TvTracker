@@ -18,7 +18,8 @@ public record AnalyticsOpsStats(
     IReadOnlyList<OpsPremiere> UpcomingPremieres,
     IReadOnlyList<OpsConnectedShow> MostConnected,
     OpsComputed Computed,
-    IReadOnlyList<OpsWorthTheWait> WorthTheWait);
+    IReadOnlyList<OpsWorthTheWait> WorthTheWait,
+    int Episodes);
 
 /// <summary>How many shows each part of the insights covers, and the other computed tables.</summary>
 /// <param name="GetsGoodTurns">Slow starters with a turn ("gets good at S01E06").</param>
@@ -97,7 +98,8 @@ public static class OpsApi
                 .OrderBy(d => d.Rank)
                 .Take(5)
                 .Select(d => new OpsWorthTheWait(d.ShowId, d.ShowTitle, d.SeasonNumber ?? 0, d.EpisodeNumber ?? 0, d.Value))
-                .ToListAsync(ct));
+                .ToListAsync(ct),
+            Episodes: await db.Episodes.CountAsync(ct));
     }
 
     private static async Task<OpsComputed> GetComputedAsync(AnalyticsContext db, CancellationToken ct)
