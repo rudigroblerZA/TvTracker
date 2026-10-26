@@ -189,6 +189,71 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
     }
 }
 
+/// <summary>
+/// Repairs a user's signals from Tracking's and Ratings' daily snapshots (follows, episodes watched per show, ratings).
+/// A signal updated after the snapshot was taken is left alone.
+/// </summary>
+public sealed class SnapshotHandler(RecommendationsContext db, RecommendationStore store, TimeProvider time) :
+    IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>,
+    IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
+{
+    public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
+    {
+        var followed = e.Follows.Select(f => f.ShowId).ToHashSet();
+        var watched = e.Watches.DistinctBy(w => w.EpisodeId).GroupBy(w => w.ShowId).ToDictionary(g => g.Key, g => g.Count());
+        return RepairAsync(e, e.UserId, e.TakenAtUtc, followed.Union(watched.Keys), signal =>
+        {
+            signal.Followed = followed.Contains(signal.ShowId);
+            signal.EpisodesWatched = watched.GetValueOrDefault(signal.ShowId);
+        }, ct);
+    }
+
+    public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct)
+    {
+        var ratings = e.Shows.DistinctBy(r => r.ShowId).ToDictionary(r => r.ShowId, r => r.Stars);
+        return RepairAsync(e, e.UserId, e.TakenAtUtc, ratings.Keys, signal => signal.Rating = ratings.TryGetValue(signal.ShowId, out var stars) ? stars : null, ct);
+    }
+
+    /// <param name="shows">Shows the snapshot has something for; the user's other signals are repaired too.</param>
+    private async Task RepairAsync(IntegrationEvent e, string userId, DateTimeOffset takenAt, IEnumerable<Guid> shows,
+        Action<UserShowSignal> apply, CancellationToken ct)
+    {
+        var handler = $"{nameof(SnapshotHandler)}.{e.GetType().Name}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var signals = await db.Signals.Where(s => s.UserId == userId).ToDictionaryAsync(s => s.ShowId, ct);
+        foreach (var showId in shows.Where(id => !signals.ContainsKey(id)))
+        {
+            var added = new UserShowSignal { UserId = userId, ShowId = showId };
+            db.Signals.Add(added);
+            signals[showId] = added;
+        }
+
+        var changed = false;
+        var now = time.GetUtcNow().UtcDateTime;
+        foreach (var signal in signals.Values.Where(s => s.UpdatedAtUtc < takenAt.UtcDateTime))
+        {
+            var before = (signal.Followed, signal.EpisodesWatched, signal.Rating);
+            apply(signal);
+            if (before != (signal.Followed, signal.EpisodesWatched, signal.Rating))
+            {
+                signal.UpdatedAtUtc = now;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await store.MarkDirtyAsync(userId, ct);
+        }
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+}
+
 public sealed class UserDeletedHandler(RecommendationsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)

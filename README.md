@@ -34,6 +34,10 @@ The catalog grows as the schedule changes. Imported shows are refreshed daily (e
 is refreshed promptly when someone follows it. The first sync takes a minute or two, because calls are throttled to stay under
 TVmaze's limit of 20 calls every 10 seconds. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
 
+TVmaze still calls some long-finished shows "Running" (Girls, Peaky Blinders). A show with nothing aired for 4 years and
+nothing scheduled is shown as ended until a new episode is scheduled. Users' follows, watches and ratings are re-sent
+daily to the services that keep copies of them, so a lost event repairs itself within a day.
+
 If TVmaze's combined show request fails (a 5xx after the retries; seen during an outage), the sync worker switches to
 separate requests for 15 minutes. It fetches the show, episodes, seasons, cast and images in parallel; those kept
 working when the combined request didn't.
@@ -255,6 +259,8 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
   Worth the wait.
 - **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
 - **Bulk import:** the latest bulk import job.
+- **Data quality:** how much of TVmaze's data is missing (unrated episodes, runtimes, placeholder titles, numbering,
+  genres), and whether Analytics' copy of the catalog is in step.
 - **Feature flags:** every flag, on or off, as flagd answers a signed-out caller.
 
 Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,

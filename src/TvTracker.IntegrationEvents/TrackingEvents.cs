@@ -20,3 +20,15 @@ public record EpisodeWatchedIntegrationEvent(string UserId, Guid ShowId, IReadOn
 public record EpisodeUnwatchedIntegrationEvent(string UserId, Guid ShowId, Guid EpisodeId) : IntegrationEvent;
 
 public record ShowCompletedIntegrationEvent(string UserId, Guid ShowId) : IntegrationEvent;
+
+/// <summary>
+/// One user's follows and watched episodes as Tracking has them, sent after start and daily. Consumers repair their
+/// copies from it: with no dead-letter queue, an event lost on the way leaves a copy wrong for good otherwise.
+/// </summary>
+/// <param name="TakenAtUtc">When the snapshot was read. A consumer keeps anything it recorded after this.</param>
+public record TrackingSnapshotIntegrationEvent(string UserId, DateTimeOffset TakenAtUtc, IReadOnlyList<SnapshotFollow> Follows,
+    IReadOnlyList<SnapshotWatch> Watches) : IntegrationEvent;
+
+public record SnapshotFollow(Guid ShowId, DateTimeOffset FollowedAtUtc);
+
+public record SnapshotWatch(Guid ShowId, Guid EpisodeId, DateTimeOffset WatchedAtUtc);

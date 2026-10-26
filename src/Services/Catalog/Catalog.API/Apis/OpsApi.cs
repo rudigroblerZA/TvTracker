@@ -29,7 +29,18 @@ public record CatalogOpsStats(
     OpsBackfills Backfills,
     OpsNanogenres Nanogenres,
     OpsUniverses? Universes,
-    IReadOnlyList<OpsFlag> Flags);
+    IReadOnlyList<OpsFlag> Flags,
+    OpsDataQuality DataQuality);
+
+/// <summary>
+/// Gaps and oddities in the provider's data, over aired regular episodes. Mostly TVmaze's own: daily, reality and
+/// anime shows go unrated and untitled ("Episode 12"), and crossovers can share an episode number.
+/// </summary>
+/// <param name="PlaceholderTitles">Titled "TBA", "TBD" or "Episode N".</param>
+/// <param name="DuplicateNumbers">Season and episode numbers that more than one episode of a show has.</param>
+/// <param name="SeasonsWithGaps">Seasons whose aired episode numbers skip some.</param>
+public record OpsDataQuality(int AiredEpisodes, int Rated, int WithoutRuntime, int PlaceholderTitles, int DuplicateNumbers,
+    int SeasonsWithGaps, int ShowsWithoutGenres, int ShowsWithoutEpisodes);
 
 /// <summary>The sync worker's slow background fetches from the provider, and how far through they are.</summary>
 /// <param name="Actors">People in a catalog show's cast with a provider id: the ones the cast-credit backfill fetches.</param>
@@ -150,8 +161,26 @@ public static class OpsApi
                 await db.Nanogenres.OrderByDescending(n => n.ShowCount).ThenBy(n => n.Name).Take(6)
                     .Select(n => new OpsNamedCount(n.Name, n.ShowCount)).ToListAsync(ct)),
             Universes: await GetUniversesAsync(db, universes, ct),
-            Flags: await GetFlagsAsync(features, ct));
+            Flags: await GetFlagsAsync(features, ct),
+            DataQuality: await GetDataQualityAsync(db, ct));
     }
+
+    private static async Task<OpsDataQuality> GetDataQualityAsync(CatalogContext db, CancellationToken ct) =>
+        (await db.Database.SqlQueryRaw<OpsDataQuality>("""
+            WITH aired AS (
+                SELECT * FROM episodes WHERE "SeasonNumber" > 0 AND "AirsAtUtc" <= now()
+            )
+            SELECT
+                (SELECT COUNT(*)::int FROM aired) AS "AiredEpisodes",
+                (SELECT COUNT(*)::int FROM aired WHERE "ExternalRating" IS NOT NULL) AS "Rated",
+                (SELECT COUNT(*)::int FROM aired WHERE coalesce("RuntimeMinutes", 0) = 0) AS "WithoutRuntime",
+                (SELECT COUNT(*)::int FROM aired WHERE "Title" ~* '^(tba|tbd|episode [0-9]+)$') AS "PlaceholderTitles",
+                (SELECT COUNT(*)::int FROM (SELECT 1 FROM episodes GROUP BY "ShowId", "SeasonNumber", "EpisodeNumber" HAVING COUNT(*) > 1) d) AS "DuplicateNumbers",
+                (SELECT COUNT(*)::int FROM (SELECT 1 FROM aired GROUP BY "ShowId", "SeasonNumber"
+                    HAVING MAX("EpisodeNumber") <> COUNT(DISTINCT "EpisodeNumber")) g) AS "SeasonsWithGaps",
+                (SELECT COUNT(*)::int FROM shows WHERE cardinality("Genres") = 0) AS "ShowsWithoutGenres",
+                (SELECT COUNT(*)::int FROM shows s WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e."ShowId" = s."Id")) AS "ShowsWithoutEpisodes"
+            """).ToListAsync(ct)).Single();
 
     private static async Task<OpsBackfills> GetBackfillsAsync(CatalogContext db, DateTimeOffset now, CancellationToken ct)
     {

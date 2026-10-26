@@ -439,7 +439,12 @@ public sealed partial class TvMazeCatalogProvider(
             return null;
         }
 
-        var text = WebUtility.HtmlDecode(HtmlTag().Replace(html, " "));
+        // Some summaries are escaped twice ("&amp;amp;"), so decode until nothing changes.
+        var text = HtmlTag().Replace(html, " ");
+        for (var i = 0; i < 3 && WebUtility.HtmlDecode(text) is var decoded && decoded != text; i++)
+        {
+            text = decoded;
+        }
         text = Whitespace().Replace(text, " ").Trim();
         return text.Length == 0 ? null : text;
     }
