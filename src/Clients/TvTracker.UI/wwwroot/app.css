@@ -8,6 +8,13 @@
     --accent-text: #ffffff;
     --danger: #b91c1c;
     --star: #f59e0b;
+    /* Tones for findings: text dark enough to read on its own 10% tint; fills strong enough for white text. */
+    --good: #166534;
+    --warn: #92400e;
+    --bad: #991b1b;
+    --info: #1d4ed8;
+    --good-fill: #15803d;
+    --on-good-fill: #ffffff;
     --radius: 10px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color-scheme: light dark;
@@ -23,6 +30,12 @@
         --accent: #60a5fa;
         --accent-text: #0c0a09;
         --danger: #f87171;
+        --good: #4ade80;
+        --warn: #fbbf24;
+        --bad: #f87171;
+        --info: #93c5fd;
+        --good-fill: #4ade80;
+        --on-good-fill: #052e16;
     }
 }
 
@@ -453,6 +466,9 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .finish-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .tag.finish-on-track { color: var(--text); border-color: var(--accent); }
 .tag.finish-stalled { opacity: 0.8; }
+.tag.landing-sticks, .tag.landing-great-finale { color: var(--good); border-color: currentColor; background: color-mix(in srgb, var(--good) 10%, var(--surface)); font-weight: 600; }
+.tag.landing-fizzles, .tag.landing-finale-lets-down { color: var(--bad); border-color: currentColor; background: color-mix(in srgb, var(--bad) 10%, var(--surface)); font-weight: 600; }
+.tag.landing-weaker-last-season { color: var(--warn); border-color: currentColor; background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-weight: 600; }
 
 /* Nanogenres */
 .nanogenre-tags { margin-top: 6px; }
@@ -464,3 +480,66 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 
 .time-travel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 4px; }
 .time-moments { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+
+/* Show insights: highlights, toned ratings, season chart, cards */
+.tone-good { --tone: var(--good); }
+.tone-warn { --tone: var(--warn); }
+.tone-bad { --tone: var(--bad); }
+.tone-info { --tone: var(--info); }
+.insight-highlights { list-style: none; padding: 0; margin: 4px 0 16px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.highlight { border-radius: var(--radius); padding: 12px 14px; background: color-mix(in srgb, var(--tone) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border)); min-width: 0; }
+.highlight-kicker { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tone); }
+.highlight-headline { font-size: 1.3rem; font-weight: 750; line-height: 1.2; margin: 4px 0 3px; color: var(--text); overflow-wrap: anywhere; }
+.highlight-sub { font-size: 0.82rem; color: var(--muted); line-height: 1.35; }
+.insights .stat-value { font-size: 1.6rem; line-height: 1.2; }
+.stat-value.rating-great, .stat-value.rating-good { color: var(--good); }
+.stat-value.rating-low { color: var(--bad); }
+.insight-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); align-items: start; margin-bottom: 12px; }
+.insight-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; min-width: 0; }
+.insight-card > h3:first-child { margin-top: 0; }
+.insight-card h4 { margin: 16px 0 6px; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.insight-card > :last-child { margin-bottom: 0; }
+
+/* "Previously on…" refresher on the show page */
+.refresher { margin: 20px 0; }
+.refresher .insight-card { border-left: 4px solid var(--info); background: color-mix(in srgb, var(--info) 6%, var(--surface)); }
+.refresher .insight-card > h2:first-child { margin-top: 0; scroll-margin-top: 16px; }
+.refresher h2:focus { outline: none; }
+.refresher-why { color: var(--muted); }
+.refresher-plan { list-style: none; padding: 0; margin: 12px 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.refresher-plan li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.refresher-code { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--info); flex: none; }
+.refresher-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.refresher-body a { overflow-wrap: anywhere; }
+.refresher-plan .rating-pill { flex: none; }
+.rating-pill { display: inline-block; min-width: 2.6em; text-align: center; font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 6px; border: 1px solid transparent; }
+.rating-pill.rating-great { background: var(--good-fill); color: var(--on-good-fill); }
+.rating-pill.rating-good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, var(--border)); }
+.rating-pill.rating-ok { background: var(--bg); color: var(--text); border-color: var(--border); }
+.rating-pill.rating-low { background: color-mix(in srgb, var(--bad) 12%, var(--surface)); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, var(--border)); }
+.episode-rank { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.episode-rank li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.season-chart { display: flex; align-items: flex-end; gap: 6px; height: 160px; padding-top: 4px; }
+.season-col { flex: 1 1 0; max-width: 64px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; }
+.season-chart.dense { gap: 2px; }
+.season-chart.dense .season-bar { border-radius: 3px 3px 1px 1px; }
+.season-chart.dense .season-value, .season-chart.dense .season-label { white-space: nowrap; font-size: 0.68rem; }
+.season-value:empty, .season-label:empty { visibility: hidden; }
+.season-value:empty::before, .season-label:empty::before { content: "\00a0"; }
+.season-bar { display: block; width: 100%; min-height: 4px; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
+.season-value { font-size: 0.75rem; font-weight: 650; font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+.season-label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+.season-col.best .season-bar { background: var(--good-fill); }
+.season-col.best .season-value { color: var(--good); }
+.season-col.worst .season-bar { background: color-mix(in srgb, var(--bad) 65%, var(--surface)); }
+.season-col.worst .season-value { color: var(--bad); }
+.chart-legend { display: flex; align-items: center; gap: 4px; margin: 8px 0 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.swatch.best { background: var(--good-fill); }
+.swatch.worst { background: color-mix(in srgb, var(--bad) 65%, var(--surface)); margin-left: 8px; }
+.columns span.rating-fill-great { background: var(--good-fill); }
+.columns span.rating-fill-good { background: color-mix(in srgb, var(--good) 60%, var(--surface)); }
+.columns span.rating-fill-ok { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
+.columns span.rating-fill-low { background: color-mix(in srgb, var(--bad) 55%, var(--surface)); }
+.insight-card .columns { height: 110px; }
+

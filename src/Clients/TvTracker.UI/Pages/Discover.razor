@@ -81,20 +81,22 @@
 
     private const int Length = 30;
 
-    private static readonly (string Key, string Label, string Description)[] Lists =
+    /// <summary>The lists, in tab order; a list behind a feature flag names it, and shows only while it's on.</summary>
+    private static readonly (string Key, string Label, string Description, string? Flag)[] Lists =
     [
-        ("hidden-gems", "Hidden gems", "Highly rated shows that fly under the radar: less well known, and few TV Tracker users follow them yet."),
-        ("most-consistent", "Most consistent", "Well-rated shows whose episodes hardly ever dip."),
-        ("rollercoasters", "Rollercoasters", "Well-rated shows with the biggest swings between episodes."),
-        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes."),
-        ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for."),
-        ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less."),
-        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more)."),
-        ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good.")
+        ("hidden-gems", "Hidden gems", "Highly rated shows that fly under the radar: less well known, and few TV Tracker users follow them yet.", null),
+        ("most-consistent", "Most consistent", "Well-rated shows whose episodes hardly ever dip.", null),
+        ("rollercoasters", "Rollercoasters", "Well-rated shows with the biggest swings between episodes.", null),
+        ("best-finales", "Best finales", "Season finales that stand out most from their show's usual episodes.", null),
+        ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for.", null),
+        ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less.", null),
+        ("fan-favorites", "Fan favorites", "Loved by TV Tracker users (4.3★ or more), or by TVmaze's viewers (8.5 or more).", null),
+        ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good.", FeatureFlags.GetsGood),
+        ("great-endings", "Great endings", "Finished shows that stick the landing: a strong finale, and a final season that holds up.", FeatureFlags.Endings)
     ];
 
-    /// <summary>The lists shown: all of them, less those behind a feature flag that's off.</summary>
-    private (string Key, string Label, string Description)[] visible = Lists.Where(l => l.Key != "worth-the-wait").ToArray();
+    /// <summary>The lists shown: until the flags are known, only those behind none.</summary>
+    private (string Key, string Label, string Description, string? Flag)[] visible = Lists.Where(l => l.Flag is null).ToArray();
 
     private string list = Lists[0].Key;
     private string genre = "";
@@ -103,14 +105,15 @@
     private string? error;
     private string? loadedFor;
 
-    private (string Key, string Label, string Description) Selected => Lists.First(t => t.Key == list);
+    private (string Key, string Label, string Description, string? Flag) Selected => Lists.First(t => t.Key == list);
 
     protected override async Task OnInitializedAsync()
     {
-        if (await Flags.IsEnabledAsync(FeatureFlags.GetsGood))
-        {
-            visible = Lists;
-        }
+        // Every flag at once, rather than one round trip after another.
+        var flags = Lists.Select(l => l.Flag).OfType<string>().Distinct().ToList();
+        var enabled = await Task.WhenAll(flags.Select(Flags.IsEnabledAsync));
+        var on = flags.Where((_, i) => enabled[i]).ToHashSet();
+        visible = Lists.Where(l => l.Flag is null || on.Contains(l.Flag)).ToArray();
 
         try
         {
@@ -165,6 +168,7 @@
             "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
             "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from TV Tracker users",
             "worth-the-wait" => $"Gets good here: rated {item.Value:0.0} higher from this episode on",
+            "great-endings" => $"Finale rated {Format.Rating(item.Value)}",
             _ => null
         };
         return string.Join(" · ", new[] { rating, detail }.Where(s => s is not null));

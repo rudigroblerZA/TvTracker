@@ -257,6 +257,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **No probability:** per-person history is too thin for an honest one.
   - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
     the user's record from as far in, and the show's drop-off point when it's ahead of them.
+- **Previously on…** (`RefresherApi`): a rewatch for coming back after a break, computed on request from the caller's
+  own watches.
+  - **Due:** 120+ days since the last watch, with aired episodes ahead or a new episode or season scheduled. Up Next's
+    list looks only at followed shows.
+  - **Only watched episodes:** picking from what the user has seen is what makes it spoiler-proof, so titles show.
+    (Recaps from TVmaze's summaries were the other idea; summaries of past episodes would have needed trimming.)
+  - **Picks, in order:** where they left off (always in), that season's premiere, the episode before, the season's top
+    two, last season's finale and top two, then the rest by rating. Taken greedily while they fit the budget plus
+    Tonight's overrun (max(5 min, budget/12)). Two-parters use the essential cut's pattern.
+  - **Ratings:** the user's own stars × 2 outrank the provider's; a refresher is about what they remember.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
@@ -280,6 +290,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     Only shows with a creator or developer credit count: TVmaze rarely credits one on reality, talk and news shows,
     and Analytics has no kind of show to tell them apart otherwise.
   - **Kindred creators:** fingerprint similarity ≥ 0.85 and a shared signature trait, never having made a show together.
+- **Does it stick the landing?** (`LandingInsight`): ended shows only (TVmaze has no "cancelled", so a cut-short show
+  can't be told from a planned ending, and nothing is said about it).
+  - **Finale:** the last aired regular episode against the median episode: 0.3 above is strong, 0.3 below weak.
+  - **Final season:** against the median season (`RatedSeasons`: 3+ rated episodes), 0.3 below is weak, even with two
+    seasons; ranked only among 3+. Differences are rounded first, since 8.1 − 7.8 is 0.2999… in floating point.
+  - **Verdicts:** strong finale → sticks (or great finale, weaker last season); weak finale → fizzles (weak season too)
+    or the finale lets it down; in-line finale → weaker last season, or ends as it ran.
+  - **No unchecked claims:** every verdict says how the final season did, so a show whose final season has too few
+    rated episodes to count gets no verdict at all (and never reaches Great endings).
+  - **Ties:** the finale's and the final season's places are stored as counts (rated higher, lower), not a share or a
+    rank alone, so a tie reads as one ("ties for its best") rather than "higher than any other episode".
+  - **Spoiler-free:** no titles, in the panel or the Great endings list.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
   - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a
@@ -387,6 +409,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Both images are optional parts of a sync: with `ImagesMissing`, the catalog keeps the ones it has.
 - **Tags on cards:** `ShowCard` gets tags from the scoped `ShowTagStore`. It batches every card on a page into one
   `GET /api/v1/insights/tags?ids=…` call within a 50 ms window. Tags are shown only to signed-in users.
+- **Show insights layout:** `InsightHighlights` leads with up to six findings (gets good, the ending, next season,
+  coming back, consistency, the arc, finales) as cards toned good/warn/bad/info (`--good`, `--warn`, `--bad`, `--info`,
+  dark enough to read on their own 10% tint). Ratings are toned by `Format.RatingTone` (8.5+ great, 8+ good, 7+ ok).
+  The season chart marks best and weakest only among 3+ seasons, and over 12 seasons squeezes to fit (values on the
+  marked seasons only, labels every fifth).
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why

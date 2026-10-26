@@ -1,0 +1,75 @@
+@* Does an ended show stick the landing? Its finale and final season against the rest, without naming the finale. *@
+@if (Landing is { } landing)
+{
+    <div class="insight-card">
+        <h3>Does it stick the landing?</h3>
+        <p><span class="tag landing-@landing.Verdict">@Headline(landing)</span><span>@($" {Detail(landing)}")</span></p>
+        <p class="small muted">Spoiler-free: from TVmaze's ratings of the last episode and season against the rest.</p>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Landing? Landing { get; set; }
+
+    /// <summary>The verdict in words; also the highlight card's headline.</summary>
+    public static string Headline(Landing landing) => landing.Verdict switch
+    {
+        "sticks" => "Sticks the landing",
+        "great-finale" => "Great finale, weaker last season",
+        "finale-lets-down" => "The finale lets it down",
+        "fizzles" => "Fizzles out",
+        "weaker-last-season" => "Weaker last season",
+        _ => "Ends as it ran"
+    };
+
+    private static string Detail(Landing landing)
+    {
+        var typical = Format.Rating(landing.ShowMedian);
+        var rated = $"The finale rates {Format.Rating(landing.FinaleRating)}";
+        var finale = landing.Verdict is "as-it-ran" or "weaker-last-season"
+            ? $"{rated}, close to its typical episode ({typical})"
+            // Stored before the counts existed: the share of episodes it beats is all there is, until the next hourly run.
+            : landing.OtherEpisodes == 0 ? landing.FinaleBeats >= 0.5
+                ? $"{rated}, above {Format.Percent(landing.FinaleBeats)} of its episodes (typical: {typical})"
+                : $"{rated}, below {Format.Percent(1 - landing.FinaleBeats)} of its episodes (typical: {typical})"
+            : landing.RatedHigher == 0 && landing.RatedLower == landing.OtherEpisodes ? $"{rated}, higher than any other episode (typical: {typical})"
+            : landing.RatedLower == 0 && landing.RatedHigher == landing.OtherEpisodes ? $"{rated}, lower than any other episode (typical: {typical})"
+            : landing.RatedLower >= landing.RatedHigher ? $"{rated}, above {Share(landing.RatedLower, landing.OtherEpisodes)} of its episodes (typical: {typical})"
+            : $"{rated}, below {Share(landing.RatedHigher, landing.OtherEpisodes)} of its episodes (typical: {typical})";
+        return Season(landing) is { } season ? $"{finale}, and {season}." : $"{finale}.";
+    }
+
+    /// <summary>
+    /// The final season against the others: its rank among three or more ("its 2nd best of 6"), ties said as ties;
+    /// with two, whether it held up. Null when it was the only season, or stored before the counts existed.
+    /// </summary>
+    private static string? Season(Landing landing)
+    {
+        var weak = landing.Verdict is "great-finale" or "weaker-last-season" or "fizzles";
+        if (landing.SeasonsCompared == 0)
+        {
+            // Older documents: the rank, if any, without ties.
+            return landing.FinalSeasonRank is { } rank ? Rank(rank, landing.RankedSeasons) : null;
+        }
+        if (landing.SeasonsCompared == 1)
+        {
+            return weak ? "the final season rates well below the first" : "the final season holds up";
+        }
+
+        var (higher, lower, others) = (landing.SeasonsHigher, landing.SeasonsLower, landing.SeasonsCompared);
+        return higher == 0 && lower == others ? "the final season is its best"
+            : higher == 0 ? "the final season ties for its best"
+            : lower == 0 && higher == others ? "the final season is its weakest"
+            : lower == 0 ? "the final season ties for its weakest"
+            : Rank(higher + 1, others + 1);
+    }
+
+    private static string Rank(int rank, int of) =>
+        rank == 1 ? "the final season is its best" : rank == of ? "the final season is its weakest" : $"the final season is its {Ordinal(rank)} best of {of}";
+
+    /// <summary>A share that never rounds to 100% or 0% unless it is: 298 of 299 is "99%", 1 of 250 is "1%".</summary>
+    private static string Share(int count, int of) =>
+        $"{Math.Clamp(Math.Round(100.0 * count / of), count == 0 ? 0 : 1, count == of ? 100 : 99):0}%";
+
+    private static string Ordinal(int n) => n + (n % 100 is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
+}

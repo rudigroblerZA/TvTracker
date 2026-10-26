@@ -315,9 +315,5 @@ public sealed class PremiereForecaster
         .Where(d => d >= 0)
         .ToList();
 
-    private static double Predict(List<double> waits)
-    {
-        var recent = waits.TakeLast(3).Order().ToList();
-        return recent.Count % 2 == 1 ? recent[recent.Count / 2] : (recent[recent.Count / 2 - 1] + recent[recent.Count / 2]) / 2;
-    }
+    private static double Predict(List<double> waits) => InsightMath.Median(waits.TakeLast(3));
 }

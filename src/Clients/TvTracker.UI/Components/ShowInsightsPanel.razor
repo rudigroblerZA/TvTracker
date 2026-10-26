@@ -69,28 +69,16 @@
             </ul>
         }
 
+        <InsightHighlights Insights="insights" />
+
         <div class="stat-tiles">
             @if (insights.Rating.External is { } external)
             {
-                <div class="stat"><div class="stat-value">@Format.Rating(external)</div><div class="muted">TVmaze rating</div></div>
+                <div class="stat"><div class="stat-value rating-@Format.RatingTone(external)">@Format.Rating(external)</div><div class="muted">TVmaze rating</div></div>
             }
             @if (insights.Rating.Ours is { } ours)
             {
                 <div class="stat"><div class="stat-value">@Format.Stars(ours, insights.Rating.OurCount)</div><div class="muted">TV Tracker users</div></div>
-            }
-            @if (insights.BestSeason is { } best)
-            {
-                <div class="stat">
-                    <div class="stat-value">Season @best.Number</div>
-                    <div class="muted">best rated · @RatingText(best)</div>
-                </div>
-            }
-            @if (insights.WorstSeason is { } worst)
-            {
-                <div class="stat">
-                    <div class="stat-value">Season @worst.Number</div>
-                    <div class="muted">lowest rated · @RatingText(worst)</div>
-                </div>
             }
             @if (insights.Run.AiredEpisodes > 0)
             {
@@ -122,101 +110,114 @@
             }
         </div>
 
-        @if (insights.NextPremiere is { } premiere)
-        {
-            <div class="panel premiere">
-                <div class="muted small">Season @premiere.SeasonNumber premieres</div>
-                <div class="stat-value">@Format.Relative(premiere.PremieresAtUtc)</div>
-                <div><LocalTime Utc="premiere.PremieresAtUtc" /></div>
-                @if (premiere.DaysSincePreviousSeason is { } gap)
-                {
-                    <div class="muted">@Gap(gap) after the last season</div>
-                }
-                @if (premiere.CatchUpEpisodes > 0)
-                {
-                    <div>
-                        Catch up before it starts: @premiere.CatchUpEpisodes episodes, @Format.Duration(premiere.CatchUpRuntimeMinutes)
-                    </div>
-                }
-            </div>
-        }
-
-        @{ var ratedSeasons = insights.Seasons.Where(s => s.Rating.External is not null).ToList(); }
-        @if (ratedSeasons.Count > 1)
-        {
-            <h3>Season by season</h3>
-            @if (insights.Trend is { } trend)
+        <div class="insight-grid">
+            @{ var ratedSeasons = insights.Seasons.Where(s => s.Rating.External is not null).ToList(); }
+            @if (ratedSeasons.Count > 1)
             {
-                <p class="muted">@Format.Trend(trend)</p>
-            }
-            // Scaled across this show's range (not 0-10), so a one-point difference between seasons is visible.
-            var low = ratedSeasons.Min(s => s.Rating.External!.Value) - 0.5;
-            var high = ratedSeasons.Max(s => s.Rating.External!.Value);
-            <ul class="bars">
-                @foreach (var season in ratedSeasons)
-                {
-                    var rating = season.Rating.External!.Value;
-                    <li>
-                        <span class="bar-label">Season @season.Number</span>
-                        <span class="bar @(season.Number == insights.BestSeason?.Number ? "best" : "")" style="width:@BarWidth(rating, low, high)%"></span>
-                        <span class="muted small">
-                            @Format.Rating(rating)
-                            @if (season.Rating.Ours is { } seasonOurs)
-                            {
-                                <text> · @Format.Stars(seasonOurs, season.Rating.OurCount)</text>
-                            }
-                        </span>
-                    </li>
-                }
-            </ul>
-        }
-
-        @if (insights.Patterns is { } patterns && (patterns.Finales is not null || patterns.Consistency is not null || patterns.Arc is not null || patterns.SeasonBests.Count > 1))
-        {
-            <h3>Episode patterns</h3>
-            @if (patterns.Consistency is { } consistency)
-            {
-                <p><span class="tag">@Capitalize(consistency.Label)</span> @ConsistencyText(consistency)</p>
-            }
-            @if (patterns.Arc is { } arc)
-            {
-                <p>@ArcText(arc)</p>
-            }
-            @if (patterns.Finales is { } finales)
-            {
-                <p>@FinaleText(finales)</p>
-            }
-            @if (patterns.SeasonBests.Count > 1)
-            {
-                <details class="season-bests" open="@(patterns.SeasonBests.Count <= 6)">
-                    <summary>Best episode of each season</summary>
-                    <ol class="top-episodes">
-                        @foreach (var seasonBest in patterns.SeasonBests)
+                // Scaled across this show's range (not 0-10), so a one-point difference between seasons is visible.
+                var low = ratedSeasons.Min(s => s.Rating.External!.Value) - 0.5;
+                var high = ratedSeasons.Max(s => s.Rating.External!.Value);
+                // Long runs fit the card: values on the best and weakest only, labels every fifth season.
+                var dense = ratedSeasons.Count > DenseSeasons;
+                <div class="insight-card">
+                    <h3>Season by season</h3>
+                    @if (insights.Trend is { } trend)
+                    {
+                        <p class="muted small">@Format.Trend(trend)</p>
+                    }
+                    <div class="season-chart @(dense ? "dense" : "")" role="img" aria-label="@SeasonChartLabel(ratedSeasons)">
+                        @foreach (var season in ratedSeasons)
                         {
-                            <li>
-                                <span class="code">@Format.EpisodeCode(seasonBest.SeasonNumber, seasonBest.EpisodeNumber)</span>
-                                <a href="episodes/@seasonBest.EpisodeId">@seasonBest.Title</a>
-                                <span class="muted small">@Format.Rating(seasonBest.Rating)</span>
-                            </li>
+                            var rating = season.Rating.External!.Value;
+                            // Best and weakest only mean something among three or more seasons.
+                            var mark = ratedSeasons.Count < 3 ? ""
+                                : season.Number == insights.BestSeason?.Number ? "best" : season.Number == insights.WorstSeason?.Number ? "worst" : "";
+                            <div class="season-col @mark" title="@SeasonTitle(season)">
+                                <span class="season-value">@(dense && mark == "" ? "" : Format.Rating(rating))</span>
+                                <span class="season-bar" style="height:@BarWidth(rating, low, high)%"></span>
+                                <span class="season-label">@(dense && season.Number != 1 && season.Number % 5 != 0 ? "" : $"S{season.Number}")</span>
+                            </div>
                         }
-                    </ol>
-                </details>
+                    </div>
+                    @if (ratedSeasons.Count >= 3)
+                    {
+                        <p class="chart-legend small muted"><span class="swatch best"></span><span> best season </span><span class="swatch worst"></span><span> weakest</span></p>
+                    }
+                    @if (insights.Patterns?.Arc is { } arc)
+                    {
+                        <p class="small">@ArcText(arc)</p>
+                    }
+                </div>
             }
-        }
 
-        <Feature Flag="@FeatureFlags.GetsGood"><GetsGoodPanel GetsGood="insights.GetsGood" DropOff="insights.Viewing?.DropOff" /></Feature>
-        <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
-        <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>
-
-        @if (insights.Histograms is { } histograms && (histograms.OurStars is not null || histograms.ExternalEpisodes.Count > 1))
-        {
-            <h3>How it's rated</h3>
-            <div class="histograms">
-                @if (histograms.OurStars is { } stars)
-                {
-                    var most = Math.Max(1, stars.Max());
-                    <div>
-                        <div class="muted small">TV Tracker users (@stars.Sum() ratings)</div>
+            @if (insights.TopEpisodes.Count > 0 || insights.Patterns is { } || insights.Histograms is { })
+            {
+                var patterns = insights.Patterns;
+                <div class="insight-card">
+                    <h3>Episodes</h3>
+                    @if (patterns?.Consistency is { } consistency)
+                    {
+                        <p class="small">@ConsistencyText(consistency)</p>
+                    }
+                    @if (patterns?.Finales is { } finales)
+                    {
+                        <p class="small">@FinaleText(finales)</p>
+                    }
+                    @if (insights.TopEpisodes.Count > 0)
+                    {
+                        <h4>Top episodes</h4>
+                        <ol class="episode-rank">
+                            @foreach (var episode in insights.TopEpisodes)
+                            {
+                                <li>
+                                    @if (episode.Rating.External is { } r)
+                                    {
+                                        <span class="rating-pill rating-@Format.RatingTone(r)">@Format.Rating(r)</span>
+                                    }
+                                    <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                                    <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                                    @if (episode.Rating.Ours is { } o)
+                                    {
+                                        <span class="muted small">@($" · {Format.Stars(o, episode.Rating.OurCount)}")</span>
+                                    }
+                                </li>
+                            }
+                        </ol>
+                    }
+                    @if (patterns?.SeasonBests.Count > 1)
+                    {
+                        <details class="season-bests" open="@(patterns.SeasonBests.Count <= 6)">
+                            <summary>Best episode of each season</summary>
+                            <ol class="episode-rank">
+                                @foreach (var seasonBest in patterns.SeasonBests)
+                                {
+                                    <li>
+                                        <span class="rating-pill rating-@Format.RatingTone(seasonBest.Rating)">@Format.Rating(seasonBest.Rating)</span>
+                                        <span class="code">@Format.EpisodeCode(seasonBest.SeasonNumber, seasonBest.EpisodeNumber)</span>
+                                        <a href="episodes/@seasonBest.EpisodeId">@seasonBest.Title</a>
+                                    </li>
+                                }
+                            </ol>
+                        </details>
+                    }
+                    @if (insights.Histograms is { } histograms && histograms.ExternalEpisodes.Count > 1)
+                    {
+                        var most = Math.Max(1, histograms.ExternalEpisodes.Max(b => b.Count));
+                        <h4>Episodes by TVmaze rating</h4>
+                        <div class="columns" aria-label="Episodes by TVmaze rating">
+                            @foreach (var bucket in histograms.ExternalEpisodes)
+                            {
+                                <div class="column" title="@bucket.Count episodes rated @bucket.From.ToString("0.0")–@((bucket.From + 0.5).ToString("0.0"))">
+                                    <span class="rating-fill-@Format.RatingTone(bucket.From + 0.25)" style="height:@(100 * bucket.Count / most)%"></span>
+                                    <span class="column-label">@bucket.From.ToString("0.#")</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (insights.Histograms?.OurStars is { } stars)
+                    {
+                        var most = Math.Max(1, stars.Max());
+                        <h4>TV Tracker users (@stars.Sum() ratings)</h4>
                         <ul class="bars">
                             @for (var star = 5; star >= 1; star--)
                             {
@@ -227,103 +228,80 @@
                                 </li>
                             }
                         </ul>
-                    </div>
-                }
-                @if (histograms.ExternalEpisodes.Count > 1)
-                {
-                    var most = Math.Max(1, histograms.ExternalEpisodes.Max(b => b.Count));
-                    <div>
-                        <div class="muted small">Episodes by TVmaze rating</div>
-                        <div class="columns" aria-label="Episodes by TVmaze rating">
-                            @foreach (var bucket in histograms.ExternalEpisodes)
-                            {
-                                <div class="column" title="@bucket.Count episodes rated @bucket.From.ToString("0.0")–@((bucket.From + 0.5).ToString("0.0"))">
-                                    <span style="height:@(100 * bucket.Count / most)%"></span>
-                                    <span class="column-label">@bucket.From.ToString("0.#")</span>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
-            </div>
-        }
-
-        @if (insights.Viewing is { } viewing && (viewing.Seasons.Count > 0 || viewing.DropOff is not null))
-        {
-            <h3>Who's watching</h3>
-            @if (viewing.DropOff is { } drop)
-            {
-                <p>
-                    Most viewers who stop do so after
-                    <strong>@Format.EpisodeCode(drop.SeasonNumber, drop.EpisodeNumber) @drop.Title</strong>
-                    <span class="muted">(@Format.Percent(drop.Share) of viewers)</span>.
-                </p>
-            }
-            @if (viewing.Seasons.Count > 1)
-            {
-                var most = Math.Max(1, viewing.Seasons.Max(s => s.Viewers));
-                <ul class="bars">
-                    @foreach (var season in viewing.Seasons)
-                    {
-                        <li>
-                            <span class="bar-label">Season @season.Number</span>
-                            <span class="bar" style="width:@(100 * season.Viewers / most)%"></span>
-                            <span class="muted small">@season.Viewers viewers</span>
-                        </li>
                     }
-                </ul>
+                </div>
             }
-        }
 
-        @if (insights.TopEpisodes.Count > 0)
-        {
-            <h3>Top episodes</h3>
-            <ol class="top-episodes">
-                @foreach (var episode in insights.TopEpisodes)
-                {
-                    <li>
-                        <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
-                        <a href="episodes/@episode.EpisodeId">@episode.Title</a>
-                        <span class="muted small">
-                            @if (episode.Rating.External is { } r) { <text>@Format.Rating(r)</text> }
-                            @if (episode.Rating.Ours is { } o) { <text> · @Format.Stars(o, episode.Rating.OurCount)</text> }
-                        </span>
-                    </li>
-                }
-            </ol>
-        }
+            <Feature Flag="@FeatureFlags.GetsGood"><GetsGoodPanel GetsGood="insights.GetsGood" DropOff="insights.Viewing?.DropOff" /></Feature>
+            <Feature Flag="@FeatureFlags.Endings"><LandingPanel Landing="insights.Landing" /></Feature>
+            <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>
+            <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
 
-        @if (insights.Run.LongestBreak is { Days: > 180 } pause)
-        {
-            <p class="muted">Longest break: @Gap(pause.Days) between seasons @pause.AfterSeason and @pause.BeforeSeason.</p>
-        }
+            @if (insights.Viewing is { } viewing && (viewing.Seasons.Count > 0 || viewing.DropOff is not null))
+            {
+                <div class="insight-card">
+                    <h3>Who's watching</h3>
+                    @if (viewing.DropOff is { } drop)
+                    {
+                        <p>
+                            Most viewers who stop do so after
+                            <strong>@Format.EpisodeCode(drop.SeasonNumber, drop.EpisodeNumber) @drop.Title</strong>
+                            <span class="muted">(@Format.Percent(drop.Share) of viewers)</span>.
+                        </p>
+                    }
+                    @if (viewing.Seasons.Count > 1)
+                    {
+                        var most = Math.Max(1, viewing.Seasons.Max(s => s.Viewers));
+                        <ul class="bars">
+                            @foreach (var season in viewing.Seasons)
+                            {
+                                <li>
+                                    <span class="bar-label">Season @season.Number</span>
+                                    <span class="bar" style="width:@(100 * season.Viewers / most)%"></span>
+                                    <span class="muted small">@season.Viewers viewers</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
 
-        @if (insights.SharedCast.Count > 0)
-        {
-            <h3>Shared cast</h3>
-            <ul class="shared-cast">
-                @foreach (var shared in insights.SharedCast)
-                {
-                    <li>
-                        @if (shared.PersonId is { } personId)
-                        {
-                            <a href="people/@personId"><strong>@shared.PersonName</strong></a>
-                        }
-                        else
-                        {
-                            <strong>@shared.PersonName</strong>
-                        }
-                        @(shared.SameCharacter ? " also appears as " : " is also in ")
-                        <a href="shows/@shared.OtherShowId">@shared.OtherShowTitle</a>
-                        @if (!string.IsNullOrEmpty(shared.CharacterThere))
-                        {
-                            @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
-                            <span class="muted"> (@shared.CharacterThere)</span>
-                        }
-                    </li>
-                }
-            </ul>
-        }
+            @if (insights.SharedCast.Count > 0 || insights.Run.LongestBreak is { Days: > 180 })
+            {
+                <div class="insight-card">
+                    @if (insights.SharedCast.Count > 0)
+                    {
+                        <h3>Shared cast</h3>
+                        <ul class="shared-cast">
+                            @foreach (var shared in insights.SharedCast)
+                            {
+                                <li>
+                                    @if (shared.PersonId is { } personId)
+                                    {
+                                        <a href="people/@personId"><strong>@shared.PersonName</strong></a>
+                                    }
+                                    else
+                                    {
+                                        <strong>@shared.PersonName</strong>
+                                    }
+                                    @(shared.SameCharacter ? " also appears as " : " is also in ")
+                                    <a href="shows/@shared.OtherShowId">@shared.OtherShowTitle</a>
+                                    @if (!string.IsNullOrEmpty(shared.CharacterThere))
+                                    {
+                                        @* The space is inside the span: Blazor drops text nodes that are only whitespace. *@
+                                        <span class="muted"> (@shared.CharacterThere)</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (insights.Run.LongestBreak is { Days: > 180 } pause)
+                    {
+                        <p class="muted small">Longest break: @Gap(pause.Days) between seasons @pause.AfterSeason and @pause.BeforeSeason.</p>
+                    }
+                </div>
+            }
+        </div>
 
         <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
     </section>
@@ -358,6 +336,16 @@
 
     private static string RatingText(SeasonHighlight highlight) =>
         highlight.Source == "external" ? Format.Rating(highlight.Rating) : $"★ {highlight.Rating:0.0}";
+
+    /// <summary>More seasons than this, and the chart squeezes to fit rather than labelling every column.</summary>
+    private const int DenseSeasons = 12;
+
+    private static string SeasonTitle(SeasonStats season) =>
+        $"Season {season.Number}: {Format.Rating(season.Rating.External!.Value)} on TVmaze" +
+        (season.Rating.Ours is { } ours ? $", {Format.Stars(ours, season.Rating.OurCount)} from TV Tracker users" : "");
+
+    private static string SeasonChartLabel(List<SeasonStats> seasons) =>
+        "Season ratings on TVmaze: " + string.Join(", ", seasons.Select(s => $"season {s.Number} {Format.Rating(s.Rating.External!.Value)}"));
 
     private static int BarWidth(double rating, double low, double high) =>
         high <= low ? 100 : (int)Math.Round(10 + 90 * (rating - low) / (high - low));

@@ -212,7 +212,15 @@ public record SharedCast(string PersonName, string? CharacterHere, Guid OtherSho
 public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, RatingPair Rating, IReadOnlyList<SeasonStats> Seasons,
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
-    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null);
+    EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
+    Landing? Landing = null);
+
+/// <summary>Whether an ended show sticks the landing; spoiler-free (no titles).</summary>
+/// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles", "weaker-last-season" or "as-it-ran".</param>
+/// <param name="FinalSeasonRank">The final season's rank among RankedSeasons (1 = best); null with fewer than three.</param>
+/// <param name="RatedHigher">Other episodes rated above the finale; RatedLower below; ties in neither.</param>
+public record Landing(string Verdict, double FinaleRating, double ShowMedian, double FinaleBeats, int? FinalSeasonRank, int RankedSeasons,
+    int RatedHigher = 0, int RatedLower = 0, int OtherEpisodes = 0, int SeasonsCompared = 0, int SeasonsHigher = 0, int SeasonsLower = 0);
 
 /// <summary>When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.</summary>
 public record GetsGood(bool FromTheStart, double Opening, double Settled, GetsGoodTurn? Turn);
@@ -363,3 +371,17 @@ public record MonthWatch(int Year, int Month, int Episodes, int Minutes);
 public record TasteProgress(int Finished, int Watching, int Dropped, IReadOnlyList<ProgressShow> RecentlyDropped);
 
 public record ProgressShow(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc);
+
+/// <summary>"Previously on…": a rewatch for coming back after a long break (see Analytics.API's RefresherApi).</summary>
+public record Refresher(Guid ShowId, string Title, string? PosterUrl, bool Due, DateTime LastWatchedAtUtc, int DaysSince,
+    RefresherEpisode LeftOff, RefresherAhead Ahead, RefresherReturn? Returns, int BudgetMinutes, int PlanMinutes,
+    IReadOnlyList<RefresherEpisode> Plan);
+
+/// <param name="Why">"left-off", "season-premiere", "before-you-stopped", "season-best", "last-season-finale",
+/// "last-season-best" or "two-parter".</param>
+public record RefresherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes, double? Rating,
+    int? YourStars, string Why);
+
+public record RefresherAhead(int Episodes, int Minutes, Guid? NextEpisodeId, int? NextSeason, int? NextEpisode);
+
+public record RefresherReturn(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
