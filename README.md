@@ -269,7 +269,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -330,6 +330,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
+| Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
@@ -341,7 +342,7 @@ How events flow:
 
 - **Catalog.SyncWorker** publishes `ShowAdded`, `ShowUpdated`, `EpisodesScheduled` (one per show sync, up to 500 episodes each), `EpisodeAired`, `SeasonAnnounced`, `ShowStatusChanged`.
 - **Tracking.API** publishes `ShowFollowed`, `ShowUnfollowed`, `EpisodeWatched`, `EpisodeUnwatched`, `ShowCompleted`.
-- **Ratings.API** publishes `ShowRated`, `EpisodeRated`, `ShowRatingRemoved`, `EpisodeRatingRemoved`. **Identity.API** publishes `UserRegistered`, `UserProfileUpdated`, `UserDeleted`.
+- **Ratings.API** publishes `ShowRated`, `EpisodeRated`, `ShowRatingRemoved`, `EpisodeRatingRemoved`. **Identity.API** publishes `UserRegistered`, `UserProfileUpdated`, `UserDeleted`, and a daily `UserProfileSnapshot` per user.
 - Events are saved in each service's outbox table in the same transaction as the change, then published; a background publisher retries anything left behind.
 - Consumers record processed event ids, so redelivered events are ignored.
 - **Analytics.Worker** keeps its own copy of the catalog and of our users' ratings, watched episodes and follows from
@@ -588,12 +589,28 @@ How events flow:
     - Shows you're caught up on, watching, or dropped (nothing watched for 30 days).
 
   Watched events carry the time the user watched, so episodes the mobile app marks while offline count in the right month.
+- **Social.API** builds the feed from Tracking's and Ratings' events (watched, finished, followed a show, rated a show),
+  keeps show titles and episode numbers from the catalog (asking the sync worker for a replay on its first start, like
+  Analytics), and names from Identity's events and daily snapshots.
+  - **Following people:** one way, no approval. Search by name at `/feed/people`; each person has a page at `/users/{id}`.
+  - **The feed** (`/feed`, in the menu): what the people you follow watched, finished, started following and rated,
+    newest first. Episodes of one show watched within 6 hours are one item ("S02E01–S02E04 · 4 episodes"). Episode
+    titles are never shown: a follower may not have seen them.
+  - **Taken back:** unwatching, unfollowing a show or removing a rating takes it out of the feed. A follow that comes
+    with a watch of the same show (watching follows it) is shown as the watch only.
+  - **Privacy:** Settings → Social, "Share what I watch…", on by default. Turned off, nobody sees any of your activity,
+    including what's already in their feed; your page says you don't share. Anyone signed in can find and follow you.
+  - **Data:** included in the data export and deleted with the account. Behind the `social` flag.
+  - **API:** `GET /api/v1/feed?before=…`, `GET /api/v1/people?q=…`, `GET /api/v1/people/{id}`,
+    `POST|DELETE /api/v1/people/{id}/follow`, `GET /api/v1/people/{id}/followers|following`, `GET /api/v1/me/social`,
+    `PUT /api/v1/me/social/settings` on Social.API (port 5111), all signed in.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 
 ## Database schema
 
-Catalog, Analytics and Recommendations use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`,
-`Recommendations.API/Data/Migrations`); Catalog.API, Analytics.API and Recommendations.API apply them at startup. The
+Catalog, Analytics, Recommendations and Social use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`,
+`Recommendations.API/Data/Migrations`, `Social.API/Data/Migrations`); Catalog.API, Analytics.API, Recommendations.API
+and Social.API apply them at startup. The
 other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
 Recommendations' first migration (`InitialCreate`) is its `EnsureCreated` schema, so a database made before it moved
 to migrations is marked as having it and upgraded in place.
@@ -607,6 +624,8 @@ dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --ou
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 # or, for Recommendations:
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
+# or, for Social:
+dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 ```
 
 **Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database
@@ -640,4 +659,5 @@ Run `aspire update` (or `dotnet list package --outdated`) to bring them up to da
 
 ## Not built yet
 
-Social.API (friends, activity feed, shared lists) and the weekly digest email are planned for a later round.
+Shared lists (lists your followers can see) and the weekly digest email are planned for a later round. Social.API
+has following and the activity feed.

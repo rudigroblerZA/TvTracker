@@ -27,6 +27,7 @@ var ratingsDb = postgres.AddDatabase("ratingsdb");
 var recommendationsDb = postgres.AddDatabase("recommendationsdb");
 var notificationsDb = postgres.AddDatabase("notificationsdb");
 var analyticsDb = postgres.AddDatabase("analyticsdb");
+var socialDb = postgres.AddDatabase("socialdb");
 
 var redis = builder.AddRedis("redis");
 
@@ -125,12 +126,21 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
     .WaitFor(analyticsApi)
     .WithHttpHealthCheck("/health");
 
+// Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
+var socialApi = builder.AddProject<Projects.Social_API>("social-api")
+    .WithReference(socialDb).WaitFor(socialDb)
+    .WithReference(eventBus).WaitFor(eventBus)
+    .WithReference(flagd)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithHttpHealthCheck("/health");
+
 // The data export collects each service's data for the user.
 identityApi
     .WithReference(trackingApi)
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
-    .WithReference(notificationsApi);
+    .WithReference(notificationsApi)
+    .WithReference(socialApi);
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.
@@ -143,6 +153,7 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WaitFor(recommendationsApi)
     .WaitFor(notificationsApi)
     .WaitFor(analyticsWorker)
+    .WaitFor(socialApi)
     .WithHttpHealthCheck("/health");
 
 // The embedding model for semantic search: the "Embeddings" section of the AppHost's configuration (Model, and any
@@ -196,6 +207,7 @@ catalogApi.WithReference(analyticsApi);
 
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);
+socialApi.WithReference(catalogSync);
 
 // ---------------------------------------------------------------------------
 // Gateways and clients
@@ -211,7 +223,8 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
     .WithReference(notificationsApi)
-    .WithReference(analyticsApi);
+    .WithReference(analyticsApi)
+    .WithReference(socialApi);
 
 builder.AddProject<Projects.WebApp>("webapp")
     .WithExternalHttpEndpoints()
@@ -226,6 +239,7 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
     .WithReference(notificationsApi)
-    .WithReference(analyticsApi);
+    .WithReference(analyticsApi)
+    .WithReference(socialApi);
 
 builder.Build().Run();

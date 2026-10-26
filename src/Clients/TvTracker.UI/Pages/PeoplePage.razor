@@ -1,0 +1,122 @@
+@page "/feed/people"
+@attribute [RequiresFeature(FeatureFlags.Social)]
+@inject SocialClient Social
+
+<PageTitle>People · TV Tracker</PageTitle>
+
+<p><a href="feed">← Feed</a></p>
+<h1>People</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <form class="search-form" @onsubmit="SearchAsync">
+            <label class="sr-only" for="people-search">Find people by name</label>
+            <input id="people-search" type="search" placeholder="Find people by name" @bind="query" />
+            <button class="btn" type="submit">Search</button>
+        </form>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (results is not null)
+        {
+            <section>
+                <h2>Results</h2>
+                @if (results.Count == 0)
+                {
+                    <p class="muted">Nobody by that name.</p>
+                }
+                else
+                {
+                    <ul class="people">
+                        @foreach (var person in results)
+                        {
+                            <PersonRow @key="person.UserId" Person="person" />
+                        }
+                    </ul>
+                }
+            </section>
+        }
+
+        <section>
+            <h2>Following <span class="muted small">@following?.Count</span></h2>
+            @if (following is { Count: > 0 })
+            {
+                <ul class="people">
+                    @foreach (var person in following)
+                    {
+                        <PersonRow @key="person.UserId" Person="person" />
+                    }
+                </ul>
+            }
+            else if (following is not null)
+            {
+                <p class="muted">You don't follow anyone yet. Search for friends above.</p>
+            }
+        </section>
+
+        <section>
+            <h2>Followers <span class="muted small">@followers?.Count</span></h2>
+            @if (followers is { Count: > 0 })
+            {
+                <ul class="people">
+                    @foreach (var person in followers)
+                    {
+                        <PersonRow @key="person.UserId" Person="person" />
+                    }
+                </ul>
+            }
+            else if (followers is not null)
+            {
+                <p class="muted">No followers yet.</p>
+            }
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to find and follow people." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private string query = "";
+    private List<SocialPerson>? results;
+    private List<SocialPerson>? following;
+    private List<SocialPerson>? followers;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            if (await Social.GetMeAsync() is { } me)
+            {
+                following = await Social.GetFollowingAsync(me.UserId) ?? [];
+                followers = await Social.GetFollowersAsync(me.UserId) ?? [];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (query.Trim().Length < 2)
+        {
+            results = null;
+            return;
+        }
+
+        try
+        {
+            results = await Social.SearchAsync(query.Trim()) ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

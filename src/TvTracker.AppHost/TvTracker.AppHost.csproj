@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" />
     <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />
     <ProjectReference Include="..\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
+    <ProjectReference Include="..\Services\Social\Social.API\Social.API.csproj" />
     <ProjectReference Include="..\Services\Notifications\Notifications.API\Notifications.API.csproj" />
     <ProjectReference Include="..\Services\Analytics\Analytics.API\Analytics.API.csproj" />
     <ProjectReference Include="..\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />

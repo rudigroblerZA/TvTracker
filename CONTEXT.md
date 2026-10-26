@@ -23,6 +23,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
 | Ratings.API | ratings, comments, reactions | |
 | Recommendations.API | picks, dismissals | |
+| Social.API | follows between users, activity feed, "share my activity" | copies of show titles, episode numbers and names from events; behind the `social` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
@@ -405,6 +406,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why distinctive traits:** similarity alone pairs every hour-long weekly drama with every other one.
   - **Computed on request** from all DNA rows (a few hundred), cached 30 minutes like similar shows.
 
+## Social
+
+- **Following, not friending** (a product decision): one way, no approval, like Letterboxd. Privacy is the followed
+  user's "share my activity" setting, on by default; off hides all of their items at once, past ones too, because the
+  feed checks it at read time rather than copying items to followers.
+- **Read-time feed:** items are stored once per actor (`activities`) and the feed is a query over the people you follow.
+  That keeps unsharing, unfollowing and deletion instant; a fan-out copy per follower would need them propagated.
+- **Items:** watched (episodes of one show within 6 hours merge, so a binge is one line), finished, followed a show,
+  rated a show (a re-rate within a day replaces it). Undo events take items back out.
+  - **Follow with a watch:** watching an unfollowed show follows it too, so a follow within the watch's 6 hours is
+    dropped, in either order of arrival.
+  - **No episode titles:** only numbers, since a follower may not have seen the episode. The copy keeps no titles.
+- **Copies:** shows and episode numbers from catalog events (replay requested on first start, as Analytics does);
+  display names from `UserRegistered` / `UserProfileUpdated` and Identity's daily `UserProfileSnapshot`, which exists
+  because Social started after most users registered. Until one arrives, the token's `name` claim stands in.
+- **History:** activity from before Social existed isn't replayed; the feed fills from then on.
+- **Search:** by display name, for anyone signed in. With one-way following there's no hidden profile yet.
+
 ## Tonight's plan
 
 - **Split across services:**
@@ -469,7 +488,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics and Recommendations use EF Core migrations, applied at startup by their API.
+- **Migrations:** Catalog, Analytics, Recommendations and Social use EF Core migrations, applied at startup by their API.
   The other services still use `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
@@ -484,5 +503,5 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - There are no tests and no CI.
 - There's no dead-letter queue.
 - The MAUI app has never been compiled.
-- Social.API and the weekly digest email aren't built yet.
+- Shared lists and the weekly digest email aren't built yet. Social has no blocking or hidden profiles yet.
 - Development secrets are in `AppHost.cs` and the realm file.
