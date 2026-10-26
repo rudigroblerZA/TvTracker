@@ -1,0 +1,39 @@
+@implements IDisposable
+@inject SpoilerShield Shield
+
+@* Wraps a title, summary or still of an episode. While the spoiler shield is on and the user hasn't watched it, a
+   placeholder shows instead; selecting it reveals this one. *@
+@if (!Hidden || !shieldOn || revealed)
+{
+    @ChildContent
+}
+else
+{
+    <button type="button" class="spoiler-hidden" @onclick="() => revealed = true" title="Hidden by the spoiler shield. Select to show.">@Placeholder</button>
+}
+
+@code {
+    /// <summary>Whether this is a spoiler for the user: an episode they haven't watched.</summary>
+    [Parameter] public bool Hidden { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "Title hidden";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool shieldOn;
+    private bool revealed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Shield.Changed += OnChanged;
+        shieldOn = await Shield.IsOnAsync();
+    }
+
+    private async void OnChanged()
+    {
+        shieldOn = await Shield.IsOnAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Shield.Changed -= OnChanged;
+}

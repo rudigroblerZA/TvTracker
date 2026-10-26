@@ -4,6 +4,7 @@
 @inject UserSession Session
 @inject IPlatformServices Platform
 @inject IAuthActions Auth
+@inject SpoilerShield Shield
 
 <PageTitle>Settings · TV Tracker</PageTitle>
 
@@ -102,6 +103,17 @@
             }
         </section>
 
+        <Feature Flag="@FeatureFlags.SpoilerShield">
+            <section class="panel">
+                <h2>Spoiler shield</h2>
+                <label class="checkbox">
+                    <input type="checkbox" checked="@spoilerShield" @onchange="e => SetSpoilerShieldAsync(e.Value is true)" />
+                    Hide titles and summaries of episodes I haven't watched
+                </label>
+                <p class="muted small">On this device or browser. A hidden title shows when you select it.</p>
+            </section>
+        </Feature>
+
         <section class="panel">
             <h2>Your data</h2>
             <div class="actions">
@@ -131,6 +143,14 @@
 </AuthorizeView>
 
 @code {
+    private bool spoilerShield;
+
+    private async Task SetSpoilerShieldAsync(bool on)
+    {
+        spoilerShield = on;
+        await Shield.SetAsync(on);
+    }
+
     private Profile? profile;
     private string displayName = "";
     private string? avatarUrl;
@@ -148,6 +168,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        spoilerShield = await Shield.IsOnAsync();
         try
         {
             await Session.EnsureLoadedAsync();

@@ -1,0 +1,121 @@
+@page "/time-off"
+@attribute [RequiresFeature(FeatureFlags.TimeOff)]
+@inject AnalyticsClient Analytics
+@inject NavigationManager Navigation
+
+<PageTitle>Fits your time off · TV Tracker</PageTitle>
+
+<h1>Fits your time off</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">A holiday, a long weekend, a week off: finished shows you can watch from start to end in the time you have, so you get the ending too.</p>
+
+        <div class="chips" role="group" aria-label="How much time you have">
+            @foreach (var (value, label) in Budgets)
+            {
+                <button type="button" class="chip @(hours == value ? "active" : null)" aria-pressed="@(hours == value)" @onclick="() => Go(value)">@label</button>
+            }
+            <label class="inline small">
+                <span class="sr-only">Hours</span>
+                <input type="number" min="2" max="200" value="@hours" @onchange="e => Go(int.TryParse(e.Value?.ToString(), out var h) ? Math.Clamp(h, 2, 200) : hours)" /> hours
+            </label>
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (result is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Finding shows that fit…</p>
+            }
+        }
+        else if (result.Fits.Count == 0 && result.Mix is null)
+        {
+            <p class="notice">Nothing finished fits @hours hours that you haven't started. Try more time.</p>
+        }
+        else
+        {
+            @if (result.Mix is { } mix)
+            {
+                <section class="time-off-mix insight-card">
+                    <h2>A mix that fills it</h2>
+                    <p class="muted small">@mix.Shows.Count shows, @Format.Hours(mix.Minutes)@(mix.Minutes > hours * 60 ? $": a little over your {hours} hours." : $" of your {hours} hours.")</p>
+                    <ul class="backlog-list">
+                        @foreach (var show in mix.Shows)
+                        {
+                            @Item(show)
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (result.Fits.Count > 0)
+            {
+                <section class="backlog-group">
+                    <h2>One show, start to finish</h2>
+                    <ul class="backlog-list">
+                        @foreach (var show in result.Fits)
+                        {
+                            @Item(show)
+                        }
+                    </ul>
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to find finished shows that fit your time off." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly (int Hours, string Label)[] Budgets = [(6, "A day"), (12, "A weekend"), (20, "A long weekend"), (40, "A week off")];
+
+    [SupplyParameterFromQuery] public int? Hours { get; set; }
+
+    private int hours = 20;
+    private TimeOff? result;
+    private string? error;
+
+    protected override Task OnParametersSetAsync()
+    {
+        hours = Math.Clamp(Hours ?? 20, 2, 200);
+        return LoadAsync();
+    }
+
+    private void Go(int value) => Navigation.NavigateTo($"time-off?hours={value}");
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        result = null;
+        try
+        {
+            result = await Analytics.GetTimeOffAsync(hours);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private RenderFragment Item(TimeOffShow show) =>
+        @<li @key="show.ShowId" class="tone-@(show.Landing is "sticks" or "great-finale" ? "good" : "info")">
+            <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
+            <div class="backlog-body">
+                <a class="strong" href="shows/@show.ShowId">@show.Title</a>
+                <div class="muted small">
+                    <span>@(show.Episodes == 1 ? "1 episode" : $"{show.Episodes} episodes") · @Format.Hours(show.Minutes)@(show.Limited ? " · limited series" : "")</span>
+                </div>
+                <ul class="backlog-reasons">
+                    @foreach (var reason in show.Reasons)
+                    {
+                        <li>@reason</li>
+                    }
+                </ul>
+            </div>
+            <span class="rating-pill rating-@Format.RatingTone(show.Value)" title="Worth your time, out of 10">@Format.Rating(show.Value)</span>
+        </li>;
+}

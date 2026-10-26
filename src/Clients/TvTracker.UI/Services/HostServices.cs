@@ -30,6 +30,12 @@ public interface IPlatformServices
 
     /// <summary>Saves or shares a text file (used for the data export).</summary>
     Task SaveTextFileAsync(string fileName, string content);
+
+    /// <summary>A setting kept on this device or browser (the spoiler shield); null when never set.</summary>
+    Task<string?> GetPreferenceAsync(string key);
+
+    /// <summary>Keeps a setting on this device or browser; null removes it.</summary>
+    Task SetPreferenceAsync(string key, string? value);
 }
 
 /// <summary>Offline support. The web app uses <see cref="OnlineOnly"/>; the mobile app stores responses and queues changes in SQLite.</summary>

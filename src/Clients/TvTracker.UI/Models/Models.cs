@@ -385,3 +385,45 @@ public record RefresherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumb
 public record RefresherAhead(int Episodes, int Minutes, Guid? NextEpisodeId, int? NextSeason, int? NextEpisode);
 
 public record RefresherReturn(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
+
+/// <summary>The catch-up planner: what to watch, and at what pace, before a new season (see Analytics.API's CatchUpApi).</summary>
+/// <param name="Path">"full" or "cut": which path <paramref name="Weeks"/> follow.</param>
+public record CatchUpPlan(Guid ShowId, string Title, string? PosterUrl, CatchUpPremiere Premiere, int DaysLeft, CatchUpPath Full,
+    CatchUpPath? Cut, int YourMinutesPerWeek, string Path, IReadOnlyList<CatchUpWeek> Weeks);
+
+public record CatchUpPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc);
+
+/// <param name="Verdict">"comfortable", "doable", "tight", "behind", or null without a pace.</param>
+public record CatchUpPath(int Episodes, int Minutes, double EpisodesPerWeek, int MinutesPerWeek, string? Verdict, DateOnly? StartBy);
+
+public record CatchUpWeek(DateOnly Starts, int Minutes, IReadOnlyList<CatchUpEpisode> Episodes);
+
+public record CatchUpEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes);
+
+/// <summary>"Is it worth going back?" for a dropped show (see Analytics.API's ComebackApi).</summary>
+/// <param name="Verdict">"gets-good", "better", "same", "worse" or "unknown".</param>
+public record Comeback(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc,
+    ComebackEpisode StoppedAt, string Verdict, double? BeforeYouStopped, double? Ahead, int AheadEpisodes, int AheadMinutes,
+    ComebackFrom? BetterFrom, ComebackTurn? GetsGoodAt, double? YourAverage);
+
+public record ComebackEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title);
+
+public record ComebackFrom(int SeasonNumber, bool RestOfSeason, double Average);
+
+public record ComebackTurn(int SeasonNumber, int EpisodeNumber, int EpisodesAway, int MinutesAway);
+
+/// <summary>Backlog triage (see Analytics.API's BacklogApi).</summary>
+public record Backlog(int Minutes, int YourMinutesPerWeek, int? WeeksToClear, int LetGoMinutes, int CutSavesMinutes,
+    IReadOnlyList<BacklogShow> Shows, IReadOnlyList<Comeback> Dropped);
+
+/// <param name="Verdict">"start-next", "worth-it", "long", "ends-badly" or "let-it-go".</param>
+public record BacklogShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, int? CutMinutes, double Value,
+    string Verdict, IReadOnlyList<string> Reasons);
+
+/// <summary>"Fits your time off" (see Analytics.API's TimeOffApi).</summary>
+public record TimeOff(int BudgetMinutes, IReadOnlyList<TimeOffShow> Fits, TimeOffMix? Mix);
+
+public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, double Value, string? Landing,
+    bool Limited, IReadOnlyList<string> Reasons);
+
+public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);

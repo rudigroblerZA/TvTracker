@@ -267,6 +267,33 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     two, last season's finale and top two, then the rest by rating. Taken greedily while they fit the budget plus
     Tonight's overrun (max(5 min, budget/12)). Two-parters use the essential cut's pattern.
   - **Ratings:** the user's own stars × 2 outrank the provider's; a refresher is about what they remember.
+- **Catch-up planner** (`CatchUpApi`): for a followed show with a season premiere (a scheduled episode 1, or an
+  announced season) within 120 days, the aired episodes after the furthest watched, spread over the weeks left.
+  - **Pace:** the user's minutes over the last 8 weeks, across all shows, with each day capped at 4 hours. Bulk marks
+    ("watched up to S05E10") share one timestamp and land on one day; uncapped, seeding three shows read as 15 h a week.
+  - **Verdicts** compare the minutes a week needed with that pace: ≤ 0.5× comfortable, ≤ 1× doable, ≤ 1.5× tight.
+  - **Cut path:** `EssentialCutApi.Decide` at "lean", offered when it saves 10%+. The cut's loading, runtimes and
+    decisions were split out of its endpoint for this; its responses for seven shows at all three levels came out
+    byte-identical.
+  - **Weeks:** split by cumulative running time, an episode going to the week where its midpoint falls.
+- **Is it worth going back?** (`ComebackApi`): for a dropped show (episodes left, nothing watched for
+  `StoppedAfterDays`), what's left against the last 10 rated episodes watched.
+  - **Why that stretch:** it's likely why they stopped; against the whole show, a strong opening hides a slump.
+  - **Order:** a slow start's turn still ahead wins ("gets good"), then the first later season (or the rest of the
+    current one) 0.3+ higher ("better"), then all of what's left 0.3+ lower ("worse"), else "same". Parts need 3 rated
+    episodes. Ratings are the essential cut's.
+  - **TVmaze is flat on some shows:** Breaking Bad's seasons all rate 8.1-8.3, so it's honestly "more of the same".
+- **Show value** (`ShowValue`, shared by the backlog and time off): the provider's rating + 0.6 × (share of the show's
+  genres the user likes − 0.5) + an ending adjustment (sticks/great finale +0.3, weaker last season −0.1, finale lets
+  down −0.3, fizzles −0.5). On the rating's scale, so thresholds read as ratings (let go under 7, time off from 7.3).
+  - **Liked genres:** of shows rated 4+ or 80% watched; with four or more such shows a genre needs two.
+  - **Simple on purpose:** every part is shown as a reason. Recommendations' scores live in another service and are
+    relative to the user's list, so they aren't reused.
+- **Backlog triage** (`BacklogApi`): followed shows with nothing watched. Analytics has no copy of Tracking's watch
+  status (`ShowFollowed` carries none), and "plan to watch" mostly means exactly that.
+- **Fits your time off** (`TimeOffApi`): ended, unstarted shows within the budget plus Tonight's overrun. The mix is
+  the best pair or triple of the top 30 by Σ minutes × (value − 6.5), shown only when it fills 60%+ and more than the
+  best single show.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,
@@ -414,6 +441,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   dark enough to read on their own 10% tint). Ratings are toned by `Format.RatingTone` (8.5+ great, 8+ good, 7+ ok).
   The season chart marks best and weakest only among 3+ seasons, and over 12 seasons squeezes to fit (values on the
   marked seasons only, labels every fifth).
+- **Spoiler shield:** `SpoilerShield` (scoped) reads a device preference through `IPlatformServices` (localStorage
+  on the web, MAUI `Preferences` on the phone). `<Spoiler Hidden=…>` swaps hidden content for a "Title hidden" button.
+  Per device by design, and it needed no column in Identity, which still uses `EnsureCreated`.
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why

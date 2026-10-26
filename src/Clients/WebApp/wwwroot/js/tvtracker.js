@@ -2,6 +2,17 @@
 window.tvtracker = {
     timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
 
+    // Device settings (the spoiler shield). Storage can be blocked (private windows), which reads as unset.
+    getPreference: (key) => {
+        try { return localStorage.getItem("tvtracker." + key); } catch { return null; }
+    },
+    setPreference: (key, value) => {
+        try {
+            if (value === null) localStorage.removeItem("tvtracker." + key);
+            else localStorage.setItem("tvtracker." + key, value);
+        } catch { }
+    },
+
     downloadText: (fileName, text) => {
         const blob = new Blob([text], { type: "application/json" });
         const link = document.createElement("a");

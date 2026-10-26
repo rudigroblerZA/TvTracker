@@ -37,7 +37,7 @@
                             <li class="@(item.Watched ? "watched" : "")">
                                 <span class="time">@Session.ToLocal(item.Episode.AirsAtUtc!.Value).ToString("HH:mm")</span>
                                 <a href="shows/@item.ShowId" class="strong">@item.ShowTitle</a>
-                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber) · @item.Episode.Title</a>
+                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber)</a><Spoiler Hidden="!item.Watched">@(" · " + item.Episode.Title)</Spoiler>
                                 @if (item.Watched)
                                 {
                                     <span class="tag">Watched</span>

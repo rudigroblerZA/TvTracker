@@ -34,6 +34,22 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
         return Task.FromResult(id);
     }
 
+    public Task<string?> GetPreferenceAsync(string key) =>
+        Task.FromResult(Preferences.Default.ContainsKey(key) ? Preferences.Default.Get<string?>(key, null) : null);
+
+    public Task SetPreferenceAsync(string key, string? value)
+    {
+        if (value is null)
+        {
+            Preferences.Default.Remove(key);
+        }
+        else
+        {
+            Preferences.Default.Set(key, value);
+        }
+        return Task.CompletedTask;
+    }
+
     public bool SupportsPush => pushTokens.IsConfigured;
 
     public async Task<bool> EnablePushAsync()

@@ -263,7 +263,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -424,6 +424,49 @@ How events flow:
     - **Up Next:** followed shows due one, the ones coming back soonest first, each linking to its refresher.
     - **API:** `GET /api/v1/shows/{id}/refresher?minutes=120` (204 when there's nothing to go back to) and
       `GET /api/v1/me/refreshers` on Analytics.API, signed in, computed on request from your own watches.
+  - **Catch-up planner** (show page, signed in; "Before the premiere" on Up Next): for a followed show with a new
+    season in the next 120 days, what's left to watch first and a week-by-week plan to get there.
+    - **What's left:** everything aired after the furthest episode you've watched (all of it for a show you haven't
+      started), with its hours.
+    - **The pace:** "About 3 episodes (2 h) a week", against your own: what you've watched across all shows over the
+      last 8 weeks. Verdicts: comfortable (half your pace or less), doable, tight (up to 1.5×) or behind, with how
+      late you'd finish at your pace. Marking old seasons all at once doesn't count as a binge: a day counts for at
+      most 4 hours.
+    - **Essential cut:** when the cut ("lean") saves 10% or more of the time, it's offered as the other path, and the
+      weeks follow it.
+    - **The weeks:** split by running time, so long episodes spread out ("This week: S05E11–E16 · 6 h"). Two show;
+      the rest open with "All N weeks".
+    - **API:** `GET /api/v1/shows/{id}/catch-up?cut=false` (204 when nothing's due or you're caught up) and
+      `GET /api/v1/me/catch-up` on Analytics.API, signed in, computed on request.
+  - **Is it worth going back?** (show page, signed in; dropped shows on the backlog): for a show you dropped (episodes
+    left, nothing watched for 30 days), whether what's left is better than where you stopped.
+    - **Compared with where you stopped:** the last 10 rated episodes you watched, not the whole show, since that
+      stretch is likely why you stopped.
+    - **Verdicts:** "It gets good soon" (a slow start's turn is still ahead: The Office at S02E03, 4 episodes on), "It
+      gets better from season 2" or "picks up later this season" (a season's remainder 0.3+ higher: Foundation), "More
+      of the same", "It doesn't recover" (0.3+ lower: Dexter after season 4), or "Hard to say" (too few ratings).
+    - **Spoiler-free:** the turn ahead is named by its number only.
+    - **API:** `GET /api/v1/shows/{id}/comeback` (204 unless you dropped it) on Analytics.API, signed in.
+  - **Backlog triage** (`/backlog`, signed in; in the menu and on Up Next): the shows you follow but haven't started,
+    ranked by how much they're likely worth your time, plus the ones you dropped.
+    - **Worth your time:** TVmaze's rating, ±0.3 for whether its genres are ones you like (from shows you rated 4+ or
+      watched 80% of), and how it ends (+0.3 sticks the landing, −0.5 fizzles). Each show lists its reasons.
+    - **Verdicts:** Start next (the best 3), Worth it, Long but worth it (40 h or more; the essential cut is offered),
+      Ends badly, and Let it go (under 7).
+    - **Totals:** the hours on your list, how long it takes at your pace, and what letting go and essential cuts save.
+    - **Dropped shows:** each with its "worth going back?" verdict.
+    - **The backlog** is followed shows with nothing watched: Analytics doesn't see Tracking's "plan to watch" status.
+    - **API:** `GET /api/v1/me/backlog` on Analytics.API, signed in.
+  - **Fits your time off** (`/time-off`, signed in; linked from Tonight's plan): finished shows you can watch start to
+    end in the time you have: a day, a weekend, a long weekend, a week off, or any number of hours.
+    - **Which shows:** ended, not started, rated to at least 7.3 for you, and not ones that fizzle out. A single show
+      fills at least a quarter of the time.
+    - **A mix:** two or three shows that fill the time better than one, when there are (Firefly and The Haunting of Hill
+      House in 20 hours).
+    - **API:** `GET /api/v1/me/time-off?hours=20` on Analytics.API, signed in, about 50 ms.
+  - **Spoiler shield** (Settings): hides titles and summaries of episodes you haven't watched, on the show page (its
+    episodes, next and latest, top episodes, season bests, when it gets good), the episode page, Up Next and the
+    calendar. A hidden title shows when you select it. It's a setting of the device or browser, not the account.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

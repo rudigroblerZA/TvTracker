@@ -1,0 +1,162 @@
+@page "/backlog"
+@attribute [RequiresFeature(FeatureFlags.BacklogTriage)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>Your backlog · TV Tracker</PageTitle>
+
+<h1>Your backlog</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">The shows you follow but haven't started, ranked by how much they're likely worth your time: their rating, whether they're your kind of show, and how they end. Plus the ones you dropped, and whether to go back.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (backlog is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Sorting your list…</p>
+            }
+        }
+        else if (backlog.Shows.Count == 0 && backlog.Dropped.Count == 0)
+        {
+            <p class="notice">Nothing waiting. Follow shows you mean to start, and they're triaged here.</p>
+        }
+        else
+        {
+            <div class="stat-tiles backlog-totals">
+                <div class="stat"><div class="stat-value">@Format.Hours(backlog.Minutes)</div><div class="muted">on your list</div></div>
+                @if (backlog.WeeksToClear is { } weeks)
+                {
+                    <div class="stat"><div class="stat-value">@Clear(weeks)</div><div class="muted">to clear at your @Format.Hours(backlog.YourMinutesPerWeek) a week</div></div>
+                }
+                @if (backlog.LetGoMinutes > 0)
+                {
+                    <div class="stat tone-good"><div class="stat-value">@Format.Hours(backlog.LetGoMinutes)</div><div class="muted">saved by letting go</div></div>
+                }
+                @if (backlog.CutSavesMinutes > 0)
+                {
+                    <div class="stat tone-good"><div class="stat-value">@Format.Hours(backlog.CutSavesMinutes)</div><div class="muted">saved by essential cuts</div></div>
+                }
+            </div>
+
+            @foreach (var (verdict, heading, blurb) in Groups)
+            {
+                var shows = backlog.Shows.Where(s => s.Verdict == verdict).ToList();
+                if (shows.Count == 0)
+                {
+                    continue;
+                }
+                <section class="backlog-group">
+                    <h2>@heading <span class="muted small">@shows.Count</span></h2>
+                    <p class="muted small">@blurb</p>
+                    <ul class="backlog-list">
+                        @foreach (var show in shows)
+                        {
+                            <li @key="show.ShowId" class="tone-@Tone(show.Verdict)">
+                                <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
+                                <div class="backlog-body">
+                                    <a class="strong" href="shows/@show.ShowId">@show.Title</a>
+                                    <div class="muted small">
+                                        <span>@(show.Episodes == 1 ? "1 episode" : $"{show.Episodes:N0} episodes") · @Format.Hours(show.Minutes)</span>
+                                        @if (show.CutMinutes is { } cut)
+                                        {
+                                            <span> · </span><a href="shows/@show.ShowId/essential-cut">essential cut: @Format.Hours(cut)</a>
+                                        }
+                                    </div>
+                                    <ul class="backlog-reasons">
+                                        @foreach (var reason in show.Reasons)
+                                        {
+                                            <li>@reason</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <span class="rating-pill rating-@Format.RatingTone(show.Value)" title="Worth your time, out of 10">@Format.Rating(show.Value)</span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (backlog.Dropped.Count > 0)
+            {
+                <Feature Flag="@FeatureFlags.WorthGoingBack">
+                    <section class="backlog-group">
+                        <h2>Dropped: worth going back? <span class="muted small">@backlog.Dropped.Count</span></h2>
+                        <p class="muted small">What's left of each, against the stretch where you stopped.</p>
+                        <ul class="backlog-list">
+                            @foreach (var c in backlog.Dropped.OrderBy(d => DroppedOrder(d.Verdict)))
+                            {
+                                <li @key="c.ShowId" class="tone-@ComebackText.Tone(c.Verdict)">
+                                    <a href="shows/@c.ShowId"><Poster Title="@c.Title" Url="@c.PosterUrl" Size="small" /></a>
+                                    <div class="backlog-body">
+                                        <a class="strong" href="shows/@c.ShowId">@c.Title</a>
+                                        <div class="muted small">
+                                            <span>Stopped at @Format.EpisodeCode(c.StoppedAt.SeasonNumber, c.StoppedAt.EpisodeNumber), @Format.Relative(c.LastWatchedAtUtc) · @Format.Hours(c.AheadMinutes) left</span>
+                                        </div>
+                                        <ComebackText Comeback="c" />
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                </Feature>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to triage the shows you mean to watch." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly (string Verdict, string Heading, string Blurb)[] Groups =
+    [
+        ("start-next", "Start next", "The best value for your time."),
+        ("worth-it", "Worth it", "Good picks, after those."),
+        ("long", "Long, but worth it", "A big commitment. The essential cut gets you the best of it in less time."),
+        ("ends-badly", "Ends badly", "Good on the way, but the ending lets it down. Go in knowing."),
+        ("let-it-go", "Let it go", "Unlikely to be worth the hours, going by its ratings and your taste.")
+    ];
+
+    private Backlog? backlog;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            backlog = await Analytics.GetBacklogAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string Tone(string verdict) => verdict switch
+    {
+        "start-next" or "worth-it" => "good",
+        "long" => "info",
+        "ends-badly" => "warn",
+        _ => "bad"
+    };
+
+    private static int DroppedOrder(string verdict) => verdict switch
+    {
+        "gets-good" => 0,
+        "better" => 1,
+        "same" => 2,
+        "unknown" => 3,
+        _ => 4
+    };
+
+    /// <summary>"6 weeks", "8 months", "2 years".</summary>
+    private static string Clear(int weeks) =>
+        weeks < 9 ? $"{weeks} week{(weeks == 1 ? "" : "s")}"
+        : weeks < 104 ? $"{Math.Round(weeks / 4.35):N0} months"
+        : $"{Math.Round(weeks / 52.0):N0} years";
+}

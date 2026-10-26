@@ -175,7 +175,7 @@
                                         <span class="rating-pill rating-@Format.RatingTone(r)">@Format.Rating(r)</span>
                                     }
                                     <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
-                                    <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                                    <Spoiler Hidden="!Seen(episode.EpisodeId)"><a href="episodes/@episode.EpisodeId">@episode.Title</a></Spoiler>
                                     @if (episode.Rating.Ours is { } o)
                                     {
                                         <span class="muted small">@($" · {Format.Stars(o, episode.Rating.OurCount)}")</span>
@@ -194,7 +194,7 @@
                                     <li>
                                         <span class="rating-pill rating-@Format.RatingTone(seasonBest.Rating)">@Format.Rating(seasonBest.Rating)</span>
                                         <span class="code">@Format.EpisodeCode(seasonBest.SeasonNumber, seasonBest.EpisodeNumber)</span>
-                                        <a href="episodes/@seasonBest.EpisodeId">@seasonBest.Title</a>
+                                        <Spoiler Hidden="!Seen(seasonBest.EpisodeId)"><a href="episodes/@seasonBest.EpisodeId">@seasonBest.Title</a></Spoiler>
                                     </li>
                                 }
                             </ol>
@@ -232,7 +232,7 @@
                 </div>
             }
 
-            <Feature Flag="@FeatureFlags.GetsGood"><GetsGoodPanel GetsGood="insights.GetsGood" DropOff="insights.Viewing?.DropOff" /></Feature>
+            <Feature Flag="@FeatureFlags.GetsGood"><GetsGoodPanel GetsGood="insights.GetsGood" DropOff="insights.Viewing?.DropOff" Watched="Watched" /></Feature>
             <Feature Flag="@FeatureFlags.Endings"><LandingPanel Landing="insights.Landing" /></Feature>
             <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>
             <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
@@ -245,7 +245,7 @@
                     {
                         <p>
                             Most viewers who stop do so after
-                            <strong>@Format.EpisodeCode(drop.SeasonNumber, drop.EpisodeNumber) @drop.Title</strong>
+                            <strong>@Format.EpisodeCode(drop.SeasonNumber, drop.EpisodeNumber)<Spoiler Hidden="true">@(" " + drop.Title)</Spoiler></strong>
                             <span class="muted">(@Format.Percent(drop.Share) of viewers)</span>.
                         </p>
                     }
@@ -312,6 +312,11 @@
 
     /// <summary>Who made the show, from the catalog; prolific creators and producers are highlighted.</summary>
     [Parameter] public IReadOnlyList<Creative>? Creatives { get; set; }
+
+    /// <summary>The episodes the user has watched, so the spoiler shield can hide the titles of the rest.</summary>
+    [Parameter] public IReadOnlySet<Guid>? Watched { get; set; }
+
+    private bool Seen(Guid episodeId) => Watched?.Contains(episodeId) == true;
 
     private ShowInsights? insights;
 
