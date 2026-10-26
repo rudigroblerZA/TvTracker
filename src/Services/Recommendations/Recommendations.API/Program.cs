@@ -28,6 +28,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeUnwatchedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowRatedIntegrationEvent, UserSignalHandler>()
     .AddSubscription<ShowRatingRemovedIntegrationEvent, UserSignalHandler>()
+    .AddSubscription<TrackingSnapshotIntegrationEvent, SnapshotHandler>()
+    .AddSubscription<RatingsSnapshotIntegrationEvent, SnapshotHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 builder.Services.AddIntegrationEventOutbox<RecommendationsContext>();
 

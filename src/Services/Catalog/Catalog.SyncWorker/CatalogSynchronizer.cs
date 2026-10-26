@@ -22,6 +22,9 @@ public sealed class CatalogSynchronizer(
 {
     private const int RefreshBatchSize = 50;
 
+    /// <summary>A show the provider calls airing, with nothing aired for this long and nothing coming, is presumed ended.</summary>
+    private const int PresumedEndedAfterYears = 4;
+
     /// <summary>Imports featured shows that aren't in the catalog yet.</summary>
     public async Task<int> ImportFeaturedAsync(CancellationToken ct)
     {
@@ -189,6 +192,27 @@ public sealed class CatalogSynchronizer(
         return updated;
     }
 
+    /// <summary>
+    /// The provider's status, except that a show it still calls airing with no episode for
+    /// <see cref="PresumedEndedAfterYears"/> years and nothing scheduled is presumed ended. TVmaze leaves some finished
+    /// shows "Running" for years (Girls, last aired 2017; Peaky Blinders, 2022), often with an undated, empty next
+    /// season, which therefore doesn't count as coming. A scheduled episode, a TBA one, or a dated season brings the
+    /// show back to airing on its next refresh.
+    /// </summary>
+    private ShowStatus StatusOf(ProviderShow p)
+    {
+        var now = time.GetUtcNow();
+        if (p.Status != ShowStatus.Airing
+            || p.Episodes.Any(e => e.AirsAtUtc is null || e.AirsAtUtc > now)
+            || p.Seasons.Any(s => s.PremieresAtUtc > now))
+        {
+            return p.Status;
+        }
+
+        var last = p.Episodes.Max(e => e.AirsAtUtc);
+        return last < now.AddYears(-PresumedEndedAfterYears) ? ShowStatus.Ended : p.Status;
+    }
+
     /// <summary>Publishes EpisodeAired for episodes whose air time has passed.</summary>
     public async Task<int> PublishAiredEpisodesAsync(CancellationToken ct)
     {
@@ -350,7 +374,7 @@ public sealed class CatalogSynchronizer(
         show.ExternalRating = p.Rating;
         show.SimilarExternalIds = p.SimilarExternalIds.ToList();
         show.SimilarShowIds = await ResolveSimilarAsync(p.SimilarExternalIds, ct);
-        show.Status = p.Status;
+        show.Status = StatusOf(p);
 
         if (!p.CastMissing)
         {

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Ratings.API.Apis;
 using Ratings.API.Data;
 using Ratings.API.IntegrationEvents;
+using Ratings.API.Services;
 using TvTracker.IntegrationEvents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeWatchedIntegrationEvent, EpisodeWatchedHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 builder.Services.AddIntegrationEventOutbox<RatingsContext>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHostedService<RatingsSnapshotPublisher>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

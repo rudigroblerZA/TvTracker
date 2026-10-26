@@ -27,6 +27,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeUnwatchedIntegrationEvent, TrackingEventHandlers>()
     .AddSubscription<ShowFollowedIntegrationEvent, TrackingEventHandlers>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, TrackingEventHandlers>()
+    .AddSubscription<TrackingSnapshotIntegrationEvent, SnapshotHandlers>()
+    .AddSubscription<RatingsSnapshotIntegrationEvent, SnapshotHandlers>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 
 // Publishes show tags for the catalog's search filter.
