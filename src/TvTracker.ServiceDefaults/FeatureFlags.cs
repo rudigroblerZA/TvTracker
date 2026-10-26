@@ -24,6 +24,11 @@ public static class FeatureFlags
     public const string TimeMachine = "time-machine";
     public const string Endings = "endings";
     public const string Refresher = "refresher";
+    public const string CatchUp = "catch-up";
+    public const string WorthGoingBack = "worth-going-back";
+    public const string BacklogTriage = "backlog-triage";
+    public const string TimeOff = "time-off";
+    public const string SpoilerShield = "spoiler-shield";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

@@ -97,42 +97,85 @@ public static class EssentialCutApi
             .ToListAsync(ct);
         var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
 
-        var ours = await db.EpisodeRatings.AsNoTracking()
-            .Where(r => r.ShowId == showId)
-            .GroupBy(r => r.EpisodeId)
-            .Where(g => g.Count() >= InsightRules.MinRatingsToShow)
-            .Select(g => new { EpisodeId = g.Key, Average = g.Average(r => r.Stars * 2.0) })
-            .ToDictionaryAsync(g => g.EpisodeId, g => g.Average, ct);
-        double? Rating(EpisodeCopy e) => (e.ExternalRating, ours.TryGetValue(e.EpisodeId, out var mine) ? mine : (double?)null) switch
-        {
-            ({ } theirs, { } us) => Math.Round((theirs + us) / 2, 1),
-            ({ } theirs, null) => theirs,
-            (null, { } us) => Math.Round(us, 1),
-            _ => null
-        };
+        var rating = await RatingsAsync(db, showId, ct);
 
         var userId = user.FindFirst("sub")?.Value;
         var watched = userId is null
             ? []
             : (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
 
-        // Missing runtimes count as the show's typical one, so the hours stay honest.
-        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
-        var typical = runtimes.Count > 0 ? runtimes[runtimes.Count / 2] : 0;
-        int Minutes(EpisodeCopy e) => e.RuntimeMinutes is > 0 ? e.RuntimeMinutes.Value : typical;
-
-        var full = new CutTotalsDto(aired.Count, aired.Sum(Minutes));
-        var rated = aired.Count(e => Rating(e) is not null);
-        string? reason = aired.Count < MinEpisodes
-            ? $"It has {aired.Count} episodes; the essential cut is for shows with {MinEpisodes} or more."
-            : rated < aired.Count * MinRatedShare
-                ? $"Only {rated} of its {aired.Count} episodes are rated, too few to tell the essential ones."
-                : null;
-        if (reason is not null)
+        var minutes = MinutesOf(aired);
+        var full = new CutTotalsDto(aired.Count, aired.Sum(minutes));
+        if (Unavailable(aired, rating) is { } reason)
         {
             return TypedResults.Ok(new EssentialCutDto(showId, show.Title, level, false, reason, full, full, [], [], null));
         }
 
+        var decisions = Decide(show, episodes, aired, rating, settings, now);
+        var seasons = aired.GroupBy(e => e.SeasonNumber)
+            .Select(g => new CutSeasonDto(
+                g.Key,
+                g.Count(),
+                g.Count(e => decisions[e.EpisodeId].Keep),
+                g.Where(e => !decisions[e.EpisodeId].Keep).Sum(minutes),
+                g.Select(e => new CutEpisodeDto(e.EpisodeId, e.EpisodeNumber, e.Title, rating(e), decisions[e.EpisodeId].Keep,
+                    decisions[e.EpisodeId].Why, watched.Contains(e.EpisodeId))).ToList()))
+            .ToList();
+        var kept = aired.Where(e => decisions[e.EpisodeId].Keep).ToList();
+
+        return TypedResults.Ok(new EssentialCutDto(
+            showId, show.Title, level, true, null,
+            full,
+            new CutTotalsDto(kept.Count, kept.Sum(minutes)),
+            seasons,
+            SkipRuns(aired, decisions, rating, minutes),
+            Progress(aired, decisions, watched, minutes)));
+    }
+
+    /// <summary>The ratings the cut goes by: the provider's, averaged with our users' once enough rated an episode.</summary>
+    internal static async Task<Func<EpisodeCopy, double?>> RatingsAsync(AnalyticsContext db, Guid showId, CancellationToken ct)
+    {
+        var ours = await db.EpisodeRatings.AsNoTracking()
+            .Where(r => r.ShowId == showId)
+            .GroupBy(r => r.EpisodeId)
+            .Where(g => g.Count() >= InsightRules.MinRatingsToShow)
+            .Select(g => new { EpisodeId = g.Key, Average = g.Average(r => r.Stars * 2.0) })
+            .ToDictionaryAsync(g => g.EpisodeId, g => g.Average, ct);
+        return e => (e.ExternalRating, ours.TryGetValue(e.EpisodeId, out var mine) ? mine : (double?)null) switch
+        {
+            ({ } theirs, { } us) => Math.Round((theirs + us) / 2, 1),
+            ({ } theirs, null) => theirs,
+            (null, { } us) => Math.Round(us, 1),
+            _ => null
+        };
+    }
+
+    /// <summary>Episode runtimes, with missing ones counted as the show's typical one so the hours stay honest.</summary>
+    internal static Func<EpisodeCopy, int> MinutesOf(List<EpisodeCopy> aired)
+    {
+        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
+        var typical = runtimes.Count > 0 ? runtimes[runtimes.Count / 2] : 0;
+        return e => e.RuntimeMinutes is > 0 ? e.RuntimeMinutes.Value : typical;
+    }
+
+    /// <summary>Why the show can't be cut (too short, or too few episodes rated); null when it can.</summary>
+    internal static string? Unavailable(List<EpisodeCopy> aired, Func<EpisodeCopy, double?> rating)
+    {
+        var rated = aired.Count(e => rating(e) is not null);
+        return aired.Count < MinEpisodes
+            ? $"It has {aired.Count} episodes; the essential cut is for shows with {MinEpisodes} or more."
+            : rated < aired.Count * MinRatedShare
+                ? $"Only {rated} of its {aired.Count} episodes are rated, too few to tell the essential ones."
+                : null;
+    }
+
+    /// <summary>The "lean" level's settings, for other features that offer the cut as a shorter path.</summary>
+    internal static (double Share, double Margin) Lean => Levels["lean"];
+
+    /// <summary>Keep or skip, and why, for every aired regular episode (<paramref name="aired"/>, in season order).</summary>
+    internal static Dictionary<Guid, (bool Keep, string Why)> Decide(ShowCopy show, List<EpisodeCopy> episodes, List<EpisodeCopy> aired,
+        Func<EpisodeCopy, double?> rating, (double Share, double Margin) settings, DateTimeOffset now)
+    {
         // A season's last episode is its finale only once nothing more of it is scheduled.
         var unaired = episodes.Where(e => e.AirsAtUtc is null || e.AirsAtUtc > now).Select(e => e.SeasonNumber).ToHashSet();
         var lastSeason = aired.Max(e => e.SeasonNumber);
@@ -142,7 +185,7 @@ public static class EssentialCutApi
         foreach (var season in aired.GroupBy(e => e.SeasonNumber))
         {
             var list = season.ToList();
-            var ratings = list.Select(Rating).OfType<double>().ToList();
+            var ratings = list.Select(rating).OfType<double>().ToList();
             var average = ratings.DefaultIfEmpty(0).Average();
             var spread = ratings.Count > 1 ? Math.Sqrt(ratings.Average(x => (x - average) * (x - average))) : 0;
             var below = average - Math.Max(MinMargin, settings.Margin * spread);
@@ -154,7 +197,7 @@ public static class EssentialCutApi
             {
                 protectedWhy[list[^1].EpisodeId] = ended && season.Key == lastSeason ? "series-finale" : "season-finale";
             }
-            if (list.Where(e => Rating(e) is not null).MaxBy(Rating) is { } best)
+            if (list.Where(e => rating(e) is not null).MaxBy(rating) is { } best)
             {
                 protectedWhy.TryAdd(best.EpisodeId, "best-of-season");
             }
@@ -162,8 +205,8 @@ public static class EssentialCutApi
             // Lowest first among the clearly below-average episodes, up to the level's share of the season.
             var budget = (int)Math.Floor(list.Count * settings.Share);
             var skip = list
-                .Where(e => !protectedWhy.ContainsKey(e.EpisodeId) && Rating(e) is { } r && r <= below)
-                .OrderBy(e => Rating(e))
+                .Where(e => !protectedWhy.ContainsKey(e.EpisodeId) && rating(e) is { } r && r <= below)
+                .OrderBy(e => rating(e))
                 .Take(budget)
                 .Select(e => e.EpisodeId)
                 .ToHashSet();
@@ -185,28 +228,11 @@ public static class EssentialCutApi
             {
                 decisions[e.EpisodeId] = skip.Contains(e.EpisodeId)
                     ? (false, "below-average")
-                    : (true, protectedWhy.GetValueOrDefault(e.EpisodeId) ?? (Rating(e) is null ? "unrated" : "above-average"));
+                    : (true, protectedWhy.GetValueOrDefault(e.EpisodeId) ?? (rating(e) is null ? "unrated" : "above-average"));
             }
         }
 
-        var seasons = aired.GroupBy(e => e.SeasonNumber)
-            .Select(g => new CutSeasonDto(
-                g.Key,
-                g.Count(),
-                g.Count(e => decisions[e.EpisodeId].Keep),
-                g.Where(e => !decisions[e.EpisodeId].Keep).Sum(Minutes),
-                g.Select(e => new CutEpisodeDto(e.EpisodeId, e.EpisodeNumber, e.Title, Rating(e), decisions[e.EpisodeId].Keep,
-                    decisions[e.EpisodeId].Why, watched.Contains(e.EpisodeId))).ToList()))
-            .ToList();
-        var kept = aired.Where(e => decisions[e.EpisodeId].Keep).ToList();
-
-        return TypedResults.Ok(new EssentialCutDto(
-            showId, show.Title, level, true, null,
-            full,
-            new CutTotalsDto(kept.Count, kept.Sum(Minutes)),
-            seasons,
-            SkipRuns(aired, decisions, Rating, Minutes),
-            Progress(aired, decisions, watched, Minutes)));
+        return decisions;
     }
 
     /// <summary>Consecutive skipped episodes within a season, as ranges.</summary>
