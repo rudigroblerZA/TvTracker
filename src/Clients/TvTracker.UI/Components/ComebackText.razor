@@ -1,0 +1,44 @@
+@* "Is it worth going back?" for a dropped show: a toned headline and the figures behind it. Spoiler-free: the turn
+   ahead is named by its number only. *@
+<div class="comeback tone-@Tone(Comeback.Verdict)">
+    <strong class="comeback-headline">@Headline(Comeback)</strong>
+    <span class="comeback-detail">@(" " + Detail(Comeback))</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Comeback Comeback { get; set; } = null!;
+
+    public static string Tone(string verdict) => verdict switch
+    {
+        "gets-good" or "better" => "good",
+        "worse" => "bad",
+        _ => "info"
+    };
+
+    public static string Headline(Comeback c) => c.Verdict switch
+    {
+        "gets-good" => "It gets good soon",
+        "better" when c.BetterFrom is { RestOfSeason: true } => "It picks up later this season",
+        "better" when c.BetterFrom is { } from => $"It gets better from season {from.SeasonNumber}",
+        "same" => "More of the same",
+        "worse" => "It doesn't recover",
+        _ => "Hard to say"
+    };
+
+    private static string Detail(Comeback c)
+    {
+        var text = c.Verdict switch
+        {
+            "gets-good" when c.GetsGoodAt is { } turn =>
+                $"Its slow start turns at {Format.EpisodeCode(turn.SeasonNumber, turn.EpisodeNumber)}, {(turn.EpisodesAway == 0 ? "the very next episode" : $"{Episodes(turn.EpisodesAway)} ({Format.Hours(turn.MinutesAway)}) after where you stopped")}.",
+            "better" when c.BetterFrom is { } from =>
+                $"{(from.RestOfSeason ? "The rest of the season" : $"Season {from.SeasonNumber}")} rates {Format.Rating(from.Average)}, against {Format.Rating(c.BeforeYouStopped ?? 0)} for the episodes before you stopped.",
+            "same" => $"What's left rates {Format.Rating(c.Ahead ?? 0)}, like the {Format.Rating(c.BeforeYouStopped ?? 0)} of where you stopped.",
+            "worse" => $"What's left rates {Format.Rating(c.Ahead ?? 0)}, below the {Format.Rating(c.BeforeYouStopped ?? 0)} of where you stopped.",
+            _ => "Too few of its episodes are rated to tell."
+        };
+        return c.YourAverage is { } yours ? $"{text} You rated what you saw {Format.Rating(yours)}." : text;
+    }
+
+    private static string Episodes(int count) => count == 1 ? "1 episode" : $"{count} episodes";
+}

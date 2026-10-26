@@ -156,7 +156,7 @@ public static class FinishOutlookApi
     }
 
     /// <summary>The shows' insights documents, for their drop-off points (there only with enough viewers) and turns.</summary>
-    private static async Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct)
+    internal static async Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct)
     {
         var documents = await db.ShowInsights.AsNoTracking().Where(i => showIds.Contains(i.ShowId)).Select(i => new { i.ShowId, i.Document }).ToListAsync(ct);
         return documents

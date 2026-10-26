@@ -114,7 +114,7 @@ public static class CatchUpApi
     /// Minutes a week the user has watched lately, across all their shows (each episode at its runtime, each day capped
     /// at <see cref="MaxMinutesPerDay"/>).
     /// </summary>
-    private static async Task<int> PaceAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
+    internal static async Task<int> PaceAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
     {
         var since = now.UtcDateTime.AddDays(-7 * PaceWeeks);
         var days = await db.Watches.AsNoTracking()

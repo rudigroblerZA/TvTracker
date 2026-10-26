@@ -90,6 +90,30 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next." }
+    },
+    "worth-going-back": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Is it worth going back?: for dropped shows, whether what's left gets better, on the show page and the backlog." }
+    },
+    "backlog-triage": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Backlog triage: /backlog ranks followed shows not started by how much they're worth your time, with verdicts." }
+    },
+    "time-off": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Fits your time off: /time-off suggests finished shows to watch start to end in the hours you have." }
+    },
+    "spoiler-shield": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Spoiler shield: a setting that hides titles, summaries and stills of episodes you haven't watched." }
     }
   }
 }

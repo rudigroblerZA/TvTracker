@@ -123,6 +123,7 @@ else
         <Authorized>
             <Feature Flag="@FeatureFlags.Refresher"><RefresherSection ShowId="show.Id" /></Feature>
             <Feature Flag="@FeatureFlags.CatchUp"><CatchUpSection ShowId="show.Id" /></Feature>
+            <Feature Flag="@FeatureFlags.WorthGoingBack"><ComebackSection ShowId="show.Id" /></Feature>
         </Authorized>
     </AuthorizeView>
 
@@ -131,7 +132,7 @@ else
         {
             <div class="panel">
                 <div class="muted small">Next episode @(Format.Label(next.Label) is { } nl ? $"· {nl}" : "")</div>
-                <a href="episodes/@next.Id">@Format.EpisodeCode(next.SeasonNumber, next.EpisodeNumber) · @next.Title</a>
+                <a href="episodes/@next.Id">@Format.EpisodeCode(next.SeasonNumber, next.EpisodeNumber)</a><Spoiler Hidden="!IsWatched(next.Id)">@(" · " + next.Title)</Spoiler>
                 <div><LocalTime Utc="next.AirsAtUtc" /> @if (next.AirsAtUtc is { } a) { <span class="muted">(@Format.Relative(a))</span> }</div>
             </div>
         }
@@ -139,7 +140,7 @@ else
         {
             <div class="panel">
                 <div class="muted small">Latest episode</div>
-                <a href="episodes/@last.Id">@Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber) · @last.Title</a>
+                <a href="episodes/@last.Id">@Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber)</a><Spoiler Hidden="!IsWatched(last.Id)">@(" · " + last.Title)</Spoiler>
                 <div><LocalTime Utc="last.AirsAtUtc" /></div>
             </div>
         }
@@ -193,7 +194,7 @@ else
                                     </Authorized>
                                 </AuthorizeView>
                                 <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
-                                <a href="episodes/@episode.Id">@episode.Title</a>
+                                <Spoiler Hidden="!IsWatched(episode.Id)"><a href="episodes/@episode.Id">@episode.Title</a></Spoiler>
                                 @if (Format.Label(episode.Label) is { } label)
                                 {
                                     <span class="tag">@label</span>
@@ -219,7 +220,7 @@ else
         }
     </section>
 
-    <ShowInsightsPanel ShowId="Id" Creatives="show.Creatives" />
+    <ShowInsightsPanel ShowId="Id" Creatives="show.Creatives" Watched="watched" />
 
     @if (show.WatchProviders.Count > 0)
     {

@@ -1,0 +1,40 @@
+@inject AnalyticsClient Analytics
+
+@* "Is it worth going back?" on the show page, only for a show the user dropped. *@
+@if (comeback is { } c)
+{
+    <section class="comeback-section" aria-labelledby="comeback-title">
+        <div class="insight-card">
+            <h2 id="comeback-title">Worth going back?</h2>
+            <p class="muted">
+                <span>You stopped at </span><a href="episodes/@c.StoppedAt.EpisodeId">@Format.EpisodeCode(c.StoppedAt.SeasonNumber, c.StoppedAt.EpisodeNumber) · @c.StoppedAt.Title</a><span>, @Format.Relative(c.LastWatchedAtUtc), with @(c.AheadEpisodes == 1 ? "1 episode" : $"{c.AheadEpisodes} episodes") (@Format.Hours(c.AheadMinutes)) left.</span>
+            </p>
+            <ComebackText Comeback="c" />
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private Comeback? comeback;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        comeback = null;
+        try
+        {
+            comeback = await Analytics.GetComebackAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Optional on the show page; the rest of it works without.
+        }
+    }
+}

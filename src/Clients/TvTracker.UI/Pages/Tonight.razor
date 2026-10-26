@@ -11,6 +11,9 @@
 <AuthorizeView>
     <Authorized>
         <p class="muted">How long have you got, and what are you in the mood for? The plan comes from the shows you're watching and your watchlist.</p>
+        <Feature Flag="@FeatureFlags.TimeOff">
+            <p class="small"><a href="time-off">More than an evening?</a><span class="muted"> Find finished shows that fit your time off, start to end.</span></p>
+        </Feature>
 
         <div class="tonight-controls">
             <div class="tonight-field">

@@ -302,6 +302,18 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<List<CatchUpPlan>?> GetCatchUpsAsync(CancellationToken ct = default) =>
         GetAsync<List<CatchUpPlan>>(ApiClients.Analytics, "api/v1/me/catch-up", ct);
 
+    /// <summary>"Is it worth going back?"; null unless the user dropped the show.</summary>
+    public Task<Comeback?> GetComebackAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<Comeback>(ApiClients.Analytics, $"api/v1/shows/{showId}/comeback", ct);
+
+    /// <summary>The user's backlog, triaged: followed shows not started, and dropped ones.</summary>
+    public Task<Backlog?> GetBacklogAsync(CancellationToken ct = default) =>
+        GetAsync<Backlog>(ApiClients.Analytics, "api/v1/me/backlog", ct, cacheForOffline: true);
+
+    /// <summary>Finished shows to watch start to end in <paramref name="hours"/>.</summary>
+    public Task<TimeOff?> GetTimeOffAsync(int hours, CancellationToken ct = default) =>
+        GetAsync<TimeOff>(ApiClients.Analytics, $"api/v1/me/time-off?hours={hours}", ct);
+
     /// <param name="level">"light", "lean" or "essentials".</param>
     public Task<EssentialCut?> GetEssentialCutAsync(Guid showId, string level = "lean", CancellationToken ct = default) =>
         GetAsync<EssentialCut>(ApiClients.Analytics, $"api/v1/shows/{showId}/essential-cut?level={level}", ct, cacheForOffline: true);

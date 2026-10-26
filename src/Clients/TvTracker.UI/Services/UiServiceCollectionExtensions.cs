@@ -25,6 +25,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<UserSession>();
         services.AddScoped<ShowTagStore>();
         services.AddScoped<FeatureFlagStore>();
+        services.AddScoped<SpoilerShield>();
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();

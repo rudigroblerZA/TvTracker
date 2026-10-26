@@ -253,7 +253,39 @@ On the show page and Up Next, before a followed show's new season.
 - **A shorter path:** the essential cut, when it saves real time, with the weeks replanned along it.
 - **Week by week:** "This week: S05E11–E16", split by running time.
 
-### 21. Smaller touches
+### 21. Is it worth going back?
+
+On the show page and the backlog, for shows you dropped.
+
+- **The question nobody answers:** you stopped a show months ago; does what's left get better? It compares what's left
+  with the stretch where you stopped, which is likely why you stopped.
+- **Real answers:** The Office "gets good soon" (S02E03, 4 episodes after where you stopped at S01E04), Foundation "gets
+  better from season 2", Dexter after season 4 "doesn't recover".
+
+### 22. Backlog triage
+
+At `/backlog`.
+
+- **Lists only grow:** this ranks the shows you follow but haven't started by how much they're likely worth your time,
+  and says plainly which to start next and which to let go.
+- **Explained:** each show says why: its rating, whether it's your kind of show, how it ends, a slow start.
+- **The honest total:** "766 h on your list, 7 years at your 2 h a week; letting go saves 95 h, essential cuts 125 h".
+
+### 23. Fits your time off
+
+At `/time-off`.
+
+- **A holiday-sized pick:** finished shows you can watch start to end in the time you have, so you get the ending too.
+- **Or a mix:** two or three that fill the time together.
+
+### 24. Spoiler shield
+
+In Settings.
+
+- **Everywhere at once:** titles and summaries of episodes you haven't watched are hidden across the app, and one tap
+  shows one.
+
+### 25. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
@@ -268,7 +300,5 @@ Ranked by value for the effort. Each builds on data and code that already exist.
 | # | Idea | What it does | Builds on | Effort |
 | --- | --- | --- | --- | --- |
 | 1 | **Crossover alerts** | Tell you when a crossover event is scheduled in a universe you're watching ("Reckoning airs across Fire, Med and P.D. on Wednesday"), so you're caught up on all three shows first. | Watch order's crossover detection, follows, Notifications | Small |
-| 2 | **Is it worth going back?** | For a show you dropped, compare the ratings after where you stopped with the ones you watched: "it gets better from season 3", or "it doesn't recover". | Episode patterns, your progress, the "dropped" list in Your taste | Small |
-| 3 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
-| 4 | **Spoiler shield** | Hide titles, summaries and images of episodes you haven't watched across the whole app, with a tap to reveal. | Your progress, the essential cut's title hiding | Medium |
-| 5 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+| 2 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
+| 3 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |

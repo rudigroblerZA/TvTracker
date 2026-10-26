@@ -3,8 +3,9 @@
 @inject TrackingClient Tracking
 @inject RatingsClient Ratings
 @inject UserSession Session
+@inject SpoilerShield Shield
 
-<PageTitle>@(episode?.Title ?? "Episode") · TV Tracker</PageTitle>
+<PageTitle>@(episode is null ? "Episode" : hideTitle ? Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) : episode.Title) · TV Tracker</PageTitle>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
@@ -18,7 +19,7 @@
 else
 {
     <p><a href="shows/@episode.ShowId">← @(showTitle ?? "Back to show")</a></p>
-    <h1>@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) · @episode.Title</h1>
+    <h1>@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)<Spoiler Hidden="!watched">@(" · " + episode.Title)</Spoiler></h1>
     <p class="muted">
         <LocalTime Utc="episode.AirsAtUtc" Format="dddd d MMMM yyyy, HH:mm" />
         @if (episode.RuntimeMinutes is { } runtime)
@@ -32,7 +33,7 @@ else
     </p>
     @if (!string.IsNullOrEmpty(episode.Overview))
     {
-        <p>@episode.Overview</p>
+        <Spoiler Hidden="!watched" Placeholder="Summary hidden: you haven't watched this yet"><p>@episode.Overview</p></Spoiler>
     }
 
     <div class="rating-line">
@@ -130,6 +131,10 @@ else
     private string? showTitle;
     private bool notFound;
     private bool watched;
+
+    /// <summary>The spoiler shield is on and the user hasn't watched this: the tab title shows only the episode code.</summary>
+    private bool hideTitle => shieldOn && !watched;
+    private bool shieldOn;
     private bool aired;
     private RatingSummary? summary;
     private int? myRating;
@@ -139,7 +144,11 @@ else
     private bool newCommentIsSpoiler;
     private string? error;
 
-    protected override Task OnParametersSetAsync() => LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        shieldOn = await Shield.IsOnAsync();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

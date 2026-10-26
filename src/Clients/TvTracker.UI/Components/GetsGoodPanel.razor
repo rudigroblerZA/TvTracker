@@ -6,7 +6,7 @@
         @if (getsGood.Turn is { } turn)
         {
             <p>
-                <span>Gets good at </span><strong>@Format.EpisodeCode(turn.SeasonNumber, turn.EpisodeNumber) <a href="episodes/@turn.EpisodeId">“@turn.Title”</a></strong><span>, @Format.Hours(turn.MinutesBefore) in (@turn.EpisodesBefore episode@(turn.EpisodesBefore == 1 ? "" : "s")).</span>
+                <span>Gets good at </span><strong>@Format.EpisodeCode(turn.SeasonNumber, turn.EpisodeNumber) <Spoiler Hidden="Watched?.Contains(turn.EpisodeId) != true"><a href="episodes/@turn.EpisodeId">“@turn.Title”</a></Spoiler></strong><span>, @Format.Hours(turn.MinutesBefore) in (@turn.EpisodesBefore episode@(turn.EpisodesBefore == 1 ? "" : "s")).</span>
                 <span class="muted"> The episodes before it average @Format.Rating(turn.Before) on TVmaze; from there, @Format.Rating(turn.After).</span>
             </p>
             @if (DropOff is { } dropOff && (dropOff.SeasonNumber, dropOff.EpisodeNumber).CompareTo((turn.SeasonNumber, turn.EpisodeNumber)) < 0)
@@ -26,4 +26,7 @@
 
     /// <summary>Where our viewers most often stop, to say when that's before the turn.</summary>
     [Parameter] public DropOff? DropOff { get; set; }
+
+    /// <summary>The episodes the user has watched, for the spoiler shield.</summary>
+    [Parameter] public IReadOnlySet<Guid>? Watched { get; set; }
 }

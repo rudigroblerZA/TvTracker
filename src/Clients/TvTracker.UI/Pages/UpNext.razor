@@ -8,6 +8,9 @@
 
 <AuthorizeView>
     <Authorized>
+        <Feature Flag="@FeatureFlags.BacklogTriage">
+            <p><a href="backlog"><strong>Your backlog</strong></a><span class="muted">: what to start next from the shows you follow, and what to let go.</span></p>
+        </Feature>
         <Feature Flag="@FeatureFlags.TonightPlan">
             <p><a href="tonight"><strong>Plan tonight</strong></a><span class="muted">: tell it how long you've got and your mood, and it picks the episodes.</span></p>
         </Feature>
@@ -89,7 +92,7 @@
                         <div class="up-next-body">
                             <a class="strong" href="shows/@item.ShowId">@item.ShowTitle</a>
                             <div>
-                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber) · @item.Episode.Title</a>
+                                <a href="episodes/@item.Episode.EpisodeId">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber)</a><Spoiler Hidden="true">@(" · " + item.Episode.Title)</Spoiler>
                             </div>
                             <div class="muted small">
                                 @if (item.HasAired)
@@ -105,7 +108,7 @@
                         </div>
                         @if (item.HasAired)
                         {
-                            <button class="btn" @onclick="() => MarkWatchedAsync(item)" aria-label="Mark @item.Episode.Title watched">✓ Watched</button>
+                            <button class="btn" @onclick="() => MarkWatchedAsync(item)" aria-label="Mark @item.ShowTitle @Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber) watched">✓ Watched</button>
                         }
                     </li>
                 }

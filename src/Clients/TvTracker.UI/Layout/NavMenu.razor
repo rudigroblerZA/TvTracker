@@ -8,6 +8,7 @@
     <AuthorizeView>
         <Authorized>
             <NavLink href="shows">My shows</NavLink>
+            <Feature Flag="@FeatureFlags.BacklogTriage"><NavLink href="backlog">Backlog</NavLink></Feature>
             <NavLink href="for-you">For you</NavLink>
             <NavLink href="insights">Insights</NavLink>
             <NavLink href="discover">Discover</NavLink>

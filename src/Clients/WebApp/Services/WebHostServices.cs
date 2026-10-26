@@ -63,5 +63,9 @@ public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notif
     public async Task SaveTextFileAsync(string fileName, string content) =>
         await js.InvokeVoidAsync("tvtracker.downloadText", fileName, content);
 
+    public async Task<string?> GetPreferenceAsync(string key) => await js.InvokeAsync<string?>("tvtracker.getPreference", key);
+
+    public async Task SetPreferenceAsync(string key, string? value) => await js.InvokeVoidAsync("tvtracker.setPreference", key, value);
+
     private sealed record BrowserPushSubscription(string Endpoint, string P256dh, string Auth);
 }

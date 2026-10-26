@@ -399,3 +399,31 @@ public record CatchUpPath(int Episodes, int Minutes, double EpisodesPerWeek, int
 public record CatchUpWeek(DateOnly Starts, int Minutes, IReadOnlyList<CatchUpEpisode> Episodes);
 
 public record CatchUpEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes);
+
+/// <summary>"Is it worth going back?" for a dropped show (see Analytics.API's ComebackApi).</summary>
+/// <param name="Verdict">"gets-good", "better", "same", "worse" or "unknown".</param>
+public record Comeback(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc,
+    ComebackEpisode StoppedAt, string Verdict, double? BeforeYouStopped, double? Ahead, int AheadEpisodes, int AheadMinutes,
+    ComebackFrom? BetterFrom, ComebackTurn? GetsGoodAt, double? YourAverage);
+
+public record ComebackEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title);
+
+public record ComebackFrom(int SeasonNumber, bool RestOfSeason, double Average);
+
+public record ComebackTurn(int SeasonNumber, int EpisodeNumber, int EpisodesAway, int MinutesAway);
+
+/// <summary>Backlog triage (see Analytics.API's BacklogApi).</summary>
+public record Backlog(int Minutes, int YourMinutesPerWeek, int? WeeksToClear, int LetGoMinutes, int CutSavesMinutes,
+    IReadOnlyList<BacklogShow> Shows, IReadOnlyList<Comeback> Dropped);
+
+/// <param name="Verdict">"start-next", "worth-it", "long", "ends-badly" or "let-it-go".</param>
+public record BacklogShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, int? CutMinutes, double Value,
+    string Verdict, IReadOnlyList<string> Reasons);
+
+/// <summary>"Fits your time off" (see Analytics.API's TimeOffApi).</summary>
+public record TimeOff(int BudgetMinutes, IReadOnlyList<TimeOffShow> Fits, TimeOffMix? Mix);
+
+public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, double Value, string? Landing,
+    bool Limited, IReadOnlyList<string> Reasons);
+
+public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
