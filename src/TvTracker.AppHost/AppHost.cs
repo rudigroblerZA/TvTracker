@@ -77,6 +77,7 @@ var flagd = builder.AddFlagd("flagd")
 // Development secrets; they match Realms/tvtracker-realm.json. Change both for any shared environment.
 const string WebClientSecret = "tvtracker-web-dev-secret";
 const string IdentityAdminClientSecret = "tvtracker-identity-admin-dev-secret";
+const string AppAdminPassword = "admin";
 
 // ---------------------------------------------------------------------------
 // Services
@@ -152,11 +153,16 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
     .WithHttpHealthCheck("/health");
 
 // The data export collects each service's data for the user.
-// Admin:Users (Keycloak usernames) may use the feature flags page.
+// Admin:Users (Keycloak usernames) may use the feature flags page. The app's own admin account (admin / admin in
+// development, separate from Keycloak's console admin in the master realm) is in the realm file, and Identity.API
+// creates it in a realm imported before it was added.
 foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildren())
 {
     identityApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
 }
+identityApi
+    .WithEnvironment("Admin__Account__Username", "admin")
+    .WithEnvironment("Admin__Account__Password", AppAdminPassword);
 
 identityApi
     .WithReference(trackingApi)

@@ -13,7 +13,8 @@ CONTEXT.md; how to run it and what each feature does for users is in README.md.
 dotnet build src/TvTracker.AppHost
 dotnet build src/Tools/Catalog.ImportCli
 
-# Run everything (Docker or Podman must be running). Web app https://localhost:7120, demo / demo.
+# Run everything (Docker or Podman must be running). Web app https://localhost:7120, demo / demo
+# (app admin: admin / admin).
 dotnet run --project src/TvTracker.AppHost
 
 # Migrations (Catalog, Analytics, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)

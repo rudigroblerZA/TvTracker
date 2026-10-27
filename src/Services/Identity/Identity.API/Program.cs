@@ -16,6 +16,7 @@ builder.Services.AddIntegrationEventOutbox<IdentityContext>();
 builder.Services.AddHttpClient<KeycloakAdminClient>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<ProfileSnapshotPublisher>();
+builder.Services.AddHostedService<AdminAccountSeeder>();
 
 // Used by the data export to collect each service's data for the user.
 foreach (var source in new[] { "tracking", "ratings", "recommendations", "notifications", "social" })

@@ -498,6 +498,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     bytes, which makes flagd re-read it; overrides still win, and git sees no change. The rewrite waits 5 seconds:
     flagd polls the files every 3, and when both changed in one poll it read flagd.json first and dropped the flag anyway.
   - **404 for non-admins,** so the UI asks the list endpoint to know whether to show the link.
+  - **Admin account:** `admin` in the app's realm (not Keycloak's master-realm console admin), so trying the app as
+    an ordinary user (demo) and as an admin are separate sign-ins. Keycloak imports the realm only on its first start,
+    so `AdminAccountSeeder` creates the account through the admin API when an older realm lacks it.
   - **No flag of its own:** a flag on the flags page could lock admins out of it.
 - **Fail open:** the default is on. With flagd down or a flag unknown, features stay available. Turning one off is a
   deliberate edit.
