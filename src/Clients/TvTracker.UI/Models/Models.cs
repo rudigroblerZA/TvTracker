@@ -489,3 +489,9 @@ public record FeedItem(Guid Id, string UserId, string DisplayName, string Kind, 
     int Episodes, EpisodeCode? First, EpisodeCode? Last, int? Stars, DateTime OccurredAtUtc);
 
 public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
+
+/// <summary>A feature flag on the flags page (see Identity.API's FlagsApi).</summary>
+/// <param name="Default">What flagd.json says.</param>
+/// <param name="Targeting">flagd.json treats some users differently; an override applies to everyone.</param>
+/// <param name="Override">Set on the flags page; null when flagd.json decides.</param>
+public record FeatureFlagSetting(string Key, string? Description, bool Default, bool Targeting, bool? Override, bool On);

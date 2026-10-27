@@ -1,0 +1,103 @@
+@page "/settings/flags"
+@inject IdentityClient Identity
+@inject FeatureFlagStore Flags
+
+<PageTitle>Feature flags · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Feature flags</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (flags is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notAdmin ? "Only admins can change feature flags." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p class="muted">
+                Turn a feature on or off for everyone. Services see a change within seconds; other people's open pages within
+                30 seconds. A flag you haven't set follows flagd.json, including any targeting there.
+            </p>
+            <ul class="flag-list">
+                @foreach (var flag in flags)
+                {
+                    <li class="panel flag-row" @key="flag.Key">
+                        <div class="flag-body">
+                            <div class="section-head">
+                                <code class="strong">@flag.Key</code>
+                                <span class="tag @(flag.On ? "flag-on" : "flag-off")">@(flag.On ? "On" : "Off")</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(flag.Description))
+                            {
+                                <div class="small">@flag.Description</div>
+                            }
+                            <div class="muted small">
+                                @(flag.Override is null
+                                    ? $"From flagd.json{(flag.Targeting ? ", with targeting" : "")}"
+                                    : $"Set here; flagd.json says {(flag.Default ? "on" : "off")}{(flag.Targeting ? " with targeting" : "")}")
+                            </div>
+                        </div>
+                        <div class="chips" role="radiogroup" aria-label="@flag.Key">
+                            <button type="button" role="radio" aria-checked="@(flag.Override is null ? "true" : "false")" class="chip @(flag.Override is null ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, null)">flagd.json</button>
+                            <button type="button" role="radio" aria-checked="@(flag.Override == true ? "true" : "false")" class="chip @(flag.Override == true ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, true)">On</button>
+                            <button type="button" role="radio" aria-checked="@(flag.Override == false ? "true" : "false")" class="chip @(flag.Override == false ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, false)">Off</button>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in as an admin to change feature flags." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<FeatureFlagSetting>? flags;
+    private bool notAdmin;
+    private bool busy;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            flags = await Identity.GetFeatureFlagsAsync();
+            notAdmin = flags is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task SetAsync(FeatureFlagSetting flag, bool? on)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            if (await Identity.SetFeatureFlagAsync(flag.Key, on) is { } updated && flags is not null)
+            {
+                flags[flags.IndexOf(flag)] = updated;
+            }
+            Flags.Clear();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

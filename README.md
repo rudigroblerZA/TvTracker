@@ -311,6 +311,18 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
   flagd's `fractional` operator does percentage rollouts on `targetingKey`.
 - **If flagd is down:** every flag is on, so a flag server outage never takes features away.
+- **From the app:** admins get Settings → Admin → Feature flags (`/settings/flags`). Each flag can follow
+  flagd.json, or be turned on or off for everyone.
+  - **Admins:** the Keycloak usernames in `Admin:Users` in the AppHost's `appsettings.json` (`demo` by default). For
+    anyone else the page and its API answer 404.
+  - **Where changes go:** `Flags/overrides.json`, which flagd reads after flagd.json, so an override wins. It isn't
+    checked in, and flagd.json is never edited. An override applies to everyone, ignoring flagd.json's targeting;
+    "flagd.json" removes it.
+  - **How fast:** services within seconds; the UI keeps answers for 30 seconds (the admin's own at once).
+  - **Only in development:** Identity.API writes the file in the AppHost's Flags folder, which is bind-mounted into
+    flagd, so it needs the two on one disk.
+  - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
+    Identity.API.
 
 ### White label and theme
 
@@ -322,7 +334,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
     in `ApplicationTitle` in `MobileApp.csproj`.
   - **Not covered:** the Keycloak sign-in page, whose title is the realm's `displayName` in
     `Realms/tvtracker-realm.json` (imported once, so change an existing realm in the Keycloak admin console).
-- **Theme** (Settings → Theme): Same as device, Light or Dark. Kept per device or browser, and applied before the page
+- **Theme:** the ☀/☾ button in the header switches between light and dark. Settings → Theme also offers Same as
+  device (the default). On a phone-width screen the header drops its Sign out button to fit one row; Sign out is in
+  Settings. Kept per device or browser, and applied before the page
   first paints, so a saved choice doesn't flash the other theme. Available signed out too.
 
 ### Mobile app

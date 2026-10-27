@@ -61,8 +61,17 @@ var keycloakUrl = keycloak.GetEndpoint("http");
 // flagd: the OpenFeature flag server, reading ./Flags/flagd.json and picking up edits to it while running. Services
 // and the web app evaluate flags through the OpenFeature SDK (flagd provider, ConnectionStrings:flagd); the mobile
 // app through the BFF's /features route, over OFREP. Nothing waits for it: with flagd down, flags take their defaults.
+// Flags/overrides.json is a second source, written by the flags page (Identity.API); for a key in both, flagd uses the
+// later source. It isn't checked in, so it's created empty when missing.
+var flagsDirectory = Path.Combine(builder.AppHostDirectory, "Flags");
+var flagOverrides = Path.Combine(flagsDirectory, "overrides.json");
+if (!File.Exists(flagOverrides))
+{
+    File.WriteAllText(flagOverrides, "{ \"flags\": {} }\n");
+}
 var flagd = builder.AddFlagd("flagd")
     .WithBindFileSync("./Flags/")
+    .WithArgs("--uri", "file:./flags/overrides.json")
     .WithLifetime(ContainerLifetime.Persistent);
 
 // Development secrets; they match Realms/tvtracker-realm.json. Change both for any shared environment.
@@ -78,6 +87,7 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithReference(eventBus).WaitFor(eventBus)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithEnvironment("Identity__AdminClientSecret", IdentityAdminClientSecret)
+    .WithEnvironment("Flags__Directory", flagsDirectory)
     .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
 
@@ -142,6 +152,12 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
     .WithHttpHealthCheck("/health");
 
 // The data export collects each service's data for the user.
+// Admin:Users (Keycloak usernames) may use the feature flags page.
+foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildren())
+{
+    identityApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
+}
+
 identityApi
     .WithReference(trackingApi)
     .WithReference(ratingsApi)

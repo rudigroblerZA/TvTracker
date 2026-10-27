@@ -25,11 +25,28 @@ public sealed class ThemeStore(IPlatformServices platform, IJSRuntime js)
         }
     }
 
+    /// <summary>Raised when the choice changes, so the header toggle and Settings agree.</summary>
+    public event Action? Changed;
+
     public async Task SetAsync(string? theme)
     {
         theme = Normalize(theme);
         await platform.SetPreferenceAsync(Key, theme);
         await ApplyAsync(theme);
+        Changed?.Invoke();
+    }
+
+    /// <summary>The theme showing now, "light" or "dark": the chosen one, else the device's. Light if the page can't say.</summary>
+    public async Task<string> EffectiveAsync()
+    {
+        try
+        {
+            return await js.InvokeAsync<string>("tvtrackerTheme.effective") == "dark" ? "dark" : "light";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TaskCanceledException or JSException or JSDisconnectedException)
+        {
+            return "light";
+        }
     }
 
     /// <summary>
