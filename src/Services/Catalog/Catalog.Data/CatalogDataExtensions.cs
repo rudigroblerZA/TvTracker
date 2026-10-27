@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TvTracker.Persistence;
 
 namespace Catalog.Data;
 
@@ -15,7 +16,7 @@ public static class CatalogDataExtensions
     {
         var connectionString = builder.Configuration.GetConnectionString("catalogdb")
             ?? throw new InvalidOperationException("The \"catalogdb\" connection string is missing.");
-        builder.Services.AddDbContextPool<CatalogContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
+        builder.Services.AddDbContextPool<CatalogContext>(options => options.UseNpgsql(ConnectionPool.Limit(connectionString), npgsql => npgsql.UseVector()));
         builder.EnrichNpgsqlDbContext<CatalogContext>();
         return builder;
     }

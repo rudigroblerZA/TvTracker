@@ -3,6 +3,7 @@ using Social.API.Data;
 using Social.API.IntegrationEvents;
 using Social.API.Services;
 using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,7 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
 
-builder.AddNpgsqlDbContext<SocialContext>("socialdb");
+builder.AddNpgsqlDbContext<SocialContext>("socialdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<SocialContext>();
 
 builder.AddRabbitMQEventBus("eventbus")

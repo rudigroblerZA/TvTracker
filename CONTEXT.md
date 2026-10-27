@@ -40,6 +40,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outboxes still deserialize. Don't rename or reorder existing ones.
 - **Publishing:** add the event to `IIntegrationEventOutbox` in the same `SaveChanges` as the change, then
   `PublishAddedAsync`. `OutboxPublisher` retries anything left behind.
+  - **Channels:** `RabbitMQEventBus` rents publishing channels from a small pool and declares the exchange once per
+    connection. A channel opened, declared and closed per event added three round trips to every write; pooling took
+    follow and mark-watched from p50 ~50 ms to ~30 ms at 20 load-test users.
 - **Consuming:** an `IIntegrationEventHandler<T>` starts with `db.HasProcessedAsync(@event, nameof(Handler))`, and
   calls `db.MarkProcessed(...)` before saving. This is the inbox; redeliveries become no-ops.
 - **RabbitMQ:** one queue per service; a failing message is retried once, then dropped (no DLQ yet). Lost-event
@@ -609,6 +612,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     as at that migration and migrated from there, rather than refusing to start.
   - **Checked:** Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
+- **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
+  idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).
+  - **Why:** with Npgsql's defaults (100 per pool, idle kept 5 minutes), services that had been busy held their
+    connections, and under 80 load-test users Postgres refused ~6,000 new ones in 5 minutes ("too many clients").
+    Npgsql calls that transient, so EF's retry strategy backed off for up to 30 s: Tracking, which needed new
+    connections last, answered in 2-30 s, reads as well as writes. Capped, the same load ran at 310 requests/s instead
+    of 85, with no errors and p95 0.8 s instead of 3.9 s, and no database held more than 12 connections.
+  - **The rule:** keep the cap × the processes with a database (10 here, more with replicas) under the server's
+    `max_connections`, or put a pooler (Azure's built-in PgBouncer) in front once replicas multiply.
+  - **Not a server setting:** raising `max_connections` with `WithArgs` on the persistent Postgres container didn't
+    apply to an existing container, so the fix lives in the services.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
 

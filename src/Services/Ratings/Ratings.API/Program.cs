@@ -5,6 +5,7 @@ using Ratings.API.Data;
 using Ratings.API.IntegrationEvents;
 using Ratings.API.Services;
 using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,7 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
 
-builder.AddNpgsqlDbContext<RatingsContext>("ratingsdb");
+builder.AddNpgsqlDbContext<RatingsContext>("ratingsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<RatingsContext>(baseline: "InitialCreate");
 
 builder.AddRedisDistributedCache("redis");
