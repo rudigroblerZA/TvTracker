@@ -322,6 +322,19 @@ claude mcp add --transport http tvtracker http://localhost:5112/mcp
 - **Access:** development only, with no sign-in. Set `Mcp:ApiKey` to run it anywhere else; callers then send it as
   `Authorization: Bearer <key>`.
 
+**MCP gateway** (`mcp-gateway`, http://localhost:5113/mcp): one endpoint in front of the app's MCP servers, which is
+what Open WebUI uses.
+- **Open WebUI:** the AppHost adds the gateway as an MCP tool server called after the app ("TV Tracker"), on for
+  everyone. In a chat, turn it on from the tools button, then ask "landman insights". A chat model has to be pulled
+  first (the "Pull …" command on `model-runner`); small models call tools less reliably.
+- **Key:** every caller sends `Authorization: Bearer <Gateway:ApiKey>` (`tvtracker-gateway-dev-key` in development):
+  `claude mcp add --transport http tvtracker-gateway http://localhost:5113/mcp --header "Authorization: Bearer tvtracker-gateway-dev-key"`.
+- **More servers:** add `Gateway:Servers:{name}:Url` (and optionally `BearerToken`, and `Tools` to expose only some)
+  to the AppHost's configuration; their tools join the same list. Tools keep their names unless two servers share one,
+  which then become `{server}_{tool}`.
+- **Logs:** every call is logged with its server, outcome and time (the `mcp-gateway` resource on the dashboard). A
+  server that's down is left out of the list until it answers, and a failed call reconnects and retries once.
+
 ### Ops dashboard
 
 http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
@@ -443,6 +456,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog and Analytics for internal queries |
+| Mcp.Gateway | `src/Services/Mcp/Mcp.Gateway` | One MCP endpoint with an API key in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
 | WebApp | `src/Clients/WebApp` | Blazor web app; OIDC sign-in, tokens kept server-side in Redis, browser push |
