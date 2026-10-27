@@ -18,8 +18,44 @@
     {
         SignInRequiredException => "Your session has ended. Please sign in again.",
         HttpRequestException { StatusCode: null } => "Can't connect right now. Check your connection.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.TooManyRequests } e when ProblemText(e) is { } detail => detail,
         HttpRequestException { StatusCode: System.Net.HttpStatusCode.TooManyRequests } => "That's a lot of requests at once. Please wait a moment and try again.",
+        HttpRequestException { StatusCode: System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.ServiceUnavailable } e
+            when ProblemText(e) is { } detail => detail,
         HttpRequestException => "Something went wrong on our side. Please try again.",
         _ => "Something went wrong. Please try again."
     };
+
+    /// <summary>
+    /// The reason a service gave, from the problem details in the exception's message: the first validation error,
+    /// else the detail. Null when there's none to show.
+    /// </summary>
+    private static string? ProblemText(HttpRequestException ex)
+    {
+        var start = ex.Message.IndexOf('{');
+        if (start < 0)
+        {
+            return null;
+        }
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(ex.Message[start..]);
+            if (json.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                foreach (var field in errors.EnumerateObject())
+                {
+                    if (field.Value.ValueKind == System.Text.Json.JsonValueKind.Array && field.Value.GetArrayLength() > 0)
+                    {
+                        return field.Value[0].GetString();
+                    }
+                }
+            }
+            return json.RootElement.TryGetProperty("detail", out var detail) ? detail.GetString() : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Cut short at 300 characters, or not JSON.
+            return null;
+        }
+    }
 }

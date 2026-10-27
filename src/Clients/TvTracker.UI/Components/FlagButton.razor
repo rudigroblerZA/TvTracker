@@ -1,0 +1,80 @@
+@inject RatingsClient Ratings
+
+@* Flags a comment or community insight for moderators: pick a reason, optionally say more. *@
+@if (done is { } message)
+{
+    <span class="muted small">@message</span>
+}
+else if (!open)
+{
+    <button class="link small muted" type="button" @onclick="() => open = true">Flag</button>
+}
+else
+{
+    <div class="flag-form">
+        <span class="small">Why?</span>
+        <div class="chips">
+            @foreach (var (value, label) in Reasons)
+            {
+                <button type="button" class="chip small @(reason == value ? "active" : "")" @onclick="() => reason = value">@label</button>
+            }
+        </div>
+        <input type="text" maxlength="500" placeholder="Anything else? (optional)" @bind="note" aria-label="Note for the moderators" />
+        <div class="actions">
+            <button class="btn small" type="button" disabled="@(reason is null || busy)" @onclick="SendAsync">Flag</button>
+            <button class="btn btn-quiet small" type="button" @onclick="() => open = false">Cancel</button>
+        </div>
+        @if (error is not null)
+        {
+            <span class="small danger">@error</span>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Value, string Label)[] Reasons =
+        [("spoiler", "Spoiler"), ("abuse", "Abusive"), ("spam", "Spam"), ("off-topic", "Off-topic"), ("wrong", "Wrong or misleading")];
+
+    /// <summary>"comment" or "insight".</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = "";
+    [Parameter, EditorRequired] public Guid Id { get; set; }
+    [Parameter] public bool Flagged { get; set; }
+
+    /// <summary>Called once flagged, with whether flags have now hidden it or made it a spoiler.</summary>
+    [Parameter] public EventCallback<FlagResult> OnFlagged { get; set; }
+
+    private bool open;
+    private string? reason;
+    private string? note;
+    private bool busy;
+    private string? done;
+    private string? error;
+
+    protected override void OnParametersSet() => done ??= Flagged ? "Flagged" : null;
+
+    private async Task SendAsync()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            if (await Ratings.FlagAsync(Kind, Id, reason!, string.IsNullOrWhiteSpace(note) ? null : note.Trim()) is { } result)
+            {
+                done = result.Hidden ? "Flagged · hidden until a moderator looks" : result.MarkedSpoiler ? "Flagged · now marked as a spoiler" : "Flagged · thanks";
+                await OnFlagged.InvokeAsync(result);
+            }
+            else
+            {
+                done = "It's gone already";
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

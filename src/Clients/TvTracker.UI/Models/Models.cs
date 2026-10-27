@@ -155,7 +155,9 @@ public record MyRating(int Stars, DateTime RatedAtUtc);
 
 public record RatingSummary(double Average, int Count, IReadOnlyList<int> Distribution);
 
-public record Comment(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc);
+/// <param name="HiddenReason">Only on the user's own hidden comment: "flags", "held" or "moderator".</param>
+public record Comment(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc,
+    string? HiddenReason = null, bool FlaggedByMe = false);
 
 public record CommentsPage(bool HiddenUntilWatched, int TotalCount, IReadOnlyList<Comment> Comments);
 
@@ -495,3 +497,28 @@ public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
 /// <param name="Targeting">flagd.json treats some users differently; an override applies to everyone.</param>
 /// <param name="Override">Set on the flags page; null when flagd.json decides.</param>
 public record FeatureFlagSetting(string Key, string? Description, bool Default, bool Targeting, bool? Override, bool On);
+
+/// <summary>The result of flagging a comment or community insight (see Ratings.API's CommunityApi).</summary>
+public record FlagResult(bool Hidden, bool MarkedSpoiler);
+
+/// <summary>A viewer's tip about a show or an episode, ranked by how many found it helpful.</summary>
+/// <param name="HiddenReason">Only on the user's own hidden insight.</param>
+public record CommunityInsight(Guid Id, Guid ShowId, Guid? EpisodeId, string DisplayName, string Text, bool IsSpoiler, int Helpful,
+    bool VotedHelpful, bool IsMine, bool FlaggedByMe, string? HiddenReason, DateTime CreatedAtUtc);
+
+public record CommunityInsights(int Total, IReadOnlyList<CommunityInsight> Insights);
+
+/// <summary>A suggested fix to show or episode data. Status: pending, accepted, rejected or reverted.</summary>
+public record Correction(Guid Id, Guid ShowId, Guid? EpisodeId, string Field, string? CurrentValue, string SuggestedValue,
+    string? Note, string? Context, string DisplayName, string Status, string? ReviewedBy, DateTime? ReviewedAtUtc, DateTime CreatedAtUtc);
+
+public record PostFlag(string Reason, string? Note, DateTime CreatedAtUtc);
+
+/// <param name="Kind">"comment" or "insight".</param>
+public record ModeratedPost(string Kind, Guid Id, Guid ShowId, Guid? EpisodeId, string Author, string Text, bool IsSpoiler,
+    string? HiddenReason, DateTime CreatedAtUtc, IReadOnlyList<PostFlag> Flags);
+
+public record ModerationLogItem(string Moderator, string Action, string TargetKind, Guid TargetId, string? Summary, DateTime AtUtc);
+
+public record ModerationQueue(IReadOnlyList<ModeratedPost> Posts, IReadOnlyList<Correction> Corrections, IReadOnlyList<Correction> Accepted,
+    IReadOnlyList<ModerationLogItem> Log);

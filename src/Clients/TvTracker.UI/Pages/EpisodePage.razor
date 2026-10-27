@@ -54,6 +54,12 @@ else
                 <StarRating Value="myRating" ValueChanged="RateAsync" />
             </div>
 
+            <Feature Flag="@FeatureFlags.Corrections">
+                <SuggestCorrection ShowId="episode.ShowId" EpisodeId="episode.Id"
+                                   Context="@($"{showTitle} · {Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)}")"
+                                   Current="@CorrectionValues" />
+            </Feature>
+
             <section>
                 <h2>Reactions</h2>
                 <div class="reactions">
@@ -83,7 +89,7 @@ else
                 else
                 {
                     <form class="comment-form" @onsubmit="PostCommentAsync">
-                        <textarea @bind="newComment" maxlength="2000" placeholder="What did you think?" aria-label="Comment"></textarea>
+                        <textarea @bind="newComment" @bind:event="oninput" maxlength="2000" placeholder="What did you think?" aria-label="Comment"></textarea>
                         <label class="inline checkbox"><input type="checkbox" @bind="newCommentIsSpoiler" /> Contains spoilers</label>
                         <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newComment))">Post</button>
                     </form>
@@ -104,17 +110,31 @@ else
                                 }
                                 else
                                 {
-                                    <p>@if (comment.IsSpoiler) { <span class="tag">Spoiler</span> } @comment.Text</p>
+                                    <p>@if (comment.IsSpoiler) { <span class="tag">Spoiler</span> }@(" " + comment.Text)</p>
                                 }
-                                @if (comment.IsMine)
-                                {
-                                    <button class="link small" @onclick="() => DeleteCommentAsync(comment.Id)">Delete</button>
-                                }
+                                <div class="insight-meta small">
+                                    @if (comment.HiddenReason is { } hidden)
+                                    {
+                                        <span class="tag">@CommunityInsightsSection.HiddenLabel(hidden)</span>
+                                    }
+                                    @if (comment.IsMine)
+                                    {
+                                        <button class="link small" @onclick="() => DeleteCommentAsync(comment.Id)">Delete</button>
+                                    }
+                                    else
+                                    {
+                                        <FlagButton Kind="comment" Id="comment.Id" Flagged="comment.FlaggedByMe" />
+                                    }
+                                </div>
                             </li>
                         }
                     </ul>
                 }
             </section>
+
+            <Feature Flag="@FeatureFlags.CommunityInsights">
+                <CommunityInsightsSection ShowId="episode.ShowId" EpisodeId="episode.Id" />
+            </Feature>
         </Authorized>
         <NotAuthorized>
             <SignInPrompt Message="Sign in to mark this episode watched, rate it and join the discussion." />
@@ -140,6 +160,16 @@ else
     private int? myRating;
     private Reactions? reactions;
     private CommentsPage? comments;
+
+    /// <summary>What the page shows, for "Suggest a correction" (the air date as the profile's calendar would show it is
+    /// close enough; the moderator sees both values).</summary>
+    private Dictionary<string, string?> CorrectionValues => episode is null ? [] : new()
+    {
+        ["episode-title"] = episode.Title,
+        ["episode-summary"] = episode.Overview,
+        ["episode-airdate"] = episode.AirsAtUtc?.UtcDateTime.ToString("yyyy-MM-dd"),
+        ["episode-runtime"] = episode.RuntimeMinutes?.ToString()
+    };
     private string? newComment;
     private bool newCommentIsSpoiler;
     private string? error;

@@ -21,7 +21,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Catalog.API | read side of `catalogdb` | search (title + semantic + tag filter), schedule, people, `/ops` dashboard; applies Catalog migrations |
 | Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay |
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
-| Ratings.API | ratings, comments, reactions | |
+| Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
@@ -411,6 +411,32 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why distinctive traits:** similarity alone pairs every hour-long weekly drama with every other one.
   - **Computed on request** from all DNA rows (a few hundred), cached 30 minutes like similar shows.
 
+## Community and moderation
+
+- **One owner:** Ratings.API holds everything viewers write (comments, community insights, flags, suggested
+  corrections) and the moderation that goes with it, so one service decides what's visible.
+- **Hidden, not deleted:** a post gets a `HiddenReason`: `flags`, `held` or `moderator`. Only its author sees it then,
+  with why, so nobody is silently shadow-banned and a restore loses nothing.
+- **Flags** (`ContentFlag`, one per person per post): 3 open flags hide a post until a moderator looks; 2 spoiler flags
+  mark it a spoiler, which is usually all it needs. A moderator's restore or remove settles (resolves) the flags, so a
+  restored post needs 3 fresh ones to be hidden again.
+- **Light layer** (`Moderation`): blocked terms (`Moderation:BlockedTerms`, whole words) are refused; a link holds a
+  post for review, spam's usual shape; 20 posts and 30 flags per person an hour. Moderators are `Admin:Users` plus
+  `Moderation:Users`; anyone else gets 404 from the moderation API, which the UI uses to know whether to link it.
+- **Community insights** are ranked by helpful votes counted at read time, not a stored counter, so deleting a user's
+  votes needs no recount.
+- **Corrections are applied by the sync worker:** an accepted one is sent to `POST /api/v1/overrides` (internal, like
+  the import API), stored as `CatalogOverride` (`catalog_overrides`, id = the correction's) and applied straight away.
+  - **Surviving refreshes:** `SyncShowAsync` patches the provider's show with the overrides before comparing, so a
+    refresh neither undoes one nor sees it as a change, and the usual events carry the corrected values.
+  - **Fields:** show summary; episode title, summary, air date (the date only; the provider's time of day is kept)
+    and runtime. "Other" is recorded, not applied. Both services check values, Ratings so the suggester hears why.
+  - **Reverting** deletes the override and makes the show due for refresh, which brings the provider's value back.
+  - **Synchronous on purpose:** the moderator sees at once if the catalog refused the value or the show is gone.
+- **Ratings' migrations:** Ratings moved off `EnsureCreated` for these tables. Its `InitialCreate` baseline was applied
+  to a scratch database and diffed (`pg_dump -s`) against the live one `EnsureCreated` made: identical apart from EF's
+  history table.
+
 ## Social
 
 - **Following, not friending** (a product decision): one way, no approval, like Letterboxd. Privacy is the followed
@@ -549,13 +575,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Recommendations, Social and Tracking use EF Core migrations, applied at startup by
+- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Social and Tracking use EF Core migrations, applied at startup by
   their API.
   The other services still use `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+  - **Checked:** Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).

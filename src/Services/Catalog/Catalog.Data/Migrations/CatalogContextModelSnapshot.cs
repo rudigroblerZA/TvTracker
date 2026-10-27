@@ -53,6 +53,37 @@ namespace Catalog.Data.Migrations
                     b.ToTable("cast_members", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.CatalogOverride", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Field")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("catalog_overrides", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.Episode", b =>
                 {
                     b.Property<Guid>("Id")
