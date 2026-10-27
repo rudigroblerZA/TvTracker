@@ -17,20 +17,25 @@ dotnet build src/Tools/Catalog.ImportCli
 # (app admin: admin / admin).
 dotnet run --project src/TvTracker.AppHost
 
-# Migrations (Catalog, Analytics, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
+# Migrations (Catalog, Analytics, Ratings, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
+dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
+
+# Load while the AppHost runs (setup once; cleanup deletes the users and their data)
+dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
+dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
 ```
 
 There are no tests or CI. Verify changes by building, then running the AppHost and checking endpoints, the
-database or the UI. `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
+database or the UI. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
 Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not needed.
 
 ## Conventions
@@ -59,6 +64,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
   signed out (tags, the tag filter).
 - **App name:** never write "TV Tracker" in UI or service text; use `@Brand.AppName` in pages and `Branding` in
   services (white label, see CONTEXT.md). New colours go in `app.css` as `light-dark(light, dark)` tokens.
+- **User posts** (comments, tips, anything people write for others) live in Ratings.API and go through `Moderation`:
+  check the text, the hourly limit, and honour `HiddenReason` when reading.
 - **Docs:** update README.md for user-visible behaviour, and CONTEXT.md for architecture or a decision.
 
 ## Gotchas

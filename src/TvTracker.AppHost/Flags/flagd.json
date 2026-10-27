@@ -126,6 +126,18 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share." }
+    },
+    "community-insights": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Community insights: viewers' tips on show and episode pages, ranked by how many found them helpful." }
+    },
+    "corrections": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Corrections: viewers suggest fixes to show and episode data; moderators accept them into the catalog." }
     }
   }
 }

@@ -209,6 +209,47 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task DeleteCommentAsync(Guid commentId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/comments/{commentId}", null, ct);
 
+    /// <summary>Flags a comment ("comment") or community insight ("insight"); null when it's gone.</summary>
+    public Task<FlagResult?> FlagAsync(string kind, Guid id, string reason, string? note, CancellationToken ct = default) =>
+        SendAsync<FlagResult>(ApiClients.Ratings, HttpMethod.Post,
+            kind == "comment" ? $"api/v1/comments/{id}/flag" : $"api/v1/community-insights/{id}/flag", new { Reason = reason, Note = note }, ct);
+
+    /// <summary>A show's community insights, or one episode's.</summary>
+    public Task<CommunityInsights?> GetCommunityInsightsAsync(Guid showId, Guid? episodeId, CancellationToken ct = default) =>
+        GetAsync<CommunityInsights>(ApiClients.Ratings,
+            $"api/v1/shows/{showId}/community-insights{(episodeId is { } e ? $"?episodeId={e}" : "")}", ct);
+
+    public Task<CommunityInsight?> PostCommunityInsightAsync(Guid showId, Guid? episodeId, string text, bool isSpoiler, CancellationToken ct = default) =>
+        SendAsync<CommunityInsight>(ApiClients.Ratings, HttpMethod.Post, $"api/v1/shows/{showId}/community-insights",
+            new { EpisodeId = episodeId, Text = text, IsSpoiler = isSpoiler }, ct);
+
+    public Task DeleteCommunityInsightAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/community-insights/{id}", null, ct);
+
+    public Task SetHelpfulAsync(Guid id, bool helpful, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, helpful ? HttpMethod.Put : HttpMethod.Delete, $"api/v1/community-insights/{id}/helpful", null, ct);
+
+    public Task<Correction?> SuggestCorrectionAsync(Guid showId, Guid? episodeId, string field, string? currentValue, string suggestedValue,
+        string? note, string? context, CancellationToken ct = default) =>
+        SendAsync<Correction>(ApiClients.Ratings, HttpMethod.Post, "api/v1/corrections",
+            new { ShowId = showId, EpisodeId = episodeId, Field = field, CurrentValue = currentValue, SuggestedValue = suggestedValue, Note = note, Context = context }, ct);
+
+    public Task<List<Correction>?> GetMyCorrectionsAsync(CancellationToken ct = default) =>
+        GetAsync<List<Correction>>(ApiClients.Ratings, "api/v1/me/corrections", ct);
+
+    /// <summary>The moderation queue, for moderators; null for anyone else.</summary>
+    public Task<ModerationQueue?> GetModerationQueueAsync(CancellationToken ct = default) =>
+        GetAsync<ModerationQueue>(ApiClients.Ratings, "api/v1/moderation", ct);
+
+    /// <summary>Restores (shows again) or removes a flagged or held post.</summary>
+    public Task SettlePostAsync(string kind, Guid id, bool restore, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, HttpMethod.Post, $"api/v1/moderation/posts/{kind}/{id}/{(restore ? "restore" : "remove")}", null, ct);
+
+    /// <summary>Accepts (applying <paramref name="value"/>, or the suggestion), rejects or reverts a correction.</summary>
+    public Task<Correction?> ReviewCorrectionAsync(Guid id, string action, string? value = null, CancellationToken ct = default) =>
+        SendAsync<Correction>(ApiClients.Ratings, HttpMethod.Post, $"api/v1/moderation/corrections/{id}/{action}",
+            action == "accept" ? new { Value = value } : null, ct);
+
     public Task<Reactions?> GetReactionsAsync(Guid episodeId, CancellationToken ct = default) =>
         GetAsync<Reactions>(ApiClients.Ratings, $"api/v1/episodes/{episodeId}/reactions", ct);
 

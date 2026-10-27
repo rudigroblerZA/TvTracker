@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    tvtracker-load: generates load against a running AppHost. Load-test users sign in through Keycloak and browse
+    (and optionally follow, watch and rate) through the Mobile BFF, so every service and the gateway see traffic.
+    Development only: it creates a Keycloak client that accepts passwords directly.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>tvtracker-load</AssemblyName>
+    <RootNamespace>TvTracker.LoadGen</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+</Project>

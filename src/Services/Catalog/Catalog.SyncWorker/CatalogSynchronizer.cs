@@ -213,6 +213,44 @@ public sealed class CatalogSynchronizer(
         return last < now.AddYears(-PresumedEndedAfterYears) ? ShowStatus.Ended : p.Status;
     }
 
+    /// <summary>
+    /// Stores an accepted correction and applies it now, publishing the episode's change like a refresh would.
+    /// Returns false when the show or episode isn't in the catalog.
+    /// </summary>
+    public async Task<bool> AddOverrideAsync(CatalogOverride o, CancellationToken ct)
+    {
+        var show = await db.Shows.Include(s => s.Episodes).SingleOrDefaultAsync(s => s.Id == o.ShowId, ct);
+        if (show is null || o.EpisodeId is { } episodeId && show.Episodes.All(e => e.Id != episodeId))
+        {
+            return false;
+        }
+
+        o.CreatedAtUtc = time.GetUtcNow().UtcDateTime;
+        db.Overrides.Add(o);
+        if (CatalogOverrides.ApplyTo(show, o) && o.EpisodeId is { } changed)
+        {
+            outbox.Add(EpisodesScheduled(show, show.Episodes.Where(e => e.Id == changed)));
+        }
+        await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
+        await cache.RemoveByTagAsync(CacheKeys.ShowTag(show.Id), ct);
+        logger.LogInformation("Correction {Id} applied to {Show}: {Field}", o.Id, show.Title, o.Field);
+        return true;
+    }
+
+    /// <summary>Removes a correction; the show's next refresh (due now) brings the provider's value back.</summary>
+    public async Task<bool> RemoveOverrideAsync(Guid id, CancellationToken ct)
+    {
+        if (await db.Overrides.FindAsync([id], ct) is not { } o)
+        {
+            return false;
+        }
+        db.Overrides.Remove(o);
+        await db.Shows.Where(s => s.Id == o.ShowId).ExecuteUpdateAsync(s => s.SetProperty(x => x.NextRefreshAtUtc, time.GetUtcNow().UtcDateTime), ct);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     /// <summary>Publishes EpisodeAired for episodes whose air time has passed.</summary>
     public async Task<int> PublishAiredEpisodesAsync(CancellationToken ct)
     {
@@ -326,6 +364,10 @@ public sealed class CatalogSynchronizer(
             .SingleOrDefaultAsync(s => s.Source == provider.Name && s.ExternalId == p.ExternalId, ct);
 
         var isNew = show is null;
+        if (show is not null && await db.Overrides.AsNoTracking().Where(o => o.ShowId == show.Id).ToListAsync(ct) is { Count: > 0 } overrides)
+        {
+            p = CatalogOverrides.Apply(p, overrides, show.Episodes.ToDictionary(e => e.Id, e => e.ExternalId));
+        }
         if (show is null)
         {
             show = new Show

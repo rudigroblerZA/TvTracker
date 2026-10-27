@@ -1,0 +1,87 @@
+@page "/corrections"
+@attribute [RequiresFeature(FeatureFlags.Corrections)]
+@inject RatingsClient Ratings
+
+<PageTitle>Your suggested corrections · @Brand.AppName</PageTitle>
+
+<h1>Your suggested corrections</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (corrections is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (corrections.Count == 0)
+        {
+            <p class="muted">None yet. Spot something wrong on a show or episode page? "Suggest a correction" is under its details.</p>
+        }
+        else
+        {
+            <ul class="flag-list">
+                @foreach (var c in corrections)
+                {
+                    <li class="panel" @key="c.Id">
+                        <div class="section-head">
+                            <a class="strong" href="@(c.EpisodeId is { } e ? $"episodes/{e}" : $"shows/{c.ShowId}")">@(c.Context ?? "A show")</a>
+                            <span class="tag @StatusClass(c.Status)">@StatusLabel(c.Status)</span>
+                        </div>
+                        <div class="small"><span class="muted">@FieldLabel(c.Field): </span>@c.SuggestedValue</div>
+                        <div class="muted small">Sent @Format.Relative(c.CreatedAtUtc)@(c.ReviewedAtUtc is { } at ? $" · reviewed {Format.Relative(at)}" : "")</div>
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see your suggested corrections." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<Correction>? corrections;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            corrections = await Ratings.GetMyCorrectionsAsync() ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    internal static string FieldLabel(string field) => field switch
+    {
+        "show-summary" or "episode-summary" => "Summary",
+        "episode-title" => "Title",
+        "episode-airdate" => "Air date",
+        "episode-runtime" => "Runtime (minutes)",
+        _ => "Other"
+    };
+
+    internal static string StatusLabel(string status) => status switch
+    {
+        "accepted" => "Accepted",
+        "rejected" => "Not accepted",
+        "reverted" => "Reverted",
+        _ => "Waiting for review"
+    };
+
+    internal static string StatusClass(string status) => status switch
+    {
+        "accepted" => "flag-on",
+        "rejected" or "reverted" => "flag-off",
+        _ => ""
+    };
+}

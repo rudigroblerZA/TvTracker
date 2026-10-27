@@ -1,0 +1,110 @@
+@inject RatingsClient Ratings
+
+@* "Suggest a correction" for a show's or an episode's data. A moderator reviews it; accepted, it replaces TVmaze's value. *@
+<div class="suggest-correction">
+    @if (sent is not null)
+    {
+        <p class="muted small">Thanks. A moderator will check it. <a href="corrections">Your suggestions</a></p>
+    }
+    else if (!open)
+    {
+        <button class="link small muted" type="button" @onclick="Open">Something wrong here? Suggest a correction</button>
+    }
+    else
+    {
+        <form class="panel stack correction-form" @onsubmit="SendAsync">
+            <label>
+                What's wrong?
+                <select @bind="field" @bind:after="() => value = Prefill(field)">
+                    @foreach (var (key, label) in Fields)
+                    {
+                        <option value="@key">@label</option>
+                    }
+                </select>
+            </label>
+            @if (Current.GetValueOrDefault(field) is { Length: > 0 } now)
+            {
+                <div class="small"><span class="muted">Now: </span>@Shorten(now)</div>
+            }
+            <label>
+                @(field == "other" ? "What should it say?" : "Correct value")
+                @switch (field)
+                {
+                    case "episode-airdate":
+                        <input type="date" value="@value" @oninput="e => value = e.Value?.ToString()" />
+                        break;
+                    case "episode-runtime":
+                        <input type="number" min="1" max="600" value="@value" @oninput="e => value = e.Value?.ToString()" />
+                        break;
+                    case "episode-title":
+                        <input type="text" maxlength="300" @bind="value" @bind:event="oninput" />
+                        break;
+                    default:
+                        <textarea maxlength="4000" rows="4" @bind="value" @bind:event="oninput"></textarea>
+                        break;
+                }
+            </label>
+            <label>Source or note (optional) <input type="text" maxlength="1000" @bind="note" placeholder="e.g. the network's press release" /></label>
+            <ErrorNotice Message="@error" />
+            <div class="actions">
+                <button class="btn" type="submit" disabled="@(busy || string.IsNullOrWhiteSpace(value))">Send</button>
+                <button class="btn btn-quiet" type="button" @onclick="() => open = false">Cancel</button>
+            </div>
+        </form>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+    [Parameter] public Guid? EpisodeId { get; set; }
+
+    /// <summary>The show and episode as shown here ("Severance · S01E03"), for the moderator.</summary>
+    [Parameter] public string? Context { get; set; }
+
+    /// <summary>The values the page shows now, by field (episode-airdate as yyyy-MM-dd), for comparison and to start from.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string?> Current { get; set; } = new Dictionary<string, string?>();
+
+    private (string Key, string Label)[] Fields => EpisodeId is null
+        ? [("show-summary", "The summary"), ("other", "Something else")]
+        : [("episode-title", "The title"), ("episode-airdate", "The air date"), ("episode-runtime", "The runtime"),
+           ("episode-summary", "The summary"), ("other", "Something else")];
+
+    private bool open;
+    private string field = "";
+    private string? value;
+    private string? note;
+    private bool busy;
+    private string? error;
+    private Correction? sent;
+
+    private void Open()
+    {
+        open = true;
+        field = Fields[0].Key;
+        value = Prefill(field);
+    }
+
+    /// <summary>Starts from the current value, so a small fix is a small edit.</summary>
+    private string? Prefill(string key) => key == "other" ? null : Current.GetValueOrDefault(key);
+
+    private static string Shorten(string text) => text.Length > 200 ? text[..200] + "…" : text;
+
+    private async Task SendAsync()
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            sent = await Ratings.SuggestCorrectionAsync(ShowId, EpisodeId, field, Current.GetValueOrDefault(field), value!.Trim(),
+                string.IsNullOrWhiteSpace(note) ? null : note.Trim(), Context);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}
