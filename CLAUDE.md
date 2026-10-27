@@ -28,10 +28,14 @@ dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --o
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
+
+# Load while the AppHost runs (setup once; cleanup deletes the users and their data)
+dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
+dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
 ```
 
 There are no tests or CI. Verify changes by building, then running the AppHost and checking endpoints, the
-database or the UI. `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
+database or the UI. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
 Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not needed.
 
 ## Conventions

@@ -267,6 +267,35 @@ at all). The tool talks to `http://localhost:5107` (`--url` or `TVTRACKER_SYNC_U
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
 
+### Load testing
+
+`tvtracker-load` (`src/Tools/TvTracker.LoadGen`) generates load against a running AppHost. Load-test users sign in
+through Keycloak and use the app through the Mobile BFF, so the gateway and every service see realistic traffic: the
+Aspire dashboard's metrics and traces fill up as they would with real users.
+
+```bash
+cd src/Tools/TvTracker.LoadGen
+dotnet run -- setup --users 50                 # once: a load-test Keycloak client and users load-0001 … load-0050
+dotnet run -- run --users 50 --duration 5m     # browse for 5 minutes
+dotnet run -- run -u 20 -d 2m --think 200ms --writes --csv run.csv   # busier, and follow, watch and rate
+dotnet run -- cleanup                          # delete the users and everything they did
+```
+
+- **What users do:** each signs in, then visits pages until the run ends, each page a burst of the requests the app
+  makes for it: a show page (seven services), home, an episode, a search, Discover, the feed, stats. Shows come from
+  the catalog's trending list and a few genres. `--writes` adds following, marking watched and rating, and now and then
+  unfollowing so long runs stay bounded.
+- **Pacing:** `--ramp-up` (default 10s) starts users evenly; `--think` (default 1s, ±50%) is the pause between pages;
+  `--think 0` runs flat out.
+- **Output:** a progress line every 5 seconds (req/s, p95, errors), then a table per endpoint: count, req/s, errors,
+  429s, 404s and p50/p95/p99/max. Errors are 5xx and failed connections; 429s (the services' per-user rate limits) and
+  404s (a feature flag off, "not following") are counted apart. The exit code is 2 when there were errors.
+- **Cleanup** signs each user in and deletes the account the way Settings does, so every service drops their data.
+- **Development only:** `setup` uses Keycloak's console admin (`--admin-password`, default `admin`) and creates a
+  `tvtracker-loadgen` client that accepts passwords directly.
+- A first run on a laptop-class sandbox: 5 users at 300 ms think time with writes gave about 55 req/s, p95 ~110 ms
+  once warm (the first seconds are slower while caches fill), and no errors.
+
 ### Ops dashboard
 
 http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
@@ -376,6 +405,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
 | Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |
 | Catalog.ImportCli | `src/Tools` | `tvtracker-import`: bulk import by titles, TVmaze ids or top N, through the sync worker |
+| TvTracker.LoadGen | `src/Tools` | `tvtracker-load`: load-test users browsing (and tracking) through the Mobile BFF, with a per-endpoint report |
 | Catalog.Embeddings | `src/Services/Catalog` | Local text embeddings (all-MiniLM-L6-v2 via ONNX Runtime) for semantic search |
 | Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
