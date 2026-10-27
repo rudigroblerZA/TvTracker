@@ -353,6 +353,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<List<CatchUpPlan>?> GetCatchUpsAsync(CancellationToken ct = default) =>
         GetAsync<List<CatchUpPlan>>(ApiClients.Analytics, "api/v1/me/catch-up", ct);
 
+    /// <summary>For each actor in the show's cast, the other shows the user has seen them in.</summary>
+    public Task<KnownFaces?> GetKnownFacesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<KnownFaces>(ApiClients.Analytics, $"api/v1/shows/{showId}/known-faces", ct);
+
     /// <summary>"Is it worth going back?"; null unless the user dropped the show.</summary>
     public Task<Comeback?> GetComebackAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<Comeback>(ApiClients.Analytics, $"api/v1/shows/{showId}/comeback", ct);

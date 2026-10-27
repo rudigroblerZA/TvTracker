@@ -522,3 +522,11 @@ public record ModerationLogItem(string Moderator, string Action, string TargetKi
 
 public record ModerationQueue(IReadOnlyList<ModeratedPost> Posts, IReadOnlyList<Correction> Corrections, IReadOnlyList<Correction> Accepted,
     IReadOnlyList<ModerationLogItem> Log);
+
+/// <summary>"Where do I know them from?" for a show's cast (see Analytics.API's KnownFacesApi).</summary>
+public record KnownFaces(Guid ShowId, int CastCount, IReadOnlyList<KnownFace> People);
+
+public record KnownFace(Guid PersonId, string Name, string? Character, IReadOnlyList<KnownFrom> From);
+
+/// <param name="CaughtUp">False when the user is partway through that show, so the actor may only arrive later.</param>
+public record KnownFrom(Guid ShowId, string Title, string? PosterUrl, string? Character, int Watched, int Aired, bool CaughtUp);
