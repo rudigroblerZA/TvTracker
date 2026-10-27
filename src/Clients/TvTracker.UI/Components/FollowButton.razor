@@ -1,0 +1,42 @@
+@inject SocialClient Social
+
+@* Follow or unfollow someone; shows the new state once the change is saved. *@
+@if (!Person.IsYou)
+{
+    <button class="btn @(following ? "btn-quiet" : "")" @onclick="ToggleAsync" disabled="@busy"
+            aria-label="@(following ? "Unfollow" : "Follow") @Person.DisplayName">@(following ? "Following" : "Follow")</button>
+}
+
+@code {
+    [Parameter, EditorRequired] public SocialPerson Person { get; set; } = null!;
+
+    private bool following;
+    private bool busy;
+
+    protected override void OnParametersSet() => following = Person.IsFollowing;
+
+    private async Task ToggleAsync()
+    {
+        busy = true;
+        try
+        {
+            if (following)
+            {
+                await Social.UnfollowAsync(Person.UserId);
+            }
+            else
+            {
+                await Social.FollowAsync(Person.UserId);
+            }
+            following = !following;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Leave the button as it was; the next load shows the truth.
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

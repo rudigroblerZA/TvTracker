@@ -532,6 +532,18 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .comeback-section { margin: 20px 0; }
 .comeback-section .insight-card > h2:first-child { margin-top: 0; }
 
+/* Social: the feed, people and user pages */
+.feed, .people { list-style: none; padding: 0; margin: 8px 0 16px; display: flex; flex-direction: column; }
+.feed-item, .person-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.feed-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface)); text-decoration: none; }
+.avatar.large { width: 64px; height: 64px; font-size: 1.6rem; }
+.user-hero { display: flex; align-items: center; gap: 16px; margin: 8px 0; }
+.user-hero h1 { margin: 0; overflow-wrap: anywhere; }
+.user-hero > div { flex: 1; min-width: 0; }
+.feed-stars { color: var(--warn); letter-spacing: 1px; }
+
 /* Spoiler shield: a hidden title, select to show */
 .spoiler-hidden { font: inherit; font-size: 0.85em; font-weight: 400; color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); border: 1px dashed var(--border); border-radius: 6px; padding: 0 8px; margin-left: 6px; cursor: pointer; }
 .spoiler-hidden:hover, .spoiler-hidden:focus-visible { color: var(--text); border-color: var(--accent); }

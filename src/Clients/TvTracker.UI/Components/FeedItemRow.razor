@@ -1,0 +1,63 @@
+@* One feed item: who did what to which show, and when. Episode numbers only, never titles: a follower may not have
+   seen them yet. *@
+<li class="feed-item">
+    <a class="avatar" href="users/@Item.UserId" aria-hidden="true" tabindex="-1">@Initial(Item.DisplayName)</a>
+    <div class="feed-body">
+        <div>
+            @if (ShowName)
+            {
+                <a class="strong" href="users/@Item.UserId">@Item.DisplayName</a><span>@(" " + Verb(Item) + " ")</span>
+            }
+            else
+            {
+                <span>@(Capitalize(Verb(Item)) + " ")</span>
+            }
+            <a href="shows/@Item.ShowId">@(Item.ShowTitle ?? "a show")</a>
+            @if (Item.Kind == "rated" && Item.Stars is { } stars)
+            {
+                <span class="feed-stars" aria-label="@stars stars">@(" " + new string('★', stars) + new string('☆', 5 - stars))</span>
+            }
+        </div>
+        <div class="muted small">
+            @if (Item.Kind == "watched" && Episodes(Item) is { Length: > 0 } episodes)
+            {
+                <span>@episodes · </span>
+            }
+            <span>@Format.Relative(new DateTimeOffset(Item.OccurredAtUtc, TimeSpan.Zero))</span>
+        </div>
+    </div>
+    <a href="shows/@Item.ShowId"><Poster Title="@(Item.ShowTitle ?? "")" Url="@Item.PosterUrl" Size="small" /></a>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public FeedItem Item { get; set; } = null!;
+
+    /// <summary>False on a person's own page, where "Sam" before every line is noise.</summary>
+    [Parameter] public bool ShowName { get; set; } = true;
+
+    private static string Verb(FeedItem item) => item.Kind switch
+    {
+        "watched" => "watched",
+        "finished" => "finished",
+        "followed" => "started following",
+        "rated" => "rated",
+        _ => item.Kind
+    };
+
+    /// <summary>
+    /// "S02E03", "S02E01 and S02E03", "S02E01–S02E04 · 4 episodes", or "12 episodes" while the catalog copy lacks their
+    /// numbers.
+    /// </summary>
+    private static string Episodes(FeedItem item) => (item.First, item.Last) switch
+    {
+        ({ } first, null) when item.Episodes == 1 => Format.EpisodeCode(first.SeasonNumber, first.EpisodeNumber),
+        ({ } first, { } last) when item.Episodes == 2 =>
+            $"{Format.EpisodeCode(first.SeasonNumber, first.EpisodeNumber)} and {Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber)}",
+        ({ } first, { } last) => $"{Format.EpisodeCode(first.SeasonNumber, first.EpisodeNumber)}–{Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber)} · {item.Episodes} episodes",
+        _ => item.Episodes == 1 ? "1 episode" : $"{item.Episodes} episodes"
+    };
+
+    public static string Initial(string name) => name.Length == 0 ? "?" : char.ToUpperInvariant(name[0]).ToString();
+
+    private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+}

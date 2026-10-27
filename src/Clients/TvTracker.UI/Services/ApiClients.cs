@@ -17,9 +17,10 @@ public static class ApiClients
     public const string Recommendations = "recommendations";
     public const string Notifications = "notifications";
     public const string Analytics = "analytics";
+    public const string Social = "social";
 
     public static readonly IReadOnlyList<string> All =
-        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics];
+        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social];
 }
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
@@ -355,4 +356,35 @@ public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvid
         (await GetAsync<WebPushKey>(ApiClients.Notifications, "api/v1/webpush/public-key", ct))?.PublicKey;
 
     private sealed record WebPushKey(string PublicKey);
+}
+
+public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
+{
+    public Task<MySocial?> GetMeAsync(CancellationToken ct = default) =>
+        GetAsync<MySocial>(ApiClients.Social, "api/v1/me/social", ct);
+
+    public Task<SocialSettings?> UpdateSettingsAsync(SocialSettings settings, CancellationToken ct = default) =>
+        SendAsync<SocialSettings>(ApiClients.Social, HttpMethod.Put, "api/v1/me/social/settings", settings, ct);
+
+    /// <summary>The newest activity of the people the user follows; pass the last page's NextBefore for older items.</summary>
+    public Task<Feed?> GetFeedAsync(DateTime? before = null, CancellationToken ct = default) =>
+        GetAsync<Feed>(ApiClients.Social, before is { } b ? $"api/v1/feed?before={Uri.EscapeDataString(b.ToString("O"))}" : "api/v1/feed", ct);
+
+    public Task<List<SocialPerson>?> SearchAsync(string query, CancellationToken ct = default) =>
+        GetAsync<List<SocialPerson>>(ApiClients.Social, $"api/v1/people?q={Uri.EscapeDataString(query)}", ct);
+
+    public Task<SocialPersonPage?> GetPersonAsync(string userId, CancellationToken ct = default) =>
+        GetAsync<SocialPersonPage>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}", ct);
+
+    public Task<List<SocialPerson>?> GetFollowersAsync(string userId, CancellationToken ct = default) =>
+        GetAsync<List<SocialPerson>>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/followers", ct);
+
+    public Task<List<SocialPerson>?> GetFollowingAsync(string userId, CancellationToken ct = default) =>
+        GetAsync<List<SocialPerson>>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/following", ct);
+
+    public Task FollowAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Post, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
+
+    public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
 }

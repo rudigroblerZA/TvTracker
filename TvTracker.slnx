@@ -27,6 +27,7 @@
     <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
     <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
     <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
+    <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
     <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
     <Project Path="src/Services/Analytics/Analytics.Data/Analytics.Data.csproj" />
     <Project Path="src/Services/Analytics/Analytics.Worker/Analytics.Worker.csproj" />
