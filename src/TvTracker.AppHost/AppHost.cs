@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Aspire.Hosting.Utils;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -215,6 +216,14 @@ else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunner
     var endpoint = modelRunnerUrl.TrimEnd('/') + "/engines/v1/";
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
+
+    // Open WebUI runs in a container, where localhost is the container itself.
+    var fromContainer = new UriBuilder(modelRunnerUrl);
+    if (fromContainer.Host is "localhost" or "127.0.0.1")
+    {
+        fromContainer.Host = "host.docker.internal";
+    }
+    AddOpenWebUi(ReferenceExpression.Create($"{fromContainer.Uri.ToString().TrimEnd('/')}/engines/v1"), null);
 }
 else
 {
@@ -226,6 +235,57 @@ else
     var endpoint = ReferenceExpression.Create($"{modelRunner.GetEndpoint("http")}/engines/v1/");
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
+
+    // Model Runner serves only the embedding model until a chat model is pulled: this adds a "Pull <model>" command to
+    // the model-runner resource on the dashboard (Model Runner's own pull API, which the sync worker also uses).
+    var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/smollm2";
+    modelRunner.WithHttpCommand("/models/create", $"Pull {chatModel}", commandName: "pull-chat-model",
+        commandOptions: new HttpCommandOptions
+        {
+            Method = HttpMethod.Post,
+            Description = $"Pulls {chatModel} for chatting in Open WebUI. Large models take minutes; it shows there once pulled.",
+            IconName = "ArrowDownload",
+            PrepareRequest = context =>
+            {
+                context.Request.Content = JsonContent.Create(new { from = chatModel });
+                return Task.CompletedTask;
+            }
+        });
+
+    AddOpenWebUi(ReferenceExpression.Create($"{modelRunner.GetEndpoint("http")}/engines/v1"), modelRunner);
+}
+
+// Open WebUI: a web UI for Model Runner, to see the models it serves and chat with any chat model pulled into it
+// ("open-webui" on the dashboard). Development only: sign-in is off, so anyone who can reach it can use it. Its
+// document search embeds with Model Runner's embedding model too, so it downloads no model of its own at start.
+// The image is about 6 GB; ModelRunner:OpenWebUi = false leaves it out.
+void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<ContainerResource>? modelRunner)
+{
+    if (string.Equals(builder.Configuration["ModelRunner:OpenWebUi"], "false", StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    var openWebUi = builder.AddContainer("open-webui", "ghcr.io/open-webui/open-webui", "v0.7.2")
+        .WithHttpEndpoint(targetPort: 8080, name: "http")
+        .WithVolume("tvtracker-open-webui", "/app/backend/data")
+        .WithEnvironment("WEBUI_NAME", $"{appName} · Model Runner")
+        .WithEnvironment("WEBUI_AUTH", "False")
+        .WithEnvironment("ENABLE_OLLAMA_API", "False")
+        .WithEnvironment("OPENAI_API_BASE_URL", modelRunnerApi)
+        .WithEnvironment("OPENAI_API_KEY", "model-runner")
+        .WithEnvironment("RAG_EMBEDDING_ENGINE", "openai")
+        .WithEnvironment("RAG_OPENAI_API_BASE_URL", modelRunnerApi)
+        .WithEnvironment("RAG_OPENAI_API_KEY", "model-runner")
+        .WithEnvironment("RAG_EMBEDDING_MODEL", "ai/nomic-embed-text-v1.5")
+        .WithEnvironment("ENABLE_EVALUATION_ARENA_MODELS", "False")
+        .WithEnvironment("ANONYMIZED_TELEMETRY", "False")
+        .WithHttpHealthCheck("/health")
+        .WithLifetime(ContainerLifetime.Persistent);
+    if (modelRunner is not null)
+    {
+        openWebUi.WaitFor(modelRunner);
+    }
 }
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.

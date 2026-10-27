@@ -88,6 +88,16 @@ default model, so semantic search needs nothing installed beyond Docker.
 - **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
 - **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
   embeds once it's back. Each service logs one warning per outage.
+- **Open WebUI** (`open-webui` on the dashboard): a web UI for Model Runner, to see what it serves and chat with it.
+  - **Sign-in is off,** since it's for development; it's named after the app (`Branding:AppName`).
+  - **Chat needs a chat model.** Model Runner only has the embedding model until you pull one: the `model-runner`
+    resource on the dashboard has a "Pull ai/smollm2" command (another model: `ModelRunner:ChatModel`), or run
+    `docker model pull` against your own Model Runner. It shows in Open WebUI once pulled.
+  - **Its document search** embeds with the same embedding model, so it downloads no model of its own.
+  - **With your own Model Runner** (`ModelRunner:Url`), it's reached from the container through
+    `host.docker.internal`; the pull command is only on the AppHost's container.
+  - **Size:** the image is about 6 GB. `ModelRunner:OpenWebUi` = `false` leaves it out. Not started for an
+    in-process embedding model, since there's no Model Runner then.
 - **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
   `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
   - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as nomic and EmbeddingGemma):
