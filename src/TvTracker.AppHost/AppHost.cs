@@ -78,6 +78,7 @@ var flagd = builder.AddFlagd("flagd")
 // Development secrets; they match Realms/tvtracker-realm.json. Change both for any shared environment.
 const string WebClientSecret = "tvtracker-web-dev-secret";
 const string IdentityAdminClientSecret = "tvtracker-identity-admin-dev-secret";
+const string McpClientSecret = "tvtracker-mcp-dev-secret";
 const string AppAdminPassword = "admin";
 
 // ---------------------------------------------------------------------------
@@ -310,6 +311,19 @@ catalogApi.WithReference(analyticsApi);
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);
 socialApi.WithReference(catalogSync);
+
+// Internal MCP server (http://localhost:5112/mcp): read-only tools over the catalog and Analytics, for questions like
+// "landman insights" from an MCP client. It signs in to Analytics as its own Keycloak client, which it creates in
+// development if the realm predates it. Development only unless Mcp:ApiKey is set.
+builder.AddProject<Projects.Mcp_Server>("mcp-server")
+    .WithReference(catalogApi)
+    .WithReference(analyticsApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithEnvironment("Mcp__ClientSecret", McpClientSecret)
+    .WithEnvironment("Keycloak__AdminUsername", "admin")
+    .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
+    .WaitFor(keycloak)
+    .WithHttpHealthCheck("/health");
 
 // ---------------------------------------------------------------------------
 // Gateways and clients
