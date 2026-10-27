@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -38,7 +39,12 @@ public sealed class RabbitMQEventBus(
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    /// <summary>Publishing channels kept open between publishes, at most this many.</summary>
+    private const int MaxIdlePublishChannels = 8;
+
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private readonly ConcurrentBag<IChannel> _publishChannels = [];
+    private IConnection? _exchangeDeclaredOn;
     private readonly CancellationTokenSource _stopping = new();
     private IConnection? _connection;
     private IChannel? _consumerChannel;
@@ -52,10 +58,11 @@ public sealed class RabbitMQEventBus(
         var routingKey = EventName.For(@event.GetType());
         using var activity = ActivitySource.StartActivity($"publish {routingKey}", ActivityKind.Producer);
 
+        // Opening a channel per publish and declaring the exchange each time cost three round trips per event inside
+        // every write request, so channels come from a small pool (one publish at a time each) and the exchange is
+        // declared once per connection.
         var connection = await GetConnectionAsync(cancellationToken);
-        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-
-        await channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
+        var channel = await RentPublishChannelAsync(connection, cancellationToken);
 
         var body = JsonSerializer.SerializeToUtf8Bytes(@event, @event.GetType(), JsonOptions);
         var properties = new BasicProperties
@@ -66,7 +73,16 @@ public sealed class RabbitMQEventBus(
             ContentType = "application/json"
         };
 
-        await channel.BasicPublishAsync(ExchangeName, routingKey, mandatory: false, basicProperties: properties, body: body, cancellationToken: cancellationToken);
+        try
+        {
+            await channel.BasicPublishAsync(ExchangeName, routingKey, mandatory: false, basicProperties: properties, body: body, cancellationToken: cancellationToken);
+        }
+        catch
+        {
+            await channel.DisposeAsync();
+            throw;
+        }
+        await ReturnPublishChannelAsync(channel);
 
         logger.LogDebug("Published {EventName} {EventId}", routingKey, @event.Id);
     }
@@ -217,9 +233,43 @@ public sealed class RabbitMQEventBus(
         }
     }
 
+    private async Task<IChannel> RentPublishChannelAsync(IConnection connection, CancellationToken cancellationToken)
+    {
+        if (!ReferenceEquals(_exchangeDeclaredOn, connection))
+        {
+            await using var declare = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            await declare.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
+            _exchangeDeclaredOn = connection;
+        }
+
+        while (_publishChannels.TryTake(out var pooled))
+        {
+            if (pooled.IsOpen)
+            {
+                return pooled;
+            }
+            await pooled.DisposeAsync();
+        }
+        return await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+    }
+
+    private async ValueTask ReturnPublishChannelAsync(IChannel channel)
+    {
+        if (channel.IsOpen && _publishChannels.Count < MaxIdlePublishChannels)
+        {
+            _publishChannels.Add(channel);
+            return;
+        }
+        await channel.DisposeAsync();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _stopping.Dispose();
+        while (_publishChannels.TryTake(out var channel))
+        {
+            await channel.DisposeAsync();
+        }
         if (_consumerChannel is not null)
         {
             await _consumerChannel.DisposeAsync();

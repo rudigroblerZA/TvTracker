@@ -1,5 +1,6 @@
 using Analytics.API.Apis;
 using Analytics.Data;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +9,7 @@ builder.AddFeatureFlags();
 builder.AddDefaultAuthentication();
 
 // Analytics.API owns the analyticsdb schema (EF Core migrations); the worker waits for this service to be healthy.
-builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb");
+builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<AnalyticsContext>();
 
 // In memory only: the time machine's weeks, the same for everyone in a time zone on a given day.

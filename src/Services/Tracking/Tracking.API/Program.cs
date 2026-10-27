@@ -3,6 +3,7 @@ using Tracking.API.Data;
 using Tracking.API.IntegrationEvents;
 using Tracking.API.Services;
 using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,7 @@ builder.AddServiceDefaults();
 builder.AddFeatureFlags();
 builder.AddDefaultAuthentication();
 
-builder.AddNpgsqlDbContext<TrackingContext>("trackingdb");
+builder.AddNpgsqlDbContext<TrackingContext>("trackingdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 // Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
 builder.Services.AddDatabaseInitializer<TrackingContext>(baseline: "InitialCreate");
 
