@@ -287,7 +287,30 @@ In Settings.
 - **Everywhere at once:** titles and summaries of episodes you haven't watched are hidden across the app, and one tap
   shows one.
 
-### 25. Social: following, the feed and watching together
+### 25. Where do I know them from?
+
+On every show page's cast.
+
+- **The question people look actors up for:** under each actor you've seen before, the shows you saw them in and who
+  they played: open Better Call Saul and Bob Odenkirk reads "You know them from Breaking Bad as Saul Goodman".
+- **From your own history:** shows you watched or rated, not an actor's whole career. One tap filters the cast to the
+  faces you know.
+- **Spoiler-aware:** a show you're partway through says how far you are, since they may only arrive later, and the
+  spoiler shield hides it until you ask.
+
+### 26. Holiday episodes
+
+At `/holidays`, and on Home when one is near.
+
+- **Your shows' Halloween episodes, in time for Halloween:** and Thanksgiving, Christmas, New Year's Eve and
+  Valentine's Day. Every holiday episode of the shows you follow, plus the best known (Treehouse of Horror, The Office's
+  "Halloween") and shows made for the season.
+- **Safe to watch tonight?** Each one says where it sits for you: up next, one you skipped, already watched, or ahead
+  of you. A sitcom's usually stands alone; a drama's ahead of you is "ahead of you in the story", and its title stays
+  behind the spoiler shield.
+- **Nothing to maintain:** found from episode titles and summaries, so new seasons' episodes join by themselves.
+
+### 27. Social: following, the feed and watching together
 
 At `/feed`.
 
@@ -299,7 +322,7 @@ At `/feed`.
 - **Watching together:** with anyone you follow, the shows you share and who's ahead, from your whole history.
 - **Shared lists:** tick one of your lists to show it on your profile.
 
-### 26. Viewers help each other, and keep it civil
+### 28. Viewers help each other, and keep it civil
 
 - **Tips from viewers:** on show and episode pages, what people who watched it want you to know ("slow start; it
   gets good at episode 3"), the most helpful first.
@@ -308,7 +331,7 @@ At `/feed`.
 - **Flags that do something:** enough flags hide a post until a moderator looks, and spoiler flags mark it a spoiler.
 - **A light touch:** blocked words, links held for review, hourly limits, and a moderation page with a log.
 
-### 27. Smaller touches
+### 29. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

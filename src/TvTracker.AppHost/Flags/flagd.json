@@ -138,6 +138,18 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Corrections: viewers suggest fixes to show and episode data; moderators accept them into the catalog." }
+    },
+    "known-faces": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Where do I know them from? On a show's cast, the other shows the user has watched each actor in." }
+    },
+    "holiday-episodes": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     }
   }
 }

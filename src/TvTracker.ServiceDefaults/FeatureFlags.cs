@@ -33,6 +33,8 @@ public static class FeatureFlags
     public const string TonightTogether = "tonight-together";
     public const string CommunityInsights = "community-insights";
     public const string Corrections = "corrections";
+    public const string KnownFaces = "known-faces";
+    public const string HolidayEpisodes = "holiday-episodes";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

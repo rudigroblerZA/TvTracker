@@ -71,6 +71,16 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<NanogenreDetail?> GetNanogenreAsync(string slug, CancellationToken ct = default) =>
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
+    /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    public Task<List<HolidaySummary>?> GetHolidaysAsync(CancellationToken ct = default) =>
+        GetAsync<List<HolidaySummary>>(ApiClients.Catalog, "api/v1/holidays", ct);
+
+    /// <summary>A holiday's episodes: of the given shows (all of them), or the best known across the catalog.</summary>
+    public Task<Holiday?> GetHolidayAsync(string key, IReadOnlyList<Guid>? showIds = null, CancellationToken ct = default) =>
+        showIds is null
+            ? GetAsync<Holiday>(ApiClients.Catalog, $"api/v1/holidays/{Uri.EscapeDataString(key)}", ct)
+            : SendAsync<Holiday>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/holidays/{Uri.EscapeDataString(key)}/shows", new { ShowIds = showIds }, ct);
+
     public Task<List<ShowSummary>?> GetTrendingAsync(CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, "api/v1/shows/trending", ct, cacheForOffline: true);
 
@@ -352,6 +362,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     /// <summary>Followed shows with a new season coming and episodes to catch up on first.</summary>
     public Task<List<CatchUpPlan>?> GetCatchUpsAsync(CancellationToken ct = default) =>
         GetAsync<List<CatchUpPlan>>(ApiClients.Analytics, "api/v1/me/catch-up", ct);
+
+    /// <summary>For each actor in the show's cast, the other shows the user has seen them in.</summary>
+    public Task<KnownFaces?> GetKnownFacesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<KnownFaces>(ApiClients.Analytics, $"api/v1/shows/{showId}/known-faces", ct);
 
     /// <summary>"Is it worth going back?"; null unless the user dropped the show.</summary>
     public Task<Comeback?> GetComebackAsync(Guid showId, CancellationToken ct = default) =>

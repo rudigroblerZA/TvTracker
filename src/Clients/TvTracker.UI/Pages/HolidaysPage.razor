@@ -1,0 +1,249 @@
+@page "/holidays"
+@page "/holidays/{Key}"
+@attribute [RequiresFeature(FeatureFlags.HolidayEpisodes)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>@(holiday?.Name ?? "Holiday") episodes · @Brand.AppName</PageTitle>
+
+<h1>Holiday episodes</h1>
+
+@if (holidays is { Count: > 0 })
+{
+    <nav class="chips" aria-label="Holidays">
+        @foreach (var h in holidays)
+        {
+            <a class="chip @(h.Key == holiday?.Key ? "active" : "")" href="holidays/@h.Key" aria-current="@(h.Key == holiday?.Key ? "page" : null)">@h.Name</a>
+        }
+    </nav>
+}
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (holiday is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <p class="muted">@When(holiday)</p>
+
+    <AuthorizeView>
+        <Authorized>
+            <section>
+                <h2>From your shows</h2>
+                @if (mine is null)
+                {
+                    <p class="muted">Loading…</p>
+                }
+                else if (mine.Count == 0)
+                {
+                    <p class="muted">None of the shows you follow has one. Here are the best known.</p>
+                }
+                else
+                {
+                    <ol class="discovery">
+                        @foreach (var item in mine)
+                        {
+                            <li @key="item.Episode.EpisodeId">
+                                <Poster Title="@item.Episode.ShowTitle" Url="@item.Episode.PosterUrl" Size="small" />
+                                <div>
+                                    <a href="shows/@item.Episode.ShowId"><strong>@item.Episode.ShowTitle</strong></a>
+                                    <div>
+                                        <span class="code">@Format.EpisodeCode(item.Episode.SeasonNumber, item.Episode.EpisodeNumber)</span>
+                                        <Spoiler Hidden="item.Place != Place.Watched">
+                                            <a href="episodes/@item.Episode.EpisodeId">@item.Episode.Title</a>
+                                        </Spoiler>
+                                    </div>
+                                    <div class="muted small">
+                                        <span class="tag @PlaceTone(item)">@PlaceLabel(item)</span>
+                                        <span>@Details(item.Episode)</span>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+        </Authorized>
+    </AuthorizeView>
+
+    @if (Others.Count > 0)
+    {
+        <section>
+            <h2>Best known</h2>
+            <ol class="discovery">
+                @foreach (var episode in Others)
+                {
+                    <li @key="episode.EpisodeId">
+                        <Poster Title="@episode.ShowTitle" Url="@episode.PosterUrl" Size="small" />
+                        <div>
+                            <a href="shows/@episode.ShowId"><strong>@episode.ShowTitle</strong></a>
+                            <div>
+                                <span class="code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                                <a href="episodes/@episode.EpisodeId">@episode.Title</a>
+                            </div>
+                            <div class="muted small">
+                                @if (episode.StandsAlone)
+                                {
+                                    <span class="tag">Stands alone, usually</span>
+                                }
+                                <span>@Details(episode)</span>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        </section>
+    }
+
+    @if (holiday.SeasonShows.Count > 0)
+    {
+        <section>
+            <h2>Made for the season</h2>
+            <div class="card-row">
+                @foreach (var show in holiday.SeasonShows.Take(8))
+                {
+                    <ShowCard ShowId="show.ShowId" Title="@show.Title" PosterUrl="@show.PosterUrl" />
+                }
+            </div>
+        </section>
+    }
+
+    <p class="muted small">Found by the holiday in episode titles, or in summaries of episodes that aired around it. Daily shows are left out.</p>
+}
+
+@code {
+    [Parameter] public string? Key { get; set; }
+
+    /// <summary>Where a holiday episode sits for the user.</summary>
+    private enum Place { UpNext, Behind, NotStarted, Ahead, Watched }
+
+    private sealed record MyEpisode(HolidayEpisode Episode, Place Place);
+
+    private List<HolidaySummary>? holidays;
+    private Holiday? holiday;
+    private List<MyEpisode>? mine;
+    private HashSet<Guid> followed = [];
+    private string? error;
+
+    /// <summary>The best known, less the user's own shows, which are listed above.</summary>
+    private List<HolidayEpisode> Others => holiday?.Episodes.Where(e => !followed.Contains(e.ShowId)).ToList() ?? [];
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        holiday = null;
+        mine = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            holidays ??= await Catalog.GetHolidaysAsync();
+            var key = Key ?? holidays?.FirstOrDefault()?.Key ?? "halloween";
+            holiday = await Catalog.GetHolidayAsync(key);
+            if (holiday is not null && Session.IsSignedIn)
+            {
+                await LoadMineAsync(key);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>
+    /// The holiday's episodes of every followed show, placed against the user's progress: one progress call per show
+    /// with a match, as the watch order does.
+    /// </summary>
+    private async Task LoadMineAsync(string key)
+    {
+        var follows = await Tracking.GetFollowsAsync() ?? [];
+        followed = follows.Select(f => f.ShowId).ToHashSet();
+        var episodes = followed.Count == 0 ? [] : (await Catalog.GetHolidayAsync(key, followed.ToList()))?.Episodes ?? [];
+        var progress = await Task.WhenAll(episodes.Select(e => e.ShowId).Distinct().Select(id => Tracking.GetProgressAsync(id)));
+        var byShow = progress.OfType<ShowProgress>().ToDictionary(p => p.ShowId);
+
+        mine = episodes
+            .Select(e => new MyEpisode(e, PlaceOf(e, byShow.GetValueOrDefault(e.ShowId))))
+            .OrderBy(x => Rank(x))
+            .ThenBy(x => x.Episode.ShowTitle)
+            .ThenBy(x => x.Episode.SeasonNumber).ThenBy(x => x.Episode.EpisodeNumber)
+            .ToList();
+    }
+
+    private static Place PlaceOf(HolidayEpisode episode, ShowProgress? progress)
+    {
+        if (progress is null || progress.WatchedCount == 0)
+        {
+            return Place.NotStarted;
+        }
+        if (progress.WatchedEpisodeIds.Contains(episode.EpisodeId))
+        {
+            return Place.Watched;
+        }
+        if (progress.NextEpisode is not { } next)
+        {
+            return Place.Ahead;
+        }
+        var order = (episode.SeasonNumber, episode.EpisodeNumber).CompareTo((next.SeasonNumber, next.EpisodeNumber));
+        return order == 0 ? Place.UpNext : order < 0 ? Place.Behind : Place.Ahead;
+    }
+
+    /// <summary>
+    /// What can be watched now first: up next, then skipped ones, then any that stands alone, then the rest of the
+    /// story (shows not started before ones the user is partway through, whose ahead episodes spoil), and watched last.
+    /// </summary>
+    private static int Rank(MyEpisode item) => item.Place switch
+    {
+        Place.UpNext => 0,
+        Place.Behind => 1,
+        Place.Watched => 5,
+        _ when item.Episode.StandsAlone => 2,
+        Place.NotStarted => 3,
+        _ => 4
+    };
+
+    private static string PlaceLabel(MyEpisode item) => item.Place switch
+    {
+        Place.UpNext => "Up next for you",
+        Place.Behind => "Skipped: behind where you are",
+        Place.Watched => "Watched",
+        Place.NotStarted => item.Episode.StandsAlone ? "Not started · stands alone, usually" : "Not started",
+        _ => item.Episode.StandsAlone ? "Ahead of you · stands alone, usually" : "Ahead of you in the story"
+    };
+
+    private static string PlaceTone(MyEpisode item) => item.Place switch
+    {
+        Place.UpNext or Place.Behind => "holiday-good",
+        Place.Ahead when !item.Episode.StandsAlone => "holiday-warn",
+        _ => ""
+    };
+
+    private string When(Holiday h) =>
+        $"{h.Date:dddd d MMMM}" + h.DaysAway switch { 0 => " · today", 1 => " · tomorrow", var d => $" · in {d} days" };
+
+    private string Details(HolidayEpisode episode)
+    {
+        var parts = new List<string>();
+        if (episode.AirsAtUtc is { } airs)
+        {
+            parts.Add($"{Session.ToLocal(airs):yyyy}");
+        }
+        if (episode.RuntimeMinutes is { } minutes)
+        {
+            parts.Add(Format.Duration(minutes));
+        }
+        if (episode.Rating is { } rating)
+        {
+            parts.Add($"rated {Format.Rating(rating)}");
+        }
+        return parts.Count == 0 ? "" : $" {string.Join(" · ", parts)}";
+    }
+}

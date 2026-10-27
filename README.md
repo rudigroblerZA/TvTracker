@@ -7,7 +7,7 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
-What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, show DNA, nanogenres, search by meaning, computed show tags)
+What sets it apart (universes and their timelines, the essential cut, blend, the reunion radar, where you know an actor from, show DNA, nanogenres, search by meaning, computed show tags)
 is collected in [FEATURES.md](FEATURES.md), along with ideas for what to build next.
 
 ## Prerequisites
@@ -319,7 +319,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -339,6 +339,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `gets-good` | "When it gets good" on show pages, its line in "Will you finish it?", and the Worth the wait list on Discover |
 | `nanogenres` | Nanogenre chips on show pages, `/nanogenres`, the search filter and their endpoints (recommendations use them either way) |
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
+| `known-faces` | "You know them from" on show pages' cast, and its endpoint |
+| `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -575,6 +577,29 @@ How events flow:
     episodes, next and latest, top episodes, season bests, when it gets good), the episode page, Up Next and the
     calendar. A hidden title shows when you select it. It's a setting of the device or browser, not the account.
   - **Theme** (Settings): light, dark, or the device's, per device or browser.
+  - **Where do I know them from?** (show pages' cast, signed in): under each actor you've seen before, the shows you
+    saw them in and who they played ("You know them from Breaking Bad as Saul Goodman"). "N you know" filters the cast
+    to them.
+    - **Seen:** a show with a watched episode, or rated. Followed alone doesn't count.
+    - **Spoilers:** casts are today's regulars, with no seasons, so an actor in a show you're partway through may only
+      arrive after where you are. Those lines say how far you are ("26 of 62 seen"), and with the spoiler shield on
+      they read "a show you're partway through" until selected.
+    - **Main casts only:** TVmaze doesn't list guest roles, so a guest spot isn't found.
+    - **API:** `GET /api/v1/shows/{id}/known-faces` on Analytics.API, computed on request from your own data.
+  - **Holiday episodes** (`/holidays`; on Home within 3 weeks of a holiday, and linked from Insights): Halloween,
+    Thanksgiving, Christmas and the holidays, New Year's Eve and Valentine's Day.
+    - **From your shows** (signed in): every holiday episode of the shows you follow, placed against how far you are:
+      up next, skipped (behind where you are), watched, not started, or ahead of you. Comedies, animated, reality and
+      game shows are marked "stands alone, usually"; ahead in anything else is "ahead of you in the story". Ones you
+      can watch now come first. Titles you haven't watched follow the spoiler shield.
+    - **Best known:** the most popular shows' holiday episodes, two per show. **Made for the season:** shows named after
+      the holiday (Halloween Wars), whose every episode would match.
+    - **How they're found:** the holiday's words (Halloween, trick or treat, Treehouse of Horror, Thanksgiving, Christmas,
+      Hanukkah, Festivus, Valentine, …) in an episode's title, or in its summary if it aired around the holiday. Out of
+      season a summary mostly mentions one in passing. Daily shows (more than 60 episodes in a season) are left out.
+    - **API** (Catalog.API, public): `GET /api/v1/holidays`, `GET /api/v1/holidays/{key}` (best known), and
+      `POST /api/v1/holidays/{key}/shows` with `{ "showIds": [...] }` (all of those shows' episodes; a POST, since a
+      follow list doesn't fit in a URL).
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

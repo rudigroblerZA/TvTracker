@@ -387,6 +387,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why the provider's credits:** within the catalog alone (587 shows), only 73 shows had any reunion, and none of
     the demo user's favourites did. Across TVmaze, NCIS finds Chicago Hope (three of its cast) and The Wire finds Oz,
     Treme and Bosch.
+- **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
+  catalog copy's main casts (`cast_credits`), so no minimum counts.
+  - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
+  - **Catalog casts, not provider credits:** the user can only have watched catalog shows, so `CastCopy` is enough,
+    and it also covers actors whose provider credits haven't been fetched yet.
+  - **Spoilers:** casts are today's regulars with no seasons per role (Bob Odenkirk joins Breaking Bad in season 2), so
+    a line from a show the user hasn't caught up on (latest aired regular episode watched) is flagged rather than
+    dropped. Most such actors are there from the start, and the UI lets the spoiler shield hide the line.
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
 
@@ -472,6 +480,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   out of order. Tracking's snapshot carries shared lists too (an optional trailing parameter), so a lost event heals.
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
+
+## Holiday episodes
+
+- **Found, not curated** (`HolidayApi` on Catalog.API): a Postgres regex per holiday over episode titles and summaries,
+  with no list to keep up. A title match counts whenever it aired (Ghosts' "Halloween 3" aired in March); a summary
+  match only within the holiday's window (Halloween: 10 October to 7 November), since out of season summaries mostly
+  mention it in passing.
+- **Left out:** daily shows (a season of more than 60 episodes), whose dated episodes mention every holiday; shows named
+  after the holiday, listed whole as "made for the season".
+- **Ranking:** TVmaze's popularity tops out (a fifth of the catalog at 99 or 100), so the show's best rated holiday
+  episode breaks ties.
+- **Stands alone:** a reality, animation, game, variety, documentary or talk show, or a comedy without a story genre
+  (drama, crime, thriller, mystery, science fiction, fantasy). A rough rule, shown as "usually".
+- **Personal part in the UI:** the page sends the user's follows to the catalog and places each episode with one
+  Tracking `/progress` call per matching show, as the watch order does; the catalog never sees watches.
+- **Cached** per holiday for 6 hours; a scan of ~90,000 episodes takes under a second.
 
 ## Tonight's plan
 
