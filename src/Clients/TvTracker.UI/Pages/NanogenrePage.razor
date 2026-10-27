@@ -2,7 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.Nanogenres)]
 @inject CatalogClient Catalog
 
-<PageTitle>@(nanogenre?.Name ?? "Nanogenre") · TV Tracker</PageTitle>
+<PageTitle>@(nanogenre?.Name ?? "Nanogenre") · @Brand.AppName</PageTitle>
 
 <p class="small"><a href="nanogenres">All nanogenres</a></p>
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />

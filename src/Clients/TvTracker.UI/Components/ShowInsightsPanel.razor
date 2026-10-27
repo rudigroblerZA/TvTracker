@@ -25,7 +25,7 @@
                             @if (creative.OtherShows.Count > 0)
                             {
                                 <div class="small">
-                                    In TV Tracker:
+                                    In @(Brand.AppName + ":")
                                     @for (var i = 0; i < Math.Min(4, creative.OtherShows.Count); i++)
                                     {
                                         var other = creative.OtherShows[i];
@@ -78,7 +78,7 @@
             }
             @if (insights.Rating.Ours is { } ours)
             {
-                <div class="stat"><div class="stat-value">@Format.Stars(ours, insights.Rating.OurCount)</div><div class="muted">TV Tracker users</div></div>
+                <div class="stat"><div class="stat-value">@Format.Stars(ours, insights.Rating.OurCount)</div><div class="muted">@Brand.AppName users</div></div>
             }
             @if (insights.Run.AiredEpisodes > 0)
             {
@@ -217,7 +217,7 @@
                     @if (insights.Histograms?.OurStars is { } stars)
                     {
                         var most = Math.Max(1, stars.Max());
-                        <h4>TV Tracker users (@stars.Sum() ratings)</h4>
+                        <h4>@Brand.AppName users (@stars.Sum() ratings)</h4>
                         <ul class="bars">
                             @for (var star = 5; star >= 1; star--)
                             {
@@ -303,7 +303,7 @@
             }
         </div>
 
-        <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and TV Tracker users. Updated hourly.</p>
+        <p class="muted small">Ratings from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a> and @Brand.AppName users. Updated hourly.</p>
     </section>
 }
 
@@ -345,9 +345,9 @@
     /// <summary>More seasons than this, and the chart squeezes to fit rather than labelling every column.</summary>
     private const int DenseSeasons = 12;
 
-    private static string SeasonTitle(SeasonStats season) =>
+    private string SeasonTitle(SeasonStats season) =>
         $"Season {season.Number}: {Format.Rating(season.Rating.External!.Value)} on TVmaze" +
-        (season.Rating.Ours is { } ours ? $", {Format.Stars(ours, season.Rating.OurCount)} from TV Tracker users" : "");
+        (season.Rating.Ours is { } ours ? $", {Format.Stars(ours, season.Rating.OurCount)} from {Brand.AppName} users" : "");
 
     private static string SeasonChartLabel(List<SeasonStats> seasons) =>
         "Season ratings on TVmaze: " + string.Join(", ", seasons.Select(s => $"season {s.Number} {Format.Rating(s.Rating.External!.Value)}"));

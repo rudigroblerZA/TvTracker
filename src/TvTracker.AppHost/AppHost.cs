@@ -2,6 +2,10 @@ using Aspire.Hosting.Utils;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// White label: the app's name in the UI, page titles and the text services write ("★ 4.5 from 12 <name> users").
+// Passed to the web app and the services that put it in text; the phone has its own (MobileSettings.AppName).
+var appName = builder.Configuration["Branding:AppName"] is { Length: > 0 } configuredName ? configuredName : "TV Tracker";
+
 // ---------------------------------------------------------------------------
 // Infrastructure (containers; Docker or Podman must be running)
 // ---------------------------------------------------------------------------
@@ -78,6 +82,7 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithHttpHealthCheck("/health");
 
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
+    .WithEnvironment("Branding__AppName", appName)
     .WithReference(catalogDb).WaitFor(catalogDb)
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
@@ -121,6 +126,7 @@ var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
     .WithHttpHealthCheck("/health");
 
 var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-worker")
+    .WithEnvironment("Branding__AppName", appName)
     .WithReference(analyticsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WaitFor(analyticsApi)
@@ -128,6 +134,7 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
 
 // Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
 var socialApi = builder.AddProject<Projects.Social_API>("social-api")
+    .WithEnvironment("Branding__AppName", appName)
     .WithReference(socialDb).WaitFor(socialDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(flagd)
@@ -227,6 +234,7 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(socialApi);
 
 builder.AddProject<Projects.WebApp>("webapp")
+    .WithEnvironment("Branding__AppName", appName)
     .WithExternalHttpEndpoints()
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)

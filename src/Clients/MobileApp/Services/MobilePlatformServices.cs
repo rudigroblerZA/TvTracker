@@ -79,7 +79,7 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
         await File.WriteAllTextAsync(path, content);
         await Share.Default.RequestAsync(new ShareFileRequest
         {
-            Title = "TV Tracker data export",
+            Title = $"{MobileSettings.AppName} data export",
             File = new ShareFile(path, "application/json")
         });
     }

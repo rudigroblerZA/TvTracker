@@ -1,10 +1,12 @@
 // Service worker for browser push notifications from Notifications.API.
-// Payload: { title, body, link }
+// Payload: { title, body, link }. Registered as /sw.js?app=<app name>, the title when a payload has none.
+
+const appName = new URL(self.location).searchParams.get("app") || "TV Tracker";
 
 self.addEventListener("push", event => {
     const data = event.data ? event.data.json() : {};
     event.waitUntil(
-        self.registration.showNotification(data.title || "TV Tracker", {
+        self.registration.showNotification(data.title || appName, {
             body: data.body || "",
             data: { link: data.link || "/" },
             tag: data.link || undefined

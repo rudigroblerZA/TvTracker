@@ -5,7 +5,7 @@
 @inject UserSession Session
 @inject SpoilerShield Shield
 
-<PageTitle>@(episode is null ? "Episode" : hideTitle ? Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) : episode.Title) · TV Tracker</PageTitle>
+<PageTitle>@(episode is null ? "Episode" : hideTitle ? Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) : episode.Title) · @Brand.AppName</PageTitle>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 

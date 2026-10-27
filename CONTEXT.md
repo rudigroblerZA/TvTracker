@@ -499,6 +499,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Spoiler shield:** `SpoilerShield` (scoped) reads a device preference through `IPlatformServices` (localStorage
   on the web, MAUI `Preferences` on the phone). `<Spoiler Hidden=…>` swaps hidden content for a "Title hidden" button.
   Per device by design, and it needed no column in Identity, which still uses `EnsureCreated`.
+- **White label:** the app's name is `Branding:AppName`, set once in the AppHost and passed as `Branding__AppName`.
+  - **Two `Branding` types:** services use ServiceDefaults' (`TvTracker.Branding`, registered by
+    `AddServiceDefaults`); the UI has its own (`TvTracker.UI.Services.Branding`), since the phone doesn't reference
+    ServiceDefaults. The web app passes its configured name to `AddTvTrackerUi`, the phone `MobileSettings.AppName`.
+  - **In pages:** `_Imports.razor` injects it as `Brand`. Static text that needs it (Discover's list descriptions,
+    ops.html) says `{app}` and is filled in when shown.
+  - **Stored text:** Analytics' fan-favorite tag reason includes the name, so a rename shows there after the next
+    hourly run.
+- **Theme:** every colour token in `app.css` is `light-dark(light, dark)`, and `color-scheme` picks the side: the
+  device's, or `data-theme` on `<html>` from Settings (`ThemeStore`, a device preference like the spoiler shield).
+  `theme.js` loads in the head, before the stylesheet, and applies a saved choice from `localStorage` before first
+  paint. The phone keeps its choice in MAUI `Preferences`, which the page can't read that early, so `MainLayout`
+  also applies it after the first render, and `theme.js` mirrors it into `localStorage` for the next start.
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why
