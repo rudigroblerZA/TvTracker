@@ -29,6 +29,9 @@ dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --o
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
 
+# Ask the running app questions ("landman insights") from Claude Code, over its MCP server
+claude mcp add --transport http tvtracker http://localhost:5112/mcp
+
 # Load while the AppHost runs (setup once; cleanup deletes the users and their data)
 dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
