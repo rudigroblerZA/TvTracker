@@ -780,3 +780,19 @@ Run `aspire update` (or `dotnet list package --outdated`) to bring them up to da
 ## Not built yet
 
 The weekly digest email is planned for a later round.
+
+**Qwen3-Embedding-8B as a built-in embedding model** (backlog; started and set aside). What the first attempt found:
+- **The model:** `ai/qwen3-embedding:8B-Q4_K_M` on Docker Hub (4.7 GB; also `hf.co/Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M`,
+  which Model Runner can pull from Hugging Face). 4096 dimensions, trained to be shortened (MRL), so it can be cut to
+  the column's 384 like nomic. Queries take an instruction (`Instruct: …\nQuery:`), documents none.
+- **It needs two per-model settings first:**
+  - **A longer request timeout:** on 4 CPU cores a search takes ~2 s and a show ~6 s, so the sync worker's 32-show
+    batches take minutes, past the server client's 60 s.
+  - **A smaller context in Model Runner** (`POST /engines/_configure` with `context-size`, before the model loads):
+    with Model Runner's default 40,960 tokens, llama.cpp didn't load within Model Runner's 5 minutes on a CPU;
+    2,048 loaded in about 3.5 minutes. Inputs are cut at 512 tokens anyway.
+- **Still to do:** tune its `MaxDistance` (and compare MRR with the others) on the 42 test searches, about an hour of
+  embedding on a CPU, and decide whether it's only worth offering with a GPU (Docker Desktop's Model Runner via
+  `ModelRunner:Url`).
+- **Docker Hub's anonymous pull limit** (429) blocked the `ai/` pull in the sandbox, which is why the Hugging Face copy
+  was used there.
