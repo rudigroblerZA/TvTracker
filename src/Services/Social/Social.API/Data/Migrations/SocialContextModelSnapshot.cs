@@ -63,6 +63,9 @@ namespace Social.API.Data.Migrations
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AirsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("EpisodeNumber")
                         .HasColumnType("integer");
 
@@ -90,6 +93,9 @@ namespace Social.API.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<bool>("Private")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShareActivity")
                         .HasColumnType("boolean");
 
@@ -101,6 +107,39 @@ namespace Social.API.Data.Migrations
                     b.HasIndex("DisplayName");
 
                     b.ToTable("profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Social.API.Data.SharedList", b =>
+                {
+                    b.Property<Guid>("ListId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.PrimitiveCollection<List<Guid>>("ShowIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("ListId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("shared_lists", (string)null);
                 });
 
             modelBuilder.Entity("Social.API.Data.ShowCopy", b =>
@@ -121,6 +160,26 @@ namespace Social.API.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
+            modelBuilder.Entity("Social.API.Data.UserBlock", b =>
+                {
+                    b.Property<string>("BlockerId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("BlockedId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("BlockerId", "BlockedId");
+
+                    b.HasIndex("BlockedId");
+
+                    b.ToTable("blocks", (string)null);
+                });
+
             modelBuilder.Entity("Social.API.Data.UserFollow", b =>
                 {
                     b.Property<string>("FollowerId")
@@ -131,6 +190,11 @@ namespace Social.API.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<bool>("Approved")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -139,6 +203,53 @@ namespace Social.API.Data.Migrations
                     b.HasIndex("FolloweeId");
 
                     b.ToTable("follows", (string)null);
+                });
+
+            modelBuilder.Entity("Social.API.Data.UserShow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Followed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("FollowedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Stars")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId", "ShowId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("user_shows", (string)null);
+                });
+
+            modelBuilder.Entity("Social.API.Data.UserWatch", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("WatchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "EpisodeId");
+
+                    b.HasIndex("ShowId", "UserId");
+
+                    b.ToTable("user_watches", (string)null);
                 });
 
             modelBuilder.Entity("TvTracker.Persistence.IntegrationEventLogEntry", b =>

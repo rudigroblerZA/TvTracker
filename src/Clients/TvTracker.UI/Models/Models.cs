@@ -140,11 +140,12 @@ public record YearStats(int Year, int Episodes, int Minutes, int ShowsStarted);
 
 public record Stats(int EpisodesWatched, int MinutesWatched, int ShowsFollowed, int ShowsCompleted, IReadOnlyList<GenreCount> TopGenres, IReadOnlyList<YearStats> Years);
 
-public record ListSummary(Guid Id, string Name, string? Description, int ItemCount, DateTime UpdatedAtUtc);
+public record ListSummary(Guid Id, string Name, string? Description, int ItemCount, DateTime UpdatedAtUtc, bool Shared = false);
 
 public record ListItem(Guid ShowId, string? Title, string? PosterUrl, int Position, DateTime AddedAtUtc);
 
-public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc);
+/// <param name="Shared">Shown on the owner's Social page to the people who can see them.</param>
+public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false);
 
 // Ratings
 
@@ -429,14 +430,41 @@ public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Epis
 public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
 
 /// <summary>Someone on TV Tracker, as Social.API describes them to the caller.</summary>
-public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou);
+/// <param name="Requested">The user asked to follow this private profile and is waiting for approval.</param>
+/// <param name="BlockedByYou">On the user's block list.</param>
+public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou,
+    bool Private = false, bool Requested = false, bool BlockedByYou = false);
 
-public record MySocial(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following);
+/// <param name="Requests">Follow requests waiting for the user's approval.</param>
+public record MySocial(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following, bool Private = false, int Requests = 0);
 
-public record SocialSettings(bool ShareActivity);
+/// <summary>Leave either out (null) to keep it as it is.</summary>
+public record SocialSettings(bool? ShareActivity, bool? Private = null);
 
 /// <param name="Shares">Whether they share their activity; when not, <paramref name="Activity"/> is empty.</param>
-public record SocialPersonPage(SocialPerson Person, bool Shares, IReadOnlyList<FeedItem> Activity);
+/// <param name="CanSee">False for a private profile the user isn't an approved follower of: only the name shows.</param>
+public record SocialPersonPage(SocialPerson Person, bool Shares, IReadOnlyList<FeedItem> Activity, bool CanSee = true,
+    IReadOnlyList<SharedListSummary>? Lists = null);
+
+public record FollowState(bool Following, bool Requested);
+
+public record SharedListSummary(Guid ListId, string Name, string? Description, int Shows, DateTime UpdatedAtUtc);
+
+public record SharedList(Guid ListId, SocialPerson Owner, string Name, string? Description, IReadOnlyList<ListShow> Shows, DateTime UpdatedAtUtc);
+
+public record ListShow(Guid ShowId, string? Title, string? PosterUrl);
+
+/// <summary>How far someone is through a show (regular episodes).</summary>
+public record PeerProgress(int Watched, int Aired, EpisodeCode? Furthest, bool Finished);
+
+public record FriendOnShow(string UserId, string DisplayName, bool Following, PeerProgress Progress, int? Stars);
+
+public record FriendsOnShow(int Total, IReadOnlyList<FriendOnShow> People);
+
+/// <param name="Ahead">"you", "them", "level", or null when neither has started.</param>
+public record TogetherShow(Guid ShowId, string? Title, string? PosterUrl, PeerProgress You, PeerProgress Them, string? Ahead);
+
+public record Together(SocialPerson Person, IReadOnlyList<TogetherShow> Shows);
 
 public record Feed(IReadOnlyList<FeedItem> Items, DateTime? NextBefore);
 

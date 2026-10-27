@@ -44,7 +44,8 @@ public sealed class ActivitySnapshotPublisher(IServiceScopeFactory scopes, TimeP
         using (var scope = scopes.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<TrackingContext>();
-            users = await db.Follows.Select(f => f.UserId).Union(db.WatchedEpisodes.Select(w => w.UserId)).ToListAsync(ct);
+            users = await db.Follows.Select(f => f.UserId).Union(db.WatchedEpisodes.Select(w => w.UserId))
+                .Union(db.Lists.Where(l => l.Shared).Select(l => l.UserId)).ToListAsync(ct);
         }
 
         foreach (var batch in users.Chunk(UsersPerBatch))
@@ -56,13 +57,17 @@ public sealed class ActivitySnapshotPublisher(IServiceScopeFactory scopes, TimeP
             var takenAt = time.GetUtcNow();
             var follows = (await db.Follows.AsNoTracking().Where(f => batch.Contains(f.UserId)).ToListAsync(ct)).ToLookup(f => f.UserId);
             var watches = (await db.WatchedEpisodes.AsNoTracking().Where(w => batch.Contains(w.UserId)).ToListAsync(ct)).ToLookup(w => w.UserId);
+            var lists = (await db.Lists.AsNoTracking().Include(l => l.Items).Where(l => l.Shared && batch.Contains(l.UserId)).ToListAsync(ct))
+                .ToLookup(l => l.UserId);
             foreach (var user in batch)
             {
                 outbox.Add(new TrackingSnapshotIntegrationEvent(
                     user,
                     takenAt,
                     follows[user].Select(f => new SnapshotFollow(f.ShowId, new DateTimeOffset(f.FollowedAtUtc, TimeSpan.Zero))).ToList(),
-                    watches[user].Select(w => new SnapshotWatch(w.ShowId, w.EpisodeId, new DateTimeOffset(w.WatchedAtUtc, TimeSpan.Zero))).ToList()));
+                    watches[user].Select(w => new SnapshotWatch(w.ShowId, w.EpisodeId, new DateTimeOffset(w.WatchedAtUtc, TimeSpan.Zero))).ToList(),
+                    lists[user].Select(l => new SharedListSnapshot(l.Id, l.Name, l.Description,
+                        l.Items.OrderBy(i => i.Position).Select(i => i.ShowId).ToList(), new DateTimeOffset(l.UpdatedAtUtc, TimeSpan.Zero))).ToList()));
             }
 
             await db.SaveChangesAsync(ct);

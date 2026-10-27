@@ -4,8 +4,9 @@ using Social.API.Data;
 namespace Social.API.Services;
 
 /// <summary>
-/// Backfill: when Social has no shows yet (its first start), asks the catalog sync worker to republish the catalog, so
-/// the feed can name the shows people watch. Analytics does the same on its first start.
+/// Backfill: when Social has no shows yet (its first start), or episodes from before it kept air times, asks the catalog
+/// sync worker to republish the catalog, so the feed can name shows and progress can count aired episodes. Analytics
+/// does the same on its first start.
 /// </summary>
 public sealed class CatalogReplayRequester(IServiceScopeFactory scopeFactory, HttpClient http, ILogger<CatalogReplayRequester> logger)
     : BackgroundService
@@ -17,7 +18,8 @@ public sealed class CatalogReplayRequester(IServiceScopeFactory scopeFactory, Ht
     {
         await using (var scope = scopeFactory.CreateAsyncScope())
         {
-            if (await scope.ServiceProvider.GetRequiredService<SocialContext>().Shows.AnyAsync(stoppingToken))
+            var db = scope.ServiceProvider.GetRequiredService<SocialContext>();
+            if (await db.Shows.AnyAsync(stoppingToken) && await db.Episodes.AnyAsync(e => e.AirsAtUtc != null, stoppingToken))
             {
                 return;
             }

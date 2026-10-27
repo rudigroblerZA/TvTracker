@@ -89,15 +89,16 @@ public record StatsDto(
 
 public record CreateListRequest(string Name, string? Description);
 
-public record UpdateListRequest(string Name, string? Description);
+/// <param name="Shared">Share the list with the people who can see you on Social; null leaves it as it is.</param>
+public record UpdateListRequest(string Name, string? Description, bool? Shared = null);
 
 public record AddListItemRequest(Guid ShowId);
 
-public record ListSummaryDto(Guid Id, string Name, string? Description, int ItemCount, DateTime UpdatedAtUtc);
+public record ListSummaryDto(Guid Id, string Name, string? Description, int ItemCount, DateTime UpdatedAtUtc, bool Shared = false);
 
 public record ListItemDto(Guid ShowId, string? Title, string? PosterUrl, int Position, DateTime AddedAtUtc);
 
-public record ListDetailDto(Guid Id, string Name, string? Description, IReadOnlyList<ListItemDto> Items, DateTime UpdatedAtUtc);
+public record ListDetailDto(Guid Id, string Name, string? Description, IReadOnlyList<ListItemDto> Items, DateTime UpdatedAtUtc, bool Shared = false);
 
 public static class TrackingMappings
 {

@@ -2,10 +2,15 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tracking.API.Data;
+using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 namespace Tracking.API.Apis;
 
-/// <summary>Custom lists, e.g. "Weekend binge".</summary>
+/// <summary>
+/// Custom lists, e.g. "Weekend binge". A shared list is sent to Social (<see cref="ListSharedIntegrationEvent"/>) on every
+/// change, through the outbox with the change, and taken back with <see cref="ListUnsharedIntegrationEvent"/>.
+/// </summary>
 public static class ListsApi
 {
     private const int MaxListsPerUser = 100;
@@ -32,7 +37,7 @@ public static class ListsApi
         var lists = await db.Lists.AsNoTracking()
             .Where(l => l.UserId == userId)
             .OrderBy(l => l.Name)
-            .Select(l => new ListSummaryDto(l.Id, l.Name, l.Description, l.Items.Count, l.UpdatedAtUtc))
+            .Select(l => new ListSummaryDto(l.Id, l.Name, l.Description, l.Items.Count, l.UpdatedAtUtc, l.Shared))
             .ToListAsync(ct);
 
         return TypedResults.Ok(lists);
@@ -89,32 +94,38 @@ public static class ListsApi
             })
             .ToList();
 
-        return TypedResults.Ok(new ListDetailDto(list.Id, list.Name, list.Description, items, list.UpdatedAtUtc));
+        return TypedResults.Ok(new ListDetailDto(list.Id, list.Name, list.Description, items, list.UpdatedAtUtc, list.Shared));
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem>> UpdateListAsync(
-        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, TimeProvider time, CancellationToken ct)
+        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, TimeProvider time,
+        CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var list = await FindOwnedAsync(id, user, db, ct);
+        var list = await FindOwnedAsync(id, user, db, ct, includeItems: true);
         if (list is null)
         {
             return TypedResults.NotFound();
         }
 
+        var wasShared = list.Shared;
         list.Name = request.Name.Trim();
         list.Description = request.Description?.Trim();
+        list.Shared = request.Shared ?? list.Shared;
         list.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        Announce(list, outbox, wasShared);
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
 
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteListAsync(Guid id, ClaimsPrincipal user, TrackingContext db, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> DeleteListAsync(
+        Guid id, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct);
         if (list is null)
@@ -122,13 +133,19 @@ public static class ListsApi
             return TypedResults.NotFound();
         }
 
+        if (list.Shared)
+        {
+            outbox.Add(new ListUnsharedIntegrationEvent(list.Id, list.UserId, time.GetUtcNow()));
+        }
         db.Lists.Remove(list);
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
         return TypedResults.NoContent();
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem>> AddItemAsync(
-        Guid id, AddListItemRequest request, ClaimsPrincipal user, TrackingContext db, TimeProvider time, CancellationToken ct)
+        Guid id, AddListItemRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, TimeProvider time,
+        CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct, includeItems: true);
         if (list is null)
@@ -155,13 +172,15 @@ public static class ListsApi
             AddedAtUtc = now
         });
         list.UpdatedAtUtc = now;
+        Announce(list, outbox, list.Shared);
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
 
         return TypedResults.NoContent();
     }
 
     private static async Task<Results<NoContent, NotFound>> RemoveItemAsync(
-        Guid id, Guid showId, ClaimsPrincipal user, TrackingContext db, TimeProvider time, CancellationToken ct)
+        Guid id, Guid showId, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct, includeItems: true);
         var item = list?.Items.FirstOrDefault(i => i.ShowId == showId);
@@ -172,9 +191,26 @@ public static class ListsApi
 
         list.Items.Remove(item);
         list.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        Announce(list, outbox, list.Shared);
         await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
 
         return TypedResults.NoContent();
+    }
+
+    /// <summary>Tells Social about a shared list's new state, or that it stopped being shared. Needs the list's items loaded.</summary>
+    private static void Announce(UserList list, IIntegrationEventOutbox outbox, bool wasShared)
+    {
+        var at = new DateTimeOffset(list.UpdatedAtUtc, TimeSpan.Zero);
+        if (list.Shared)
+        {
+            outbox.Add(new ListSharedIntegrationEvent(list.Id, list.UserId, list.Name, list.Description,
+                list.Items.OrderBy(i => i.Position).Select(i => i.ShowId).ToList(), at));
+        }
+        else if (wasShared)
+        {
+            outbox.Add(new ListUnsharedIntegrationEvent(list.Id, list.UserId, at));
+        }
     }
 
     private static Task<UserList?> FindOwnedAsync(Guid id, ClaimsPrincipal user, TrackingContext db, CancellationToken ct, bool includeItems = false)

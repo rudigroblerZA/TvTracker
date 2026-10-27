@@ -285,13 +285,17 @@ In Settings.
 - **Everywhere at once:** titles and summaries of episodes you haven't watched are hidden across the app, and one tap
   shows one.
 
-### 25. Following and the feed
+### 25. Social: following, the feed and watching together
 
 At `/feed`.
 
 - **Follow people, see what they watch:** episodes (a binge as one line), finished shows, new follows and ratings,
   without episode titles, so nothing is spoiled.
-- **One switch for privacy:** stop sharing, and none of your activity shows anywhere, past items included.
+- **Privacy that's simple:** stop sharing, and none of your activity shows anywhere, past items included. Or go private
+  and approve followers yourself, and block anyone.
+- **On every show page:** which people you follow watched it, how far they got and what they rated it.
+- **Watching together:** with anyone you follow, the shows you share and who's ahead, from your whole history.
+- **Shared lists:** tick one of your lists to show it on your profile.
 
 ### 26. Smaller touches
 

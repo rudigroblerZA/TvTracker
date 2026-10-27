@@ -11,7 +11,8 @@ builder.AddFeatureFlags();
 builder.AddDefaultAuthentication();
 
 builder.AddNpgsqlDbContext<TrackingContext>("trackingdb");
-builder.Services.AddDatabaseInitializer<TrackingContext>();
+// Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
+builder.Services.AddDatabaseInitializer<TrackingContext>(baseline: "InitialCreate");
 
 builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();

@@ -543,6 +543,8 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .user-hero h1 { margin: 0; overflow-wrap: anywhere; }
 .user-hero > div { flex: 1; min-width: 0; }
 .feed-stars { color: var(--warn); letter-spacing: 1px; }
+.person-row .btn + .btn { margin-left: -4px; }
+.friends-on-show, .together { margin: 20px 0; }
 
 /* Spoiler shield: a hidden title, select to show */
 .spoiler-hidden { font: inherit; font-size: 0.85em; font-weight: 400; color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); border: 1px dashed var(--border); border-radius: 6px; padding: 0 8px; margin-left: 6px; cursor: pointer; }
