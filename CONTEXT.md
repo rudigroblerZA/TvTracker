@@ -27,6 +27,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
+| Mcp.Server | — | read-only MCP tools over Catalog.API and Analytics.API, for internal queries ("landman insights") |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
 
@@ -609,6 +610,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
+
+## MCP server
+
+- **Over the APIs, not the databases:** `Mcp.Server` calls Catalog.API and Analytics.API like any other client, so
+  the one-database-per-service rule holds and the tools see exactly what the app shows.
+- **Its own identity:** Analytics needs a token for everything, so the server signs in as the confidential client
+  `tvtracker-mcp` (client credentials, with the `tvtracker-api` audience mapper). The token has no user, which suits
+  it: the endpoints it calls are about shows and people, never one viewer.
+  - **Older realms:** Keycloak imports the realm file only on first start, so in development `ServiceToken` creates
+    the client through the master realm's admin API when Keycloak says it doesn't exist (the same reason
+    `AdminAccountSeeder` exists).
+- **Pass-through answers:** tools return the services' JSON less image URLs, rather than new models, so a new field in
+  Analytics' show document reaches the tools without a change here.
+- **Stateless HTTP transport:** no MCP sessions, so the server can restart without clients reconnecting.
+- **Access:** `/mcp` is mapped only in Development unless `Mcp:ApiKey` is set; it reads Analytics with its own token,
+  so it mustn't be open by default.
 
 ## Load testing
 

@@ -296,6 +296,32 @@ dotnet run -- cleanup                          # delete the users and everything
 - A first run on a laptop-class sandbox: 5 users at 300 ms think time with writes gave about 55 req/s, p95 ~110 ms
   once warm (the first seconds are slower while caches fill), and no errors.
 
+### MCP server (internal queries)
+
+`mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the
+catalog and Analytics, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
+the running app. Add it to Claude Code with:
+
+```bash
+claude mcp add --transport http tvtracker http://localhost:5112/mcp
+```
+
+| Tool | Answers |
+| --- | --- |
+| `show_insights` | Everything computed about a show: season ratings, top episodes, consistency and arc, when it gets good, the landing, DNA, tags, forecasts, viewing |
+| `show_details` | The catalog record: summary, status, genres, nanogenres, seasons, cast and creators (with person ids), next and latest episode, where to watch |
+| `search_shows` | Search by title or description, as in the app (imports from TVmaze when missing) |
+| `season_episodes`, `show_universe`, `holiday_episodes` | A season's episodes; the franchise a show is in; a holiday's best-known episodes |
+| `discover_list`, `upcoming_premieres`, `top_episodes` | Discover's lists, premieres with catch-up time, best-rated episodes |
+| `person`, `person_insights` | A person's credits; their insights and, for creators, their fingerprint |
+
+- **Shows by name:** every show argument takes a title ("landman") or an id. A title goes through catalog search
+  and takes the exact match, else the most popular.
+- **Nothing personal:** it signs in to Analytics as its own Keycloak client (`tvtracker-mcp`, client credentials), so
+  there is no user, and only figures that already follow the 5-user rule come back. Image URLs are left out.
+- **Access:** development only, with no sign-in. Set `Mcp:ApiKey` to run it anywhere else; callers then send it as
+  `Authorization: Bearer <key>`.
+
 ### Ops dashboard
 
 http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
@@ -416,6 +442,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
+| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog and Analytics for internal queries |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
 | WebApp | `src/Clients/WebApp` | Blazor web app; OIDC sign-in, tokens kept server-side in Redis, browser push |
