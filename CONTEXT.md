@@ -586,6 +586,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
 
+## Load testing
+
+- **Through the BFF, as users:** `tvtracker-load` signs real (load-test) users in and calls the Mobile BFF, so the
+  gateway, token validation and per-user rate limits are part of what's measured. Hitting services directly would skip
+  all three.
+- **Password grant, for this only:** the realm's clients don't allow it, so `setup` creates a separate public client
+  (`tvtracker-loadgen`) through Keycloak's admin API, with the same audience mapper as the app's clients. Development
+  only.
+- **Pages, not endpoints:** a virtual user visits weighted pages, each a burst of the app's requests in parallel, so
+  the mix (and fan-out to services) is roughly a real session's.
+- **Cleanup through account deletion:** deleting Keycloak users alone would leave their follows, ratings and so on in
+  every service; Identity.API's account deletion removes them everywhere.
+
 ## Known gaps
 
 - There are no tests and no CI.
