@@ -155,6 +155,36 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
+// Internal MCP server (http://localhost:5112/mcp): read-only tools over the catalog and Analytics, for questions like
+// "landman insights" from an MCP client. It signs in to Analytics as its own Keycloak client, which it creates in
+// development if the realm predates it. Development only unless Mcp:ApiKey is set.
+var mcpServer = builder.AddProject<Projects.Mcp_Server>("mcp-server")
+    .WithReference(catalogApi)
+    .WithReference(analyticsApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithEnvironment("Mcp__ClientSecret", McpClientSecret)
+    .WithEnvironment("Keycloak__AdminUsername", "admin")
+    .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
+    .WaitFor(keycloak)
+    .WithHttpHealthCheck("/health");
+
+// MCP gateway (http://localhost:5113/mcp): one endpoint, with an API key, in front of the app's MCP servers
+// (Gateway:Servers:{name}:Url, optionally BearerToken and a Tools allow-list), logging every call. Open WebUI uses it.
+// More servers can be added under Gateway:Servers in this project's configuration.
+const string McpGatewayKey = "tvtracker-gateway-dev-key";
+var mcpGateway = builder.AddProject<Projects.Mcp_Gateway>("mcp-gateway")
+    .WithEnvironment("Gateway__ApiKey", McpGatewayKey)
+    .WithEnvironment("Gateway__Servers__tvtracker__Url", ReferenceExpression.Create($"{mcpServer.GetEndpoint("http")}/mcp"))
+    .WaitFor(mcpServer)
+    .WithHttpHealthCheck("/health");
+foreach (var server in builder.Configuration.GetSection("Gateway:Servers").GetChildren())
+{
+    foreach (var setting in server.GetChildren().Where(c => c.Value is not null))
+    {
+        mcpGateway.WithEnvironment($"Gateway__Servers__{server.Key}__{setting.Key}", setting.Value);
+    }
+}
+
 // The data export collects each service's data for the user.
 // Moderators (Ratings.API's moderation page): admins and Moderation:Users. Moderation:BlockedTerms are refused in posts.
 foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:BlockedTerms" })
@@ -291,6 +321,13 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
         .WithEnvironment("RAG_EMBEDDING_MODEL", "ai/nomic-embed-text-v1.5")
         .WithEnvironment("ENABLE_EVALUATION_ARENA_MODELS", "False")
         .WithEnvironment("ANONYMIZED_TELEMETRY", "False")
+        // The app's MCP tools ("landman insights"), through the gateway, on for every chat's tool list. The AppHost owns
+        // this config, so Open WebUI reads it from here on every start instead of keeping its first copy in its database.
+        // Keep the closing braces apart: ReferenceExpression turns "}}" in its literal text into "}".
+        .WithEnvironment("TOOL_SERVER_CONNECTIONS", ReferenceExpression.Create(
+            $"[{{\"type\":\"mcp\",\"url\":\"{mcpGateway.GetEndpoint("http")}/mcp\",\"path\":\"\",\"auth_type\":\"bearer\",\"key\":\"{McpGatewayKey}\",\"config\":{{\"enable\":true}},\"info\":{{\"id\":\"tvtracker\",\"name\":\"{appName}\",\"description\":\"Shows, insights, discovery lists and premieres from the catalog and Analytics\"}} }}]"))
+        .WithEnvironment("ENABLE_PERSISTENT_CONFIG", "False")
+        .WithReference(mcpGateway).WaitFor(mcpGateway)
         .WithHttpHealthCheck("/health")
         .WithLifetime(ContainerLifetime.Persistent);
     if (modelRunner is not null)
@@ -311,19 +348,6 @@ catalogApi.WithReference(analyticsApi);
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);
 socialApi.WithReference(catalogSync);
-
-// Internal MCP server (http://localhost:5112/mcp): read-only tools over the catalog and Analytics, for questions like
-// "landman insights" from an MCP client. It signs in to Analytics as its own Keycloak client, which it creates in
-// development if the realm predates it. Development only unless Mcp:ApiKey is set.
-builder.AddProject<Projects.Mcp_Server>("mcp-server")
-    .WithReference(catalogApi)
-    .WithReference(analyticsApi)
-    .WithEnvironment("Identity__Url", keycloakUrl)
-    .WithEnvironment("Mcp__ClientSecret", McpClientSecret)
-    .WithEnvironment("Keycloak__AdminUsername", "admin")
-    .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
-    .WaitFor(keycloak)
-    .WithHttpHealthCheck("/health");
 
 // ---------------------------------------------------------------------------
 // Gateways and clients
