@@ -28,6 +28,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
 | Mcp.Server | — | read-only MCP tools over Catalog.API and Analytics.API, for internal queries ("landman insights") |
+| Mcp.Gateway | — | one MCP endpoint (API key, tool allow-list, call logs) in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
 
@@ -626,6 +627,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Stateless HTTP transport:** no MCP sessions, so the server can restart without clients reconnecting.
 - **Access:** `/mcp` is mapped only in Development unless `Mcp:ApiKey` is set; it reads Analytics with its own token,
   so it mustn't be open by default.
+- **Gateway** (`Mcp.Gateway`): one endpoint for clients, so adding a server or a key is done once, there.
+  - **Not Docker's MCP Gateway:** `docker/mcp-gateway` needs the host's Docker socket mounted even for remote
+    servers (it inspects networks at start), which gives the container control of the host's Docker. This one only
+    forwards to HTTP servers, with the same SDK as the server.
+  - **Forwarding:** tools are listed from every upstream (cached a minute, re-listed when a call names an unknown
+    tool) and calls are forwarded as they came. A clash of names gets `{server}_` prefixes; a server that's down is
+    left out rather than failing the list.
+- **Open WebUI** gets the gateway as an MCP tool server in `TOOL_SERVER_CONNECTIONS`, at `aspire.dev.internal`, the
+  host name Aspire gives containers for reaching projects.
+  - **Not persisted:** `ENABLE_PERSISTENT_CONFIG=False`, since Open WebUI otherwise keeps the first value of each
+    setting in its database and ignores the environment afterwards, so a changed URL or key would silently not apply.
+    The AppHost sets all of its configuration anyway; changes made in its admin settings last until a restart.
+  - **Braces:** `ReferenceExpression` turns `}}` in its literal text into `}`, so the JSON keeps its closing braces apart.
 
 ## Load testing
 
