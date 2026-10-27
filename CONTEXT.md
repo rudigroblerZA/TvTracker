@@ -127,6 +127,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
       true)`), so the two services don't download the same model at once. It retries every minute until it works.
     - **Pull responses:** Model Runner streams progress as JSON lines, with the quotes HTML-escaped (`&#34;`), so
       the success check decodes first.
+    - **Open WebUI** (AppHost `AddOpenWebUi`): a UI on the same Model Runner, sign-in off (development only). Its RAG
+      embeds through Model Runner (`RAG_EMBEDDING_ENGINE=openai`), because by default it downloads a
+      sentence-transformers model at start. The dashboard's "Pull …" command on `model-runner` is an Aspire HTTP command
+      to `POST /models/create`; pulling a chat model failed in the sandbox for the same proxy-certificate reason as
+      before, so chatting was not checked there.
     - **Seeding the volume by hand:** the image runs as `modelrunner`, so the volume's files must be owned by
       that user. Docker sets this when it creates the volume on first mount; a volume made with
       `docker volume create` is root-owned.
