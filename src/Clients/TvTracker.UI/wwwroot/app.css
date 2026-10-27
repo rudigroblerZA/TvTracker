@@ -608,3 +608,9 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .correction-form { max-width: 640px; }
 .correction-form textarea, .correction-form input, .correction-form select { width: 100%; }
 .danger { color: var(--danger); }
+
+/* Holiday episodes: where each sits against the user's progress. */
+.tag.holiday-good { color: var(--good); border-color: currentColor; background: color-mix(in srgb, var(--good) 10%, var(--surface)); }
+.tag.holiday-warn { color: var(--warn); border-color: currentColor; background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+a.chip { text-decoration: none; }
+.holiday-teaser { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }

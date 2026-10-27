@@ -481,6 +481,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
 
+## Holiday episodes
+
+- **Found, not curated** (`HolidayApi` on Catalog.API): a Postgres regex per holiday over episode titles and summaries,
+  with no list to keep up. A title match counts whenever it aired (Ghosts' "Halloween 3" aired in March); a summary
+  match only within the holiday's window (Halloween: 10 October to 7 November), since out of season summaries mostly
+  mention it in passing.
+- **Left out:** daily shows (a season of more than 60 episodes), whose dated episodes mention every holiday; shows named
+  after the holiday, listed whole as "made for the season".
+- **Ranking:** TVmaze's popularity tops out (a fifth of the catalog at 99 or 100), so the show's best rated holiday
+  episode breaks ties.
+- **Stands alone:** a reality, animation, game, variety, documentary or talk show, or a comedy without a story genre
+  (drama, crime, thriller, mystery, science fiction, fantasy). A rough rule, shown as "usually".
+- **Personal part in the UI:** the page sends the user's follows to the catalog and places each episode with one
+  Tracking `/progress` call per matching show, as the watch order does; the catalog never sees watches.
+- **Cached** per holiday for 6 hours; a scan of ~90,000 episodes takes under a second.
+
 ## Tonight's plan
 
 - **Split across services:**

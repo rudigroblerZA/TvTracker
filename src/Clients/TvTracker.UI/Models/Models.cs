@@ -530,3 +530,15 @@ public record KnownFace(Guid PersonId, string Name, string? Character, IReadOnly
 
 /// <param name="CaughtUp">False when the user is partway through that show, so the actor may only arrive later.</param>
 public record KnownFrom(Guid ShowId, string Title, string? PosterUrl, string? Character, int Watched, int Aired, bool CaughtUp);
+
+/// <summary>A holiday with episodes made for it (see Catalog.API's HolidayApi).</summary>
+public record HolidaySummary(string Key, string Name, DateOnly Date, int DaysAway);
+
+public record Holiday(string Key, string Name, DateOnly Date, int DaysAway, IReadOnlyList<HolidayEpisode> Episodes,
+    IReadOnlyList<HolidayShow> SeasonShows);
+
+/// <param name="StandsAlone">A comedy, animated, reality or game show, whose episodes usually work out of order.</param>
+public record HolidayEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
+    string Title, DateTimeOffset? AirsAtUtc, int? RuntimeMinutes, double? Rating, bool InTitle, bool StandsAlone);
+
+public record HolidayShow(Guid ShowId, string Title, string? PosterUrl);
