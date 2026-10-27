@@ -6,7 +6,10 @@ using TvTracker.Persistence;
 
 namespace Social.API.IntegrationEvents;
 
-/// <summary>Keeps show titles, posters, episode numbers and air times from the catalog, for the feed and comparing progress.</summary>
+/// <summary>
+/// Keeps show titles, posters, episode numbers, air times and runtimes from the catalog, for the feed, comparing progress
+/// and planning an evening for two.
+/// </summary>
 public sealed class CatalogEventHandlers(SocialContext db) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
@@ -26,24 +29,25 @@ public sealed class CatalogEventHandlers(SocialContext db) :
             var existing = await db.Episodes.Where(x => ids.Contains(x.EpisodeId)).ToDictionaryAsync(x => x.EpisodeId, ct);
             foreach (var episode in e.Episodes)
             {
-                Upsert(existing.GetValueOrDefault(episode.EpisodeId), e.ShowId, episode.EpisodeId, episode.SeasonNumber, episode.EpisodeNumber, episode.AirsAtUtc);
+                Upsert(existing.GetValueOrDefault(episode.EpisodeId), e.ShowId, episode.EpisodeId, episode.SeasonNumber, episode.EpisodeNumber, episode.AirsAtUtc, episode.RuntimeMinutes);
             }
         }, ct);
 
     public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
         db.HandleOnceAsync(e, nameof(CatalogEventHandlers), async () =>
-            Upsert(await db.Episodes.FindAsync([e.EpisodeId], ct), e.ShowId, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.AirsAtUtc), ct);
+            Upsert(await db.Episodes.FindAsync([e.EpisodeId], ct), e.ShowId, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.AirsAtUtc, e.RuntimeMinutes), ct);
 
-    private void Upsert(EpisodeCopy? episode, Guid showId, Guid episodeId, int season, int number, DateTimeOffset? airsAtUtc)
+    private void Upsert(EpisodeCopy? episode, Guid showId, Guid episodeId, int season, int number, DateTimeOffset? airsAtUtc, int? runtimeMinutes)
     {
         if (episode is null)
         {
-            db.Episodes.Add(new EpisodeCopy { EpisodeId = episodeId, ShowId = showId, SeasonNumber = season, EpisodeNumber = number, AirsAtUtc = airsAtUtc });
+            db.Episodes.Add(new EpisodeCopy { EpisodeId = episodeId, ShowId = showId, SeasonNumber = season, EpisodeNumber = number, AirsAtUtc = airsAtUtc, RuntimeMinutes = runtimeMinutes });
             return;
         }
         episode.SeasonNumber = season;
         episode.EpisodeNumber = number;
         episode.AirsAtUtc = airsAtUtc;
+        episode.RuntimeMinutes = runtimeMinutes;
     }
 
     private async Task UpsertShowAsync(Guid showId, string title, string? posterUrl, CancellationToken ct)

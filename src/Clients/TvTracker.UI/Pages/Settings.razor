@@ -6,6 +6,7 @@
 @inject IAuthActions Auth
 @inject SpoilerShield Shield
 @inject ThemeStore Theme
+@implements IDisposable
 @inject SocialClient Social
 
 <PageTitle>Settings · @Brand.AppName</PageTitle>
@@ -143,6 +144,14 @@
             </section>
         </Feature>
 
+        @if (isAdmin)
+        {
+            <section class="panel">
+                <h2>Admin</h2>
+                <p><a href="settings/flags">Feature flags</a><span class="muted small"> · turn features on or off for everyone</span></p>
+            </section>
+        }
+
         <section class="panel">
             <h2>Your data</h2>
             <div class="actions">
@@ -210,6 +219,18 @@
 
     private string? theme;
 
+    // The flags page answers only admins, so asking it is how the page knows.
+    private bool isAdmin;
+
+    // The header's toggle changes it too.
+    private void OnThemeChanged() => InvokeAsync(async () =>
+    {
+        theme = await Theme.GetAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Theme.Changed -= OnThemeChanged;
+
     private async Task SetThemeAsync(string? value)
     {
         theme = value;
@@ -240,6 +261,7 @@
     protected override async Task OnInitializedAsync()
     {
         theme = await Theme.GetAsync();
+        Theme.Changed += OnThemeChanged;
         spoilerShield = await Shield.IsOnAsync();
         await LoadShareActivityAsync();
         try
@@ -251,6 +273,7 @@
             }
 
             profile = await Identity.GetProfileAsync();
+            isAdmin = await Identity.GetFeatureFlagsAsync() is not null;
             if (profile is not null)
             {
                 displayName = profile.DisplayName;

@@ -8,3 +8,6 @@ obj/
 *.swp
 .DS_Store
 TestResults/
+
+# Feature flag overrides written by the flags page (Identity.API); flagd.json is the checked-in baseline.
+src/TvTracker.AppHost/Flags/overrides.json

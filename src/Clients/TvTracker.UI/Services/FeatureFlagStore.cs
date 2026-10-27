@@ -31,4 +31,7 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         cache[key] = (enabled, DateTimeOffset.UtcNow);
         return enabled;
     }
+
+    /// <summary>Forgets every answer, so a flag changed on the flags page shows here at once.</summary>
+    public void Clear() => cache.Clear();
 }

@@ -102,6 +102,17 @@
       ]
     },
     {
+      "username": "admin",
+      "email": "admin@example.com",
+      "firstName": "App",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "admin", "temporary": false }
+      ]
+    },
+    {
       "username": "service-account-tvtracker-identity-admin",
       "enabled": true,
       "serviceAccountClientId": "tvtracker-identity-admin",

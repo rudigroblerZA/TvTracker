@@ -31,6 +31,45 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>Creates a user with a password unless one with that username exists. Returns true when it created one.</summary>
+    public async Task<bool> EnsureUserAsync(string username, string password, string email, string firstName, string lastName,
+        CancellationToken cancellationToken)
+    {
+        var token = await GetAdminTokenAsync(cancellationToken);
+        var users = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/users";
+
+        using var find = new HttpRequestMessage(HttpMethod.Get, $"{users}?username={Uri.EscapeDataString(username)}&exact=true");
+        find.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var found = await httpClient.SendAsync(find, cancellationToken);
+        found.EnsureSuccessStatusCode();
+        if ((await found.Content.ReadFromJsonAsync<List<object>>(cancellationToken))?.Count > 0)
+        {
+            return false;
+        }
+
+        using var create = new HttpRequestMessage(HttpMethod.Post, users)
+        {
+            Content = JsonContent.Create(new
+            {
+                username,
+                email,
+                firstName,
+                lastName,
+                enabled = true,
+                emailVerified = true,
+                credentials = new[] { new { type = "password", value = password, temporary = false } }
+            })
+        };
+        create.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var created = await httpClient.SendAsync(create, cancellationToken);
+        if (created.StatusCode == HttpStatusCode.Conflict)
+        {
+            return false;
+        }
+        created.EnsureSuccessStatusCode();
+        return true;
+    }
+
     private async Task<string> GetAdminTokenAsync(CancellationToken cancellationToken)
     {
         var form = new FormUrlEncodedContent(new Dictionary<string, string>

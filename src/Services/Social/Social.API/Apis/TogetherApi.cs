@@ -97,7 +97,7 @@ public static class TogetherApi
     }
 
     /// <summary>Shows a user follows or has watched any of.</summary>
-    private static async Task<HashSet<Guid>> ShowsOfAsync(SocialContext db, string userId, CancellationToken ct) =>
+    internal static async Task<HashSet<Guid>> ShowsOfAsync(SocialContext db, string userId, CancellationToken ct) =>
         (await db.UserShows.Where(s => s.UserId == userId && s.Followed).Select(s => s.ShowId)
             .Union(db.Watches.Where(w => w.UserId == userId).Select(w => w.ShowId))
             .ToListAsync(ct)).ToHashSet();

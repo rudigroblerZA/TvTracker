@@ -34,6 +34,14 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task DeleteAccountAsync(CancellationToken ct = default) =>
         SendAsync(ApiClients.Identity, HttpMethod.Delete, "api/v1/account", null, ct);
 
+    /// <summary>The feature flags, for admins; null for anyone else.</summary>
+    public Task<List<FeatureFlagSetting>?> GetFeatureFlagsAsync(CancellationToken ct = default) =>
+        GetAsync<List<FeatureFlagSetting>>(ApiClients.Identity, "api/v1/admin/flags", ct);
+
+    /// <summary>Turns a flag on or off for everyone, or (null) back to what flagd.json says.</summary>
+    public Task<FeatureFlagSetting?> SetFeatureFlagAsync(string key, bool? on, CancellationToken ct = default) =>
+        SendAsync<FeatureFlagSetting>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/flags/{Uri.EscapeDataString(key)}", new { On = on }, ct);
+
     public async Task<string> ExportAsync(CancellationToken ct = default)
     {
         var json = await GetAsync<System.Text.Json.JsonElement>(ApiClients.Identity, "api/v1/account/export", ct);
@@ -415,6 +423,10 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
     /// <summary>Shows the user and someone else both follow or have started; null when the user can't see their activity.</summary>
     public Task<Together?> GetTogetherAsync(string userId, CancellationToken ct = default) =>
         GetAsync<Together>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/together", ct);
+
+    /// <summary>The queue for an evening with someone else; null when the user can't see their activity.</summary>
+    public Task<TonightTogether?> GetTonightTogetherAsync(string userId, int perShow = 8, CancellationToken ct = default) =>
+        GetAsync<TonightTogether>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/tonight?perShow={perShow}", ct);
 
     public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);

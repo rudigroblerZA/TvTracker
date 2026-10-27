@@ -1,0 +1,13 @@
+@* Tonight for two: shared shows left out because one of the two is too far ahead to watch together tonight. *@
+@if (Shows.Count > 0)
+{
+    <p class="muted small">
+        Too far apart tonight:
+        @string.Join(", ", Shows.Select(s => $"{s.Title} ({(s.Ahead == "you" ? "you're" : Name + " is")} {s.Gap} episodes ahead)")).
+    </p>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ApartShow> Shows { get; set; } = [];
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+}

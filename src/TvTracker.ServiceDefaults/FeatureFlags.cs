@@ -30,6 +30,7 @@ public static class FeatureFlags
     public const string TimeOff = "time-off";
     public const string SpoilerShield = "spoiler-shield";
     public const string Social = "social";
+    public const string TonightTogether = "tonight-together";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

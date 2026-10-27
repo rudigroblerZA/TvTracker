@@ -28,6 +28,10 @@ public record TonightPlan(IReadOnlyList<TonightBlock> Blocks, int Minutes, int B
 ///   mix really mixes, unless that cap leaves the evening under three-quarters full.
 /// </item>
 /// <item>
+///   <b>For two:</b> an episode one of the two has already seen is a rewatch for them, so its minutes count for
+///   <see cref="RewatchValue"/> of a new one: a level show beats one where somebody sits through reruns.
+/// </item>
+/// <item>
 ///   <b>Running over:</b> allowed by a few minutes (an episode rarely fits the budget exactly), never more.
 /// </item>
 /// </list>
@@ -47,6 +51,9 @@ public static class TonightPlanner
 
     private const double MoodWeight = 0.65;
 
+    // A rewatch for one of two people: still an evening together, but worth less than episodes new to both.
+    private const double RewatchValue = 0.6;
+
     // In a mix, the most of the evening one show may take: room for two hour-long episodes in a two-and-a-half-hour
     // evening, but not the whole of it.
     private const double MixShare = 0.75;
@@ -54,13 +61,15 @@ public static class TonightPlanner
     /// <param name="fits">Each show's mood fit (0-1); null when no mood was given or the fits were unavailable.</param>
     /// <param name="mood">The mood as the user would say it, for the reasons ("Fits “Light & funny”").</param>
     /// <param name="excluded">Shows the user swapped out of earlier plans.</param>
+    /// <param name="why">The reason a show is in the plan when it isn't the mood ("You're level"); by default, where the
+    /// user is in it.</param>
     public static TonightPlan Plan(IReadOnlyList<TonightShow> queue, IReadOnlyDictionary<Guid, double>? fits, string? mood,
-        int budgetMinutes, bool oneShow, IReadOnlySet<Guid> excluded, DateTimeOffset now)
+        int budgetMinutes, bool oneShow, IReadOnlySet<Guid> excluded, DateTimeOffset now, Func<TonightShow, string>? why = null)
     {
-        var plan = Plan(queue, fits, mood, budgetMinutes, oneShow, excluded, now, capShows: !oneShow);
+        var plan = Plan(queue, fits, mood, budgetMinutes, oneShow, excluded, now, capShows: !oneShow, why);
         if (!oneShow && plan.Minutes < budgetMinutes * 0.75)
         {
-            var uncapped = Plan(queue, fits, mood, budgetMinutes, oneShow, excluded, now, capShows: false);
+            var uncapped = Plan(queue, fits, mood, budgetMinutes, oneShow, excluded, now, capShows: false, why);
             if (uncapped.Minutes > plan.Minutes)
             {
                 return uncapped;
@@ -70,7 +79,7 @@ public static class TonightPlanner
     }
 
     private static TonightPlan Plan(IReadOnlyList<TonightShow> queue, IReadOnlyDictionary<Guid, double>? fits, string? mood,
-        int budgetMinutes, bool oneShow, IReadOnlySet<Guid> excluded, DateTimeOffset now, bool capShows)
+        int budgetMinutes, bool oneShow, IReadOnlySet<Guid> excluded, DateTimeOffset now, bool capShows, Func<TonightShow, string>? why)
     {
         var tolerance = Math.Max(5, budgetMinutes / 12);
         var limit = budgetMinutes + tolerance;
@@ -112,7 +121,8 @@ public static class TonightPlanner
                         {
                             break;
                         }
-                        value += show.Episodes[k - 1].RuntimeMinutes * (score * score + FillValue);
+                        value += show.Episodes[k - 1].RuntimeMinutes * (score * score + FillValue)
+                            * (show.Episodes[k - 1].SeenBy is null ? 1 : RewatchValue);
                         if (next[used + 1, total] is not { } existing || value > existing.Value)
                         {
                             var take = (int[])state.Take.Clone();
@@ -152,7 +162,7 @@ public static class TonightPlanner
             .Select(x =>
             {
                 var episodes = x.Show.Episodes.Take(x.Count).ToList();
-                return new TonightBlock(x.Show, episodes, episodes.Sum(e => e.RuntimeMinutes), Reason(x.Show, fits, mood, now));
+                return new TonightBlock(x.Show, episodes, episodes.Sum(e => e.RuntimeMinutes), Reason(x.Show, fits, mood, now, why));
             })
             .ToList();
         return new TonightPlan(blocks, blocks.Sum(b => b.Minutes), budgetMinutes, fits is null ? null : mood);
@@ -183,15 +193,18 @@ public static class TonightPlanner
         return days <= 14 ? 1 : days <= 60 ? 0.7 : 0.45;
     }
 
-    private static string Reason(TonightShow show, IReadOnlyDictionary<Guid, double>? fits, string? mood, DateTimeOffset now)
+    private static string Reason(TonightShow show, IReadOnlyDictionary<Guid, double>? fits, string? mood, DateTimeOffset now,
+        Func<TonightShow, string>? why)
     {
         var first = show.Episodes[0];
         var start = first.SeasonNumber == 1 && first.EpisodeNumber == 1 ? "Start from the first episode" : $"Pick up at {Format.EpisodeCode(first.SeasonNumber, first.EpisodeNumber)}";
-        var why = fits is not null && fits.TryGetValue(show.ShowId, out var fit) && fit >= 0.7
+        var because = fits is not null && fits.TryGetValue(show.ShowId, out var fit) && fit >= 0.7
             ? $"Fits “{mood}”"
-            : show.Status == WatchStatus.PlanToWatch || show.LastWatchedAtUtc is null
-                ? "On your watchlist"
-                : Continuity(show, now) >= 1 ? "You're in the middle of it" : "You haven't watched it in a while";
-        return $"{why} · {start}";
+            : why is not null
+                ? why(show)
+                : show.Status == WatchStatus.PlanToWatch || show.LastWatchedAtUtc is null
+                    ? "On your watchlist"
+                    : Continuity(show, now) >= 1 ? "You're in the middle of it" : "You haven't watched it in a while";
+        return $"{because} · {start}";
     }
 }

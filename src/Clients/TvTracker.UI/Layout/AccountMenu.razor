@@ -5,7 +5,7 @@
     <Authorized>
         <a href="stats" class="account-link">Stats</a>
         <a href="settings" class="account-link">@(context.User.FindFirst("name")?.Value ?? context.User.Identity?.Name ?? "Account")</a>
-        <button class="btn btn-quiet" @onclick="Auth.SignOutAsync">Sign out</button>
+        <button class="btn btn-quiet header-sign-out" @onclick="Auth.SignOutAsync">Sign out</button>
     </Authorized>
     <NotAuthorized>
         <button class="btn" @onclick="SignIn">Sign in</button>

@@ -16,6 +16,7 @@ builder.Services.AddIntegrationEventOutbox<IdentityContext>();
 builder.Services.AddHttpClient<KeycloakAdminClient>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<ProfileSnapshotPublisher>();
+builder.Services.AddHostedService<AdminAccountSeeder>();
 
 // Used by the data export to collect each service's data for the user.
 foreach (var source in new[] { "tracking", "ratings", "recommendations", "notifications", "social" })
@@ -40,5 +41,6 @@ app.UseAuthorization();
 
 app.MapGet("/api/v1/status", () => new { Service = "identity-api", Status = "ok" });
 app.MapProfileApi();
+app.MapFlagsApi();
 
 app.Run();
