@@ -122,6 +122,8 @@ On the Stats page, computed from your own data only.
 - **How the mood is matched:** with the same meaning vectors as search. It ranks your own shows: Ted Lasso first for
   "Light & funny"; The Expanse and Severance for "Mind-bending".
 - **Mix it up or one show:** swap a show out, start watching, or mark the whole plan watched afterwards.
+- **For two:** plan an evening with someone you follow, from the shows you share. It picks up where whoever is
+  behind left off, so nobody skips an episode, and prefers shows you're level on over ones where one of you rewatches.
 
 ### 11. Reunion radar
 

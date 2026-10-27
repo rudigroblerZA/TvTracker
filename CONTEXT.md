@@ -456,6 +456,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Mix cap:** in a mix each show is capped at 75% of the budget, so a mix really mixes. The cap is dropped if the
     plan would come out under 75% full.
   - **Overrun:** allowed by max(5 min, budget/12).
+- **For two** (`TonightTogetherApi` on Social): the queue comes from Social's copy of both people's watches, since
+  Tracking only knows the caller's and Social already applies `Visibility`. The same `TonightPlanner` plans it.
+  - **Start:** after the behind person's furthest episode; episodes seen by both are skipped.
+  - **Rewatches:** an episode one has seen is worth 0.6 of a new one in the planner, so a level show wins.
+  - **Gap:** over 3 episodes apart, the show is listed apart rather than planned (an evening of reruns for one).
+  - **Runtimes:** Social's episode copy keeps `RuntimeMinutes` for this (migration `EpisodeRuntimes`); the replay is
+    requested again when no episode has one. Titles stay out of Social, so the plan shows episode numbers.
+  - **Marking:** marks only the caller's episodes, and takes the plan out of the queue locally, since Social hears
+    of the watches a moment later through events.
 - **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
   previous plan, and the browser showed the old poster until the new one loaded.
 

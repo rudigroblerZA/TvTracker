@@ -2,6 +2,8 @@
 @attribute [RequiresFeature(FeatureFlags.TonightPlan)]
 @inject TrackingClient Tracking
 @inject CatalogClient Catalog
+@inject SocialClient Social
+@inject FeatureFlagStore Flags
 @inject NavigationManager Navigation
 
 <PageTitle>Tonight · @Brand.AppName</PageTitle>
@@ -10,22 +12,43 @@
 
 <AuthorizeView>
     <Authorized>
-        <p class="muted">How long have you got, and what are you in the mood for? The plan comes from the shows you're watching and your watchlist.</p>
+        @if (partner is null)
+        {
+            <p class="muted">How long have you got, and what are you in the mood for? The plan comes from the shows you're watching and your watchlist.</p>
+        }
+        else
+        {
+            <p class="muted">An evening with @partner.DisplayName: from the shows you both follow or have started, picking up where whoever is behind left off, so nobody skips anything.</p>
+        }
         <Feature Flag="@FeatureFlags.TimeOff">
             <p class="small"><a href="time-off">More than an evening?</a><span class="muted"> Find finished shows that fit your time off, start to end.</span></p>
         </Feature>
 
         <div class="tonight-controls">
+            @if (people is { Count: > 0 })
+            {
+                <div class="tonight-field">
+                    <label class="small strong" for="tonight-with">Watching</label>
+                    <select id="tonight-with" value="@(With ?? "")" @onchange="e => Go(minutes, mood, oneShow, e.Value?.ToString())">
+                        <option value="">On my own</option>
+                        @foreach (var person in people)
+                        {
+                            <option value="@person.UserId">With @person.DisplayName</option>
+                        }
+                    </select>
+                </div>
+            }
+
             <div class="tonight-field">
                 <span class="small strong">Time</span>
                 <div class="chips">
                     @foreach (var (value, label) in Times)
                     {
-                        <button type="button" class="chip @(minutes == value ? "active" : null)" @onclick="() => Go(value, mood, oneShow)">@label</button>
+                        <button type="button" class="chip @(minutes == value ? "active" : null)" @onclick="() => Go(value, mood, oneShow, With)">@label</button>
                     }
                     <label class="inline small">
                         <input type="number" min="15" max="600" step="15" value="@minutes" aria-label="Minutes"
-                               @onchange="e => Go(int.TryParse(e.Value?.ToString(), out var m) ? m : minutes, mood, oneShow)" />
+                               @onchange="e => Go(int.TryParse(e.Value?.ToString(), out var m) ? m : minutes, mood, oneShow, With)" />
                         min
                     </label>
                 </div>
@@ -34,13 +57,13 @@
             <div class="tonight-field">
                 <span class="small strong">Mood</span>
                 <div class="chips">
-                    <button type="button" class="chip @(string.IsNullOrEmpty(mood) ? "active" : null)" @onclick="() => Go(minutes, null, oneShow)">Anything</button>
+                    <button type="button" class="chip @(string.IsNullOrEmpty(mood) ? "active" : null)" @onclick="() => Go(minutes, null, oneShow, With)">Anything</button>
                     @foreach (var (label, text) in Moods)
                     {
-                        <button type="button" class="chip @(mood == text ? "active" : null)" @onclick="() => Go(minutes, text, oneShow)">@label</button>
+                        <button type="button" class="chip @(mood == text ? "active" : null)" @onclick="() => Go(minutes, text, oneShow, With)">@label</button>
                     }
                 </div>
-                <form class="inline" @onsubmit="() => Go(minutes, customMood, oneShow)">
+                <form class="inline" @onsubmit="() => Go(minutes, customMood, oneShow, With)">
                     <input type="text" placeholder="Or describe it: “something cosy with a mystery”" @bind="customMood" aria-label="Describe the mood" maxlength="200" />
                     <button class="btn btn-quiet small" type="submit">Use</button>
                 </form>
@@ -49,8 +72,8 @@
             <div class="tonight-field">
                 <span class="small strong">Shows</span>
                 <div class="chips">
-                    <button type="button" class="chip @(!oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, false)">Mix it up</button>
-                    <button type="button" class="chip @(oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, true)">One show</button>
+                    <button type="button" class="chip @(!oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, false, With)">Mix it up</button>
+                    <button type="button" class="chip @(oneShow ? "active" : null)" @onclick="() => Go(minutes, mood, true, With)">One show</button>
                 </div>
             </div>
         </div>
@@ -63,6 +86,18 @@
             {
                 <p class="muted">Planning…</p>
             }
+        }
+        else if (notVisible)
+        {
+            <p class="notice">You can't plan with them: you'd need to see what they watch. <button class="link" type="button" @onclick="() => Go(minutes, mood, oneShow, null)">Plan on your own</button></p>
+        }
+        else if (queue.Count == 0 && partner is not null)
+        {
+            <p class="notice">
+                Nothing to watch together yet: you and @partner.DisplayName have no show you both follow or have started with episodes
+                left for both@(apart.Count > 0 ? ", close enough to watch together" : ""). Follow one of their shows, or pick one together.
+            </p>
+            <ApartList Shows="apart" Name="@partner.DisplayName" />
         }
         else if (queue.Count == 0)
         {
@@ -119,8 +154,12 @@
                                     @foreach (var episode in block.Episodes)
                                     {
                                         <li>
-                                            <a href="episodes/@episode.EpisodeId">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) · @episode.Title</a>
+                                            <a href="episodes/@episode.EpisodeId">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)@(string.IsNullOrEmpty(episode.Title) ? "" : " · " + episode.Title)</a>
                                             <span class="muted small"> · @(episode.RuntimeEstimated ? "about " : "")@Format.Duration(episode.RuntimeMinutes)</span>
+                                            @if (episode.SeenBy is { } seenBy)
+                                            {
+                                                <span class="tag">@(seenBy == "you" ? "Rewatch for you" : $"Rewatch for {partner?.DisplayName}")</span>
+                                            }
                                         </li>
                                     }
                                 </ul>
@@ -131,9 +170,13 @@
                 </ol>
 
                 <p class="small">
-                    <button class="btn btn-quiet small" type="button" disabled="@marking" @onclick="MarkPlanWatchedAsync">I watched all of this</button>
-                    <span class="muted"> Marks every episode in the plan watched, and plans again.</span>
+                    <button class="btn btn-quiet small" type="button" disabled="@marking" @onclick="MarkPlanWatchedAsync">@(partner is null ? "I watched all of this" : "We watched all of this")</button>
+                    <span class="muted">@(partner is null ? " Marks every episode in the plan watched, and plans again." : $" Marks the plan watched for you, and plans again; {partner.DisplayName} marks their own.")</span>
                 </p>
+                @if (partner is not null)
+                {
+                    <ApartList Shows="apart" Name="@partner.DisplayName" />
+                }
                 </div>
             }
         }
@@ -148,6 +191,9 @@
     [SupplyParameterFromQuery(Name = "minutes")] public int? Minutes { get; set; }
     [SupplyParameterFromQuery(Name = "mood")] public string? Mood { get; set; }
     [SupplyParameterFromQuery(Name = "one")] public bool? One { get; set; }
+
+    /// <summary>Tonight for two: the user id of the person watching with the user.</summary>
+    [SupplyParameterFromQuery(Name = "with")] public string? With { get; set; }
 
     private static readonly (int Value, string Label)[] Times = [(30, "30 min"), (60, "1 h"), (90, "1½ h"), (120, "2 h"), (180, "3 h")];
 
@@ -169,6 +215,14 @@
     private bool oneShow;
 
     private List<TonightShow>? queue;
+
+    // Tonight for two: who, the shared shows by id (for the reasons), and the shows too far apart to plan.
+    private string? loadedWith;
+    private List<SocialPerson>? people;
+    private SocialPerson? partner;
+    private Dictionary<Guid, TonightTogetherShow> togetherShows = [];
+    private IReadOnlyList<ApartShow> apart = [];
+    private bool notVisible;
     private readonly Dictionary<string, Dictionary<Guid, double>?> fitsByMood = [];
     private bool moodAvailable = true;
     private readonly HashSet<Guid> excluded = [];
@@ -185,7 +239,11 @@
         mood = string.IsNullOrWhiteSpace(Mood) ? null : Mood.Trim();
         customMood = mood is not null && Moods.All(m => m.Text != mood) ? mood : customMood;
         oneShow = One == true;
-        if (queue is null)
+        if (people is null)
+        {
+            await LoadPeopleAsync();
+        }
+        if (queue is null || loadedWith != With)
         {
             await LoadAsync();
         }
@@ -200,13 +258,77 @@
         error = null;
         try
         {
-            queue = await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+            queue = await LoadQueueAsync();
+            fitsByMood.Clear();
+            excluded.Clear();
             await PlanAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
         }
+    }
+
+    /// <summary>The user's own queue from Tracking, or the shared one from Social when planning with someone.</summary>
+    private async Task<List<TonightShow>> LoadQueueAsync()
+    {
+        loadedWith = With;
+        partner = null;
+        togetherShows = [];
+        apart = [];
+        notVisible = false;
+        if (string.IsNullOrEmpty(With))
+        {
+            return await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+        }
+
+        var together = await Social.GetTonightTogetherAsync(With, perShow: 8);
+        if (together is null)
+        {
+            notVisible = true;
+            return [];
+        }
+
+        partner = together.Person;
+        apart = together.Apart;
+        togetherShows = together.Shows.ToDictionary(s => s.ShowId);
+        return together.Shows
+            .Select(s => new TonightShow(s.ShowId, s.Title, s.PosterUrl, [], s.LastWatchedAtUtc is null ? WatchStatus.PlanToWatch : WatchStatus.Watching,
+                s.LastWatchedAtUtc, 0,
+                s.Episodes.Select(e => new TonightEpisode(e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, "", e.RuntimeMinutes, e.RuntimeEstimated, e.SeenBy)).ToList()))
+            .ToList();
+    }
+
+    /// <summary>
+    /// People the user follows, to plan with; only while both flags are on. Social being down just leaves the choice out.
+    /// </summary>
+    private async Task LoadPeopleAsync()
+    {
+        people = [];
+        try
+        {
+            if (await Flags.IsEnabledAsync(FeatureFlags.Social) && await Flags.IsEnabledAsync(FeatureFlags.TonightTogether)
+                && await Social.GetMeAsync() is { } me)
+            {
+                people = (await Social.GetFollowingAsync(me.UserId) ?? []).OrderBy(p => p.DisplayName).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+        }
+    }
+
+    /// <summary>Why a shared show is in the plan, when it isn't the mood: where the two of them are in it.</summary>
+    private string WhyTogether(TonightShow show)
+    {
+        var name = partner?.DisplayName ?? "they";
+        return togetherShows.GetValueOrDefault(show.ShowId) switch
+        {
+            null or { Ahead: null } => "New to you both",
+            { Ahead: "level" } => "You're level",
+            { Ahead: "you", Gap: var gap } => $"Catch {name} up: {Episodes(gap)} you've seen",
+            { Gap: var gap } => $"{name} is {Episodes(gap)} ahead: a rewatch for them first"
+        };
     }
 
     private async Task PlanAsync()
@@ -231,13 +353,13 @@
                 }
                 moodAvailable = fits is not null;
             }
-            plan = TonightPlanner.Plan(queue, fits, mood is null ? null : MoodLabel(mood), minutes, oneShow, excluded, DateTimeOffset.UtcNow);
+            plan = TonightPlanner.Plan(queue, fits, mood is null ? null : MoodLabel(mood), minutes, oneShow, excluded, DateTimeOffset.UtcNow, Why);
         }
         catch (HttpRequestException)
         {
             // Mood matching is optional: plan without it.
             moodAvailable = false;
-            plan = TonightPlanner.Plan(queue, null, null, minutes, oneShow, excluded, DateTimeOffset.UtcNow);
+            plan = TonightPlanner.Plan(queue, null, null, minutes, oneShow, excluded, DateTimeOffset.UtcNow, Why);
         }
         finally
         {
@@ -245,9 +367,14 @@
         }
     }
 
-    private void Go(int newMinutes, string? newMood, bool newOneShow) =>
+    private static string Episodes(int count) => count == 1 ? "1 episode" : $"{count} episodes";
+
+    private Func<TonightShow, string>? Why => partner is null ? null : WhyTogether;
+
+    private void Go(int newMinutes, string? newMood, bool newOneShow, string? newWith) =>
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
         {
+            ["with"] = string.IsNullOrEmpty(newWith) ? null : newWith,
             ["minutes"] = newMinutes == 120 ? null : Math.Clamp(newMinutes, 15, 600),
             ["mood"] = string.IsNullOrWhiteSpace(newMood) ? null : newMood.Trim(),
             ["one"] = newOneShow ? true : null
@@ -276,8 +403,21 @@
         error = null;
         try
         {
-            await Tracking.MarkWatchedAsync(new MarkWatched(plan.Blocks.SelectMany(b => b.Episodes).Select(e => e.EpisodeId).ToList(), null, null, null, null));
-            queue = await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+            var watched = plan.Blocks.SelectMany(b => b.Episodes).Where(e => e.SeenBy != "you").Select(e => e.EpisodeId).ToList();
+            if (watched.Count > 0)
+            {
+                await Tracking.MarkWatchedAsync(new MarkWatched(watched, null, null, null, null));
+            }
+            if (partner is null)
+            {
+                queue = await Tracking.GetTonightQueueAsync(perShow: 8) ?? [];
+            }
+            else
+            {
+                // Social hears of the watches through events, a moment later; take them off here rather than wait.
+                var planned = plan.Blocks.SelectMany(b => b.Episodes).Select(e => e.EpisodeId).ToHashSet();
+                queue = queue!.Select(s => s with { Episodes = s.Episodes.Where(e => !planned.Contains(e.EpisodeId)).ToList() }).ToList();
+            }
             await PlanAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)

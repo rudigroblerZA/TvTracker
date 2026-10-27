@@ -120,6 +120,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Social: following people, the activity feed (/feed), people pages and search." }
+    },
+    "tonight-together": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share." }
     }
   }
 }

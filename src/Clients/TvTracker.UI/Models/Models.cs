@@ -50,7 +50,9 @@ public record TonightShow(Guid ShowId, string Title, string? PosterUrl, IReadOnl
     DateTime? LastWatchedAtUtc, int WatchedCount, IReadOnlyList<TonightEpisode> Episodes);
 
 /// <param name="RuntimeEstimated">The provider has no runtime; it's the show's typical one.</param>
-public record TonightEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int RuntimeMinutes, bool RuntimeEstimated);
+/// <param name="SeenBy">Planning for two: "you" or "them" when one of the two has seen it already; null when new to both.</param>
+public record TonightEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int RuntimeMinutes, bool RuntimeEstimated,
+    string? SeenBy = null);
 
 public record MoodResponse(bool Available, IReadOnlyList<MoodFit> Fits);
 
@@ -465,6 +467,20 @@ public record FriendsOnShow(int Total, IReadOnlyList<FriendOnShow> People);
 public record TogetherShow(Guid ShowId, string? Title, string? PosterUrl, PeerProgress You, PeerProgress Them, string? Ahead);
 
 public record Together(SocialPerson Person, IReadOnlyList<TogetherShow> Shows);
+
+/// <summary>Tonight for two: what the user and someone they follow could watch together (see Social.API's TonightTogetherApi).</summary>
+public record TonightTogether(SocialPerson Person, IReadOnlyList<TonightTogetherShow> Shows, IReadOnlyList<ApartShow> Apart);
+
+/// <param name="Ahead">"you", "them", "level", or null when neither has started.</param>
+/// <param name="Gap">How far apart the two are, in episodes.</param>
+public record TonightTogetherShow(Guid ShowId, string Title, string? PosterUrl, string? Ahead, int Gap, DateTime? LastWatchedAtUtc,
+    IReadOnlyList<TogetherEpisode> Episodes);
+
+/// <param name="SeenBy">"you" or "them" when one has seen it already; null when new to both.</param>
+public record TogetherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, int RuntimeMinutes, bool RuntimeEstimated, string? SeenBy);
+
+/// <summary>A shared show one of the two is too far ahead in to watch together tonight.</summary>
+public record ApartShow(Guid ShowId, string Title, string Ahead, int Gap);
 
 public record Feed(IReadOnlyList<FeedItem> Items, DateTime? NextBefore);
 

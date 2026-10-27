@@ -416,6 +416,10 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
     public Task<Together?> GetTogetherAsync(string userId, CancellationToken ct = default) =>
         GetAsync<Together>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/together", ct);
 
+    /// <summary>The queue for an evening with someone else; null when the user can't see their activity.</summary>
+    public Task<TonightTogether?> GetTonightTogetherAsync(string userId, int perShow = 8, CancellationToken ct = default) =>
+        GetAsync<TonightTogether>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/tonight?perShow={perShow}", ct);
+
     public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
 }

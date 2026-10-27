@@ -121,6 +121,9 @@ public class EpisodeCopy
 
     /// <summary>For counting what's aired when comparing progress.</summary>
     public DateTimeOffset? AirsAtUtc { get; set; }
+
+    /// <summary>For planning an evening for two; null when the provider has none.</summary>
+    public int? RuntimeMinutes { get; set; }
 }
 
 public class SocialContext(DbContextOptions<SocialContext> options) : DbContext(options), IIntegrationEventLogDbContext
