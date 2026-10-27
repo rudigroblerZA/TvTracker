@@ -2,6 +2,10 @@
 // page head, before the stylesheet, so a saved choice applies before the first paint instead of flashing the other one.
 // The choice is also kept in localStorage under the web app's preference key, so the phone gets it early too.
 window.tvtrackerTheme = {
+    // The theme showing now: the chosen one, else the device's.
+    effective: () => document.documentElement.dataset.theme
+        || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
+
     apply: (theme) => {
         const root = document.documentElement;
         if (theme === "light" || theme === "dark") root.dataset.theme = theme;

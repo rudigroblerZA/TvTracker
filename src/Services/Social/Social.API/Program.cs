@@ -66,5 +66,6 @@ app.UseAuthorization();
 app.MapGet("/api/v1/status", () => new { Service = "social-api", Status = "ok" });
 app.MapSocialApi();
 app.MapTogetherApi();
+app.MapTonightTogetherApi();
 
 app.Run();

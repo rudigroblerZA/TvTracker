@@ -168,6 +168,15 @@ watching and your watchlist.
   - **Start watching** opens the first episode.
   - **I watched all of this** marks the plan watched.
   - The address holds the settings (`/tonight?minutes=90&mood=…&one=true`).
+- **Tonight for two:** "Watching: With …" picks someone you follow (or "Plan tonight with …" on their page). The plan
+  then comes from the shows you both follow or have started.
+  - **Nobody skips anything:** it picks up after whoever is behind. Episodes the one ahead has seen are marked
+    "Rewatch for …", and count for less, so a show you're level on wins.
+  - **Too far apart:** a show where one of you is more than 3 episodes ahead is left out and listed below the plan.
+  - **No titles:** episodes show as numbers, since the other person may not have seen them.
+  - **We watched all of this** marks the plan watched for you; they mark their own.
+  - Needs you to see their activity, as watching together does. Behind the `tonight-together` flag (and `social`).
+  - **API:** `GET /api/v1/people/{id}/tonight?perShow=8` on Social.API.
 - **How the mood is matched:** with the same vectors as search by meaning. If the embedding model is down, it
   plans from what you're watching alone and says so.
 - **How it chooses:** see `TonightPlanner`.
@@ -269,7 +278,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan, Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -279,6 +288,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `universes` | `/universes` and universe pages, the nav link, and the "Shared universe" section on show pages |
 | `essential-cut` | `/shows/{id}/essential-cut` and its teaser on show pages |
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
+| `tonight-together` | Tonight for two: the "Watching" choice on `/tonight`, the link on people's pages, and its endpoint |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
@@ -301,6 +311,18 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
   flagd's `fractional` operator does percentage rollouts on `targetingKey`.
 - **If flagd is down:** every flag is on, so a flag server outage never takes features away.
+- **From the app:** admins get Settings → Admin → Feature flags (`/settings/flags`). Each flag can follow
+  flagd.json, or be turned on or off for everyone.
+  - **Admins:** the Keycloak usernames in `Admin:Users` in the AppHost's `appsettings.json` (`demo` by default). For
+    anyone else the page and its API answer 404.
+  - **Where changes go:** `Flags/overrides.json`, which flagd reads after flagd.json, so an override wins. It isn't
+    checked in, and flagd.json is never edited. An override applies to everyone, ignoring flagd.json's targeting;
+    "flagd.json" removes it.
+  - **How fast:** services within seconds; the UI keeps answers for 30 seconds (the admin's own at once).
+  - **Only in development:** Identity.API writes the file in the AppHost's Flags folder, which is bind-mounted into
+    flagd, so it needs the two on one disk.
+  - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
+    Identity.API.
 
 ### White label and theme
 
@@ -312,7 +334,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
     in `ApplicationTitle` in `MobileApp.csproj`.
   - **Not covered:** the Keycloak sign-in page, whose title is the realm's `displayName` in
     `Realms/tvtracker-realm.json` (imported once, so change an existing realm in the Keycloak admin console).
-- **Theme** (Settings → Theme): Same as device, Light or Dark. Kept per device or browser, and applied before the page
+- **Theme:** the ☀/☾ button in the header switches between light and dark. Settings → Theme also offers Same as
+  device (the default). On a phone-width screen the header drops its Sign out button to fit one row; Sign out is in
+  Settings. Kept per device or browser, and applied before the page
   first paints, so a saved choice doesn't flash the other theme. Available signed out too.
 
 ### Mobile app

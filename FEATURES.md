@@ -122,6 +122,8 @@ On the Stats page, computed from your own data only.
 - **How the mood is matched:** with the same meaning vectors as search. It ranks your own shows: Ted Lasso first for
   "Light & funny"; The Expanse and Severance for "Mind-bending".
 - **Mix it up or one show:** swap a show out, start watching, or mark the whole plan watched afterwards.
+- **For two:** plan an evening with someone you follow, from the shows you share. It picks up where whoever is
+  behind left off, so nobody skips an episode, and prefers shows you're level on over ones where one of you rewatches.
 
 ### 11. Reunion radar
 
@@ -304,7 +306,8 @@ At `/feed`.
 - **Actor pages:** a person's shows' average rating, their best show, the years they worked, and co-stars they share
   two or more shows with.
 - **Privacy:** anything computed from our users' activity needs at least 5 users or ratings behind it.
-- **Light or dark:** pick a theme in Settings, or follow the device.
+- **Light or dark:** one tap in the header, or follow the device (Settings).
+- **Flags from the app:** admins turn features on or off for everyone from Settings, without editing files.
 - **Your name on it:** the app's name is a setting, so it can be white-labelled without code changes.
 
 ## Ideas for next

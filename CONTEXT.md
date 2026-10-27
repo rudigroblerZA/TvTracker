@@ -456,6 +456,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Mix cap:** in a mix each show is capped at 75% of the budget, so a mix really mixes. The cap is dropped if the
     plan would come out under 75% full.
   - **Overrun:** allowed by max(5 min, budget/12).
+- **For two** (`TonightTogetherApi` on Social): the queue comes from Social's copy of both people's watches, since
+  Tracking only knows the caller's and Social already applies `Visibility`. The same `TonightPlanner` plans it.
+  - **Start:** after the behind person's furthest episode; episodes seen by both are skipped.
+  - **Rewatches:** an episode one has seen is worth 0.6 of a new one in the planner, so a level show wins.
+  - **Gap:** over 3 episodes apart, the show is listed apart rather than planned (an evening of reruns for one).
+  - **Runtimes:** Social's episode copy keeps `RuntimeMinutes` for this (migration `EpisodeRuntimes`); the replay is
+    requested again when no episode has one. Titles stay out of Social, so the plan shows episode numbers.
+  - **Marking:** marks only the caller's episodes, and takes the plan out of the queue locally, since Social hears
+    of the watches a moment later through events.
 - **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
   previous plan, and the browser showed the old poster until the new one loaded.
 
@@ -478,6 +487,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     "Not available" instead, so the page never calls an API that answers 404.
 - **Context:** `FeatureFlags.ContextFor(user)` gives `targetingKey` (Keycloak `sub`) and `email`, so flags can
   target users and roll out by percentage.
+- **Flags page** (`FlagsApi` on Identity.API, `/settings/flags`): admins (`Admin:Users`, Keycloak usernames) turn a
+  flag on or off for everyone.
+  - **Overrides file:** changes go to `Flags/overrides.json`, a second flagd source (`--uri`); for a key in both,
+    flagd uses the later source. flagd.json stays the checked-in baseline, and removing an override restores it,
+    targeting included. The AppHost creates the file when missing; it's git-ignored.
+  - **Written in place:** a rename over the file would replace the file flagd watches.
+  - **flagd forgets dropped overrides:** in v0.17, removing a key from overrides.json removed the flag altogether
+    (FLAG_NOT_FOUND) instead of falling back to flagd.json. Removing one therefore rewrites flagd.json with its own
+    bytes, which makes flagd re-read it; overrides still win, and git sees no change. The rewrite waits 5 seconds:
+    flagd polls the files every 3, and when both changed in one poll it read flagd.json first and dropped the flag anyway.
+  - **404 for non-admins,** so the UI asks the list endpoint to know whether to show the link.
+  - **No flag of its own:** a flag on the flags page could lock admins out of it.
 - **Fail open:** the default is on. With flagd down or a flag unknown, features stay available. Turning one off is a
   deliberate edit.
 
@@ -507,7 +528,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     ops.html) says `{app}` and is filled in when shown.
   - **Stored text:** Analytics' fan-favorite tag reason includes the name, so a rename shows there after the next
     hourly run.
-- **Theme:** every colour token in `app.css` is `light-dark(light, dark)`, and `color-scheme` picks the side: the
+- **Theme:** the header's `ThemeToggle` sets the opposite of what's showing (`tvtrackerTheme.effective()` reads the
+  chosen theme, else the device's); Settings can go back to the device's. Every colour token in `app.css` is `light-dark(light, dark)`, and `color-scheme` picks the side: the
   device's, or `data-theme` on `<html>` from Settings (`ThemeStore`, a device preference like the spoiler shield).
   `theme.js` loads in the head, before the stylesheet, and applies a saved choice from `localStorage` before first
   paint. The phone keeps its choice in MAUI `Preferences`, which the page can't read that early, so `MainLayout`

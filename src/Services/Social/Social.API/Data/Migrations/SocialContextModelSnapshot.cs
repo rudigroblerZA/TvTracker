@@ -69,6 +69,9 @@ namespace Social.API.Data.Migrations
                     b.Property<int>("EpisodeNumber")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("RuntimeMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<int>("SeasonNumber")
                         .HasColumnType("integer");
 

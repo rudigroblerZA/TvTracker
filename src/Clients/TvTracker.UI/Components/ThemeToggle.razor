@@ -1,0 +1,35 @@
+@implements IDisposable
+@inject ThemeStore Theme
+
+@* The header's light/dark switch. It sets the opposite of what's showing; Settings → Theme can go back to the device's. *@
+<button type="button" class="theme-toggle" @onclick="ToggleAsync" title="@Label" aria-label="@Label">
+    @(effective == "dark" ? "☀" : "☾")
+</button>
+
+@code {
+    private string effective = "light";
+
+    private string Label => effective == "dark" ? "Switch to light theme" : "Switch to dark theme";
+
+    protected override void OnInitialized() => Theme.Changed += OnChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task ToggleAsync() => await Theme.SetAsync(effective == "dark" ? "light" : "dark");
+
+    private async Task RefreshAsync()
+    {
+        effective = await Theme.EffectiveAsync();
+        StateHasChanged();
+    }
+
+    private void OnChanged() => InvokeAsync(RefreshAsync);
+
+    public void Dispose() => Theme.Changed -= OnChanged;
+}
