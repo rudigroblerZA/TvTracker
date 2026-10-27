@@ -1,0 +1,51 @@
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+
+@* Home's line when a holiday is near: how many of its episodes the user's shows have. *@
+@if (next is not null && count > 0)
+{
+    <section>
+        <div class="section-head">
+            <h2>@next.Name @(next.DaysAway switch { 0 => "is today", 1 => "is tomorrow", var d => $"is in {d} days" })</h2>
+            <a href="holidays/@next.Key">Holiday episodes</a>
+        </div>
+        <p class="holiday-teaser">
+            <span>@($"{count} {(count == 1 ? "episode" : "episodes")} from {shows} of your shows")</span>
+            <span class="muted">@string.Join(", ", titles)@(shows > titles.Count ? " and more" : "")</span>
+        </p>
+    </section>
+}
+
+@code {
+    /// <summary>How close a holiday has to be for Home to mention it.</summary>
+    private const int DaysAhead = 21;
+
+    private HolidaySummary? next;
+    private int count;
+    private int shows;
+    private List<string> titles = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            next = (await Catalog.GetHolidaysAsync())?.FirstOrDefault(h => h.DaysAway <= DaysAhead);
+            if (next is null)
+            {
+                return;
+            }
+            var followed = (await Tracking.GetFollowsAsync() ?? []).Select(f => f.ShowId).ToList();
+            if (followed.Count > 0 && await Catalog.GetHolidayAsync(next.Key, followed) is { } holiday)
+            {
+                count = holiday.Episodes.Count;
+                var byShow = holiday.Episodes.Select(e => e.ShowTitle).Distinct().ToList();
+                shows = byShow.Count;
+                titles = byShow.Take(3).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra on Home.
+        }
+    }
+}

@@ -27,6 +27,7 @@ public static class CatalogApi
         api.MapBlendApi();
         api.MapUniverseApi();
         api.MapMoodApi();
+        api.MapHolidayApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
