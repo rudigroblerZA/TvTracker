@@ -15,7 +15,8 @@ namespace TvTracker.Persistence;
 /// <para>
 /// Keep <see cref="MaxPoolSize"/> × the database connections' owners (10 services, more with replicas) under the
 /// server's <c>max_connections</c> (Postgres' default of 100 in development), with room for migrations and tools.
-/// Under the same load, Tracking used at most a handful at once.
+/// Under that load with the cap, no database held more than 12 connections (Catalog's and Analytics' two processes
+/// each), and samples never caught more than one query running per database.
 /// </para>
 /// </summary>
 public static class ConnectionPool
