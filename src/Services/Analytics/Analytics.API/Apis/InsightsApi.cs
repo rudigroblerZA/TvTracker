@@ -70,6 +70,7 @@ public static class InsightsApi
         api.MapComebackApi();
         api.MapBacklogApi();
         api.MapTimeOffApi();
+        api.MapKnownFacesApi();
 
         return api;
     }

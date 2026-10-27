@@ -1,0 +1,97 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+@inject FeatureFlagStore Flags
+
+@* A show's cast. Signed in, each actor the user has seen before says where from ("Where do I know them from?"). *@
+<section aria-labelledby="cast-title">
+    <h2 id="cast-title">Cast</h2>
+    @if (known is { People.Count: > 0 })
+    {
+        <div class="chips known-filter">
+            <button type="button" class="chip @(onlyKnown ? "" : "active")" @onclick="() => onlyKnown = false">Everyone</button>
+            <button type="button" class="chip @(onlyKnown ? "active" : "")" @onclick="() => onlyKnown = true">@KnownLabel</button>
+        </div>
+    }
+    <ul class="cast">
+        @foreach (var member in Shown)
+        {
+            <li>
+                @if (member.PersonId != Guid.Empty)
+                {
+                    <a href="people/@member.PersonId"><strong>@member.Name</strong></a>
+                }
+                else
+                {
+                    <strong>@member.Name</strong>
+                }
+                <span class="muted">@member.Character</span>
+                @if (KnownFor(member) is { } face)
+                {
+                    <span class="known-from">
+                        <span>@("You know them from ")</span>
+                        @for (var i = 0; i < face.From.Count; i++)
+                        {
+                            var from = face.From[i];
+                            @if (i > 0)
+                            {
+                                <span>@(i == face.From.Count - 1 ? " and " : ", ")</span>
+                            }
+                            <Spoiler Hidden="!from.CaughtUp" Placeholder="a show you're partway through">
+                                <a href="shows/@from.ShowId">@from.Title</a>@if (from.Character is { Length: > 0 } character)
+                                {
+                                    <span>@($" as {character}")</span>
+                                }
+                                @if (!from.CaughtUp)
+                                {
+                                    <span class="muted" title="Casts list today's regulars, so they may join after where you are.">@($" ({from.Watched} of {from.Aired} seen)")</span>
+                                }
+                            </Spoiler>
+                        }
+                    </span>
+                }
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    [Parameter, EditorRequired] public IReadOnlyList<CastMember> Cast { get; set; } = [];
+
+    private KnownFaces? known;
+    private Dictionary<Guid, KnownFace> byPerson = [];
+    private bool onlyKnown;
+    private Guid loadedFor;
+
+    private IEnumerable<CastMember> Shown => onlyKnown ? Cast.Where(m => KnownFor(m) is not null) : Cast;
+
+    private string KnownLabel => known is { } k && k.People.Count == 1 ? "1 you know" : $"{known?.People.Count} you know";
+
+    private KnownFace? KnownFor(CastMember member) => byPerson.GetValueOrDefault(member.PersonId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        known = null;
+        byPerson = [];
+        onlyKnown = false;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            if (Session.IsSignedIn && await Flags.IsEnabledAsync(FeatureFlags.KnownFaces))
+            {
+                known = await Analytics.GetKnownFacesAsync(ShowId);
+                byPerson = known?.People.ToDictionary(p => p.PersonId) ?? [];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra: the cast shows without it.
+        }
+    }
+}

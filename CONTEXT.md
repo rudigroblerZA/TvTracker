@@ -387,6 +387,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why the provider's credits:** within the catalog alone (587 shows), only 73 shows had any reunion, and none of
     the demo user's favourites did. Across TVmaze, NCIS finds Chicago Hope (three of its cast) and The Wire finds Oz,
     Treme and Bosch.
+- **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
+  catalog copy's main casts (`cast_credits`), so no minimum counts.
+  - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
+  - **Catalog casts, not provider credits:** the user can only have watched catalog shows, so `CastCopy` is enough,
+    and it also covers actors whose provider credits haven't been fetched yet.
+  - **Spoilers:** casts are today's regulars with no seasons per role (Bob Odenkirk joins Breaking Bad in season 2), so
+    a line from a show the user hasn't caught up on (latest aired regular episode watched) is flagged rather than
+    dropped. Most such actors are there from the start, and the UI lets the spoiler shield hide the line.
 - **Episode patterns:** consistency is the rating spread (steady < 0.3, rollercoaster ≥ 0.6), plus peak/decline arc,
   finales vs. the rest of their season, and each season's best episode.
 
