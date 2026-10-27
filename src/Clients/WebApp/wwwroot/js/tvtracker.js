@@ -2,7 +2,7 @@
 window.tvtracker = {
     timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
 
-    // Device settings (the spoiler shield). Storage can be blocked (private windows), which reads as unset.
+    // Device settings (the spoiler shield, the theme). Storage can be blocked (private windows), which reads as unset.
     getPreference: (key) => {
         try { return localStorage.getItem("tvtracker." + key); } catch { return null; }
     },
@@ -26,7 +26,7 @@ window.tvtracker = {
 
     // Asks for permission, registers the service worker and subscribes to push.
     // Returns { endpoint, p256dh, auth } or null if push isn't available or was refused.
-    subscribePush: async (publicKey) => {
+    subscribePush: async (publicKey, appName) => {
         if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
             return null;
         }
@@ -36,7 +36,7 @@ window.tvtracker = {
             return null;
         }
 
-        const registration = await navigator.serviceWorker.register("/sw.js");
+        const registration = await navigator.serviceWorker.register("/sw.js?app=" + encodeURIComponent(appName));
         await navigator.serviceWorker.ready;
 
         const existing = await registration.pushManager.getSubscription();

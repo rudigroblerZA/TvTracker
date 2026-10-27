@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using TvTracker;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -24,6 +25,7 @@ public static class Extensions
         builder.AddDefaultHealthChecks();
 
         builder.Services.AddServiceDiscovery();
+        builder.Services.AddSingleton(new Branding(builder.Configuration[$"{Branding.Section}:AppName"]));
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {

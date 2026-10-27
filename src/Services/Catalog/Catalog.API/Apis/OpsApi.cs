@@ -81,7 +81,7 @@ public static class OpsApi
 {
     public static void MapOpsApi(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/ops", () => Results.Text(OpsPage.Html, "text/html; charset=utf-8")).ExcludeFromDescription();
+        app.MapGet("/ops", (Branding brand) => Results.Text(OpsPage.Html(brand), "text/html; charset=utf-8")).ExcludeFromDescription();
         app.MapGet("/ops/stats", GetStatsAsync);
     }
 

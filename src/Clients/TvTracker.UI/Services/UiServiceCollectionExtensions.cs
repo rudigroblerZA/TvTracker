@@ -10,8 +10,9 @@ public static class UiServiceCollectionExtensions
     /// base address for each named client (see <see cref="ApiClients"/>). The host must also register
     /// <see cref="IAccessTokenProvider"/>, <see cref="IAuthActions"/>, <see cref="IPlatformServices"/>
     /// an AuthenticationStateProvider and OpenFeature's IFeatureClient; <see cref="IOfflineStore"/> defaults to online-only.
+    /// <paramref name="appName"/> white-labels the UI (<see cref="Branding"/>).
     /// </summary>
-    public static IServiceCollection AddTvTrackerUi(this IServiceCollection services, Func<string, Uri> baseAddressFor)
+    public static IServiceCollection AddTvTrackerUi(this IServiceCollection services, Func<string, Uri> baseAddressFor, string? appName = null)
     {
         foreach (var name in ApiClients.All)
         {
@@ -26,6 +27,8 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<ShowTagStore>();
         services.AddScoped<FeatureFlagStore>();
         services.AddScoped<SpoilerShield>();
+        services.AddScoped<ThemeStore>();
+        services.AddSingleton(new Branding(appName));
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();

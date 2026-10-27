@@ -302,6 +302,19 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
   flagd's `fractional` operator does percentage rollouts on `targetingKey`.
 - **If flagd is down:** every flag is on, so a flag server outage never takes features away.
 
+### White label and theme
+
+- **App name:** `Branding:AppName` in the AppHost's `appsettings.json` (default "TV Tracker"), or the
+  `Branding__AppName` environment variable when starting the AppHost. It names the header, page and browser titles,
+  "… users" in insights and Discover, the ops page, and the title of a push notification without one. The AppHost
+  passes it to the web app, Catalog.API, Analytics.Worker and Social.API.
+  - **Phone:** `MobileSettings.AppName` in `src/Clients/MobileApp/Services/MobileSettings.cs`, and the home-screen name
+    in `ApplicationTitle` in `MobileApp.csproj`.
+  - **Not covered:** the Keycloak sign-in page, whose title is the realm's `displayName` in
+    `Realms/tvtracker-realm.json` (imported once, so change an existing realm in the Keycloak admin console).
+- **Theme** (Settings → Theme): Same as device, Light or Dark. Kept per device or browser, and applied before the page
+  first paints, so a saved choice doesn't flash the other theme. Available signed out too.
+
 ### Mobile app
 
 The mobile app isn't started by the AppHost. With the AppHost running, run `src/Clients/MobileApp` from Visual Studio,
@@ -474,6 +487,7 @@ How events flow:
   - **Spoiler shield** (Settings): hides titles and summaries of episodes you haven't watched, on the show page (its
     episodes, next and latest, top episodes, season bests, when it gets good), the episode page, Up Next and the
     calendar. A hidden title shows when you select it. It's a setting of the device or browser, not the account.
+  - **Theme** (Settings): light, dark, or the device's, per device or browser.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.
@@ -672,7 +686,7 @@ Until configured, each notification channel logs what it would have sent (visibl
 
 ## Package versions
 
-Versions live in `Directory.Packages.props` (the MAUI app pins its own in its project file). Aspire is on 13.6.3
+Versions live in `Directory.Packages.props` (the MAUI app pins its own in its project file). Aspire is on 13.6.4
 (`AspireVersion` there, plus the `Aspire.AppHost.Sdk` version in the AppHost's project file; keep the two equal).
 Run `aspire update` (or `dotnet list package --outdated`) to bring them up to date.
 

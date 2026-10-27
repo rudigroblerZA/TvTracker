@@ -9,6 +9,6 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "TV Tracker" };
+        return new Window(new MainPage()) { Title = MobileSettings.AppName };
     }
 }

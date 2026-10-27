@@ -1,4 +1,5 @@
 using Analytics.Data;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 using static Analytics.Worker.Insights.InsightMath;
 
@@ -70,14 +71,14 @@ public sealed class WeekendBingeRule : IShowTagRule
 }
 
 /// <summary>Our users' favourite (from the minimum number of ratings), else the provider's.</summary>
-public sealed class FanFavoriteRule : IShowTagRule
+public sealed class FanFavoriteRule(Branding brand) : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
         var rating = show.Rating;
         if (rating.Ours is >= ShowTags.FanFavoriteMinStars)
         {
-            return new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} TV Tracker users");
+            return new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} {brand.AppName} users");
         }
 
         return rating.External is >= ShowTags.FanFavoriteMinExternal

@@ -5,11 +5,23 @@
 @inject IPlatformServices Platform
 @inject IAuthActions Auth
 @inject SpoilerShield Shield
+@inject ThemeStore Theme
 @inject SocialClient Social
 
-<PageTitle>Settings · TV Tracker</PageTitle>
+<PageTitle>Settings · @Brand.AppName</PageTitle>
 
 <h1>Settings</h1>
+
+<section class="panel">
+    <h2>Theme</h2>
+    <div class="chips" role="radiogroup" aria-label="Theme">
+        @foreach (var (value, label) in ThemeStore.Choices)
+        {
+            <button type="button" role="radio" aria-checked="@(theme == value ? "true" : "false")" class="chip @(theme == value ? "active" : "")" @onclick="() => SetThemeAsync(value)">@label</button>
+        }
+    </div>
+    <p class="muted small">On this device or browser.</p>
+</section>
 
 <AuthorizeView>
     <Authorized>
@@ -139,7 +151,7 @@
             </div>
 
             <h3>Delete account</h3>
-            <p class="muted">Deletes your account and everything TV Tracker stores about you. This can't be undone.</p>
+            <p class="muted">Deletes your account and everything @Brand.AppName stores about you. This can't be undone.</p>
             @if (confirmDelete)
             {
                 <label>Type DELETE to confirm <input @bind="deleteConfirmation" @bind:event="oninput" /></label>
@@ -196,6 +208,14 @@
         }
     }
 
+    private string? theme;
+
+    private async Task SetThemeAsync(string? value)
+    {
+        theme = value;
+        await Theme.SetAsync(value);
+    }
+
     private async Task SetSpoilerShieldAsync(bool on)
     {
         spoilerShield = on;
@@ -219,6 +239,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        theme = await Theme.GetAsync();
         spoilerShield = await Shield.IsOnAsync();
         await LoadShareActivityAsync();
         try
