@@ -591,3 +591,17 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .flag-body { flex: 1 1 320px; min-width: 0; display: grid; gap: 2px; }
 .tag.flag-on { color: var(--good); border-color: currentColor; background: color-mix(in srgb, var(--good) 10%, var(--surface)); font-weight: 600; }
 .tag.flag-off { color: var(--bad); border-color: currentColor; background: color-mix(in srgb, var(--bad) 10%, var(--surface)); font-weight: 600; }
+
+/* Community insights, flags and corrections */
+.insight-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.insight-text { margin: 0 0 6px; white-space: pre-line; }
+.insight-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.flag-form { display: grid; gap: 6px; width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.flag-form input { width: 100%; }
+.flag-reasons { margin: 6px 0; padding-left: 18px; }
+.moderated-text { margin: 6px 0; white-space: pre-line; }
+.moderation-log { padding-left: 18px; display: grid; gap: 4px; }
+.suggest-correction { margin: 8px 0; }
+.correction-form { max-width: 640px; }
+.correction-form textarea, .correction-form input, .correction-form select { width: 100%; }
+.danger { color: var(--danger); }

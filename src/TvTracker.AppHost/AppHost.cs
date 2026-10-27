@@ -113,6 +113,7 @@ var ratingsApi = builder.AddProject<Projects.Ratings_API>("ratings-api")
     .WithReference(ratingsDb).WaitFor(ratingsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(redis).WaitFor(redis)
+    .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
@@ -154,6 +155,15 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
     .WithHttpHealthCheck("/health");
 
 // The data export collects each service's data for the user.
+// Moderators (Ratings.API's moderation page): admins and Moderation:Users. Moderation:BlockedTerms are refused in posts.
+foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:BlockedTerms" })
+{
+    foreach (var item in builder.Configuration.GetSection(section).GetChildren())
+    {
+        ratingsApi.WithEnvironment($"{section.Replace(":", "__")}__{item.Key}", item.Value);
+    }
+}
+
 // Admin:Users (Keycloak usernames) may use the feature flags page. The app's own admin account (admin / admin in
 // development, separate from Keycloak's console admin in the master realm) is in the realm file, and Identity.API
 // creates it in a realm imported before it was added.
@@ -290,6 +300,9 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
+
+// Moderators' accepted corrections are applied to the catalog by the sync worker.
+ratingsApi.WithReference(catalogSync);
 
 // The ops dashboard (/ops on Catalog.API) includes Analytics' stats.
 catalogApi.WithReference(analyticsApi);

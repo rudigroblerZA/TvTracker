@@ -1,5 +1,6 @@
 @page "/settings"
 @inject IdentityClient Identity
+@inject RatingsClient Ratings
 @inject NotificationsClient Notifications
 @inject UserSession Session
 @inject IPlatformServices Platform
@@ -144,11 +145,18 @@
             </section>
         </Feature>
 
-        @if (isAdmin)
+        @if (isAdmin || isModerator)
         {
             <section class="panel">
                 <h2>Admin</h2>
-                <p><a href="settings/flags">Feature flags</a><span class="muted small"> · turn features on or off for everyone</span></p>
+                @if (isModerator)
+                {
+                    <p><a href="moderation">Moderation</a><span class="muted small"> · flagged posts and suggested corrections</span></p>
+                }
+                @if (isAdmin)
+                {
+                    <p><a href="settings/flags">Feature flags</a><span class="muted small"> · turn features on or off for everyone</span></p>
+                }
             </section>
         }
 
@@ -222,6 +230,9 @@
     // The flags page answers only admins, so asking it is how the page knows.
     private bool isAdmin;
 
+    // Likewise for the moderation queue.
+    private bool isModerator;
+
     // The header's toggle changes it too.
     private void OnThemeChanged() => InvokeAsync(async () =>
     {
@@ -274,6 +285,7 @@
 
             profile = await Identity.GetProfileAsync();
             isAdmin = await Identity.GetFeatureFlagsAsync() is not null;
+            isModerator = await Ratings.GetModerationQueueAsync() is not null;
             if (profile is not null)
             {
                 displayName = profile.DisplayName;

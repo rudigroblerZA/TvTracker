@@ -54,6 +54,10 @@ else
             <AuthorizeView>
                 <Authorized>
                     <Feature Flag="@FeatureFlags.EssentialCut"><EssentialCutTeaser ShowId="show.Id" /></Feature>
+                    <Feature Flag="@FeatureFlags.Corrections">
+                        <SuggestCorrection ShowId="show.Id" Context="@show.Title"
+                                           Current="@(new Dictionary<string, string?> { ["show-summary"] = show.Overview })" />
+                    </Feature>
                 </Authorized>
             </AuthorizeView>
 
@@ -125,6 +129,7 @@ else
             <Feature Flag="@FeatureFlags.CatchUp"><CatchUpSection ShowId="show.Id" /></Feature>
             <Feature Flag="@FeatureFlags.WorthGoingBack"><ComebackSection ShowId="show.Id" /></Feature>
             <Feature Flag="@FeatureFlags.Social"><FriendsOnShowSection ShowId="show.Id" /></Feature>
+            <Feature Flag="@FeatureFlags.CommunityInsights"><CommunityInsightsSection ShowId="show.Id" /></Feature>
         </Authorized>
     </AuthorizeView>
 

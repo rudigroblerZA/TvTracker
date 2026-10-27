@@ -296,3 +296,47 @@ public class WatchProvider
 
     public string? Url { get; set; }
 }
+
+/// <summary>
+/// A community correction a moderator accepted (in Ratings.API): a value that replaces the provider's for one field,
+/// applied on every sync so the next refresh doesn't undo it. Removing it lets the provider's value back in.
+/// </summary>
+public class CatalogOverride
+{
+    /// <summary>The correction's id in Ratings.API; set by the app.</summary>
+    public Guid Id { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    /// <summary>Null for a show field.</summary>
+    public Guid? EpisodeId { get; set; }
+
+    /// <summary>One of <see cref="CatalogOverrideFields"/>.</summary>
+    public required string Field { get; set; }
+
+    public required string Value { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+}
+
+/// <summary>The fields a correction can override, and how each value is written.</summary>
+public static class CatalogOverrideFields
+{
+    /// <summary>The show's summary (plain text).</summary>
+    public const string ShowSummary = "show-summary";
+
+    public const string EpisodeTitle = "episode-title";
+
+    /// <summary>The episode's summary (plain text).</summary>
+    public const string EpisodeSummary = "episode-summary";
+
+    /// <summary>yyyy-MM-dd; the provider's time of day is kept (UTC midnight when it has none).</summary>
+    public const string EpisodeAirDate = "episode-airdate";
+
+    /// <summary>Whole minutes, 1-600.</summary>
+    public const string EpisodeRuntime = "episode-runtime";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string> { ShowSummary, EpisodeTitle, EpisodeSummary, EpisodeAirDate, EpisodeRuntime };
+
+    public static bool IsEpisodeField(string field) => field != ShowSummary;
+}

@@ -1,0 +1,208 @@
+@page "/moderation"
+@inject RatingsClient Ratings
+
+<PageTitle>Moderation · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Moderation</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (queue is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notModerator ? "Only moderators can see this page." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <section>
+                <h2>Flagged and held <span class="muted small">@queue.Posts.Count</span></h2>
+                <p class="muted small">
+                    Comments and viewers' tips with flags, or held when posted (they had a link). Three people flagging hides a
+                    post until you look; two flagging it as a spoiler marks it a spoiler. Restore shows it and settles its flags.
+                </p>
+                @if (queue.Posts.Count == 0)
+                {
+                    <p class="muted">Nothing waiting.</p>
+                }
+                <ul class="flag-list">
+                    @foreach (var post in queue.Posts)
+                    {
+                        <li class="panel" @key="post.Id">
+                            <div class="section-head">
+                                <span class="small">
+                                    <span class="strong">@(post.Kind == "comment" ? "Comment" : "Tip")</span>
+                                    <span class="muted">@(" by " + post.Author + " · " + Format.Relative(post.CreatedAtUtc) + " · ")</span>
+                                    <a href="@(post.EpisodeId is { } e ? $"episodes/{e}" : $"shows/{post.ShowId}")">where</a>
+                                </span>
+                                @if (post.HiddenReason is { } hidden)
+                                {
+                                    <span class="tag flag-off">@(hidden == "held" ? "Held" : "Hidden by flags")</span>
+                                }
+                            </div>
+                            <p class="moderated-text">@if (post.IsSpoiler) { <span class="tag">Spoiler</span> }@(" " + post.Text)</p>
+                            @if (post.Flags.Count > 0)
+                            {
+                                <ul class="small flag-reasons">
+                                    @foreach (var flag in post.Flags)
+                                    {
+                                        <li><span class="strong">@flag.Reason</span>@(flag.Note is { } n ? $": {n}" : "")<span class="muted">@(" · " + Format.Relative(flag.CreatedAtUtc))</span></li>
+                                    }
+                                </ul>
+                            }
+                            <div class="actions">
+                                <button class="btn small" type="button" disabled="@busy" @onclick="() => SettleAsync(post, true)">Restore</button>
+                                <button class="btn btn-danger small" type="button" disabled="@busy" @onclick="() => SettleAsync(post, false)">Remove</button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </section>
+
+            <section>
+                <h2>Suggested corrections <span class="muted small">@queue.Corrections.Count</span></h2>
+                <p class="muted small">
+                    Accepting replaces TVmaze's value in the catalog, and keeps replacing it on every refresh. You can edit the
+                    value first. "Something else" is only recorded.
+                </p>
+                @if (queue.Corrections.Count == 0)
+                {
+                    <p class="muted">Nothing waiting.</p>
+                }
+                <ul class="flag-list">
+                    @foreach (var c in queue.Corrections)
+                    {
+                        <li class="panel stack" @key="c.Id">
+                            <div class="section-head">
+                                <a class="strong" href="@(c.EpisodeId is { } e ? $"episodes/{e}" : $"shows/{c.ShowId}")">@(c.Context ?? "A show")</a>
+                                <span class="muted small">@MyCorrections.FieldLabel(c.Field) · from @c.DisplayName · @Format.Relative(c.CreatedAtUtc)</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(c.CurrentValue))
+                            {
+                                <div class="small"><span class="muted">Now: </span>@c.CurrentValue</div>
+                            }
+                            <label class="small">
+                                Suggested
+                                @if (c.Field is "show-summary" or "episode-summary" or "other")
+                                {
+                                    <textarea rows="3" value="@Edited(c)" @onchange="e => edits[c.Id] = e.Value?.ToString()"></textarea>
+                                }
+                                else
+                                {
+                                    <input type="text" value="@Edited(c)" @onchange="e => edits[c.Id] = e.Value?.ToString()" />
+                                }
+                            </label>
+                            @if (!string.IsNullOrEmpty(c.Note))
+                            {
+                                <div class="small"><span class="muted">Note: </span>@c.Note</div>
+                            }
+                            <div class="actions">
+                                <button class="btn small" type="button" disabled="@busy" @onclick='() => ReviewAsync(c, "accept")'>Accept</button>
+                                <button class="btn btn-quiet small" type="button" disabled="@busy" @onclick='() => ReviewAsync(c, "reject")'>Reject</button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </section>
+
+            @if (queue.Accepted.Count > 0)
+            {
+                <section>
+                    <h2>Recently accepted</h2>
+                    <p class="muted small">Reverting lets TVmaze's value back in on the show's next refresh (within the hour).</p>
+                    <ul class="flag-list">
+                        @foreach (var c in queue.Accepted)
+                        {
+                            <li class="panel flag-row" @key="c.Id">
+                                <div class="flag-body small">
+                                    <a class="strong" href="@(c.EpisodeId is { } e ? $"episodes/{e}" : $"shows/{c.ShowId}")">@(c.Context ?? "A show")</a>
+                                    <span>@(MyCorrections.FieldLabel(c.Field) + ": " + c.SuggestedValue)</span>
+                                    <span class="muted">@("Accepted by " + c.ReviewedBy + (c.ReviewedAtUtc is { } at ? " · " + Format.Relative(at) : ""))</span>
+                                </div>
+                                <button class="btn btn-quiet small" type="button" disabled="@busy" @onclick='() => ReviewAsync(c, "revert")'>Revert</button>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (queue.Log.Count > 0)
+            {
+                <section>
+                    <h2>Log</h2>
+                    <ul class="small moderation-log">
+                        @foreach (var item in queue.Log)
+                        {
+                            <li><span class="strong">@item.Moderator</span>@(" " + Past(item.Action) + " a " + item.TargetKind)<span class="muted">@(item.Summary is { } s ? $" · {s}" : "")@(" · " + Format.Relative(item.AtUtc))</span></li>
+                        }
+                    </ul>
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in as a moderator to see this page." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private ModerationQueue? queue;
+    private bool notModerator;
+    private bool busy;
+    private string? error;
+    private readonly Dictionary<Guid, string?> edits = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private string Edited(Correction c) => edits.GetValueOrDefault(c.Id) ?? c.SuggestedValue;
+
+    private static string Past(string action) => action switch
+    {
+        "restore" => "restored",
+        "remove" => "removed",
+        "accept" => "accepted",
+        "reject" => "rejected",
+        "revert" => "reverted",
+        _ => action
+    };
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            queue = await Ratings.GetModerationQueueAsync();
+            notModerator = queue is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task SettleAsync(ModeratedPost post, bool restore) => RunAsync(() => Ratings.SettlePostAsync(post.Kind, post.Id, restore));
+
+    private Task ReviewAsync(Correction c, string action) =>
+        RunAsync(() => Ratings.ReviewCorrectionAsync(c.Id, action, action == "accept" ? edits.GetValueOrDefault(c.Id) : null));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

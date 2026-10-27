@@ -299,7 +299,16 @@ At `/feed`.
 - **Watching together:** with anyone you follow, the shows you share and who's ahead, from your whole history.
 - **Shared lists:** tick one of your lists to show it on your profile.
 
-### 26. Smaller touches
+### 26. Viewers help each other, and keep it civil
+
+- **Tips from viewers:** on show and episode pages, what people who watched it want you to know ("slow start; it
+  gets good at episode 3"), the most helpful first.
+- **Fix the data:** suggest a correction to a summary, title, air date or runtime; once a moderator accepts it, it
+  sticks, even when TVmaze refreshes the show.
+- **Flags that do something:** enough flags hide a post until a moderator looks, and spoiler flags mark it a spoiler.
+- **A light touch:** blocked words, links held for review, hourly limits, and a moderation page with a log.
+
+### 27. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

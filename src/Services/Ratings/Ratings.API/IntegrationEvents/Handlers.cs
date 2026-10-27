@@ -34,8 +34,18 @@ public sealed class UserDeletedHandler(RatingsContext db) : IIntegrationEventHan
     {
         await db.ShowRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        var comments = db.Comments.Where(c => c.UserId == e.UserId).Select(c => c.Id);
+        await db.Flags.Where(f => f.TargetKind == "comment" && comments.Contains(f.TargetId)).ExecuteDeleteAsync(ct);
         await db.Comments.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Reactions.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ExecuteDeleteAsync(ct);
+
+        // Their community insights go with the votes and flags on them; their own votes and flags go too.
+        var insights = db.Insights.Where(i => i.UserId == e.UserId).Select(i => i.Id);
+        await db.InsightVotes.Where(v => insights.Contains(v.InsightId) || v.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Flags.Where(f => f.TargetKind == "insight" && insights.Contains(f.TargetId) || f.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Insights.Where(i => i.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        // Corrections already applied stay in the catalog; the suggestions themselves are theirs and go.
+        await db.Corrections.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 }

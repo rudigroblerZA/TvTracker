@@ -62,5 +62,6 @@ app.MapDefaultEndpoints();
 
 // Internal only: Catalog.API calls this before searching. Not exposed outside the Aspire network.
 app.MapImportApi();
+app.MapOverridesApi();
 
 app.Run();

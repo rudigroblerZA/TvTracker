@@ -379,7 +379,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Catalog.Embeddings | `src/Services/Catalog` | Local text embeddings (all-MiniLM-L6-v2 via ONNX Runtime) for semantic search |
 | Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
-| Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions |
+| Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions, viewers' tips, flags, corrections and moderation |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
@@ -522,6 +522,25 @@ How events flow:
     - **A mix:** two or three shows that fill the time better than one, when there are (Firefly and The Haunting of Hill
       House in 20 hours).
     - **API:** `GET /api/v1/me/time-off?hours=20` on Analytics.API, signed in, about 50 ms.
+  - **Community** (show and episode pages, signed in):
+    - **Flag** a comment or tip: spoiler, abusive, spam, off-topic, or wrong. Three people flagging hides it until a
+      moderator looks; two flagging it as a spoiler marks it a spoiler instead. The author still sees a hidden post,
+      with why.
+    - **From viewers:** tips about a show or an episode ("the first two episodes are slow"), 10-1000 characters, with
+      a spoiler box. Others mark them helpful, and the most helpful lead. Behind the `community-insights` flag.
+    - **Suggest a correction** (under a show's summary, or an episode's details): the summary, an episode's title,
+      air date, runtime or summary, or something else. A moderator accepts it, and it replaces TVmaze's value in the
+      catalog on every refresh from then on; "something else" is only recorded. Your suggestions and their status are
+      at `/corrections`. Behind the `corrections` flag.
+    - **Light moderation:** words in `Moderation:BlockedTerms` are refused; posts with a link are held for review (the
+      author sees them meanwhile); each person may post 20 comments, tips and corrections and flag 30 times an hour.
+    - **Moderators** (admins and `Moderation:Users` in the AppHost's appsettings) get Settings → Admin → Moderation
+      (`/moderation`): flagged and held posts (restore or remove), suggested corrections (accept, with an edit if
+      needed, or reject), recently accepted ones (revert), and a log.
+    - **API** (Ratings.API): `POST /api/v1/comments/{id}/flag`, `POST /api/v1/community-insights/{id}/flag`,
+      `GET`/`POST /api/v1/shows/{id}/community-insights[?episodeId=]`, `PUT`/`DELETE /api/v1/community-insights/{id}/helpful`,
+      `POST /api/v1/corrections`, `GET /api/v1/me/corrections`, and `/api/v1/moderation/...`. Included in the data
+      export and deleted with the account.
   - **Spoiler shield** (Settings): hides titles and summaries of episodes you haven't watched, on the show page (its
     episodes, next and latest, top episodes, season bests, when it gets good), the episode page, Up Next and the
     calendar. A hidden title shows when you select it. It's a setting of the device or browser, not the account.

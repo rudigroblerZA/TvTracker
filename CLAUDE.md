@@ -17,10 +17,11 @@ dotnet build src/Tools/Catalog.ImportCli
 # (app admin: admin / admin).
 dotnet run --project src/TvTracker.AppHost
 
-# Migrations (Catalog, Analytics, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
+# Migrations (Catalog, Analytics, Ratings, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
+dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
@@ -59,6 +60,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
   signed out (tags, the tag filter).
 - **App name:** never write "TV Tracker" in UI or service text; use `@Brand.AppName` in pages and `Branding` in
   services (white label, see CONTEXT.md). New colours go in `app.css` as `light-dark(light, dark)` tokens.
+- **User posts** (comments, tips, anything people write for others) live in Ratings.API and go through `Moderation`:
+  check the text, the hourly limit, and honour `HiddenReason` when reading.
 - **Docs:** update README.md for user-visible behaviour, and CONTEXT.md for architecture or a decision.
 
 ## Gotchas

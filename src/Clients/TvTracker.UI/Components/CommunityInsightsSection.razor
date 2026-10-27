@@ -1,0 +1,131 @@
+@inject RatingsClient Ratings
+
+@* Viewers' tips about a show (no EpisodeId) or an episode, most helpful first. Spoilers stay covered until revealed. *@
+<section class="community-insights">
+    <h2>From viewers @if (insights is { Total: > 0 }) { <span class="muted small">@insights.Total</span> }</h2>
+    <p class="muted small">@(EpisodeId is null ? "Tips about this show from people who watched it" : "Tips about this episode") · the most helpful first.</p>
+    <ErrorNotice Message="@error" />
+
+    @if (insights is { Insights.Count: > 0 })
+    {
+        <ul class="insight-list">
+            @foreach (var insight in insights.Insights)
+            {
+                <li class="panel" @key="insight.Id">
+                    @if (insight.IsSpoiler && !revealed.Contains(insight.Id) && !insight.IsMine)
+                    {
+                        <button class="link" type="button" @onclick="() => revealed.Add(insight.Id)">Spoiler · show it</button>
+                    }
+                    else
+                    {
+                        <p class="insight-text">@if (insight.IsSpoiler) { <span class="tag">Spoiler</span> }@(" " + insight.Text)</p>
+                    }
+                    <div class="insight-meta small">
+                        <span class="muted">@insight.DisplayName · @Format.Relative(insight.CreatedAtUtc)</span>
+                        @if (insight.HiddenReason is { } hidden)
+                        {
+                            <span class="tag">@HiddenLabel(hidden)</span>
+                        }
+                        @if (insight.IsMine)
+                        {
+                            <span class="muted">@(insight.Helpful == 1 ? "1 person found this helpful" : $"{insight.Helpful} found this helpful")</span>
+                            <button class="link small" type="button" @onclick="() => DeleteAsync(insight)">Delete</button>
+                        }
+                        else
+                        {
+                            <button class="chip small @(insight.VotedHelpful ? "active" : "")" type="button" aria-pressed="@(insight.VotedHelpful ? "true" : "false")"
+                                    @onclick="() => ToggleHelpfulAsync(insight)">Helpful @(insight.Helpful > 0 ? $"· {insight.Helpful}" : "")</button>
+                            <FlagButton Kind="insight" Id="insight.Id" Flagged="insight.FlaggedByMe" OnFlagged="_ => LoadAsync()" />
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+    else if (insights is not null)
+    {
+        <p class="muted">Nothing yet. Know something others should? A slow start, what to watch first, an episode not to skip.</p>
+    }
+
+    @if (!writing)
+    {
+        <button class="btn btn-quiet small" type="button" @onclick="() => writing = true">Share a tip</button>
+    }
+    else
+    {
+        <form class="comment-form" @onsubmit="PostAsync">
+            <textarea @bind="text" @bind:event="oninput" maxlength="1000" placeholder="@(EpisodeId is null ? "e.g. The first two episodes are slow; it gets good at episode 3." : "e.g. Watch the previous episode's last scene again first.")" aria-label="Your tip"></textarea>
+            <label class="inline checkbox"><input type="checkbox" @bind="isSpoiler" /> Contains spoilers</label>
+            <div class="actions">
+                <button class="btn" type="submit" disabled="@(busy || (text?.Trim().Length ?? 0) < 10)">Share</button>
+                <button class="btn btn-quiet" type="button" @onclick="() => writing = false">Cancel</button>
+            </div>
+            <p class="muted small">At least 10 characters. Links are held for a moderator to check.</p>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+    [Parameter] public Guid? EpisodeId { get; set; }
+
+    private CommunityInsights? insights;
+    private readonly HashSet<Guid> revealed = [];
+    private bool writing;
+    private string? text;
+    private bool isSpoiler;
+    private bool busy;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    internal static string HiddenLabel(string reason) => reason switch
+    {
+        "held" => "Only you see this until a moderator checks it",
+        "flags" => "Hidden after flags · waiting for a moderator",
+        _ => "Removed by a moderator"
+    };
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            insights = await Ratings.GetCommunityInsightsAsync(ShowId, EpisodeId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task PostAsync() => await RunAsync(async () =>
+    {
+        await Ratings.PostCommunityInsightAsync(ShowId, EpisodeId, text!.Trim(), isSpoiler);
+        text = null;
+        isSpoiler = false;
+        writing = false;
+    });
+
+    private async Task ToggleHelpfulAsync(CommunityInsight insight) => await RunAsync(() => Ratings.SetHelpfulAsync(insight.Id, !insight.VotedHelpful));
+
+    private async Task DeleteAsync(CommunityInsight insight) => await RunAsync(() => Ratings.DeleteCommunityInsightAsync(insight.Id));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

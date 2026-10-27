@@ -13,6 +13,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<ShowCreative> Creatives => Set<ShowCreative>();
     public DbSet<PersonCastCredit> CastCredits => Set<PersonCastCredit>();
     public DbSet<Nanogenre> Nanogenres => Set<Nanogenre>();
+    public DbSet<CatalogOverride> Overrides => Set<CatalogOverride>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
 
@@ -87,6 +88,15 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasKey(c => new { c.ShowId, c.PersonId });
             entity.HasIndex(c => c.PersonId);
             entity.HasOne(c => c.Person).WithMany().HasForeignKey(c => c.PersonId);
+        });
+
+        modelBuilder.Entity<CatalogOverride>(entity =>
+        {
+            entity.ToTable("catalog_overrides");
+            entity.Property(o => o.Id).ValueGeneratedNever();
+            entity.HasIndex(o => o.ShowId);
+            entity.Property(o => o.Field).HasMaxLength(32);
+            entity.Property(o => o.Value).HasMaxLength(4000);
         });
 
         modelBuilder.Entity<Nanogenre>(entity =>
