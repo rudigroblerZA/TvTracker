@@ -1,0 +1,429 @@
+@page "/research/{ShowId:guid}"
+@attribute [RequiresFeature(FeatureFlags.Research)]
+@implements IDisposable
+@inject ResearchClient Research
+
+<PageTitle>Research@(ws is null ? "" : $" · {ws.Title}") · @Brand.AppName</PageTitle>
+
+<p><a href="shows/@ShowId">← @(ws?.Title ?? "Show")</a> <span class="muted">·</span> <a href="research">All research</a></p>
+<h1>Research@(ws is null ? "" : $": {ws.Title}")</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (ws is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notModerator ? "Only moderators can research shows." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p class="muted">
+                @if (ws.Saved is { } saved)
+                {
+                    <span>@($"Version {saved.Version} saved {Format.Relative(saved.SavedAtUtc)} by {saved.SavedBy}. It's the show's trusted record: what its page shows, and its summary, network and premiere override TVmaze.")</span>
+                }
+                else
+                {
+                    <span>Nothing saved yet. Gather sources, choose the facts, write the insight, then save: the saved research becomes the show's trusted record.</span>
+                }
+            </p>
+
+            @if (notice is not null)
+            {
+                <p class="research-notice" role="status">@notice</p>
+            }
+
+            <section class="research-step" aria-labelledby="sources-title">
+                <div class="section-head">
+                    <h2 id="sources-title">Sources</h2>
+                    <button type="button" class="btn" disabled="@busy" @onclick="GatherAsync">@(gathering ? "Gathering…" : ws.GatheredAtUtc is null ? "Gather sources" : "Gather again")</button>
+                </div>
+                <p class="muted small">
+                    <span>@($"Wikidata (found by the TVmaze id), Wikipedia{(ws.TmdbConfigured ? " and TMDB" : "")}. ")</span>
+                    @if (ws.GatheredAtUtc is { } at)
+                    {
+                        <span>@($"Last gathered {Format.Relative(at)}; gathering again replaces those, and keeps pages you added.")</span>
+                    }
+                </p>
+                @foreach (var note in ws.Notes)
+                {
+                    <p class="small research-note">@note</p>
+                }
+
+                <form class="research-add" @onsubmit="AddSourceAsync" @onsubmit:preventDefault>
+                    <label for="source-url" class="small">Add a page (a review, an interview, an article)</label>
+                    <div class="research-add-row">
+                        <input id="source-url" type="url" placeholder="https://…" @bind="newUrl" @bind:event="oninput" />
+                        <button type="submit" class="btn btn-quiet" disabled="@(busy || string.IsNullOrWhiteSpace(newUrl))">@(adding ? "Reading…" : "Add")</button>
+                    </div>
+                </form>
+
+                @if (ws.Sources.Count == 0)
+                {
+                    <p class="muted">No sources yet.</p>
+                }
+                <ol class="research-sources">
+                    @foreach (var source in ws.Sources)
+                    {
+                        <li @key="source.Id" class="@(source.Included ? "" : "excluded")">
+                            <span class="research-number" aria-label="@(source.Number is { } n ? $"Source {n}" : "Left out")">@(source.Number is { } num ? $"[{num}]" : "–")</span>
+                            <div class="research-source-body">
+                                <div>
+                                    <a href="@source.Url" target="_blank" rel="noopener"><strong>@source.Title</strong></a>
+                                    <span class="tag">@KindLabel(source.Kind)</span>
+                                </div>
+                                <details>
+                                    <summary class="small muted">@($"What it says ({source.Excerpt.Length:N0} characters)")</summary>
+                                    <p class="small research-excerpt">@source.Excerpt</p>
+                                </details>
+                            </div>
+                            <div class="research-source-actions">
+                                <label class="small"><input type="checkbox" checked="@source.Included" @onchange="e => IncludeAsync(source, (bool)e.Value!)" /> Use</label>
+                                <button type="button" class="btn btn-quiet small" @onclick="() => RemoveAsync(source)" aria-label="@($"Remove {source.Title}")">Remove</button>
+                            </div>
+                        </li>
+                    }
+                </ol>
+            </section>
+
+            <section class="research-step" aria-labelledby="facts-title">
+                <h2 id="facts-title">Facts</h2>
+                <p class="muted small">For each fact, keep a value, pick a source's, or type one. Facts marked "overrides TVmaze" replace the catalog's value on save, and keep it through every refresh.</p>
+                <div class="research-facts">
+                    @foreach (var fact in ws.Facts)
+                    {
+                        var choice = choices[fact.Key];
+                        <fieldset class="research-fact" @key="fact.Key">
+                            <legend>
+                                <span>@fact.Label</span>
+                                @if (fact.CatalogField is not null)
+                                {
+                                    <span class="tag research-override">overrides TVmaze</span>
+                                }
+                            </legend>
+                            @for (var i = 0; i < fact.Options.Count; i++)
+                            {
+                                var index = i;
+                                var option = fact.Options[i];
+                                <label class="research-option">
+                                    <input type="radio" name="@($"fact-{fact.Key}")" checked="@(choice.Mode == "option" && choice.Option == index)"
+                                           @onchange='() => Choose(fact.Key, "option", index)' />
+                                    <span class="research-value">@Clip(option.Value, 280)</span>
+                                    <span class="muted small">@OriginLabel(option)</span>
+                                </label>
+                            }
+                            <label class="research-option">
+                                <input type="radio" name="@($"fact-{fact.Key}")" checked="@(choice.Mode == "custom")" @onchange='() => Choose(fact.Key, "custom", 0)' />
+                                <span>Type a value</span>
+                            </label>
+                            @if (choice.Mode == "custom")
+                            {
+                                @if (fact.Key == "summary" || fact.Key == "awards")
+                                {
+                                    <textarea id="@($"custom-{fact.Key}")" rows="4" @bind="choice.Custom" @bind:event="oninput" aria-label="@fact.Label"></textarea>
+                                }
+                                else
+                                {
+                                    <input id="@($"custom-{fact.Key}")" type="@(fact.Kind == "date" ? "date" : fact.Kind == "number" ? "number" : fact.Kind == "link" ? "url" : "text")"
+                                           value="@choice.Custom" @oninput="e => choice.Custom = e.Value?.ToString() ?? string.Empty" aria-label="@fact.Label" />
+                                }
+                            }
+                            <label class="research-option">
+                                <input type="radio" name="@($"fact-{fact.Key}")" checked="@(choice.Mode == "none")" @onchange='() => Choose(fact.Key, "none", 0)' />
+                                <span class="muted">@(fact.CatalogField is null ? "Leave out" : "Leave out (follow TVmaze)")</span>
+                            </label>
+                        </fieldset>
+                    }
+                </div>
+            </section>
+
+            <section class="research-step" aria-labelledby="insight-title">
+                <div class="section-head">
+                    <h2 id="insight-title">Insight</h2>
+                    <button type="button" class="btn btn-quiet" disabled="@(busy || Drafting || ws.Sources.All(s => !s.Included))" @onclick="DraftAsync">
+                        @(Drafting ? "Drafting…" : $"Draft with {ws.Model}")
+                    </button>
+                </div>
+                <p class="muted small">What viewers should know, citing the sources by number, like [1]. The model drafts from the sources you're using; you edit it, and saving publishes it under your name.</p>
+                @if (Drafting)
+                {
+                    <p class="small research-note" role="status">@($"Drafting since {Format.Relative(ws.DraftingSinceUtc!.Value)}. A small model on a CPU takes a few minutes; this page checks every few seconds.")</p>
+                }
+                else if (ws.DraftProblem is { } problem)
+                {
+                    <p class="small research-note">@problem</p>
+                }
+                <textarea id="insight" class="research-insight" rows="9" @bind="insight" @bind:event="oninput" @onblur="KeepDraftAsync"
+                          placeholder="Landman is… [1]"></textarea>
+                <p class="small muted">@($"{insight.Trim().Length:N0} of 4,000 characters")</p>
+            </section>
+
+            <section class="research-step research-save" aria-label="Save">
+                                <button type="button" class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(insight))" @onclick="SaveAsync">
+                    @(saving ? "Saving…" : $"Save version {(ws.Saved?.Version ?? 0) + 1}")
+                </button>
+                @if (ws.Versions.Count > 0)
+                {
+                    <details class="research-versions">
+                        <summary class="small muted">@($"{ws.Versions.Count} saved {(ws.Versions.Count == 1 ? "version" : "versions")}")</summary>
+                        <ul class="small">
+                            @foreach (var v in ws.Versions)
+                            {
+                                <li>@($"Version {v.Version} · {v.SavedAtUtc.ToLocalTime():d MMM yyyy HH:mm} · {v.SavedBy}")</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            </section>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in as a moderator to research shows." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public Guid ShowId { get; set; }
+
+    private sealed class Choice
+    {
+        public string Mode { get; set; } = "none";
+        public int Option { get; set; }
+
+        /// <summary>The picked option's value, to find it again when the options change.</summary>
+        public string? Value { get; set; }
+        public string Custom { get; set; } = "";
+
+        /// <summary>Picked by the moderator rather than defaulted; only these survive a reload.</summary>
+        public bool Chosen { get; set; }
+    }
+
+    private ResearchWorkspace? ws;
+    private Dictionary<string, Choice> choices = [];
+    private string insight = "";
+    private string newUrl = "";
+    private string? error;
+    private string? notice;
+    private bool notModerator;
+    private bool gathering, adding, saving;
+    private System.Threading.Timer? poll;
+
+    private bool busy => gathering || adding || saving;
+    private bool Drafting => ws?.DraftingSinceUtc is not null;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            Apply(await Research.GetWorkspaceAsync(ShowId), resetChoices: true);
+            notModerator = ws is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>Takes a fresh workspace, keeping the moderator's choices and edits unless asked to reset them.</summary>
+    private void Apply(ResearchWorkspace? next, bool resetChoices)
+    {
+        var previous = choices;
+        ws = next;
+        if (ws is null)
+        {
+            return;
+        }
+        choices = ws.Facts.ToDictionary(f => f.Key, f => !resetChoices && previous.TryGetValue(f.Key, out var kept) && kept.Chosen
+            ? Keep(f, kept)
+            : Default(f));
+        if (resetChoices || string.IsNullOrWhiteSpace(insight))
+        {
+            insight = ws.Draft ?? ws.Saved?.Insight ?? "";
+        }
+        SchedulePoll();
+    }
+
+    /// <summary>
+    /// A moderator's pick after a reload (a gather or added page changes the options): the same value if it's still
+    /// offered, else the default. Typed values and "leave out" stay as they were.
+    /// </summary>
+    private static Choice Keep(ResearchFact fact, Choice kept)
+    {
+        if (kept.Mode != "option")
+        {
+            return kept;
+        }
+        var index = fact.Options.Select((o, i) => (o, i)).Where(x => x.o.Value == kept.Value).Select(x => x.i).Cast<int?>().FirstOrDefault();
+        return index is { } i ? new Choice { Mode = "option", Option = i, Value = kept.Value, Chosen = true } : Default(fact);
+    }
+
+    /// <summary>
+    /// The saved value when there is one. Else a catalog field follows TVmaze: saving a value for one overrides TVmaze
+    /// for good, so that's the moderator's choice, not a default. Else the first source's.
+    /// </summary>
+    private static Choice Default(ResearchFact fact)
+    {
+        var preferred = fact.Options.Select((o, i) => (o, i))
+            .Where(x => fact.CatalogField is null || x.o.Origin == "saved")
+            .OrderBy(x => x.o.Origin switch { "saved" => 0, "catalog" => 2, _ => 1 })
+            .Select(x => x.i).Cast<int?>().FirstOrDefault();
+        return preferred is { } index ? new Choice { Mode = "option", Option = index, Value = fact.Options[index].Value } : new Choice { Mode = "none" };
+    }
+
+    private void Choose(string key, string mode, int option)
+    {
+        var choice = choices[key];
+        choice.Mode = mode;
+        choice.Option = option;
+        choice.Chosen = true;
+        if (mode == "option")
+        {
+            choice.Value = ws!.Facts.First(f => f.Key == key).Options[option].Value;
+        }
+        if (mode == "custom" && choice.Custom.Length == 0 && ws!.Facts.First(f => f.Key == key) is { Options.Count: > 0 } fact)
+        {
+            choice.Custom = fact.Options[0].Value;
+        }
+    }
+
+    private async Task GatherAsync()
+    {
+        gathering = true;
+        notice = null;
+        await RunAsync(async () => Apply(await Research.GatherAsync(ShowId), resetChoices: false));
+        gathering = false;
+    }
+
+    private async Task AddSourceAsync()
+    {
+        adding = true;
+        notice = null;
+        await RunAsync(async () =>
+        {
+            Apply(await Research.AddSourceAsync(ShowId, newUrl.Trim()), resetChoices: false);
+            newUrl = "";
+        });
+        adding = false;
+    }
+
+    private Task IncludeAsync(ResearchSourceItem source, bool included) => RunAsync(async () =>
+    {
+        await Research.IncludeSourceAsync(ShowId, source.Id, included);
+        Apply(await Research.GetWorkspaceAsync(ShowId), resetChoices: false);
+    });
+
+    private Task RemoveAsync(ResearchSourceItem source) => RunAsync(async () =>
+    {
+        await Research.RemoveSourceAsync(ShowId, source.Id);
+        Apply(await Research.GetWorkspaceAsync(ShowId), resetChoices: false);
+    });
+
+    private Task DraftAsync() => RunAsync(async () =>
+    {
+        notice = null;
+        await Research.StartDraftAsync(ShowId);
+        insight = "";
+        Apply(await Research.GetWorkspaceAsync(ShowId), resetChoices: false);
+    });
+
+    private Task KeepDraftAsync() => ws is null ? Task.CompletedTask : RunAsync(() => Research.KeepDraftAsync(ShowId, insight));
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        notice = null;
+        await RunAsync(async () =>
+        {
+            var facts = ws!.Facts
+                .Select(f => (Fact: f, Choice: choices[f.Key]))
+                .Where(x => x.Choice.Mode != "none")
+                .Select(x => x.Choice.Mode == "custom"
+                    ? new ResearchFactChoice(x.Fact.Key, x.Choice.Custom.Trim(), null)
+                    : new ResearchFactChoice(x.Fact.Key, x.Fact.Options[x.Choice.Option].Value, x.Fact.Options[x.Choice.Option].SourceId))
+                .Where(f => f.Value.Length > 0)
+                .ToList();
+            if (await Research.SaveAsync(ShowId, insight.Trim(), facts) is { } result)
+            {
+                var applied = result.Catalog.Where(c => c.Outcome == "applied").Select(c => Label(c.Key)).ToList();
+                var removed = result.Catalog.Where(c => c.Outcome == "removed").Select(c => Label(c.Key)).ToList();
+                notice = $"Saved version {result.Saved.Version}."
+                    + (applied.Count > 0 ? $" The catalog now uses its {string.Join(", ", applied)}." : "")
+                    + (removed.Count > 0 ? $" {string.Join(", ", removed)} follow{(removed.Count == 1 ? "s" : "")} TVmaze again." : "");
+                Apply(await Research.GetWorkspaceAsync(ShowId), resetChoices: true);
+            }
+        });
+        saving = false;
+    }
+
+    private string Label(string key) => ws?.Facts.FirstOrDefault(f => f.Key == key)?.Label.ToLowerInvariant() ?? key;
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>While the model drafts in the background, checks every 4 s; the draft lands in the editor when it's done.</summary>
+    private void SchedulePoll()
+    {
+        poll?.Dispose();
+        poll = null;
+        if (!Drafting)
+        {
+            return;
+        }
+        poll = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                var next = await Research.GetWorkspaceAsync(ShowId);
+                await InvokeAsync(() =>
+                {
+                    var wasDrafting = Drafting;
+                    Apply(next, resetChoices: false);
+                    if (wasDrafting && !Drafting && next?.Draft is { } draft && next.DraftProblem is null)
+                    {
+                        insight = draft;
+                    }
+                    StateHasChanged();
+                });
+            }
+            catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or ObjectDisposedException)
+            {
+                // The next tick tries again; the page shows the last state meanwhile.
+            }
+        }, null, TimeSpan.FromSeconds(4), Timeout.InfiniteTimeSpan);
+    }
+
+    private static string Clip(string text, int max) => text.Length <= max ? text : text[..(max - 1)].TrimEnd() + "…";
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "wikidata" => "Wikidata",
+        "wikipedia" => "Wikipedia",
+        "tmdb" => "TMDB",
+        _ => "Page"
+    };
+
+    private static string OriginLabel(ResearchFactOption option) => option.Origin switch
+    {
+        "saved" => option.SourceTitle is { } from ? $"saved, from {from}" : "saved",
+        "catalog" => "TVmaze (now)",
+        _ => option.SourceTitle ?? "source"
+    };
+
+    public void Dispose() => poll?.Dispose();
+}

@@ -542,3 +542,36 @@ public record HolidayEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, G
     string Title, DateTimeOffset? AirsAtUtc, int? RuntimeMinutes, double? Rating, bool InTitle, bool StandsAlone);
 
 public record HolidayShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <summary>Research workspace for moderators (see Research.API's ResearchApi).</summary>
+public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtUtc, string? Draft, DateTime? DraftingSinceUtc, string? DraftProblem,
+    IReadOnlyList<ResearchSourceItem> Sources, IReadOnlyList<ResearchFact> Facts, SavedResearch? Saved, IReadOnlyList<ResearchVersion> Versions,
+    IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
+
+/// <param name="Number">How drafts and the insight cite it, while it's included.</param>
+public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
+
+/// <param name="Origin">"saved", "catalog" or "source".</param>
+public record ResearchFactOption(string Value, string Origin, Guid? SourceId, string? SourceTitle);
+
+/// <param name="CatalogField">Set when saving this fact overrides the catalog's (TVmaze's) value.</param>
+public record ResearchFact(string Key, string Label, string Kind, string? CatalogField, string? Saved, string? Catalog, IReadOnlyList<ResearchFactOption> Options);
+
+public record ResearchVersion(int Version, DateTime SavedAtUtc, string SavedBy);
+
+public record SavedResearch(Guid ShowId, int Version, string Insight, IReadOnlyList<SavedResearchFact> Facts, IReadOnlyList<SavedResearchSource> Sources,
+    DateTime SavedAtUtc, string SavedBy);
+
+/// <param name="Source">The number of the source it came from, as the insight cites it; null when typed by hand.</param>
+public record SavedResearchFact(string Key, string Label, string Kind, string Value, int? Source);
+
+public record SavedResearchSource(int Number, Guid Id, string Kind, string Title, string Url, DateTime RetrievedAtUtc);
+
+public record ResearchedShow(Guid ShowId, string Title, int? Version, DateTime? SavedAtUtc, DateTime UpdatedAtUtc);
+
+public record ResearchFactChoice(string Key, string Value, Guid? SourceId);
+
+public record ResearchSaveResult(SavedResearch Saved, IReadOnlyList<ResearchCatalogOutcome> Catalog);
+
+/// <param name="Outcome">"applied" or "removed".</param>
+public record ResearchCatalogOutcome(string Key, string Field, string Outcome);

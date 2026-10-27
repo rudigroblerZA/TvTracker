@@ -5,8 +5,9 @@ using Catalog.SyncWorker.Providers;
 namespace Catalog.SyncWorker;
 
 /// <summary>
-/// Community corrections a moderator accepted (<see cref="CatalogOverride"/>). The synchronizer patches the provider's
-/// show with them before comparing, so a refresh neither undoes them nor sees them as changes.
+/// Community corrections a moderator accepted, and fields of saved research (<see cref="CatalogOverride"/>). The
+/// synchronizer patches the provider's show with them before comparing, so a refresh neither undoes them nor sees them
+/// as changes.
 /// </summary>
 public static class CatalogOverrides
 {
@@ -14,8 +15,10 @@ public static class CatalogOverrides
     public static string? Validate(string field, string value) => field switch
     {
         _ when !CatalogOverrideFields.All.Contains(field) => $"Unknown field \"{field}\".",
-        CatalogOverrideFields.EpisodeAirDate when !DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
-            => "An air date is yyyy-MM-dd.",
+        CatalogOverrideFields.EpisodeAirDate or CatalogOverrideFields.ShowPremiered
+            when !DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+            => "A date is yyyy-MM-dd.",
+        CatalogOverrideFields.ShowNetwork when value.Trim().Length is 0 or > 128 => "A network is 1 to 128 characters.",
         CatalogOverrideFields.EpisodeRuntime when !int.TryParse(value, out var minutes) || minutes is < 1 or > 600
             => "A runtime is 1 to 600 minutes.",
         CatalogOverrideFields.EpisodeTitle when value.Trim().Length is 0 or > 300 => "A title is 1 to 300 characters.",
@@ -33,10 +36,13 @@ public static class CatalogOverrides
 
         foreach (var o in overrides.Where(o => o.EpisodeId is null).OrderBy(o => o.CreatedAtUtc))
         {
-            if (o.Field == CatalogOverrideFields.ShowSummary)
+            show = o.Field switch
             {
-                show = show with { Overview = o.Value };
-            }
+                CatalogOverrideFields.ShowSummary => show with { Overview = o.Value },
+                CatalogOverrideFields.ShowNetwork => show with { Network = o.Value },
+                CatalogOverrideFields.ShowPremiered => show with { FirstAirDate = DateOnly.ParseExact(o.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                _ => show
+            };
         }
 
         var byEpisode = overrides
@@ -69,12 +75,20 @@ public static class CatalogOverrides
     {
         if (o.EpisodeId is null)
         {
-            if (o.Field != CatalogOverrideFields.ShowSummary || show.Overview == o.Value)
+            switch (o.Field)
             {
-                return false;
+                case CatalogOverrideFields.ShowSummary when show.Overview != o.Value:
+                    show.Overview = o.Value;
+                    return true;
+                case CatalogOverrideFields.ShowNetwork when show.Network != o.Value:
+                    show.Network = o.Value;
+                    return true;
+                case CatalogOverrideFields.ShowPremiered when show.FirstAirDate != DateOnly.ParseExact(o.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture):
+                    show.FirstAirDate = DateOnly.ParseExact(o.Value, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    return true;
+                default:
+                    return false;
             }
-            show.Overview = o.Value;
-            return true;
         }
 
         if (show.Episodes.FirstOrDefault(e => e.Id == o.EpisodeId) is not { } episode)

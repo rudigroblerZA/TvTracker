@@ -299,7 +299,7 @@ dotnet run -- cleanup                          # delete the users and everything
 ### MCP server (internal queries)
 
 `mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the
-catalog and Analytics, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
+catalog, Analytics and saved research, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
 the running app. Add it to Claude Code with:
 
 ```bash
@@ -312,6 +312,7 @@ claude mcp add --transport http tvtracker http://localhost:5112/mcp
 | `show_details` | The catalog record: summary, status, genres, nanogenres, seasons, cast and creators (with person ids), next and latest episode, where to watch |
 | `search_shows` | Search by title or description, as in the app (imports from TVmaze when missing) |
 | `season_episodes`, `show_universe`, `holiday_episodes` | A season's episodes; the franchise a show is in; a holiday's best-known episodes |
+| `show_research` | The show's saved research: the checked insight with its sources, and the checked facts |
 | `discover_list`, `upcoming_premieres`, `top_episodes` | Discover's lists, premieres with catch-up time, best-rated episodes |
 | `person`, `person_insights` | A person's credits; their insights and, for creators, their fingerprint |
 
@@ -358,7 +359,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -380,6 +381,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 | `known-faces` | "You know them from" on show pages' cast, and its endpoint |
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
+| `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -453,9 +455,10 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions, viewers' tips, flags, corrections and moderation |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
+| Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
-| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog and Analytics for internal queries |
+| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog, Analytics and Research for internal queries |
 | Mcp.Gateway | `src/Services/Mcp/Mcp.Gateway` | One MCP endpoint with an API key in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
@@ -641,6 +644,30 @@ How events flow:
     - **API** (Catalog.API, public): `GET /api/v1/holidays`, `GET /api/v1/holidays/{key}` (best known), and
       `POST /api/v1/holidays/{key}/shows` with `{ "showIds": [...] }` (all of those shows' episodes; a POST, since a
       follow list doesn't fit in a URL).
+  - **Research** (show pages; moderators research, everyone reads): a show's trusted record, checked by a person.
+    - **On the show page:** an insight with numbered citations ([1] links to its source), the checked facts (ended,
+      creators, seasons and episodes, country, awards, tagline, TMDB rating, IMDb/TMDB/Wikipedia/Wikidata links), its
+      sources, and who checked it when.
+    - **Researching** (moderators: "Research this show" on the show page, or Settings → Admin → Research):
+      1. **Gather:** Wikidata (found by the show's TVmaze id), the Wikipedia article's summary, and TMDB when
+         `Research:TmdbApiKey` is set. Gathering again replaces those and keeps pages added by hand.
+      2. **Add pages:** any public web page (a review, an interview); its text is read and kept as a source. Private
+         and local addresses are refused.
+      3. **Pick the facts:** for each fact, the catalog's value, a source's, or your own. Summary, network and premiere
+         date follow TVmaze until you pick a value for them.
+      4. **Write the insight:** "Draft with the model" asks the local model (Model Runner's chat model,
+         `ModelRunner:ChatModel`) for a draft from the included sources, in the background (a minute or two on a
+         CPU). Edit it; `[n]` cites source n.
+      5. **Save:** a new version. Earlier versions stay as history.
+    - **Trusted source of truth, field by field:** a saved summary, network or premiere date replaces TVmaze's in the
+      catalog (like an accepted correction), and survives every refresh. Dropping one in a later version gives the
+      field back to TVmaze on the show's next refresh. The other facts live with the research.
+    - **MCP:** `show_research` returns the saved record.
+    - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
+      `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
+      `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
+      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`. Anyone else gets 404. Behind the
+      `research` flag.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.
@@ -792,9 +819,9 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Recommendations, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
-`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Social.API/Data/Migrations`,
-`Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
+Catalog, Analytics, Recommendations, Research, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
+`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`,
+`Social.API/Data/Migrations`, `Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
 other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made
 before they moved to migrations is marked as having it and upgraded in place.
@@ -808,6 +835,8 @@ dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --ou
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 # or, for Recommendations:
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
+# or, for Research:
+dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 # or, for Tracking:

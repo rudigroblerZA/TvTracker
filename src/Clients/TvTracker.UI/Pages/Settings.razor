@@ -152,6 +152,9 @@
                 @if (isModerator)
                 {
                     <p><a href="moderation">Moderation</a><span class="muted small"> · flagged posts and suggested corrections</span></p>
+                    <Feature Flag="@FeatureFlags.Research">
+                        <p><a href="research">Research</a><span class="muted small"> · shows being researched, and their saved versions</span></p>
+                    </Feature>
                 }
                 @if (isAdmin)
                 {

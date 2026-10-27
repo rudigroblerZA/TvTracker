@@ -1,0 +1,126 @@
+@using System.Text.RegularExpressions
+@inject ResearchClient Research
+@inject UserSession Session
+
+@* A show's saved research, its trusted record: the insight with its cited sources, and the checked facts. Moderators
+   get the way into the research page here. *@
+@if (saved is not null || canResearch)
+{
+    <section class="research-section" aria-labelledby="research-title">
+        <div class="section-head">
+            <h2 id="research-title">Research</h2>
+            @if (canResearch)
+            {
+                <a href="research/@ShowId">@(saved is null ? "Research this show" : "Edit research")</a>
+            }
+        </div>
+        @if (saved is null)
+        {
+            <p class="muted small">No research saved yet. Gather sources, check the facts and write an insight; the saved research shows here and becomes the show's trusted record.</p>
+        }
+        else
+        {
+            <p class="research-insight-text">
+                @foreach (var part in Parts(saved.Insight))
+                {
+                    @if (part.Source is { } n && saved.Sources.Any(s => s.Number == n))
+                    {
+                        <a class="research-cite" href="@SourceUrl(n)" target="_blank" rel="noopener" title="@SourceTitle(n)">@($"[{n}]")</a>
+                    }
+                    else
+                    {
+                        <span>@part.Text</span>
+                    }
+                }
+            </p>
+            @if (Facts.Count > 0)
+            {
+                <dl class="research-facts-list">
+                    @foreach (var fact in Facts)
+                    {
+                        <div>
+                            <dt>@fact.Label</dt>
+                            <dd>
+                                @if (fact.Kind == "link")
+                                {
+                                    <a href="@fact.Value" target="_blank" rel="noopener">@LinkText(fact.Value)</a>
+                                }
+                                else
+                                {
+                                    <span>@(fact.Kind == "date" && DateOnly.TryParse(fact.Value, out var d) ? d.ToString("d MMMM yyyy") : fact.Value)</span>
+                                }
+                            </dd>
+                        </div>
+                    }
+                </dl>
+            }
+            <ol class="research-cited small">
+                @foreach (var source in saved.Sources)
+                {
+                    <li value="@source.Number"><a href="@source.Url" target="_blank" rel="noopener">@source.Title</a></li>
+                }
+            </ol>
+            <p class="muted small">@($"Checked by {saved.SavedBy}, {saved.SavedAtUtc.ToLocalTime():d MMMM yyyy} · version {saved.Version}")</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private SavedResearch? saved;
+    private bool canResearch;
+    private Guid loadedFor;
+
+    /// <summary>Facts the show page doesn't already show (its summary, network and premiere are the catalog's, which saving set).</summary>
+    private List<SavedResearchFact> Facts => saved?.Facts.Where(f => f.Key is not ("summary" or "network" or "premiered")).ToList() ?? [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        saved = null;
+        canResearch = false;
+        try
+        {
+            saved = await Research.GetSavedAsync(ShowId);
+            await Session.EnsureLoadedAsync();
+            if (Session.IsSignedIn)
+            {
+                // Moderators get the workspace; everyone else a 404, which is how the page knows not to offer it.
+                canResearch = await Research.GetWorkspaceAsync(ShowId) is not null;
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra on the show page.
+        }
+    }
+
+    private string SourceUrl(int n) => saved!.Sources.First(s => s.Number == n).Url;
+
+    private string SourceTitle(int n) => saved!.Sources.First(s => s.Number == n).Title;
+
+    private static string LinkText(string url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host.Replace("www.", "") : url;
+
+    private static IEnumerable<(string Text, int? Source)> Parts(string text)
+    {
+        var at = 0;
+        foreach (Match m in Regex.Matches(text, @"\[(\d{1,3})\]"))
+        {
+            if (m.Index > at)
+            {
+                yield return (text[at..m.Index], null);
+            }
+            yield return (m.Value, int.Parse(m.Groups[1].Value));
+            at = m.Index + m.Length;
+        }
+        if (at < text.Length)
+        {
+            yield return (text[at..], null);
+        }
+    }
+}

@@ -225,8 +225,20 @@ public sealed class CatalogSynchronizer(
             return false;
         }
 
+        // Saved research re-sends its fields under the same ids, so an existing override takes the new value (and
+        // counts as the latest, since later overrides of a field win).
         o.CreatedAtUtc = time.GetUtcNow().UtcDateTime;
-        db.Overrides.Add(o);
+        if (await db.Overrides.FindAsync([o.Id], ct) is { } existing)
+        {
+            existing.Value = o.Value;
+            existing.CreatedAtUtc = o.CreatedAtUtc;
+            o = existing;
+        }
+        else
+        {
+            db.Overrides.Add(o);
+        }
+        // Show fields (summary, network, premiere) live only in the catalog; no other service copies them.
         if (CatalogOverrides.ApplyTo(show, o) && o.EpisodeId is { } changed)
         {
             outbox.Add(EpisodesScheduled(show, show.Episodes.Where(e => e.Id == changed)));
@@ -234,7 +246,7 @@ public sealed class CatalogSynchronizer(
         await db.SaveChangesAsync(ct);
         await outbox.PublishAddedAsync(ct);
         await cache.RemoveByTagAsync(CacheKeys.ShowTag(show.Id), ct);
-        logger.LogInformation("Correction {Id} applied to {Show}: {Field}", o.Id, show.Title, o.Field);
+        logger.LogInformation("Override {Id} applied to {Show}: {Field}", o.Id, show.Title, o.Field);
         return true;
     }
 
