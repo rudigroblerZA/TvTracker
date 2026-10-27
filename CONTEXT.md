@@ -23,7 +23,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
 | Ratings.API | ratings, comments, reactions | |
 | Recommendations.API | picks, dismissals | |
-| Social.API | follows between users, activity feed, "share my activity" | copies of show titles, episode numbers and names from events; behind the `social` flag |
+| Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
@@ -422,7 +422,25 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   display names from `UserRegistered` / `UserProfileUpdated` and Identity's daily `UserProfileSnapshot`, which exists
   because Social started after most users registered. Until one arrives, the token's `name` claim stands in.
 - **History:** activity from before Social existed isn't replayed; the feed fills from then on.
-- **Search:** by display name, for anyone signed in. With one-way following there's no hidden profile yet.
+- **Visibility** (`Visibility`, one rule for every endpoint): a block, either way, hides the two from each other
+  everywhere, and 404s rather than saying so; a private profile shows only its name to anyone but approved followers;
+  activity also needs "share my activity". Lists and connections need the profile rule, activity, the show page and
+  watching together the activity rule.
+- **Private profiles:** a follow is a request (`Approved = false`) until approved. Going public approves every waiting
+  request, since nothing is left to approve. Blocking deletes follows and requests both ways.
+- **Search:** by display name, for anyone signed in, private profiles included (by name only); blocked people aren't found.
+- **User state** (`user_shows`, `user_watches`): each user's follows, ratings and watched episodes, for the show page
+  ("people you follow") and watching together. Kept from Tracking's and Ratings' events by `UserStateHandlers`, and
+  filled and repaired by their daily snapshots, so unlike the feed it includes history from before Social.
+  - **Progress:** regular episodes watched against those aired (season 0 left out, as Tracking does), and the furthest
+    one; "finished" is every aired one. Episode air times come with catalog events; the replay is requested again when
+    the copy has none (it predated them).
+- **Shared lists:** Tracking owns lists and sends a shared one's whole state (`ListSharedIntegrationEvent`) through the
+  outbox on every change, and `ListUnsharedIntegrationEvent` when it's unshared or deleted. Social keeps a copy and
+  serves it under the profile rule. Updates carry `UpdatedAtUtc`, and an older one is ignored, since events can arrive
+  out of order. Tracking's snapshot carries shared lists too (an optional trailing parameter), so a lost event heals.
+- **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
+  was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
 
 ## Tonight's plan
 
@@ -488,13 +506,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Recommendations and Social use EF Core migrations, applied at startup by their API.
+- **Migrations:** Catalog, Analytics, Recommendations, Social and Tracking use EF Core migrations, applied at startup by
+  their API.
   The other services still use `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Recommendations' `InitialCreate` script was diffed against a database made by `EnsureCreated`
-    (`pg_dump -s`); the schemas match.
+  - **Checked:** Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+    `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
 
@@ -503,5 +522,5 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - There are no tests and no CI.
 - There's no dead-letter queue.
 - The MAUI app has never been compiled.
-- Shared lists and the weekly digest email aren't built yet. Social has no blocking or hidden profiles yet.
+- The weekly digest email isn't built yet.
 - Development secrets are in `AppHost.cs` and the realm file.

@@ -16,12 +16,13 @@ dotnet build src/Tools/Catalog.ImportCli
 # Run everything (Docker or Podman must be running). Web app https://localhost:7120, demo / demo.
 dotnet run --project src/TvTracker.AppHost
 
-# Migrations (Catalog, Analytics, Recommendations and Social; dotnet-ef is pinned in dotnet-tools.json)
+# Migrations (Catalog, Analytics, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431

@@ -1,0 +1,62 @@
+@page "/users/{UserId}/lists/{ListId:guid}"
+@attribute [RequiresFeature(FeatureFlags.Social)]
+@inject SocialClient Social
+
+<PageTitle>@(list?.Name ?? "List") · TV Tracker</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (list is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notFound ? "This list isn't shared with you." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p><a href="users/@list.Owner.UserId">← @list.Owner.DisplayName</a></p>
+            <h1>@list.Name</h1>
+            @if (!string.IsNullOrEmpty(list.Description))
+            {
+                <p>@list.Description</p>
+            }
+            <p class="muted small">@(list.Shows.Count == 1 ? "1 show" : $"{list.Shows.Count} shows") · @list.Owner.DisplayName's list</p>
+            <div class="card-grid">
+                @foreach (var show in list.Shows)
+                {
+                    <ShowCard @key="show.ShowId" ShowId="show.ShowId" Title="@(show.Title ?? "Show")" PosterUrl="@show.PosterUrl" />
+                }
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see people's lists." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public string UserId { get; set; } = "";
+    [Parameter] public Guid ListId { get; set; }
+
+    private SharedList? list;
+    private bool notFound;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            list = await Social.GetSharedListAsync(UserId, ListId);
+            notFound = list is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

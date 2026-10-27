@@ -34,6 +34,12 @@
                 {
                     <p>@list.Description</p>
                 }
+                <Feature Flag="@FeatureFlags.Social">
+                    <label class="checkbox small">
+                        <input type="checkbox" checked="@list.Shared" @onchange="e => ShareAsync(e.Value is true)" />
+                        Share on your profile (people who can see you on Feed see this list)
+                    </label>
+                </Feature>
                 <div class="actions">
                     <button class="btn btn-quiet" @onclick="StartEdit">Rename</button>
                     <button class="btn btn-danger" @onclick="DeleteAsync">Delete list</button>
@@ -100,6 +106,12 @@
     {
         await Tracking.UpdateListAsync(Id, name, description);
         editing = false;
+        await LoadAsync();
+    });
+
+    private Task ShareAsync(bool shared) => RunAsync(async () =>
+    {
+        await Tracking.UpdateListAsync(Id, list!.Name, list.Description, shared);
         await LoadAsync();
     });
 

@@ -38,6 +38,10 @@ public class UserList
     public string? Description { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>Shared lists are sent to Social, which shows them to the people who can see the owner.</summary>
+    public bool Shared { get; set; }
+
     public List<UserListItem> Items { get; set; } = [];
 }
 

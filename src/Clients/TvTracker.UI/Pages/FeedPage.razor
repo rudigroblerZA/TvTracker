@@ -12,6 +12,10 @@
         {
             <p class="muted small">
                 <a href="feed/people">@m.Following following · @m.Followers follower@(m.Followers == 1 ? "" : "s")</a>
+                @if (m.Requests > 0)
+                {
+                    <span>@(" · ")</span><a href="feed/people"><strong>@m.Requests follow request@(m.Requests == 1 ? "" : "s")</strong></a>
+                }
                 @if (!m.ShareActivity)
                 {
                     <span>@(" · ")</span><a href="settings">you're not sharing your activity</a>

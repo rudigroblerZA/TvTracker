@@ -28,7 +28,18 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowFollowedIntegrationEvent, ActivityEventHandlers>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, ActivityEventHandlers>()
     .AddSubscription<ShowRatedIntegrationEvent, ActivityEventHandlers>()
-    .AddSubscription<ShowRatingRemovedIntegrationEvent, ActivityEventHandlers>();
+    .AddSubscription<ShowRatingRemovedIntegrationEvent, ActivityEventHandlers>()
+    .AddSubscription<EpisodeWatchedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<EpisodeUnwatchedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<ShowFollowedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<ShowUnfollowedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<ShowRatedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<ShowRatingRemovedIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<TrackingSnapshotIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<RatingsSnapshotIntegrationEvent, UserStateHandlers>()
+    .AddSubscription<ListSharedIntegrationEvent, SharedListHandlers>()
+    .AddSubscription<ListUnsharedIntegrationEvent, SharedListHandlers>()
+    .AddSubscription<TrackingSnapshotIntegrationEvent, SharedListHandlers>();
 builder.Services.AddIntegrationEventOutbox<SocialContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -54,5 +65,6 @@ app.UseAuthorization();
 
 app.MapGet("/api/v1/status", () => new { Service = "social-api", Status = "ok" });
 app.MapSocialApi();
+app.MapTogetherApi();
 
 app.Run();

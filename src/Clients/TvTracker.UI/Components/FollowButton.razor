@@ -1,34 +1,43 @@
 @inject SocialClient Social
 
-@* Follow or unfollow someone; shows the new state once the change is saved. *@
-@if (!Person.IsYou)
+@* Follow or unfollow someone. Following a private profile sends a request, shown as "Requested" until they approve;
+   selecting it again withdraws the request. *@
+@if (!Person.IsYou && !Person.BlockedByYou)
 {
-    <button class="btn @(following ? "btn-quiet" : "")" @onclick="ToggleAsync" disabled="@busy"
-            aria-label="@(following ? "Unfollow" : "Follow") @Person.DisplayName">@(following ? "Following" : "Follow")</button>
+    <button class="btn @(state == State.None ? "" : "btn-quiet")" @onclick="ToggleAsync" disabled="@busy"
+            aria-label="@Label @Person.DisplayName">@Text</button>
 }
 
 @code {
     [Parameter, EditorRequired] public SocialPerson Person { get; set; } = null!;
 
-    private bool following;
+    private enum State { None, Following, Requested }
+
+    private State state;
     private bool busy;
 
-    protected override void OnParametersSet() => following = Person.IsFollowing;
+    private string Text => state switch { State.Following => "Following", State.Requested => "Requested", _ => Person.Private ? "Request to follow" : "Follow" };
+
+    private string Label => state switch { State.Following => "Unfollow", State.Requested => "Withdraw request to follow", _ => "Follow" };
+
+    protected override void OnParametersSet() =>
+        state = Person.IsFollowing ? State.Following : Person.Requested ? State.Requested : State.None;
 
     private async Task ToggleAsync()
     {
         busy = true;
         try
         {
-            if (following)
+            if (state == State.None)
             {
-                await Social.UnfollowAsync(Person.UserId);
+                var result = await Social.FollowAsync(Person.UserId);
+                state = result is { Requested: true } ? State.Requested : State.Following;
             }
             else
             {
-                await Social.FollowAsync(Person.UserId);
+                await Social.UnfollowAsync(Person.UserId);
+                state = State.None;
             }
-            following = !following;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

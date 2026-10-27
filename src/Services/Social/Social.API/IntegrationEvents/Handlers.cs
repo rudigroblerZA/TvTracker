@@ -6,7 +6,7 @@ using TvTracker.Persistence;
 
 namespace Social.API.IntegrationEvents;
 
-/// <summary>Keeps show titles, posters and episode numbers from the catalog, for rendering the feed.</summary>
+/// <summary>Keeps show titles, posters, episode numbers and air times from the catalog, for the feed and comparing progress.</summary>
 public sealed class CatalogEventHandlers(SocialContext db) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
@@ -26,23 +26,24 @@ public sealed class CatalogEventHandlers(SocialContext db) :
             var existing = await db.Episodes.Where(x => ids.Contains(x.EpisodeId)).ToDictionaryAsync(x => x.EpisodeId, ct);
             foreach (var episode in e.Episodes)
             {
-                Upsert(existing.GetValueOrDefault(episode.EpisodeId), e.ShowId, episode.EpisodeId, episode.SeasonNumber, episode.EpisodeNumber);
+                Upsert(existing.GetValueOrDefault(episode.EpisodeId), e.ShowId, episode.EpisodeId, episode.SeasonNumber, episode.EpisodeNumber, episode.AirsAtUtc);
             }
         }, ct);
 
     public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
         db.HandleOnceAsync(e, nameof(CatalogEventHandlers), async () =>
-            Upsert(await db.Episodes.FindAsync([e.EpisodeId], ct), e.ShowId, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber), ct);
+            Upsert(await db.Episodes.FindAsync([e.EpisodeId], ct), e.ShowId, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.AirsAtUtc), ct);
 
-    private void Upsert(EpisodeCopy? episode, Guid showId, Guid episodeId, int season, int number)
+    private void Upsert(EpisodeCopy? episode, Guid showId, Guid episodeId, int season, int number, DateTimeOffset? airsAtUtc)
     {
         if (episode is null)
         {
-            db.Episodes.Add(new EpisodeCopy { EpisodeId = episodeId, ShowId = showId, SeasonNumber = season, EpisodeNumber = number });
+            db.Episodes.Add(new EpisodeCopy { EpisodeId = episodeId, ShowId = showId, SeasonNumber = season, EpisodeNumber = number, AirsAtUtc = airsAtUtc });
             return;
         }
         episode.SeasonNumber = season;
         episode.EpisodeNumber = number;
+        episode.AirsAtUtc = airsAtUtc;
     }
 
     private async Task UpsertShowAsync(Guid showId, string title, string? posterUrl, CancellationToken ct)
@@ -79,6 +80,10 @@ public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
     {
         await db.Activities.Where(a => a.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Follows.Where(f => f.FollowerId == e.UserId || f.FolloweeId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Blocks.Where(b => b.BlockerId == e.UserId || b.BlockedId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.UserShows.Where(s => s.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Watches.Where(w => w.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.SharedLists.Where(l => l.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Profiles.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 
@@ -209,6 +214,179 @@ public sealed class ActivityEventHandlers(SocialContext db) :
 
     private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
         db.HandleOnceAsync(e, nameof(ActivityEventHandlers), apply, ct);
+}
+
+/// <summary>
+/// Keeps each user's followed shows, ratings and watched episodes: what "people you follow" on a show page and "watching
+/// together" read. Tracking's and Ratings' daily snapshots fill it for users from before Social, and repair it after a
+/// lost event, as Analytics does: anything recorded after the snapshot was taken is kept.
+/// </summary>
+public sealed class UserStateHandlers(SocialContext db) :
+    IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>,
+    IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>,
+    IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
+    IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>,
+    IIntegrationEventHandler<ShowRatedIntegrationEvent>,
+    IIntegrationEventHandler<ShowRatingRemovedIntegrationEvent>,
+    IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>,
+    IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
+{
+    public Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        {
+            var ids = e.EpisodeIds.Distinct().ToList();
+            var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct);
+            db.Watches.AddRange(ids.Except(existing).Select(id => new UserWatch
+            {
+                UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
+            }));
+        }, ct);
+
+    public Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), () =>
+            db.Watches.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct), ct);
+
+    public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        {
+            var show = await ShowAsync(e.UserId, e.ShowId, ct);
+            show.Followed = true;
+            show.FollowedAtUtc ??= e.CreatedAt.UtcDateTime;
+        }, ct);
+
+    public Task HandleAsync(ShowUnfollowedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        {
+            var show = await ShowAsync(e.UserId, e.ShowId, ct);
+            show.Followed = false;
+            show.FollowedAtUtc = null;
+        }, ct);
+
+    public Task HandleAsync(ShowRatedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = e.Stars; }, ct);
+
+    public Task HandleAsync(ShowRatingRemovedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = null; }, ct);
+
+    public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        {
+            var takenAt = e.TakenAtUtc.UtcDateTime;
+            var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
+            var watched = watches.Select(w => w.EpisodeId).ToHashSet();
+            var snapshot = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
+            db.Watches.AddRange(snapshot.Values.Where(w => !watched.Contains(w.EpisodeId)).Select(w => new UserWatch
+            {
+                UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime
+            }));
+            db.Watches.RemoveRange(watches.Where(w => !snapshot.ContainsKey(w.EpisodeId) && w.WatchedAtUtc < takenAt));
+
+            var shows = await db.UserShows.Where(s => s.UserId == e.UserId).ToDictionaryAsync(s => s.ShowId, ct);
+            var follows = e.Follows.DistinctBy(f => f.ShowId).ToDictionary(f => f.ShowId);
+            foreach (var follow in follows.Values)
+            {
+                if (!shows.TryGetValue(follow.ShowId, out var show))
+                {
+                    db.UserShows.Add(show = new UserShow { UserId = e.UserId, ShowId = follow.ShowId });
+                    shows[follow.ShowId] = show;
+                }
+                show.Followed = true;
+                show.FollowedAtUtc ??= follow.FollowedAtUtc.UtcDateTime;
+            }
+            foreach (var show in shows.Values.Where(s => s.Followed && !follows.ContainsKey(s.ShowId) && s.FollowedAtUtc < takenAt))
+            {
+                show.Followed = false;
+                show.FollowedAtUtc = null;
+            }
+        }, ct);
+
+    /// <summary>Ratings carry no time here, so a rating changed after the snapshot can be undone until the next one.</summary>
+    public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        {
+            var shows = await db.UserShows.Where(s => s.UserId == e.UserId).ToDictionaryAsync(s => s.ShowId, ct);
+            var ratings = e.Shows.DistinctBy(r => r.ShowId).ToDictionary(r => r.ShowId, r => r.Stars);
+            foreach (var (showId, stars) in ratings)
+            {
+                if (!shows.TryGetValue(showId, out var show))
+                {
+                    db.UserShows.Add(show = new UserShow { UserId = e.UserId, ShowId = showId });
+                    shows[showId] = show;
+                }
+                show.Stars = stars;
+            }
+            foreach (var show in shows.Values.Where(s => s.Stars is not null && !ratings.ContainsKey(s.ShowId)))
+            {
+                show.Stars = null;
+            }
+        }, ct);
+
+    private async Task<UserShow> ShowAsync(string userId, Guid showId, CancellationToken ct)
+    {
+        if (await db.UserShows.FindAsync([userId, showId], ct) is { } show)
+        {
+            return show;
+        }
+        show = new UserShow { UserId = userId, ShowId = showId };
+        db.UserShows.Add(show);
+        return show;
+    }
+}
+
+/// <summary>
+/// Keeps copies of the lists users share, from Tracking. An update older than the copy is ignored, since events can
+/// arrive out of order; Tracking's daily snapshot repairs a copy that missed one.
+/// </summary>
+public sealed class SharedListHandlers(SocialContext db) :
+    IIntegrationEventHandler<ListSharedIntegrationEvent>,
+    IIntegrationEventHandler<ListUnsharedIntegrationEvent>,
+    IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>
+{
+    public Task HandleAsync(ListSharedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(SharedListHandlers), async () =>
+            Apply(await db.SharedLists.FindAsync([e.ListId], ct), e.ListId, e.UserId, e.Name, e.Description, e.ShowIds, e.UpdatedAtUtc), ct);
+
+    public Task HandleAsync(ListUnsharedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(SharedListHandlers), () =>
+            db.SharedLists.Where(l => l.ListId == e.ListId && l.UpdatedAtUtc <= e.UpdatedAtUtc.UtcDateTime).ExecuteDeleteAsync(ct), ct);
+
+    /// <summary>Snapshots from before list sharing carry no lists (null), and change nothing.</summary>
+    public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(SharedListHandlers), async () =>
+        {
+            if (e.SharedLists is not { } lists)
+            {
+                return;
+            }
+
+            var copies = await db.SharedLists.Where(l => l.UserId == e.UserId).ToDictionaryAsync(l => l.ListId, ct);
+            foreach (var list in lists)
+            {
+                Apply(copies.GetValueOrDefault(list.ListId), list.ListId, e.UserId, list.Name, list.Description, list.ShowIds, list.UpdatedAtUtc);
+            }
+            var shared = lists.Select(l => l.ListId).ToHashSet();
+            db.SharedLists.RemoveRange(copies.Values.Where(l => !shared.Contains(l.ListId) && l.UpdatedAtUtc < e.TakenAtUtc.UtcDateTime));
+        }, ct);
+
+    private void Apply(SharedList? copy, Guid listId, string userId, string name, string? description, IReadOnlyList<Guid> showIds, DateTimeOffset updatedAt)
+    {
+        if (copy is null)
+        {
+            db.SharedLists.Add(new SharedList
+            {
+                ListId = listId, UserId = userId, Name = name, Description = description, ShowIds = showIds.ToList(), UpdatedAtUtc = updatedAt.UtcDateTime
+            });
+            return;
+        }
+        if (copy.UpdatedAtUtc > updatedAt.UtcDateTime)
+        {
+            return;
+        }
+        copy.Name = name;
+        copy.Description = description;
+        copy.ShowIds = showIds.ToList();
+        copy.UpdatedAtUtc = updatedAt.UtcDateTime;
+    }
 }
 
 internal static class InboxExtensions
