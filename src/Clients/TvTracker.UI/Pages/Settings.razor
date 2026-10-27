@@ -226,13 +226,6 @@
     private void OnThemeChanged() => InvokeAsync(async () =>
     {
         theme = await Theme.GetAsync();
-        try
-        {
-            isAdmin = await Identity.GetFeatureFlagsAsync() is not null;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
-        {
-        }
         StateHasChanged();
     });
 
@@ -280,6 +273,7 @@
             }
 
             profile = await Identity.GetProfileAsync();
+            isAdmin = await Identity.GetFeatureFlagsAsync() is not null;
             if (profile is not null)
             {
                 displayName = profile.DisplayName;

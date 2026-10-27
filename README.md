@@ -26,6 +26,8 @@ The Aspire dashboard opens. The first run pulls container images and imports the
 When everything is running, open the `webapp` link and sign in:
 
 - Demo user: **demo / demo**
+- App admin: **admin / admin**, who gets Settings → Admin (the feature flags page). It's a user of the app's realm,
+  separate from Keycloak's own console admin.
 - Or create an account from the sign-in page (Keycloak handles sign-up and password reset)
 
 The catalog is filled from **[TVmaze](https://www.tvmaze.com/api)** (free, no API key). Every hour the sync worker imports the 40 most
@@ -313,8 +315,10 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 - **If flagd is down:** every flag is on, so a flag server outage never takes features away.
 - **From the app:** admins get Settings → Admin → Feature flags (`/settings/flags`). Each flag can follow
   flagd.json, or be turned on or off for everyone.
-  - **Admins:** the Keycloak usernames in `Admin:Users` in the AppHost's `appsettings.json` (`demo` by default). For
-    anyone else the page and its API answer 404.
+  - **Admins:** the Keycloak usernames in `Admin:Users` in the AppHost's `appsettings.json`: the `admin` account
+    (admin / admin) by default. For anyone else, demo included, the page and its API answer 404.
+  - **The admin account** is in the realm file; Identity.API also creates it at startup when it's missing (a realm
+    imported before it was added). To make someone else an admin, add their username to `Admin:Users`.
   - **Where changes go:** `Flags/overrides.json`, which flagd reads after flagd.json, so an override wins. It isn't
     checked in, and flagd.json is never edited. An override applies to everyone, ignoring flagd.json's targeting;
     "flagd.json" removes it.
