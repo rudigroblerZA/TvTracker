@@ -2,10 +2,11 @@
 @implements IDisposable
 @inject ConnectionState Connection
 @inject UserSession Session
+@inject ThemeStore Theme
 
 <div class="app">
     <header class="app-header">
-        <a class="brand" href="">TV Tracker</a>
+        <a class="brand" href="">@Brand.AppName</a>
         <NavMenu />
         <div class="header-account">
             <AccountMenu />
@@ -34,6 +35,14 @@
         Connection.Changed += OnChanged;
         Session.Changed += OnChanged;
         await Session.EnsureLoadedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Theme.ApplySavedAsync();
+        }
     }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);

@@ -4,7 +4,7 @@
 @inject AnalyticsClient Analytics
 @inject NavigationManager Navigation
 
-<PageTitle>Essential cut@(cut is not null ? $" · {cut.Title}" : "") · TV Tracker</PageTitle>
+<PageTitle>Essential cut@(cut is not null ? $" · {cut.Title}" : "") · @Brand.AppName</PageTitle>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 

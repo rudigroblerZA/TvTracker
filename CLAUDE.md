@@ -56,6 +56,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 - **Privacy:** anything Analytics shows about our users needs 5 or more users or ratings behind it.
 - **Signed-in features:** endpoints that need sign-in return 401 without a valid token, and the UI hides them when
   signed out (tags, the tag filter).
+- **App name:** never write "TV Tracker" in UI or service text; use `@Brand.AppName` in pages and `Branding` in
+  services (white label, see CONTEXT.md). New colours go in `app.css` as `light-dark(light, dark)` tokens.
 - **Docs:** update README.md for user-visible behaviour, and CONTEXT.md for architecture or a decision.
 
 ## Gotchas

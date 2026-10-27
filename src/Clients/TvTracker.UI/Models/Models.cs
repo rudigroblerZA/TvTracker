@@ -429,7 +429,7 @@ public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Epis
 
 public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
 
-/// <summary>Someone on TV Tracker, as Social.API describes them to the caller.</summary>
+/// <summary>Someone on the app, as Social.API describes them to the caller.</summary>
 /// <param name="Requested">The user asked to follow this private profile and is waiting for approval.</param>
 /// <param name="BlockedByYou">On the user's block list.</param>
 public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou,

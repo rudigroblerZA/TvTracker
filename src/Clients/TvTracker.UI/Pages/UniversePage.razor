@@ -3,7 +3,7 @@
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation
 
-<PageTitle>@(universe is not null ? $"{universe.Name} universe" : "Universe") · TV Tracker</PageTitle>
+<PageTitle>@(universe is not null ? $"{universe.Name} universe" : "Universe") · @Brand.AppName</PageTitle>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 

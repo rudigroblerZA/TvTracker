@@ -1,3 +1,4 @@
+@inject TvTracker.UI.Services.Branding Brand
 <!DOCTYPE html>
 <html lang="en">
 
@@ -5,7 +6,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <title>TV Tracker</title>
+    <title>@Brand.AppName</title>
+    <script src="@Assets["_content/TvTracker.UI/theme.js"]"></script>
     <link rel="stylesheet" href="@Assets["_content/TvTracker.UI/app.css"]" />
     <HeadOutlet @rendermode="RenderMode" />
 </head>

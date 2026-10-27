@@ -304,6 +304,8 @@ At `/feed`.
 - **Actor pages:** a person's shows' average rating, their best show, the years they worked, and co-stars they share
   two or more shows with.
 - **Privacy:** anything computed from our users' activity needs at least 5 users or ratings behind it.
+- **Light or dark:** pick a theme in Settings, or follow the device.
+- **Your name on it:** the app's name is a setting, so it can be white-labelled without code changes.
 
 ## Ideas for next
 

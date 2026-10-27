@@ -6,7 +6,7 @@
 @inject NotificationsClient Notifications
 @inject UserSession Session
 
-<PageTitle>@(show?.Title ?? "Show") · TV Tracker</PageTitle>
+<PageTitle>@(show?.Title ?? "Show") · @Brand.AppName</PageTitle>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 

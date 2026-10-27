@@ -35,7 +35,7 @@ public sealed class WebAuthActions(NavigationManager navigation) : IAuthActions
 }
 
 /// <summary>Browser features through wwwroot/js/tvtracker.js.</summary>
-public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notifications) : IPlatformServices
+public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notifications, Branding brand) : IPlatformServices
 {
     public bool SupportsPush => true;
 
@@ -49,7 +49,7 @@ public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notif
             return false;
         }
 
-        var subscription = await js.InvokeAsync<BrowserPushSubscription?>("tvtracker.subscribePush", publicKey);
+        var subscription = await js.InvokeAsync<BrowserPushSubscription?>("tvtracker.subscribePush", publicKey, brand.AppName);
         if (subscription is null)
         {
             return false;

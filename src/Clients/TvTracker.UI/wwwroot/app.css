@@ -1,43 +1,29 @@
 :root {
-    --bg: #fafaf9;
-    --surface: #ffffff;
-    --text: #1c1917;
-    --muted: #57534e;
-    --border: #e7e5e4;
-    --accent: #2563eb;
-    --accent-text: #ffffff;
-    --danger: #b91c1c;
+    /* Every colour is light-dark(light, dark). color-scheme picks the side: the device's by default, or the theme
+       chosen in Settings, which theme.js sets as data-theme. */
+    color-scheme: light dark;
+    --bg: light-dark(#fafaf9, #0c0a09);
+    --surface: light-dark(#ffffff, #1c1917);
+    --text: light-dark(#1c1917, #f5f5f4);
+    --muted: light-dark(#57534e, #a8a29e);
+    --border: light-dark(#e7e5e4, #292524);
+    --accent: light-dark(#2563eb, #60a5fa);
+    --accent-text: light-dark(#ffffff, #0c0a09);
+    --danger: light-dark(#b91c1c, #f87171);
     --star: #f59e0b;
     /* Tones for findings: text dark enough to read on its own 10% tint; fills strong enough for white text. */
-    --good: #166534;
-    --warn: #92400e;
-    --bad: #991b1b;
-    --info: #1d4ed8;
-    --good-fill: #15803d;
-    --on-good-fill: #ffffff;
+    --good: light-dark(#166534, #4ade80);
+    --warn: light-dark(#92400e, #fbbf24);
+    --bad: light-dark(#991b1b, #f87171);
+    --info: light-dark(#1d4ed8, #93c5fd);
+    --good-fill: light-dark(#15803d, #4ade80);
+    --on-good-fill: light-dark(#ffffff, #052e16);
     --radius: 10px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    color-scheme: light dark;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #0c0a09;
-        --surface: #1c1917;
-        --text: #f5f5f4;
-        --muted: #a8a29e;
-        --border: #292524;
-        --accent: #60a5fa;
-        --accent-text: #0c0a09;
-        --danger: #f87171;
-        --good: #4ade80;
-        --warn: #fbbf24;
-        --bad: #f87171;
-        --info: #93c5fd;
-        --good-fill: #4ade80;
-        --on-good-fill: #052e16;
-    }
-}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 

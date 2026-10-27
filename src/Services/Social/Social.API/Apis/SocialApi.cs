@@ -85,9 +85,9 @@ public static class SocialApi
         return api;
     }
 
-    private static async Task<Ok<MySocialDto>> GetMeAsync(ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Ok<MySocialDto>> GetMeAsync(ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
-        var me = await EnsureProfileAsync(user, db, time, ct);
+        var me = await EnsureProfileAsync(user, db, time, brand, ct);
         return TypedResults.Ok(new MySocialDto(me.UserId, me.DisplayName, me.ShareActivity,
             await db.Follows.CountAsync(f => f.FolloweeId == me.UserId && f.Approved, ct),
             await db.Follows.CountAsync(f => f.FollowerId == me.UserId && f.Approved, ct),
@@ -97,9 +97,9 @@ public static class SocialApi
 
     /// <summary>Making a profile public approves every waiting request: nothing is left to approve.</summary>
     private static async Task<Ok<SocialSettings>> UpdateSettingsAsync(
-        SocialSettings settings, ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
+        SocialSettings settings, ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
-        var me = await EnsureProfileAsync(user, db, time, ct);
+        var me = await EnsureProfileAsync(user, db, time, brand, ct);
         me.ShareActivity = settings.ShareActivity ?? me.ShareActivity;
         if (settings.Private is { } isPrivate && isPrivate != me.Private)
         {
@@ -199,7 +199,7 @@ public static class SocialApi
 
     /// <summary>Following a private profile makes a request. Someone blocked either way can't follow (404, as if absent).</summary>
     private static async Task<Results<Ok<FollowStateDto>, NotFound, ValidationProblem>> FollowAsync(
-        string userId, ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
+        string userId, ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
         var me = UserId(user);
         if (userId == me)
@@ -213,7 +213,7 @@ public static class SocialApi
             return TypedResults.NotFound();
         }
 
-        await EnsureProfileAsync(user, db, time, ct);
+        await EnsureProfileAsync(user, db, time, brand, ct);
         var follow = await db.Follows.FindAsync([me, userId], ct);
         if (follow is null)
         {
@@ -382,7 +382,7 @@ public static class SocialApi
     /// The caller's profile. Identity sends names for everyone, but a caller can arrive here first; their token's name
     /// stands in until Identity's event or snapshot arrives.
     /// </summary>
-    private static async Task<Profile> EnsureProfileAsync(ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Profile> EnsureProfileAsync(ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
         var id = UserId(user);
         if (await db.Profiles.FindAsync([id], ct) is { } profile)
@@ -393,7 +393,7 @@ public static class SocialApi
         profile = new Profile
         {
             UserId = id,
-            DisplayName = user.FindFirst("name")?.Value ?? user.FindFirst("preferred_username")?.Value ?? "TV Tracker user",
+            DisplayName = user.FindFirst("name")?.Value ?? user.FindFirst("preferred_username")?.Value ?? $"{brand.AppName} user",
             UpdatedAtUtc = time.GetUtcNow().UtcDateTime
         };
         db.Profiles.Add(profile);

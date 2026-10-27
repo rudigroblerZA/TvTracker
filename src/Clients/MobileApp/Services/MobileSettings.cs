@@ -9,6 +9,9 @@ public static class MobileSettings
 {
     private static string Host => DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost";
 
+    /// <summary>The app's name in the UI (white label). The home-screen name is ApplicationTitle in MobileApp.csproj.</summary>
+    public const string AppName = "TV Tracker";
+
     /// <summary>Mobile BFF ("http" launch profile, port 5110).</summary>
     public static Uri BffAddress => new($"http://{Host}:5110/");
 

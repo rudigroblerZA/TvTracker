@@ -2,7 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.Social)]
 @inject SocialClient Social
 
-<PageTitle>@(list?.Name ?? "List") · TV Tracker</PageTitle>
+<PageTitle>@(list?.Name ?? "List") · @Brand.AppName</PageTitle>
 
 <AuthorizeView>
     <Authorized>
