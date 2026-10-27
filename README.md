@@ -598,22 +598,39 @@ How events flow:
     titles are never shown: a follower may not have seen them.
   - **Taken back:** unwatching, unfollowing a show or removing a rating takes it out of the feed. A follow that comes
     with a watch of the same show (watching follows it) is shown as the watch only.
-  - **Privacy:** Settings → Social, "Share what I watch…", on by default. Turned off, nobody sees any of your activity,
-    including what's already in their feed; your page says you don't share. Anyone signed in can find and follow you.
+  - **Privacy:** Settings → Social.
+    - **Share what I watch…** (on by default): turned off, nobody sees any of your activity, including what's already
+      in their feed; your page says you don't share.
+    - **Private profile:** people ask to follow you, and only those you approve see your activity, lists and followers;
+      others see just your name. Requests are under Feed → People. Making the profile public approves every request.
+    - **Block** (on a person's page): neither of you sees the other anywhere (search, pages, feed, lists, show pages),
+      and any follows between you end. Unblock under Feed → People.
+  - **People you follow, on a show page:** who follows, watches or rated it, and how far they are ("Up to S03E04 · 28
+    of 62", "Finished", ★★★★☆), furthest along first.
+  - **Watching together** (on a person's page): shows you both follow or have started, both your progress, and who's
+    ahead. Shows you're both part-way through come first.
+  - **Shared lists:** tick "Share on your profile" on one of your lists. It appears on your page, at
+    `/users/{id}/lists/{listId}`, for whoever can see your profile; changes show straight away, and unticking takes it
+    back.
+  - **History is included** for the show page and watching together: they use your whole watch history (Tracking's
+    and Ratings' daily snapshots fill Social's copy), while the feed starts from when Social was added.
   - **Data:** included in the data export and deleted with the account. Behind the `social` flag.
   - **API:** `GET /api/v1/feed?before=…`, `GET /api/v1/people?q=…`, `GET /api/v1/people/{id}`,
     `POST|DELETE /api/v1/people/{id}/follow`, `GET /api/v1/people/{id}/followers|following`, `GET /api/v1/me/social`,
-    `PUT /api/v1/me/social/settings` on Social.API (port 5111), all signed in.
+    `PUT /api/v1/me/social/settings` (`shareActivity`, `private`), `GET /api/v1/me/follow-requests`,
+    `POST /api/v1/me/follow-requests/{id}/approve`, `DELETE /api/v1/me/follow-requests/{id}`,
+    `POST|DELETE /api/v1/people/{id}/block`, `GET /api/v1/me/blocks`, `GET /api/v1/people/{id}/lists/{listId}`,
+    `GET /api/v1/shows/{id}/friends`, `GET /api/v1/people/{id}/together` on Social.API (port 5111), all signed in.
 - The sync worker starts only after the consuming services report healthy, which includes "queue bound and consuming", so no early events are lost.
 
 ## Database schema
 
-Catalog, Analytics, Recommendations and Social use EF Core migrations (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`,
-`Recommendations.API/Data/Migrations`, `Social.API/Data/Migrations`); Catalog.API, Analytics.API, Recommendations.API
-and Social.API apply them at startup. The
+Catalog, Analytics, Recommendations, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
+`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Social.API/Data/Migrations`,
+`Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
 other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
-Recommendations' first migration (`InitialCreate`) is its `EnsureCreated` schema, so a database made before it moved
-to migrations is marked as having it and upgraded in place.
+Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made
+before they moved to migrations is marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
@@ -626,6 +643,8 @@ dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data 
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
+# or, for Tracking:
+dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
 ```
 
 **Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database
@@ -659,5 +678,4 @@ Run `aspire update` (or `dotnet list package --outdated`) to bring them up to da
 
 ## Not built yet
 
-Shared lists (lists your followers can see) and the weekly digest email are planned for a later round. Social.API
-has following and the activity feed.
+The weekly digest email is planned for a later round.

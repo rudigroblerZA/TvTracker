@@ -1,6 +1,7 @@
 @page "/users/{UserId}"
 @attribute [RequiresFeature(FeatureFlags.Social)]
 @inject SocialClient Social
+@inject NavigationManager Navigation
 
 <PageTitle>@(page?.Person.DisplayName ?? "Person") · TV Tracker</PageTitle>
 
@@ -22,7 +23,14 @@
                 <div>
                     <h1>@person.DisplayName</h1>
                     <p class="muted small">
-                        <span>@person.Followers follower@(person.Followers == 1 ? "" : "s") · @person.Following following</span>
+                        @if (page.CanSee)
+                        {
+                            <span>@person.Followers follower@(person.Followers == 1 ? "" : "s") · @person.Following following</span>
+                        }
+                        @if (person.Private)
+                        {
+                            <span class="tag">Private</span>
+                        }
                         @if (person.FollowsYou)
                         {
                             <span class="tag">Follows you</span>
@@ -32,23 +40,89 @@
                 <FollowButton Person="person" />
             </section>
 
-            <h2>Activity</h2>
-            @if (!page.Shares)
+            @if (!person.IsYou)
             {
-                <p class="muted">@person.DisplayName doesn't share what they watch.</p>
+                <p class="small">
+                    @if (confirmingBlock)
+                    {
+                        <span>Block @person.DisplayName? Neither of you will see the other, and any follows between you end. </span>
+                        <button class="btn btn-danger" @onclick="BlockAsync">Block</button>
+                        <button class="btn btn-quiet" @onclick="() => confirmingBlock = false">Cancel</button>
+                    }
+                    else
+                    {
+                        <button class="link muted" @onclick="() => confirmingBlock = true">Block</button>
+                    }
+                </p>
             }
-            else if (page.Activity.Count == 0)
+
+            @if (!page.CanSee)
             {
-                <p class="muted">Nothing yet.</p>
+                <p class="notice">@person.DisplayName's profile is private. @(person.Requested ? "Your request is waiting for their approval." : "Request to follow to see what they watch and their lists.")</p>
             }
             else
             {
-                <ul class="feed">
-                    @foreach (var item in page.Activity)
-                    {
-                        <FeedItemRow @key="item.Id" Item="item" ShowName="false" />
-                    }
-                </ul>
+                @if (together is { Shows.Count: > 0 } t)
+                {
+                    <section class="together">
+                        <h2>Watching together</h2>
+                        <p class="muted small">Shows you both follow or have started.</p>
+                        <ul class="people">
+                            @foreach (var show in t.Shows)
+                            {
+                                <li class="person-row" @key="show.ShowId">
+                                    <a href="shows/@show.ShowId"><Poster Title="@(show.Title ?? "")" Url="@show.PosterUrl" Size="small" /></a>
+                                    <div class="feed-body">
+                                        <a class="strong" href="shows/@show.ShowId">@(show.Title ?? "A show")</a>
+                                        <div class="small"><span class="muted">You: </span>@FriendsOnShowSection.Describe(show.You, true)</div>
+                                        <div class="small"><span class="muted">@(person.DisplayName + ": ")</span>@FriendsOnShowSection.Describe(show.Them, true)</div>
+                                    </div>
+                                    @if (AheadLabel(show.Ahead, person.DisplayName) is { } ahead)
+                                    {
+                                        <span class="tag">@ahead</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @if (page.Lists is { Count: > 0 } lists)
+                {
+                    <section>
+                        <h2>Lists</h2>
+                        <ul class="people">
+                            @foreach (var list in lists)
+                            {
+                                <li class="person-row" @key="list.ListId">
+                                    <div class="feed-body">
+                                        <a class="strong" href="users/@person.UserId/lists/@list.ListId">@list.Name</a>
+                                        <div class="muted small">@(list.Shows == 1 ? "1 show" : $"{list.Shows} shows")@(string.IsNullOrEmpty(list.Description) ? "" : " · " + list.Description)</div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                <h2>Activity</h2>
+                @if (!page.Shares)
+                {
+                    <p class="muted">@person.DisplayName doesn't share what they watch.</p>
+                }
+                else if (page.Activity.Count == 0)
+                {
+                    <p class="muted">Nothing yet.</p>
+                }
+                else
+                {
+                    <ul class="feed">
+                        @foreach (var item in page.Activity)
+                        {
+                            <FeedItemRow @key="item.Id" Item="item" ShowName="false" />
+                        }
+                    </ul>
+                }
             }
         }
     </Authorized>
@@ -61,7 +135,9 @@
     [Parameter] public string UserId { get; set; } = "";
 
     private SocialPersonPage? page;
+    private Together? together;
     private bool notFound;
+    private bool confirmingBlock;
     private string? error;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
@@ -70,14 +146,41 @@
     {
         error = null;
         page = null;
+        together = null;
+        confirmingBlock = false;
         try
         {
             page = await Social.GetPersonAsync(UserId);
             notFound = page is null;
+            if (page is { Shares: true, Person.IsYou: false })
+            {
+                together = await Social.GetTogetherAsync(UserId);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
         }
     }
+
+    private async Task BlockAsync()
+    {
+        try
+        {
+            await Social.BlockAsync(UserId);
+            Navigation.NavigateTo("feed/people");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string? AheadLabel(string? ahead, string name) => ahead switch
+    {
+        "you" => "You're ahead",
+        "them" => $"{name} is ahead",
+        "level" => "Level",
+        _ => null
+    };
 }

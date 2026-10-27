@@ -108,10 +108,15 @@
             <section class="panel">
                 <h2>Social</h2>
                 <label class="checkbox">
-                    <input type="checkbox" checked="@shareActivity" disabled="@(shareActivity is null)" @onchange="e => SetShareActivityAsync(e.Value is true)" />
+                    <input type="checkbox" checked="@shareActivity" disabled="@(shareActivity is null)" @onchange="e => SetSocialAsync(e.Value is true, null)" />
                     Share what I watch, finish, follow and rate with people who follow me
                 </label>
-                <p class="muted small">Anyone signed in can follow you. Turned off, nobody sees your activity, including what's already in their feed.</p>
+                <p class="muted small">Turned off, nobody sees your activity, including what's already in their feed.</p>
+                <label class="checkbox">
+                    <input type="checkbox" checked="@privateProfile" disabled="@(shareActivity is null)" @onchange="e => SetSocialAsync(null, e.Value is true)" />
+                    Private profile: approve who follows me
+                </label>
+                <p class="muted small">Only people you approve see your activity, lists and followers; others see just your name. Requests are under Feed → People. Making it public again approves every request waiting.</p>
             </section>
         </Feature>
 
@@ -157,17 +162,22 @@
 @code {
     private bool spoilerShield;
     private bool? shareActivity;
+    private bool privateProfile;
 
-    private async Task SetShareActivityAsync(bool on)
+    /// <summary>Changes one Social setting (the other is null and kept), showing what the service saved.</summary>
+    private async Task SetSocialAsync(bool? share, bool? isPrivate)
     {
-        shareActivity = on;
         try
         {
-            shareActivity = (await Social.UpdateSettingsAsync(new SocialSettings(on)))?.ShareActivity ?? on;
+            if (await Social.UpdateSettingsAsync(new SocialSettings(share, isPrivate)) is { } saved)
+            {
+                shareActivity = saved.ShareActivity;
+                privateProfile = saved.Private ?? privateProfile;
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            shareActivity = !on;
+            await LoadShareActivityAsync();
         }
     }
 
@@ -176,7 +186,9 @@
     {
         try
         {
-            shareActivity = (await Social.GetMeAsync())?.ShareActivity;
+            var me = await Social.GetMeAsync();
+            shareActivity = me?.ShareActivity;
+            privateProfile = me?.Private ?? false;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

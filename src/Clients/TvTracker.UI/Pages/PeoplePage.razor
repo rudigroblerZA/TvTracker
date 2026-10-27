@@ -17,6 +17,24 @@
 
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
+        @if (requests is { Count: > 0 })
+        {
+            <section>
+                <h2>Follow requests <span class="muted small">@requests.Count</span></h2>
+                <ul class="people">
+                    @foreach (var person in requests)
+                    {
+                        <li class="person-row" @key="person.UserId">
+                            <a class="avatar" href="users/@person.UserId" aria-hidden="true" tabindex="-1">@FeedItemRow.Initial(person.DisplayName)</a>
+                            <div class="feed-body"><a class="strong" href="users/@person.UserId">@person.DisplayName</a></div>
+                            <button class="btn" @onclick="() => ApproveAsync(person)" aria-label="Approve @person.DisplayName">Approve</button>
+                            <button class="btn btn-quiet" @onclick="() => DeclineAsync(person)" aria-label="Decline @person.DisplayName">Decline</button>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
         @if (results is not null)
         {
             <section>
@@ -70,6 +88,23 @@
                 <p class="muted">No followers yet.</p>
             }
         </section>
+
+        @if (blocked is { Count: > 0 })
+        {
+            <section>
+                <h2>Blocked <span class="muted small">@blocked.Count</span></h2>
+                <ul class="people">
+                    @foreach (var person in blocked)
+                    {
+                        <li class="person-row" @key="person.UserId">
+                            <span class="avatar" aria-hidden="true">@FeedItemRow.Initial(person.DisplayName)</span>
+                            <div class="feed-body"><span class="strong">@person.DisplayName</span></div>
+                            <button class="btn btn-quiet" @onclick="() => UnblockAsync(person)" aria-label="Unblock @person.DisplayName">Unblock</button>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
     </Authorized>
     <NotAuthorized>
         <SignInPrompt Message="Sign in to find and follow people." />
@@ -81,6 +116,8 @@
     private List<SocialPerson>? results;
     private List<SocialPerson>? following;
     private List<SocialPerson>? followers;
+    private List<SocialPerson>? requests;
+    private List<SocialPerson>? blocked;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -94,7 +131,38 @@
             {
                 following = await Social.GetFollowingAsync(me.UserId) ?? [];
                 followers = await Social.GetFollowersAsync(me.UserId) ?? [];
+                requests = me.Requests > 0 ? await Social.GetFollowRequestsAsync() ?? [] : [];
+                blocked = await Social.GetBlocksAsync() ?? [];
             }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task ApproveAsync(SocialPerson person)
+    {
+        await RunAsync(() => Social.ApproveRequestAsync(person.UserId));
+    }
+
+    private async Task DeclineAsync(SocialPerson person)
+    {
+        await RunAsync(() => Social.DeclineRequestAsync(person.UserId));
+    }
+
+    private async Task UnblockAsync(SocialPerson person)
+    {
+        await RunAsync(() => Social.UnblockAsync(person.UserId));
+    }
+
+    /// <summary>Does the change, then reloads the lists so counts and sections are current.</summary>
+    private async Task RunAsync(Func<Task> change)
+    {
+        try
+        {
+            await change();
+            await LoadAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

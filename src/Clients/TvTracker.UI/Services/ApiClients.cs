@@ -157,8 +157,9 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<ListSummary?> CreateListAsync(string name, string? description, CancellationToken ct = default) =>
         SendAsync<ListSummary>(ApiClients.Tracking, HttpMethod.Post, "api/v1/lists", new { name, description }, ct);
 
-    public Task UpdateListAsync(Guid id, string name, string? description, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Tracking, HttpMethod.Put, $"api/v1/lists/{id}", new { name, description }, ct, queueIfOffline: true);
+    /// <param name="shared">Share it on Social; null leaves it as it is.</param>
+    public Task UpdateListAsync(Guid id, string name, string? description, bool? shared = null, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Tracking, HttpMethod.Put, $"api/v1/lists/{id}", new { name, description, shared }, ct, queueIfOffline: true);
 
     public Task DeleteListAsync(Guid id, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{id}", null, ct, queueIfOffline: true);
@@ -382,8 +383,38 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
     public Task<List<SocialPerson>?> GetFollowingAsync(string userId, CancellationToken ct = default) =>
         GetAsync<List<SocialPerson>>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/following", ct);
 
-    public Task FollowAsync(string userId, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Social, HttpMethod.Post, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
+    /// <summary>Following a private profile makes a request: the result says which.</summary>
+    public Task<FollowState?> FollowAsync(string userId, CancellationToken ct = default) =>
+        SendAsync<FollowState>(ApiClients.Social, HttpMethod.Post, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
+
+    public Task<List<SocialPerson>?> GetFollowRequestsAsync(CancellationToken ct = default) =>
+        GetAsync<List<SocialPerson>>(ApiClients.Social, "api/v1/me/follow-requests", ct);
+
+    public Task ApproveRequestAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Post, $"api/v1/me/follow-requests/{Uri.EscapeDataString(userId)}/approve", null, ct);
+
+    public Task DeclineRequestAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/me/follow-requests/{Uri.EscapeDataString(userId)}", null, ct);
+
+    public Task<List<SocialPerson>?> GetBlocksAsync(CancellationToken ct = default) =>
+        GetAsync<List<SocialPerson>>(ApiClients.Social, "api/v1/me/blocks", ct);
+
+    public Task BlockAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Post, $"api/v1/people/{Uri.EscapeDataString(userId)}/block", null, ct);
+
+    public Task UnblockAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/block", null, ct);
+
+    public Task<SharedList?> GetSharedListAsync(string userId, Guid listId, CancellationToken ct = default) =>
+        GetAsync<SharedList>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/lists/{listId}", ct);
+
+    /// <summary>The people the user follows (and can see) who follow, watch or rated this show.</summary>
+    public Task<FriendsOnShow?> GetFriendsOnShowAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<FriendsOnShow>(ApiClients.Social, $"api/v1/shows/{showId}/friends", ct);
+
+    /// <summary>Shows the user and someone else both follow or have started; null when the user can't see their activity.</summary>
+    public Task<Together?> GetTogetherAsync(string userId, CancellationToken ct = default) =>
+        GetAsync<Together>(ApiClients.Social, $"api/v1/people/{Uri.EscapeDataString(userId)}/together", ct);
 
     public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);

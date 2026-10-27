@@ -1,0 +1,58 @@
+@inject SocialClient Social
+
+@* On the show page: the people you follow who follow, watch or rated this show, and how far they are. Episode numbers
+   only, as in the feed. *@
+@if (friends is { Total: > 0 } f)
+{
+    <section class="friends-on-show" aria-labelledby="friends-on-show-title">
+        <h2 id="friends-on-show-title">People you follow <span class="muted small">@f.Total</span></h2>
+        <ul class="people">
+            @foreach (var person in f.People)
+            {
+                <li class="person-row" @key="person.UserId">
+                    <a class="avatar" href="users/@person.UserId" aria-hidden="true" tabindex="-1">@FeedItemRow.Initial(person.DisplayName)</a>
+                    <div class="feed-body">
+                        <a class="strong" href="users/@person.UserId">@person.DisplayName</a>
+                        <div class="muted small">@Describe(person.Progress, person.Following)</div>
+                    </div>
+                    @if (person.Stars is { } stars)
+                    {
+                        <span class="feed-stars" aria-label="Rated @stars stars">@(new string('★', stars) + new string('☆', 5 - stars))</span>
+                    }
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private FriendsOnShow? friends;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        friends = null;
+        try
+        {
+            friends = await Social.GetFriendsOnShowAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Optional on the show page; the rest of it works without.
+        }
+    }
+
+    /// <summary>"Finished", "Up to S03E04 · 28 of 62", "Following, not started".</summary>
+    public static string Describe(PeerProgress progress, bool following) =>
+        progress.Finished ? "Finished"
+        : progress.Furthest is { } furthest ? $"Up to {Format.EpisodeCode(furthest.SeasonNumber, furthest.EpisodeNumber)} · {progress.Watched} of {progress.Aired}"
+        : following ? "Following, not started"
+        : "Rated it";
+}
