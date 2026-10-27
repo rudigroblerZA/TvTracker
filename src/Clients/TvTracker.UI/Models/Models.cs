@@ -427,3 +427,21 @@ public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Epis
     bool Limited, IReadOnlyList<string> Reasons);
 
 public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
+
+/// <summary>Someone on TV Tracker, as Social.API describes them to the caller.</summary>
+public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou);
+
+public record MySocial(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following);
+
+public record SocialSettings(bool ShareActivity);
+
+/// <param name="Shares">Whether they share their activity; when not, <paramref name="Activity"/> is empty.</param>
+public record SocialPersonPage(SocialPerson Person, bool Shares, IReadOnlyList<FeedItem> Activity);
+
+public record Feed(IReadOnlyList<FeedItem> Items, DateTime? NextBefore);
+
+/// <param name="Kind">"watched", "finished", "followed" or "rated".</param>
+public record FeedItem(Guid Id, string UserId, string DisplayName, string Kind, Guid ShowId, string? ShowTitle, string? PosterUrl,
+    int Episodes, EpisodeCode? First, EpisodeCode? Last, int? Stars, DateTime OccurredAtUtc);
+
+public record EpisodeCode(int SeasonNumber, int EpisodeNumber);

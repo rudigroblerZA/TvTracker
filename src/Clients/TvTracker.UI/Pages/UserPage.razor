@@ -1,0 +1,83 @@
+@page "/users/{UserId}"
+@attribute [RequiresFeature(FeatureFlags.Social)]
+@inject SocialClient Social
+
+<PageTitle>@(page?.Person.DisplayName ?? "Person") · TV Tracker</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (page is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notFound ? "There's nobody here." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            var person = page.Person;
+            <section class="user-hero">
+                <span class="avatar large" aria-hidden="true">@FeedItemRow.Initial(person.DisplayName)</span>
+                <div>
+                    <h1>@person.DisplayName</h1>
+                    <p class="muted small">
+                        <span>@person.Followers follower@(person.Followers == 1 ? "" : "s") · @person.Following following</span>
+                        @if (person.FollowsYou)
+                        {
+                            <span class="tag">Follows you</span>
+                        }
+                    </p>
+                </div>
+                <FollowButton Person="person" />
+            </section>
+
+            <h2>Activity</h2>
+            @if (!page.Shares)
+            {
+                <p class="muted">@person.DisplayName doesn't share what they watch.</p>
+            }
+            else if (page.Activity.Count == 0)
+            {
+                <p class="muted">Nothing yet.</p>
+            }
+            else
+            {
+                <ul class="feed">
+                    @foreach (var item in page.Activity)
+                    {
+                        <FeedItemRow @key="item.Id" Item="item" ShowName="false" />
+                    }
+                </ul>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see people's activity." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public string UserId { get; set; } = "";
+
+    private SocialPersonPage? page;
+    private bool notFound;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        page = null;
+        try
+        {
+            page = await Social.GetPersonAsync(UserId);
+            notFound = page is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

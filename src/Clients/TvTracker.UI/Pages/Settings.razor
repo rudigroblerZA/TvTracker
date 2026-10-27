@@ -5,6 +5,7 @@
 @inject IPlatformServices Platform
 @inject IAuthActions Auth
 @inject SpoilerShield Shield
+@inject SocialClient Social
 
 <PageTitle>Settings · TV Tracker</PageTitle>
 
@@ -103,6 +104,17 @@
             }
         </section>
 
+        <Feature Flag="@FeatureFlags.Social">
+            <section class="panel">
+                <h2>Social</h2>
+                <label class="checkbox">
+                    <input type="checkbox" checked="@shareActivity" disabled="@(shareActivity is null)" @onchange="e => SetShareActivityAsync(e.Value is true)" />
+                    Share what I watch, finish, follow and rate with people who follow me
+                </label>
+                <p class="muted small">Anyone signed in can follow you. Turned off, nobody sees your activity, including what's already in their feed.</p>
+            </section>
+        </Feature>
+
         <Feature Flag="@FeatureFlags.SpoilerShield">
             <section class="panel">
                 <h2>Spoiler shield</h2>
@@ -144,6 +156,33 @@
 
 @code {
     private bool spoilerShield;
+    private bool? shareActivity;
+
+    private async Task SetShareActivityAsync(bool on)
+    {
+        shareActivity = on;
+        try
+        {
+            shareActivity = (await Social.UpdateSettingsAsync(new SocialSettings(on)))?.ShareActivity ?? on;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            shareActivity = !on;
+        }
+    }
+
+    /// <summary>Optional: Settings works without Social (flag off, or the service down).</summary>
+    private async Task LoadShareActivityAsync()
+    {
+        try
+        {
+            shareActivity = (await Social.GetMeAsync())?.ShareActivity;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            shareActivity = null;
+        }
+    }
 
     private async Task SetSpoilerShieldAsync(bool on)
     {
@@ -169,6 +208,7 @@
     protected override async Task OnInitializedAsync()
     {
         spoilerShield = await Shield.IsOnAsync();
+        await LoadShareActivityAsync();
         try
         {
             await Session.EnsureLoadedAsync();

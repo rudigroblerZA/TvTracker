@@ -285,7 +285,15 @@ In Settings.
 - **Everywhere at once:** titles and summaries of episodes you haven't watched are hidden across the app, and one tap
   shows one.
 
-### 25. Smaller touches
+### 25. Following and the feed
+
+At `/feed`.
+
+- **Follow people, see what they watch:** episodes (a binge as one line), finished shows, new follows and ratings,
+  without episode titles, so nothing is spoiled.
+- **One switch for privacy:** stop sharing, and none of your activity shows anywhere, past items included.
+
+### 26. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

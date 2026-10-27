@@ -1,0 +1,98 @@
+@page "/feed"
+@attribute [RequiresFeature(FeatureFlags.Social)]
+@inject SocialClient Social
+
+<PageTitle>Feed · TV Tracker</PageTitle>
+
+<h1>Feed</h1>
+
+<AuthorizeView>
+    <Authorized>
+        @if (me is { } m)
+        {
+            <p class="muted small">
+                <a href="feed/people">@m.Following following · @m.Followers follower@(m.Followers == 1 ? "" : "s")</a>
+                @if (!m.ShareActivity)
+                {
+                    <span>@(" · ")</span><a href="settings">you're not sharing your activity</a>
+                }
+            </p>
+        }
+        <p><a href="feed/people"><strong>Find people</strong></a><span class="muted">: follow friends to see what they watch and rate.</span></p>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (items is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (items.Count == 0)
+        {
+            <p class="notice">Nothing here yet. Follow people, and what they watch, finish, follow and rate shows up here.</p>
+        }
+        else
+        {
+            <ul class="feed">
+                @foreach (var item in items)
+                {
+                    <FeedItemRow @key="item.Id" Item="item" />
+                }
+            </ul>
+            @if (nextBefore is { } before)
+            {
+                <button class="btn btn-quiet" @onclick="() => LoadMoreAsync(before)" disabled="@loadingMore">Older</button>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to follow people and see what they watch." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private MySocial? me;
+    private List<FeedItem>? items;
+    private DateTime? nextBefore;
+    private bool loadingMore;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            me = await Social.GetMeAsync();
+            var feed = await Social.GetFeedAsync();
+            items = feed?.Items.ToList() ?? [];
+            nextBefore = feed?.NextBefore;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task LoadMoreAsync(DateTime before)
+    {
+        loadingMore = true;
+        try
+        {
+            var feed = await Social.GetFeedAsync(before);
+            items!.AddRange(feed?.Items ?? []);
+            nextBefore = feed?.NextBefore;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loadingMore = false;
+        }
+    }
+}

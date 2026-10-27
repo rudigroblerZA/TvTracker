@@ -16,3 +16,9 @@ public record UserProfileUpdatedIntegrationEvent(
 
 /// <summary>Every service deletes that user's data when it receives this.</summary>
 public record UserDeletedIntegrationEvent(string UserId) : IntegrationEvent;
+
+/// <summary>
+/// A user's profile as Identity has it, sent after start and daily. Services that started after a user registered
+/// (Social) learn their name from it, and a lost profile event heals.
+/// </summary>
+public record UserProfileSnapshotIntegrationEvent(string UserId, string DisplayName) : IntegrationEvent;

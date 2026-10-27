@@ -114,6 +114,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Spoiler shield: a setting that hides titles, summaries and stills of episodes you haven't watched." }
+    },
+    "social": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Social: following people, the activity feed (/feed), people pages and search." }
     }
   }
 }

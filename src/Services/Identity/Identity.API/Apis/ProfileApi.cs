@@ -29,7 +29,7 @@ public record UpdateProfileRequest(
 public static class ProfileApi
 {
     /// <summary>Services that hold per-user data and expose GET api/v1/me/export.</summary>
-    private static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications"];
+    private static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social"];
 
     public static RouteGroupBuilder MapProfileApi(this IEndpointRouteBuilder app)
     {
