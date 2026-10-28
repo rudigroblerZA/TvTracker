@@ -382,10 +382,4 @@ On show pages, Insights, and in your inbox.
 
 ## Ideas for next
 
-Ranked by value for the effort. Each builds on data and code that already exist.
-
-| # | Idea | What it does | Builds on | Effort |
-| --- | --- | --- | --- | --- |
-| 1 | **Crossover alerts** | Tell you when a crossover event is scheduled in a universe you're watching ("Reckoning airs across Fire, Med and P.D. on Wednesday"), so you're caught up on all three shows first. | Watch order's crossover detection, follows, Notifications | Small |
-| 2 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
-| 3 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+What's planned, features and fixes alike, is in [BACKLOG.md](BACKLOG.md), with priorities and sizes.
