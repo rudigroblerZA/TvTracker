@@ -63,9 +63,11 @@ else
 
             @if (WatchNow is { } now)
             {
-                <p class="watch-now">
-                    <a class="btn" href="@now.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(now)</a>
-                </p>
+                <Feature Flag="@FeatureFlags.WatchNow">
+                    <p class="watch-now">
+                        <a class="btn" href="@now.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(now)</a>
+                    </p>
+                </Feature>
             }
 
             <div class="rating-line">
@@ -285,12 +287,12 @@ else
 @code {
     /// <summary>The first streaming service with a link to the show's page or a search for it, for the button up top.</summary>
     private WatchProvider? WatchNow => show?.WatchProviders.FirstOrDefault(p => p.Type is WatchProviderType.Stream or WatchProviderType.Free
-        && p.Link is "title" or "search");
+        && p.Link is WatchLink.Title or WatchLink.Search);
 
     private static string WatchLabel(WatchProvider provider) => provider.Link switch
     {
-        "title" => $"▶ Watch on {provider.ProviderName}",
-        "search" => $"Find it on {provider.ProviderName}",
+        WatchLink.Title => $"▶ Watch on {provider.ProviderName}",
+        WatchLink.Search => $"Find it on {provider.ProviderName}",
         _ => provider.ProviderName
     };
 

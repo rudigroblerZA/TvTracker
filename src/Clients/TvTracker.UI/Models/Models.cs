@@ -108,8 +108,11 @@ public record ShowRef(Guid Id, string Title);
 
 /// <param name="Url">The show's page on the service (on a phone the OS opens it in the service's app), else a search of
 /// the service for it, else the service's site.</param>
-/// <param name="Link">"title", "search" or "site".</param>
-public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url, string? Link = null);
+/// <param name="Link">What <paramref name="Url"/> opens; null without one.</param>
+public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url, WatchLink? Link = null);
+
+/// <summary>What a where-to-watch link opens (Catalog.Data's <c>WatchLink</c>, same order).</summary>
+public enum WatchLink { Site, Search, Title }
 
 public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, string? Overview,
     DateTimeOffset? AirsAtUtc, int? RuntimeMinutes, EpisodeLabel Label);
