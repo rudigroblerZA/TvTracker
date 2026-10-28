@@ -56,9 +56,11 @@ public sealed class SeasonVerdictInsight : IShowInsight
         var othersMedian = others.Count > 0 ? Median(others) : (double?)null;
         var higher = others.Count(r => r > rating);
         var lower = others.Count(r => r < rating);
-        var verdict = othersMedian is not { } median ? SeasonVerdicts.FirstSeason
-            : others.Count >= MinComparedForRecord && higher == 0 && lower == others.Count ? SeasonVerdicts.BestYet
-            : others.Count >= MinComparedForRecord && lower == 0 && higher == others.Count ? SeasonVerdicts.WeakestYet
+        // Nothing to compare: the first season, or a later one whose earlier seasons have too few rated episodes.
+        var verdict = othersMedian is not { } median
+                ? show.Aired.Any(e => e.SeasonNumber > 0 && e.SeasonNumber < number) ? SeasonVerdicts.Unranked : SeasonVerdicts.FirstSeason
+            : others.Count >= MinComparedForRecord && lower == others.Count ? SeasonVerdicts.BestYet
+            : others.Count >= MinComparedForRecord && higher == others.Count ? SeasonVerdicts.WeakestYet
             : Reaches(rating - median, Margin) ? SeasonVerdicts.Above
             : Reaches(median - rating, Margin) ? SeasonVerdicts.Below
             : SeasonVerdicts.InLine;
@@ -105,7 +107,7 @@ public sealed class SeasonVerdictInsight : IShowInsight
 
         var gaps = airTimes.Zip(airTimes.Skip(1), (a, b) => (b - a).TotalDays).Where(d => d >= 0.5).ToList();
         var usual = gaps.Count > 0 ? TimeSpan.FromDays(Median(gaps)) : TimeSpan.Zero;
-        var quiet = usual * 2 > MinQuiet ? usual * 2 : MinQuiet;
-        return finale + (quiet > From ? quiet : From);
+        // Never under MinQuiet, which is longer than From.
+        return finale + (usual * 2 > MinQuiet ? usual * 2 : MinQuiet);
     }
 }

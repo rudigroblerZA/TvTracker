@@ -157,9 +157,7 @@
         {
             // The genre filter is optional.
         }
-        await LoadVerdictsAsync();
-        await LoadPremieresAsync();
-        await LoadTopEpisodesAsync();
+        await Task.WhenAll(LoadVerdictsAsync(), LoadPremieresAsync(), LoadTopEpisodesAsync());
     }
 
     /// <summary>Optional: hidden when the season-verdict flag is off (404) or the call fails.</summary>
@@ -169,8 +167,9 @@
         {
             verdicts = await Analytics.GetSeasonVerdictsAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
+            // The premieres and top episodes say so if the session has ended.
             verdicts = null;
         }
     }

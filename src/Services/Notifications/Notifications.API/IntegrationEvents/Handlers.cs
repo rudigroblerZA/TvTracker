@@ -49,23 +49,38 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
 
 /// <summary>
 /// How a season that just ended did, from Analytics (<see cref="SeasonVerdictIntegrationEvent"/>), for the show's
-/// followers. Under the "new seasons" preference, which is about a show's seasons; a preference of its own would need
-/// a new column, and this service still uses EnsureCreated. Sent only while the season-verdict flag is on (evaluated
-/// without a user, so it can't target some followers only).
+/// followers.
+/// <list type="bullet">
+/// <item><b>Once per season:</b> Analytics sends the verdict hourly for a week, so a failed run loses nothing; each send
+/// has its own event Id but the same <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>, which stands in as the
+/// event's identity here, for the inbox check and for the inbox items' source.</item>
+/// <item><b>Preference:</b> "new seasons", which is about a show's seasons; a preference of its own would need a new
+/// column, and this service still uses EnsureCreated.</item>
+/// <item><b>Flag:</b> evaluated without a user, so it can't target some followers only. While it's off nothing is
+/// marked processed, so turning it back on within the week still sends.</item>
+/// </list>
 /// </summary>
-public sealed class AnalyticsNotificationHandlers(NotificationFanOut fanOut, IFeatureClient flags) : IIntegrationEventHandler<SeasonVerdictIntegrationEvent>
+public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut, IFeatureClient flags)
+    : IIntegrationEventHandler<SeasonVerdictIntegrationEvent>
 {
     public async Task HandleAsync(SeasonVerdictIntegrationEvent e, CancellationToken ct)
     {
-        if (!await flags.GetBooleanValueAsync(FeatureFlags.SeasonVerdict, FeatureFlags.DefaultValue, cancellationToken: ct))
+        // Events sent before VerdictId existed keep their own Id.
+        var verdict = e.VerdictId == Guid.Empty ? e : e with { Id = e.VerdictId };
+        if (await db.HasProcessedAsync(verdict, nameof(AnalyticsNotificationHandlers), ct)
+            || !await flags.GetBooleanValueAsync(FeatureFlags.SeasonVerdict, FeatureFlags.DefaultValue, cancellationToken: ct))
         {
             return;
         }
-        await fanOut.NotifyFollowersAsync(e, new NotificationContent(
+
+        await fanOut.NotifyFollowersAsync(verdict, new NotificationContent(
             NotificationKind.SeasonVerdict, e.ShowId, null,
             $"{e.ShowTitle}: how season {e.SeasonNumber} did",
             SeasonVerdictText(e),
             $"/shows/{e.ShowId}"), ct);
+
+        db.MarkProcessed(verdict, nameof(AnalyticsNotificationHandlers));
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>"Its best season yet, rated 8.6 against 8.1 for the others. The finale was a high point. 12 of 20 …"</summary>
@@ -75,17 +90,18 @@ public sealed class AnalyticsNotificationHandlers(NotificationFanOut fanOut, IFe
         var others = e.OthersMedian?.ToString("0.0", CultureInfo.InvariantCulture);
         var text = e.Verdict switch
         {
-            "best-yet" => $"Its best season yet, rated {rating} against {others} for the others.",
-            "weakest-yet" => $"Its weakest season yet, rated {rating} against {others} for the others.",
-            "above" => $"One of its better seasons, rated {rating} against {others} for the others.",
-            "below" => $"One of its weaker seasons, rated {rating} against {others} for the others.",
-            "in-line" => $"Rated {rating}, in line with its other seasons ({others}).",
-            _ => $"Its first season rated {rating}."
+            SeasonVerdicts.BestYet => $"Its best season yet, rated {rating} against {others} for the others.",
+            SeasonVerdicts.WeakestYet => $"Its weakest season yet, rated {rating} against {others} for the others.",
+            SeasonVerdicts.Above => $"One of its better seasons, rated {rating} against {others} for the others.",
+            SeasonVerdicts.Below => $"One of its weaker seasons, rated {rating} against {others} for the others.",
+            SeasonVerdicts.InLine => $"Rated {rating}, in line with its other seasons ({others}).",
+            SeasonVerdicts.FirstSeason => $"Its first season rated {rating}.",
+            _ => $"Rated {rating}."
         };
         text += e.Finale switch
         {
-            "strong" => " The finale was a high point.",
-            "weak" => " The finale rated below the season.",
+            FinaleVerdicts.Strong => " The finale was a high point.",
+            FinaleVerdicts.Weak => " The finale rated below the season.",
             _ => ""
         };
         if (e.Started is { } started && e.Finished is { } finished)

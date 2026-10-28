@@ -635,7 +635,8 @@ How events flow:
     - **API:** `GET /api/v1/shows/{id}/known-faces` on Analytics.API, computed on request from your own data.
   - **Season verdict** (show pages, Insights, and the inbox of the show's followers): how a season that just ended did.
     - **What it says:** the season's TVmaze rating against the show's other seasons ("its best season yet", "one of its
-      better seasons", "as good as the others", "one of its weaker", "its weakest yet", or "first season"), whether
+      better seasons", "as good as the others", "one of its weaker", "its weakest yet", "first season", or just its
+      rating when its earlier seasons have too few ratings to compare), whether
       the finale was a high point or a let-down, and how many viewers here who started the season have finished it
       (with 5 or more who started).
     - **When:** from 3 days after the finale (ratings come in) until 45 days after. A season counts as over when the show
