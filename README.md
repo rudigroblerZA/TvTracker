@@ -91,7 +91,7 @@ default model, so semantic search needs nothing installed beyond Docker.
 - **Open WebUI** (`open-webui` on the dashboard): a web UI for Model Runner, to see what it serves and chat with it.
   - **Sign-in is off,** since it's for development; it's named after the app (`Branding:AppName`).
   - **Chat needs a chat model.** Model Runner only has the embedding model until you pull one: the `model-runner`
-    resource on the dashboard has a "Pull ai/smollm2" command (another model: `ModelRunner:ChatModel`), or run
+    resource on the dashboard has a "Pull ai/qwen3:0.6B-Q4_K_M" command (another model: `ModelRunner:ChatModel`), or run
     `docker model pull` against your own Model Runner. It shows in Open WebUI once pulled.
   - **Its document search** embeds with the same embedding model, so it downloads no model of its own.
   - **With your own Model Runner** (`ModelRunner:Url`), it's reached from the container through
@@ -359,7 +359,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -382,6 +382,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `known-faces` | "You know them from" on show pages' cast, and its endpoint |
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
+| `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -456,6 +457,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
+| Assistant.API | `src/Services/Assistant` | "Ask the app": Model Runner's chat model answers questions by calling the MCP tools through the gateway |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog, Analytics and Research for internal queries |
@@ -668,6 +670,21 @@ How events flow:
       `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
       `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`. Anyone else gets 404. Behind the
       `research` flag.
+  - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
+    insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
+    things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
+    - **Grounded, and shows its work:** the model is told to answer only from what the tools returned. Each answer lists
+      what it looked up ("How I got this"), and links the shows it names that a tool returned.
+    - **Follow-ups:** "which of those is shortest?" carries the last two questions and answers.
+    - **A small model:** the default, qwen3 0.6B (`ModelRunner:ChatModel`), runs on a CPU and takes 10 s to 2 minutes
+      an answer. It picks the right tools, but often misreads what they return: on Severance it named the cast as
+      creators, and on Breaking Bad it read "ends as it ran" as a great finale. A larger chat model answers better
+      where the hardware allows; none was tried here, since only the 0.6B one could be pulled.
+    - **Limits:** questions are answered one at a time; each person may have one waiting and ask 20 an hour.
+      Questions are kept in memory for 2 hours and never stored; a restart forgets them.
+    - **Nothing personal:** the tools have no user, so it knows shows, not your watches or ratings.
+    - **API** (Assistant.API, port 5115): `POST /api/v1/ask` (`{ "question", "previousId" }`, 202 with the question's
+      state), `GET /api/v1/ask/{id}` (poll until `answered` or `failed`), `GET /api/v1/ask/about`. Behind the `ask` flag.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

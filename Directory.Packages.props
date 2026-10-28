@@ -71,6 +71,7 @@
 
   <ItemGroup Label="MCP">
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <PackageVersion Include="ModelContextProtocol.Core" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Messaging and delivery">

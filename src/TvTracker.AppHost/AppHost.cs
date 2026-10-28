@@ -194,6 +194,16 @@ var mcpGateway = builder.AddProject<Projects.Mcp_Gateway>("mcp-gateway")
     .WithEnvironment("Gateway__Servers__tvtracker__Url", ReferenceExpression.Create($"{mcpServer.GetEndpoint("http")}/mcp"))
     .WaitFor(mcpServer)
     .WithHttpHealthCheck("/health");
+// Ask the app: questions about shows, answered by Model Runner's chat model calling the app's MCP tools through the
+// gateway (its endpoint and model are set with Model Runner's below). Signed in, behind the "ask" flag.
+var assistantApi = builder.AddProject<Projects.Assistant_API>("assistant-api")
+    .WithReference(flagd)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithEnvironment("Assistant__GatewayUrl", ReferenceExpression.Create($"{mcpGateway.GetEndpoint("http")}/mcp"))
+    .WithEnvironment("Assistant__GatewayKey", McpGatewayKey)
+    .WaitFor(mcpGateway)
+    .WithHttpHealthCheck("/health");
+
 foreach (var server in builder.Configuration.GetSection("Gateway:Servers").GetChildren())
 {
     foreach (var setting in server.GetChildren().Where(c => c.Value is not null))
@@ -267,9 +277,11 @@ foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExt
 // until it's ready, search matches titles only. Not started for an in-process model: the built-in server models
 // are the dmr/ ones, and a custom one says Source: Server.
 var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
-// The chat model Open WebUI chats with and Research drafts insights with; pulled with the dashboard's command.
-var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/smollm2";
+// The chat model Open WebUI chats with, Research drafts insights with and the assistant answers with; pulled with the
+// dashboard's command. The default is the smallest that calls tools reliably (qwen3 0.6B, ~400 MB, fine on a CPU).
+var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/qwen3:0.6B-Q4_K_M";
 researchApi.WithEnvironment("Research__ChatModel", chatModel);
+assistantApi.WithEnvironment("Assistant__ChatModel", chatModel);
 var servedModel = embeddingModelId.StartsWith("dmr/", StringComparison.Ordinal)
     || string.Equals(builder.Configuration[$"Embeddings:Models:{embeddingModelId}:Source"], "Server", StringComparison.OrdinalIgnoreCase);
 if (!servedModel)
@@ -282,6 +294,7 @@ else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunner
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
     researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
+    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Open WebUI runs in a container, where localhost is the container itself.
     var fromContainer = new UriBuilder(modelRunnerUrl);
@@ -302,6 +315,7 @@ else
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
+    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Model Runner serves only the embedding model until a chat model is pulled: this adds a "Pull <model>" command to
     // the model-runner resource on the dashboard (Model Runner's own pull API, which the sync worker also uses).
@@ -309,7 +323,7 @@ else
         commandOptions: new HttpCommandOptions
         {
             Method = HttpMethod.Post,
-            Description = $"Pulls {chatModel} for chatting in Open WebUI and drafting research insights. Large models take minutes.",
+            Description = $"Pulls {chatModel} for chatting in Open WebUI, drafting research insights and answering Ask. Large models take minutes.",
             IconName = "ArrowDownload",
             PrepareRequest = context =>
             {
@@ -391,7 +405,8 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi);
+    .WithReference(researchApi)
+    .WithReference(assistantApi);
 
 builder.AddProject<Projects.WebApp>("webapp")
     .WithEnvironment("Branding__AppName", appName)
@@ -409,6 +424,7 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi);
+    .WithReference(researchApi)
+    .WithReference(assistantApi);
 
 builder.Build().Run();
