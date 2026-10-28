@@ -14,8 +14,13 @@ namespace Analytics.Worker.Insights;
 /// <item>Builds each show's document by running the <see cref="IShowInsight"/> stages in order.</item>
 /// <item>Stores the document, and hands it with the stored one to every <see cref="IInsightPublication"/>.</item>
 /// <item>Hands the finished document to every <see cref="IListInsight"/>.</item>
-/// <item>Publishes what changed (tags, DNA), then replaces every list in one transaction.</item>
+/// <item>Saves each batch's documents and the events they raise (tags, DNA, season verdicts) in one save, then
+/// publishes them; at the end, replaces every list in one transaction.</item>
 /// </list>
+/// <b>One save per batch:</b> the events once went into the outbox after every document was saved, so a run that failed
+/// in between had stored documents whose events were never sent, and the next run, comparing with those documents, saw
+/// nothing to send. Saved together, a stored document's events are in the outbox, and its publisher sends any left
+/// behind.
 /// The insights only compute; loading, batching, storage and events all happen here.
 /// </summary>
 public sealed class InsightsPipeline(
@@ -76,11 +81,20 @@ public sealed class InsightsPipeline(
                 }
             }
 
+            var events = published.SelectMany(p => p.TakeEvents()).ToList();
+            foreach (var @event in events)
+            {
+                outbox.Add(@event);
+            }
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
+            await outbox.PublishAddedAsync(ct);
         }
 
-        await PublishAsync(published, ct);
+        if (published.Any(p => p.Count > 0))
+        {
+            logger.LogInformation("Published {Changes}", string.Join(", ", published.Where(p => p.Count > 0).Select(p => $"{p.Name} for {p.Count} shows")));
+        }
         await ReplaceListsAsync(builders, ct);
 
         logger.LogInformation("Computed insights for {Shows} shows; lists: {Lists}",
@@ -92,25 +106,6 @@ public sealed class InsightsPipeline(
     /// <summary>The document the stages start from: the show, its overall rating, and nothing else yet.</summary>
     private static ShowInsights Blank(ShowInsightContext show) =>
         new(show.ShowId, show.Show.Title, show.Sources.ComputedAtUtc, show.Rating, [], null, null, null, [], NoRun, null, []);
-
-    /// <summary>Sends what changed through the outbox, in one save (see <see cref="IInsightPublication"/>).</summary>
-    private async Task PublishAsync(List<PublicationBuilder> published, CancellationToken ct)
-    {
-        var events = published.SelectMany(p => p.Events()).ToList();
-        if (events.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var @event in events)
-        {
-            outbox.Add(@event);
-        }
-        await db.SaveChangesAsync(ct);
-        db.ChangeTracker.Clear();
-        await outbox.PublishAddedAsync(ct);
-        logger.LogInformation("Published {Changes}", string.Join(", ", published.Where(p => p.Count > 0).Select(p => $"{p.Name} for {p.Count} shows")));
-    }
 
     private Task ReplaceListsAsync(List<ListBuilder> builders, CancellationToken ct) =>
         // One transaction, so readers never see an empty list mid-refresh. Run through the execution strategy:
