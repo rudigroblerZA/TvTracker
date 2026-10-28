@@ -381,7 +381,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -410,6 +410,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
 | `crossover-alerts` | Crossover notifications, "Crossover ahead" on Up Next, and the crossovers endpoints |
+| `weekly-digest` | The weekly digest email, its Settings section and preview |
+| `taste-twins` | `/taste-twins`, its For you link, and its endpoint |
+| `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -709,6 +712,18 @@ How events flow:
     - **Trusted source of truth, field by field:** a saved summary, network or premiere date replaces TVmaze's in the
       catalog (like an accepted correction), and survives every refresh. Dropping one in a later version gives the
       field back to TVmaze on the show's next refresh. The other facts live with the research.
+    - **Queue** (`/research`, moderators): what to research next.
+      - **Wikidata disagrees:** popular shows where Wikidata's network, premiere date or (ended shows) episode count
+        differs from the catalog's, with both values and a link to the Wikidata item. Saving research with the right
+        value overrides the catalog's, and the show drops off after the next check.
+      - **Popular, not researched yet:** the catalog's most popular shows with no saved research, marked when started.
+      - **How:** Research.API checks the 300 most popular shows against Wikidata after start and daily (one SPARQL query
+        per 100 shows, by TVmaze id); a network matches when one name contains the other ("HBO" and "HBO Max") or by
+        initials ("American Broadcasting Company" and ABC), a premiere when within a day at Wikidata's precision (a
+        month-only date by month), and an episode count when within 2 or 10%. When Wikidata answers 429 it waits as
+        asked, and a failed run is tried again in an hour.
+      - **API:** `GET /api/v1/research/queue` (moderators), and `GET /api/v1/shows/facts?limit=` on Catalog.API (the
+        popular shows' network, premiere date and aired episodes; behind the `research` flag).
     - **MCP:** `show_research` returns the saved record.
     - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
       `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
@@ -743,6 +758,22 @@ How events flow:
       later season counts for the whole show. Same actor only: a recast character isn't followed.
     - **API:** `GET /api/v1/people/{personId}/characters/{showId}` on Catalog.API (public); show detail's cast has
       `trailShows`. Behind the `character-trail` flag.
+  - **Taste twins** (`/taste-twins`, linked from For you; `taste-twins` flag): people here whose show ratings track
+    yours, and what they loved that you haven't rated, followed or watched.
+    - **Twins:** agreement is 1 − the average star difference / 4 on shows you've both rated (3 or more), weighted
+      towards bigger overlaps; the best 25 with 75% or more agreement count. You need 5 ratings.
+    - **Anonymous:** nobody is named; nothing shows with fewer than 5 twins, and a pick or a shared favourite needs 5 twins behind it.
+    - **The page:** how many twins and how closely you agree, the shows you agree on, and their picks ("Loved by 13 of
+      your twins · ★ 4.7").
+    - **API:** `GET /api/v1/me/taste-twins` on Analytics.API, signed in.
+  - **Awards shelf** (`awards-shelf` flag): what a show has won, on its page ("🏆 57 awards: Primetime Emmy Award × 23,
+    TCA Award × 11, …"), and **Prestige picks** (`/prestige`, linked from Discover): the most-awarded popular shows
+    you haven't started (public; signed out, simply the most awarded).
+    - **Where awards come from:** Wikidata's award wins (one statement per win) for the 300 most popular shows,
+      read by the research queue's daily check. Where a moderator saved research with an awards fact, its checked
+      wording is shown instead ("checked by our moderators"), and Prestige picks says so rather than give Wikidata's
+      count. If Wikidata's awards query fails, the previous day's awards stay.
+    - **API** (Research.API): `GET /api/v1/shows/{id}/awards` and `GET /api/v1/awards?limit=` (most wins first), public.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.
@@ -894,12 +925,13 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Recommendations, Research, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
-`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`,
-`Social.API/Data/Migrations`, `Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
-other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
-Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made
-before they moved to migrations is marked as having it and upgraded in place.
+Catalog, Analytics, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Notifications.API/Data/Migrations`,
+`Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
+`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity still uses `EnsureCreated`,
+which creates a missing database but never changes an existing one. Notifications', Recommendations' and Tracking's first
+migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
+marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
@@ -912,6 +944,8 @@ dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data 
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 # or, for Research:
 dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
+# or, for Notifications:
+dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.API --output-dir Data/Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 # or, for Tracking:
@@ -934,6 +968,20 @@ Keycloak users are kept, since Keycloak has its own volume.
 
 Until configured, each notification channel logs what it would have sent (visible in the Aspire dashboard logs); the in-app inbox always works.
 
+**Weekly digest** (`weekly-digest` flag; Settings → Notifications): one email a week instead of an email per alert, on
+the day and from the hour you pick, in your time zone. Phone and browser alerts carry on.
+- **What's in it:** "Coming up this week", the next 7 days of episodes of the shows you follow and haven't muted, with
+  premieres marked; and what you were told since the last digest: crossovers, how seasons did, new seasons and endings,
+  and new episodes counted per show.
+- **Preview:** "Preview this week's digest" in Settings shows it as it would go out now.
+- **Sending:** checked every 15 minutes; at most one in six days, and a week with nothing in it sends nothing. Links
+  in the email go to `Digest:BaseUrl` (the web app, `https://localhost:7120` by default). Like other email, it logs
+  until `Email:*` is configured.
+- **Not in it yet:** Up Next and what people you follow finished, which live in Tracking and Social; Notifications
+  can't read them for a user without the user's token.
+- **API:** `GET /api/v1/digest/preview` on Notifications.API (signed in), and the `weeklyDigest`, `digestDay` and
+  `digestHour` preference fields.
+
 ## Before production
 
 - Move the remaining services from `EnsureCreated` to EF Core migrations, as Catalog has (see Database schema).
@@ -948,8 +996,6 @@ Versions live in `Directory.Packages.props` (the MAUI app pins its own in its pr
 Run `aspire update` (or `dotnet list package --outdated`) to bring them up to date.
 
 ## Not built yet
-
-The weekly digest email is planned for a later round.
 
 **Qwen3-Embedding-8B as a built-in embedding model** (backlog; started and set aside). What the first attempt found:
 - **The model:** `ai/qwen3-embedding:8B-Q4_K_M` on Docker Hub (4.7 GB; also `hf.co/Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M`,

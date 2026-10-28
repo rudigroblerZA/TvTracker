@@ -8,6 +8,10 @@
 
 <h1>Discover</h1>
 
+<Feature Flag="@FeatureFlags.AwardsShelf">
+    <p><a href="prestige"><strong>Prestige picks</strong></a><span class="muted">: the most-awarded popular shows, less what you've started.</span></p>
+</Feature>
+
 <AuthorizeView>
     <Authorized>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />

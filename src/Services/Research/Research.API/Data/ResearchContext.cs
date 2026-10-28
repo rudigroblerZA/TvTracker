@@ -126,6 +126,56 @@ public class EpisodeNote
     public const int MaxReason = 280;
 }
 
+/// <summary>
+/// Where Wikidata disagrees with the catalog about a popular show (<see cref="Services.CatalogChecks"/>), one row per
+/// show and field. The whole table is replaced by each check.
+/// </summary>
+public class CatalogCheck
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>"network", "premiered" or "episodes".</summary>
+    public required string Field { get; set; }
+
+    public required string ShowTitle { get; set; }
+
+    /// <summary>The catalog's value; null when it has none.</summary>
+    public string? CatalogValue { get; set; }
+
+    public required string WikidataValue { get; set; }
+
+    public required string WikidataUrl { get; set; }
+
+    /// <summary>The show's place among the catalog's most popular, 1 first.</summary>
+    public int Rank { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
+/// <summary>
+/// A popular show's award wins on Wikidata (P166, one statement per win), from the daily check
+/// (<see cref="Services.CatalogChecks"/>): the awards shelf and Prestige picks. Replaced by each check; saved research's
+/// awards fact, checked by a moderator, is shown instead where there is one.
+/// </summary>
+public class ShowAward
+{
+    public Guid ShowId { get; set; }
+
+    public required string ShowTitle { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    /// <summary>Award statements on the show's Wikidata item: wins, by award and category.</summary>
+    public int Wins { get; set; }
+
+    /// <summary>Grouped by award, most won first ("Primetime Emmy Award × 6, Golden Globe Award").</summary>
+    public required string Summary { get; set; }
+
+    public required string WikidataUrl { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
 public static class SourceKinds
 {
     public const string Wikidata = "wikidata";
@@ -144,6 +194,8 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
     public DbSet<FactCandidate> Candidates => Set<FactCandidate>();
     public DbSet<SavedResearch> Saved => Set<SavedResearch>();
     public DbSet<EpisodeNote> EpisodeNotes => Set<EpisodeNote>();
+    public DbSet<CatalogCheck> CatalogChecks => Set<CatalogCheck>();
+    public DbSet<ShowAward> ShowAwards => Set<ShowAward>();
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
@@ -201,6 +253,29 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
             entity.Property(n => n.NotedById).HasMaxLength(64);
             entity.Property(n => n.NotedByName).HasMaxLength(256);
             entity.HasIndex(n => n.ShowId);
+        });
+
+        modelBuilder.Entity<CatalogCheck>(entity =>
+        {
+            entity.ToTable("catalog_checks");
+            entity.HasKey(c => new { c.ShowId, c.Field });
+            entity.Property(c => c.Field).HasMaxLength(16);
+            entity.Property(c => c.ShowTitle).HasMaxLength(256);
+            entity.Property(c => c.CatalogValue).HasMaxLength(256);
+            entity.Property(c => c.WikidataValue).HasMaxLength(256);
+            entity.Property(c => c.WikidataUrl).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<ShowAward>(entity =>
+        {
+            entity.ToTable("show_awards");
+            entity.HasKey(a => a.ShowId);
+            entity.Property(a => a.ShowId).ValueGeneratedNever();
+            entity.Property(a => a.ShowTitle).HasMaxLength(256);
+            entity.Property(a => a.PosterUrl).HasMaxLength(1024);
+            entity.Property(a => a.Summary).HasMaxLength(2000);
+            entity.Property(a => a.WikidataUrl).HasMaxLength(256);
+            entity.HasIndex(a => a.Wins);
         });
 
         modelBuilder.UseIntegrationEventLogs();

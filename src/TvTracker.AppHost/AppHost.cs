@@ -129,7 +129,9 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
     .WithHttpHealthCheck("/health");
 
 var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
+    .WithEnvironment("Branding__AppName", appName)
     .WithReference(notificationsDb).WaitFor(notificationsDb)
+    .WithReference(catalogApi)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)

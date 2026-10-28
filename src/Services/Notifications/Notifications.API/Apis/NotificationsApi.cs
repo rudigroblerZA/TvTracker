@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using Notifications.API.Services;
+using TvTracker;
 
 namespace Notifications.API.Apis;
 
@@ -16,7 +17,10 @@ public record PreferencesDto(
     string? Email,
     TimeOnly? QuietHoursStart,
     TimeOnly? QuietHoursEnd,
-    string TimeZone);
+    string TimeZone,
+    bool WeeklyDigest = false,
+    DayOfWeek DigestDay = DayOfWeek.Sunday,
+    int DigestHour = 9);
 
 public record UpdatePreferencesRequest(
     bool NewEpisodes,
@@ -26,7 +30,13 @@ public record UpdatePreferencesRequest(
     bool WebPushEnabled,
     bool EmailEnabled,
     TimeOnly? QuietHoursStart,
-    TimeOnly? QuietHoursEnd);
+    TimeOnly? QuietHoursEnd,
+    bool? WeeklyDigest = null,
+    DayOfWeek? DigestDay = null,
+    int? DigestHour = null);
+
+/// <summary>A digest as it would go out now (see <see cref="WeeklyDigest"/>).</summary>
+public record DigestDto(string Subject, IReadOnlyList<DigestSection> Sections);
 
 public record ShowPreferenceDto(Guid ShowId, bool Muted);
 
@@ -69,6 +79,8 @@ public static class NotificationsApi
 
         api.MapGet("/me/export", ExportAsync);
 
+        api.MapGet("/digest/preview", PreviewDigestAsync).RequireFeature(FeatureFlags.WeeklyDigest);
+
         return app;
     }
 
@@ -91,6 +103,10 @@ public static class NotificationsApi
         prefs.EmailEnabled = request.EmailEnabled;
         prefs.QuietHoursStart = request.QuietHoursStart;
         prefs.QuietHoursEnd = request.QuietHoursEnd;
+        // Older clients don't send the digest fields; leave them as they are.
+        prefs.WeeklyDigest = request.WeeklyDigest ?? prefs.WeeklyDigest;
+        prefs.DigestDay = request.DigestDay ?? prefs.DigestDay;
+        prefs.DigestHour = request.DigestHour is { } hour ? Math.Clamp(hour, 0, 23) : prefs.DigestHour;
         prefs.Email = user.GetEmail() ?? prefs.Email;
         prefs.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -257,5 +273,14 @@ public static class NotificationsApi
 
     private static PreferencesDto ToDto(NotificationPreferences p) =>
         new(p.NewEpisodes, p.NewSeasons, p.StatusChanges, p.PushEnabled, p.WebPushEnabled, p.EmailEnabled,
-            p.Email, p.QuietHoursStart, p.QuietHoursEnd, p.TimeZone);
+            p.Email, p.QuietHoursStart, p.QuietHoursEnd, p.TimeZone, p.WeeklyDigest, p.DigestDay, p.DigestHour);
+
+    /// <summary>This week's digest for the caller as it would go out now, whether or not they've turned it on.</summary>
+    private static async Task<Ok<DigestDto>> PreviewDigestAsync(ClaimsPrincipal user, NotificationsContext db, WeeklyDigest digests,
+        CancellationToken ct)
+    {
+        var prefs = await GetOrCreateAsync(user, db, ct);
+        var digest = await digests.BuildAsync(prefs, ct);
+        return TypedResults.Ok(new DigestDto(digest.Subject, digest.Sections));
+    }
 }

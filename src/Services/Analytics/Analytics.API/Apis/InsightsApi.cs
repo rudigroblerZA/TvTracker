@@ -63,6 +63,7 @@ public static class InsightsApi
         api.MapGet("/me/taste", TasteApi.GetTasteAsync);
         api.MapEssentialCutApi();
         api.MapReunionsApi();
+        api.MapTasteTwinsApi();
         api.MapFinishOutlookApi();
         api.MapTimeMachineApi();
         api.MapRefresherApi();

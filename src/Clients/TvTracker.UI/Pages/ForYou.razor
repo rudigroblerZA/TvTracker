@@ -11,6 +11,9 @@
         <Feature Flag="@FeatureFlags.ReunionRadar">
             <p><a href="reunions"><strong>Reunion radar</strong></a><span class="muted">: where actors from shows you love work together again.</span></p>
         </Feature>
+        <Feature Flag="@FeatureFlags.TasteTwins">
+            <p><a href="taste-twins"><strong>Taste twins</strong></a><span class="muted">: what people who rate like you loved, that you haven't seen.</span></p>
+        </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (picks is null)
