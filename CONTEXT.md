@@ -525,6 +525,29 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
 
+## Season verdict
+
+- **Part of the show document** (`SeasonVerdictInsight`), so it's computed hourly with the rest, and read by the show
+  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own.
+- **When a season is over:** "every listed episode aired" isn't enough, since TVmaze lists a weekly show's next episode
+  only days ahead (Cops in week 17 looked finished). Over means: the show ended, a later season is listed or announced,
+  the season dropped at once, or it's been quiet for twice its usual gap (at least 7 days). The catalog doesn't keep
+  TVmaze's planned episode count per season, which would settle it; adding it means a provider, catalog, event and
+  Analytics change. A reality show back from a long break can still be called over early.
+- **Window:** 3 days after the finale (the provider's episode ratings arrive after airing, and viewers catch up) to
+  45 days. Daily shows (seasons over 60 episodes) and seasons with fewer than 3 rated episodes get none.
+- **Verdicts:** against the median of the show's other seasons that count (3+ rated episodes): 0.3 above or below, else
+  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. The finale against
+  the season's average, with the same 0.3.
+- **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
+  started (the privacy rule).
+- **Sent once** (`SeasonVerdictPublication`): a verdict for a season the stored document didn't have, within 7 days of
+  when it could first be given (`ReadyAtUtc`). Not re-sent after start like tags and DNA, since it's news; and without
+  the 7 days, its first run would have notified followers about every season of the last six weeks (it sent 5 of 24).
+- **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
+  Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
+  some followers only.
+
 ## Holiday episodes
 
 - **Found, not curated** (`HolidayApi` on Catalog.API): a Postgres regex per holiday over episode titles and summaries,

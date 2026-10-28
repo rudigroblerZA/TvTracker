@@ -19,6 +19,26 @@
         </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
+        @if (verdicts is { Count: > 0 })
+        {
+            <Feature Flag="@FeatureFlags.SeasonVerdict">
+                <section aria-labelledby="verdicts-title">
+                    <h2 id="verdicts-title">Seasons that just ended</h2>
+                    <p class="muted small">How each did against the show's other seasons, a few days after its finale.</p>
+                    <ul class="season-verdicts">
+                        @foreach (var item in verdicts)
+                        {
+                            <li class="season-verdict tone-@SeasonVerdictText.Tone(item.Verdict)" @key="item.ShowId">
+                                <a href="shows/@item.ShowId"><strong>@item.Title</strong></a>
+                                <span class="muted">@($" · season {item.Verdict.Number}, ended {Format.Relative(item.Verdict.FinaleAiredAtUtc)}")</span>
+                                <div><strong>@SeasonVerdictText.Headline(item.Verdict)</strong><span class="muted small">@($" · {SeasonVerdictText.Details(item.Verdict)}")</span></div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            </Feature>
+        }
+
         <section>
             <div class="section-header">
                 <h2>Premieres coming up</h2>
@@ -116,6 +136,7 @@
 </AuthorizeView>
 
 @code {
+    private List<SeasonVerdictItem>? verdicts;
     private List<PremiereItem>? premieres;
     private List<TopEpisodeItem>? topEpisodes;
     private List<string> genres = [];
@@ -136,8 +157,22 @@
         {
             // The genre filter is optional.
         }
+        await LoadVerdictsAsync();
         await LoadPremieresAsync();
         await LoadTopEpisodesAsync();
+    }
+
+    /// <summary>Optional: hidden when the season-verdict flag is off (404) or the call fails.</summary>
+    private async Task LoadVerdictsAsync()
+    {
+        try
+        {
+            verdicts = await Analytics.GetSeasonVerdictsAsync();
+        }
+        catch (HttpRequestException)
+        {
+            verdicts = null;
+        }
     }
 
     private Task LoadPremieresAsync() => RunAsync(async () => premieres = await Analytics.GetPremieresAsync(60, premiereSort) ?? []);

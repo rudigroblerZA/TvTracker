@@ -71,6 +71,7 @@ public static class InsightsApi
         api.MapBacklogApi();
         api.MapTimeOffApi();
         api.MapKnownFacesApi();
+        api.MapSeasonVerdictsApi();
 
         return api;
     }

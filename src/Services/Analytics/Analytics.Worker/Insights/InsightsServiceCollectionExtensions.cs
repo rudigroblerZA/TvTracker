@@ -26,6 +26,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowInsight, OutlookInsight>();
         services.AddSingleton<IShowInsight, GetsGoodInsight>();
         services.AddSingleton<IShowInsight, LandingInsight>();
+        services.AddSingleton<IShowInsight, SeasonVerdictInsight>();
 
         // Tag rules, in the order tags are shown.
         services.AddSingleton<IShowTagRule, DropsAtOnceRule>();
@@ -40,6 +41,7 @@ public static class InsightsServiceCollectionExtensions
         // Parts of the document other services keep a copy of, published when they change.
         services.AddSingleton<IInsightPublication, TagsPublication>();
         services.AddSingleton<IInsightPublication, DnaPublication>();
+        services.AddSingleton<IInsightPublication, SeasonVerdictPublication>();
 
         // Lists built across shows; each sees every show's finished document.
         services.AddSingleton<IListInsight, PremieresList>();

@@ -41,6 +41,13 @@
         var list = new List<Highlight>();
         var i = Insights;
 
+        // News first: it's only here for a few weeks after the finale.
+        if (i.SeasonVerdict is { } verdict)
+        {
+            list.Add(new($"Season {verdict.Number} just ended", SeasonVerdictText.Headline(verdict), SeasonVerdictText.Details(verdict),
+                SeasonVerdictText.Tone(verdict), FeatureFlags.SeasonVerdict));
+        }
+
         if (i.GetsGood is { } getsGood)
         {
             list.Add(getsGood.Turn is { } turn

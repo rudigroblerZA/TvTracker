@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
+builder.AddFeatureFlags();
 
 builder.AddNpgsqlDbContext<NotificationsContext>("notificationsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<NotificationsContext>();
@@ -17,6 +18,7 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeAiredIntegrationEvent, CatalogNotificationHandlers>()
     .AddSubscription<SeasonAnnouncedIntegrationEvent, CatalogNotificationHandlers>()
     .AddSubscription<ShowStatusChangedIntegrationEvent, CatalogNotificationHandlers>()
+    .AddSubscription<SeasonVerdictIntegrationEvent, AnalyticsNotificationHandlers>()
     .AddSubscription<ShowFollowedIntegrationEvent, UserEventHandlers>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserEventHandlers>()
     .AddSubscription<UserRegisteredIntegrationEvent, UserEventHandlers>()
