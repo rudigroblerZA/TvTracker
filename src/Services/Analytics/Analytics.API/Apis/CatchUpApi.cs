@@ -156,8 +156,9 @@ public static class CatchUpApi
 
         var minutes = EssentialCutApi.MinutesOf(aired);
         var rating = await EssentialCutApi.RatingsAsync(db, showId, ct);
-        var decisions = EssentialCutApi.Unavailable(aired, rating) is null
-            ? EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now)
+        var notes = await EssentialCutApi.NotesAsync(db, showId, ct);
+        var decisions = EssentialCutApi.Unavailable(aired, rating, notes) is null
+            ? EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now, notes)
             : null;
         var kept = decisions is null ? null : ahead.Where(e => decisions[e.EpisodeId].Keep).ToList();
 

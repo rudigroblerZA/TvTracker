@@ -1,0 +1,187 @@
+@page "/people/{PersonId:guid}/characters/{ShowId:guid}"
+@attribute [RequiresFeature(FeatureFlags.CharacterTrail)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>@(trail?.Character ?? "Character") · @Brand.AppName</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (trail is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <h1>@Plain(trail.Character)</h1>
+    <p class="muted">
+        <span>@("Played by ")</span><a href="people/@trail.PersonId">@trail.PersonName</a>
+        <span>@($" in {trail.Shows.Count} {(trail.Shows.Count == 1 ? "show" : "shows")}, in the order they first aired.")</span>
+    </p>
+
+    @if (Session.IsSignedIn && Unfollowed.Count > 0)
+    {
+        <p>
+            <button type="button" class="btn" disabled="@following" @onclick="FollowAllAsync">
+                @($"Add {(Unfollowed.Count == 1 ? "it" : $"all {Unfollowed.Count}")} to your watchlist")
+            </button>
+        </p>
+    }
+
+    <ol class="trail">
+        @foreach (var show in trail.Shows)
+        {
+            <li @key="@(show.ShowId?.ToString() ?? show.ExternalId)">
+                <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+                <div>
+                    @if (show.ShowId is { } id)
+                    {
+                        <a href="shows/@id"><strong>@show.Title</strong></a>
+                    }
+                    else
+                    {
+                        <strong>@show.Title</strong>
+                    }
+                    <div class="muted">@Details(show)</div>
+                    @if (!SameName(show.Character))
+                    {
+                        <div class="muted">@($"as {show.Character}")</div>
+                    }
+                    @if (show.ShowId is { } showId)
+                    {
+                        @if (progress.GetValueOrDefault(showId) is { WatchedCount: > 0 } p)
+                        {
+                            <div class="trail-progress">
+                                <progress max="@Math.Max(1, p.AiredCount)" value="@p.WatchedCount"></progress>
+                                <span class="muted">@($" {p.WatchedCount} of {p.AiredCount} watched")</span>
+                            </div>
+                        }
+                        else if (followed.Contains(showId))
+                        {
+                            <div class="muted">On your list, not started</div>
+                        }
+                    }
+                    else
+                    {
+                        <a href="search?q=@Uri.EscapeDataString(show.Title)">Find it to add it</a>
+                    }
+                </div>
+            </li>
+        }
+    </ol>
+
+    <p class="muted small">
+        From the provider's main casts: guest appearances aren't listed, and a character who joins in a later season counts
+        for the whole show.
+    </p>
+}
+
+@code {
+    [Parameter] public Guid PersonId { get; set; }
+
+    [Parameter] public Guid ShowId { get; set; }
+
+    private CharacterTrail? trail;
+    private Dictionary<Guid, ShowProgress> progress = [];
+    private HashSet<Guid> followed = [];
+    private bool following;
+    private string? error;
+
+    private List<Guid> Unfollowed => trail?.Shows.Where(s => s.ShowId is { } id && !followed.Contains(id)).Select(s => s.ShowId!.Value).ToList() ?? [];
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        trail = null;
+        progress = [];
+        followed = [];
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            trail = await Catalog.GetCharacterTrailAsync(PersonId, ShowId);
+            if (trail is null)
+            {
+                error = "That character isn't in the catalog.";
+                return;
+            }
+            if (Session.IsSignedIn)
+            {
+                await LoadProgressAsync();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>The user's follows, and progress for each followed catalog show on the trail (one call per show, as the watch order does).</summary>
+    private async Task LoadProgressAsync()
+    {
+        var follows = await Tracking.GetFollowsAsync() ?? [];
+        var onTrail = trail!.Shows.Where(s => s.ShowId is not null).Select(s => s.ShowId!.Value).ToHashSet();
+        followed = follows.Select(f => f.ShowId).Where(onTrail.Contains).ToHashSet();
+        var results = await Task.WhenAll(followed.Select(id => Tracking.GetProgressAsync(id)));
+        progress = results.OfType<ShowProgress>().ToDictionary(p => p.ShowId);
+    }
+
+    private async Task FollowAllAsync()
+    {
+        following = true;
+        try
+        {
+            foreach (var id in Unfollowed)
+            {
+                await Tracking.FollowAsync(id, WatchStatus.PlanToWatch);
+                followed.Add(id);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            following = false;
+        }
+    }
+
+    /// <summary>The same name but for case, quotes and punctuation ("Gustavo 'Gus' Fring").</summary>
+    private bool SameName(string character) => Letters(character) == Letters(trail?.Character ?? "");
+
+    private static string Letters(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>The first alias, for the heading ("Frank Castle" for "Frank Castle / The Punisher").</summary>
+    private static string Plain(string character) => character.Split('/')[0].Trim();
+
+    private string Details(TrailShow show)
+    {
+        var parts = new List<string>();
+        var from = show.FirstAiredUtc is { } first ? Session.ToLocal(first).Year : show.Year;
+        if (from is { } year)
+        {
+            var to = show.LastAiredUtc is { } last ? Session.ToLocal(last).Year : (int?)null;
+            parts.Add(show.Status is ShowStatus.Ended or ShowStatus.Cancelled && to is { } end && end != year ? $"{year}–{end}" : $"{year}");
+        }
+        parts.Add(Format.Status(show.Status));
+        if (show.Episodes is > 0 and var episodes)
+        {
+            parts.Add($"{episodes} episodes");
+        }
+        if (show.Voice)
+        {
+            parts.Add("voice");
+        }
+        if (show.Rating is { } rating)
+        {
+            parts.Add($"rated {Format.Rating(rating)}");
+        }
+        return string.Join(" · ", parts);
+    }
+}

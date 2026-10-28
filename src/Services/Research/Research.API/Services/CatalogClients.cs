@@ -11,9 +11,22 @@ public sealed record CatalogCreative(Guid PersonId, string Name, IReadOnlyList<s
 public sealed record CatalogShow(Guid Id, string Title, string? Overview, DateOnly? FirstAirDate, string? Network,
     IReadOnlyList<CatalogSeason> Seasons, IReadOnlyList<CatalogCreative>? Creatives, string? Source, string? ExternalId);
 
+public sealed record CatalogEpisode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title);
+
 /// <summary>Reads shows from Catalog.API, as any client does.</summary>
 public sealed class CatalogReader(HttpClient http)
 {
+    public async Task<CatalogEpisode?> GetEpisodeAsync(Guid episodeId, CancellationToken ct)
+    {
+        using var response = await http.GetAsync($"api/v1/episodes/{episodeId}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CatalogEpisode>(ct);
+    }
+
     public async Task<CatalogShow?> GetShowAsync(Guid showId, CancellationToken ct)
     {
         using var response = await http.GetAsync($"api/v1/shows/{showId}", ct);

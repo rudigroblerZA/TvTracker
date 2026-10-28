@@ -157,6 +157,18 @@
       "defaultVariant": "on",
       "metadata": { "description": "Season verdict: how a season that just ended did, on show pages, on Insights and as a notification to followers." }
     },
+    "character-trail": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Character trail: every show where an actor plays the same character, in air order, with your progress, from the show page's cast." }
+    },
+    "episode-notes": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Episode notes: moderators mark episodes essential or skippable with a source on the research page, and the essential cut follows them." }
+    },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

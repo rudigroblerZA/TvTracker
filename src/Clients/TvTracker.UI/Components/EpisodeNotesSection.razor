@@ -1,0 +1,176 @@
+@inject ResearchClient Research
+@inject CatalogClient Catalog
+
+@* Research page: moderators mark episodes essential or skippable, with why and a source; the essential cut follows them. *@
+<section class="research-step" aria-labelledby="episode-notes-title">
+    <h2 id="episode-notes-title">Episode notes</h2>
+    <p class="small muted">
+        Mark episodes essential or skippable (filler, a recap, the set-up a later season needs). The essential cut follows
+        the marks before ratings, and a season with any skippable episode is cut by its marks alone. Viewers see the reason,
+        so keep it spoiler-free. Marks apply at once; they aren't part of a saved version.
+    </p>
+
+    <ErrorNotice Message="@error" />
+
+    @if (notes is { Count: > 0 })
+    {
+        <ul class="episode-notes">
+            @foreach (var note in notes)
+            {
+                <li @key="note.EpisodeId">
+                    <span class="cut-ep @(note.Mark == "essential" ? "keep" : "skip")">@note.EpisodeNumber</span>
+                    <span class="episode-note-body">
+                        <strong>@Format.EpisodeCode(note.SeasonNumber, note.EpisodeNumber)</strong>
+                        <span>@($" {note.Mark}: {note.Reason}")</span>
+                        <span class="muted small">
+                            @(" · ")<a href="@note.SourceUrl" target="_blank" rel="noopener noreferrer">source</a>@($" · {note.NotedBy}, {Format.Relative(note.NotedAtUtc)}")
+                        </span>
+                    </span>
+                    <button type="button" class="btn btn-quiet small" disabled="@busy" @onclick="() => RemoveAsync(note)">Remove</button>
+                </li>
+            }
+        </ul>
+    }
+    else if (notes is not null)
+    {
+        <p class="muted small">No episodes marked yet.</p>
+    }
+
+    @if (seasons.Count > 0)
+    {
+        <form class="episode-note-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="episode-note-row">
+                <label>
+                    <span class="small">Season</span>
+                    <select value="@season" @onchange="SeasonChangedAsync">
+                        @foreach (var s in seasons)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span class="small">Episode</span>
+                    <select @bind="episodeId">
+                        <option value="@Guid.Empty">Choose…</option>
+                        @foreach (var e in episodes)
+                        {
+                            <option value="@e.Id">@($"{e.EpisodeNumber}. {e.Title}")</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span class="small">Mark</span>
+                    <select @bind="mark">
+                        <option value="skippable">Skippable</option>
+                        <option value="essential">Essential</option>
+                    </select>
+                </label>
+            </div>
+            <label>
+                <span class="small">Why (shown to viewers)</span>
+                <input type="text" maxlength="280" placeholder="Filler: not from the manga" @bind="reason" @bind:event="oninput" />
+            </label>
+            <label>
+                <span class="small">Source</span>
+                <input type="url" list="episode-note-sources" placeholder="https://…" @bind="source" @bind:event="oninput" />
+                <datalist id="episode-note-sources">
+                    @foreach (var s in Sources.Where(s => s.Included))
+                    {
+                        <option value="@s.Url">@s.Title</option>
+                    }
+                </datalist>
+            </label>
+            <div>
+                <button type="submit" class="btn" disabled="@(busy || episodeId == Guid.Empty || reason.Trim().Length < 3 || string.IsNullOrWhiteSpace(source))">
+                    @(Existing is null ? "Mark episode" : "Update mark")
+                </button>
+            </div>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    /// <summary>The research's sources, offered as the note's source.</summary>
+    [Parameter] public IReadOnlyList<ResearchSourceItem> Sources { get; set; } = [];
+
+    private List<EpisodeNote>? notes;
+    private List<int> seasons = [];
+    private int season;
+    private List<Episode> episodes = [];
+    private Guid episodeId;
+    private string mark = "skippable";
+    private string reason = "";
+    private string source = "";
+    private bool busy;
+    private string? error;
+    private Guid loadedFor;
+
+    private EpisodeNote? Existing => notes?.FirstOrDefault(n => n.EpisodeId == episodeId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        await RunAsync(async () =>
+        {
+            notes = await Research.GetEpisodeNotesAsync(ShowId) ?? [];
+            var show = await Catalog.GetShowAsync(ShowId);
+            seasons = show?.Seasons.Where(s => s.Number > 0 && s.EpisodeCount > 0).Select(s => s.Number).ToList() ?? [];
+            if (seasons.Count > 0)
+            {
+                await LoadSeasonAsync(seasons[0]);
+            }
+        });
+    }
+
+    private Task SeasonChangedAsync(ChangeEventArgs e) =>
+        int.TryParse(e.Value?.ToString(), out var number) ? RunAsync(() => LoadSeasonAsync(number)) : Task.CompletedTask;
+
+    private async Task LoadSeasonAsync(int number)
+    {
+        season = number;
+        episodeId = Guid.Empty;
+        episodes = (await Catalog.GetSeasonAsync(ShowId, number))?.Episodes.ToList() ?? [];
+    }
+
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        if (await Research.SetEpisodeNoteAsync(ShowId, episodeId, mark, reason.Trim(), source.Trim()) is { } saved)
+        {
+            notes = [.. (notes ?? []).Where(n => n.EpisodeId != saved.EpisodeId).Append(saved)
+                .OrderBy(n => n.SeasonNumber).ThenBy(n => n.EpisodeNumber)];
+            reason = "";
+            episodeId = Guid.Empty;
+        }
+    });
+
+    private Task RemoveAsync(EpisodeNote note) => RunAsync(async () =>
+    {
+        await Research.RemoveEpisodeNoteAsync(ShowId, note.EpisodeId);
+        notes = notes?.Where(n => n.EpisodeId != note.EpisodeId).ToList();
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

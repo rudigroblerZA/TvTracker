@@ -24,7 +24,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
-| Research.API | dossiers, sources, fact candidates, saved research versions | moderators only; saved catalog facts go to the sync worker as overrides; behind the `research` flag |
+| Research.API | dossiers, sources, fact candidates, saved research versions, episode notes | moderators only; saved catalog facts go to the sync worker as overrides; episode notes go to Analytics as events; behind the `research` flag |
 | Assistant.API | — (questions in memory) | "Ask the app": Model Runner's chat model with the MCP tools, through the gateway; behind the `ask` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
@@ -184,6 +184,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
+- **Character trail** (`CharacterApi`): one actor's same-named character across shows, by Universes' `SameCharacter`
+  and `IsSelfRole`.
+  - **Catalog casts plus provider credits:** the actor's `PersonCastCredit` rows add shows outside the catalog (Cheers
+    on Frasier Crane's trail). A credit fetched before its show was imported has no `ShowId`, so it's matched to the
+    catalog by provider id.
+  - **Same actor only:** a recast character can't be told from a namesake by name alone, and TVmaze's character ids
+    are per show.
+  - **Counts in show detail:** `CastMemberDto.TrailShows` is computed with the show (two queries for the whole cast),
+    so the cast links only characters that go somewhere; the detail is cached a minute anyway.
+  - **Main casts only:** guest appearances never reach it, and a character who joins later counts for the whole show.
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire
@@ -393,6 +403,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     7.8 average.
   - **Tuning:** One Piece's canonical filler list was the check. Smoothing ratings over neighbouring episodes
     didn't help, so it's per episode.
+  - **Episode notes first** (Research's, copied into `episode_notes`): an episode marked essential is protected, and a
+    season with any episode marked skippable is cut by its notes alone, at every level. A moderator who marked a
+    season's filler has said what to skip; ratings adding more would contradict them. A show with notes is cut even
+    when too few episodes are rated (anime filler is often unrated). Backlog and catch-up share `Decide`, so they
+    follow the notes too.
 - **Reunion radar** (`ReunionsApi`): computed on request from the caller's own data, like "your taste".
   - **What it is:** shows where two or more actors from one show the user loves are in the main cast again.
   - **Loved:** 5 stars weighs 1 and 4 stars 0.8. Followed, or 3+ episodes watched, and unrated weighs 0.5. Rated 3 or
@@ -490,7 +505,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
 - **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
   them as numbered, so its citations keep pointing at the right source.
-- **Deleted moderators:** their name comes off the versions they saved ("a former moderator"); the research stays.
+- **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
+  moderator"); the research stays.
+- **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
+  and a source.
+  - **Apply at once, outside versions:** a note is a judgement about one episode, not part of the show's record, and
+    waiting for the next saved version would hold back a season's worth of filler marks.
+  - **Whole lists:** each change sends the show's notes as they are after it (`EpisodeNotesChangedIntegrationEvent`),
+    through the outbox in the same save; Research got an outbox for this. `EpisodeNotesPublisher` sends every show's
+    notes in one event after start and daily (notes are hand-written, so few), and Analytics replaces its copy from
+    it, so a lost event heals. A copy read later than an event (`TakenAtUtc`) is kept.
+  - **Validated against the catalog:** the episode must be the show's (Catalog.API's `/episodes/{id}`).
 
 ## Social
 

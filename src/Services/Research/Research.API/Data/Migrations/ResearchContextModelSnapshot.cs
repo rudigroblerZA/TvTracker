@@ -53,6 +53,54 @@ namespace Research.API.Data.Migrations
                     b.ToTable("dossiers", (string)null);
                 });
 
+            modelBuilder.Entity("Research.API.Data.EpisodeNote", b =>
+                {
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EpisodeNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Mark")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("NotedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NotedById")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("NotedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)");
+
+                    b.Property<int>("SeasonNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.HasKey("EpisodeId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("episode_notes", (string)null);
+                });
+
             modelBuilder.Entity("Research.API.Data.FactCandidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -161,6 +209,54 @@ namespace Research.API.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("saved_research", (string)null);
+                });
+
+            modelBuilder.Entity("TvTracker.Persistence.IntegrationEventLogEntry", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventTypeName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TimesSent")
+                        .HasColumnType("integer");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("State", "CreatedAtUtc");
+
+                    b.ToTable("integration_event_log", (string)null);
+                });
+
+            modelBuilder.Entity("TvTracker.Persistence.ProcessedIntegrationEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Handler")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EventId", "Handler");
+
+                    b.ToTable("processed_integration_events", (string)null);
                 });
 #pragma warning restore 612, 618
         }

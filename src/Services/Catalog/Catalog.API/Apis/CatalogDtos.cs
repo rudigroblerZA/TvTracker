@@ -16,7 +16,9 @@ public record ShowSummaryDto(
 
 public record SeasonSummaryDto(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
-public record CastMemberDto(string Name, string? Character, string? PhotoUrl, Guid PersonId);
+/// <param name="TrailShows">Shows on the character's trail (<see cref="CharacterApi"/>), this one included; 2 or more
+/// means the actor plays the character elsewhere too.</param>
+public record CastMemberDto(string Name, string? Character, string? PhotoUrl, Guid PersonId, int TrailShows = 0);
 
 /// <summary>A show someone appears in, with the character they play.</summary>
 public record PersonCreditDto(ShowSummaryDto Show, string? Character);

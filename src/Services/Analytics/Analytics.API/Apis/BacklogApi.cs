@@ -112,12 +112,13 @@ public static class BacklogApi
             .ToListAsync(ct);
         var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
         var rating = await EssentialCutApi.RatingsAsync(db, show.ShowId, ct);
-        if (EssentialCutApi.Unavailable(aired, rating) is not null)
+        var notes = await EssentialCutApi.NotesAsync(db, show.ShowId, ct);
+        if (EssentialCutApi.Unavailable(aired, rating, notes) is not null)
         {
             return null;
         }
 
-        var decisions = EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now);
+        var decisions = EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now, notes);
         var minutes = EssentialCutApi.MinutesOf(aired);
         var kept = aired.Where(e => decisions[e.EpisodeId].Keep).Sum(minutes);
         return kept < aired.Sum(minutes) ? kept : null;

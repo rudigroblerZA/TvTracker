@@ -359,7 +359,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, the season verdict, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -384,6 +384,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
 | `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
+| `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
+| `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -543,6 +545,11 @@ How events flow:
       Breaking Bad loses 10% at "light".
     - **The page:** hours and episodes saved, the biggest runs to skip ("S2007 E35–E44, rated 7.2 against the
       season's 8.6") and a chip per episode.
+    - **Episode notes** (`episode-notes` flag): moderators mark episodes essential or skippable on the research page,
+      with a reason viewers see and a source. The cut follows them first, at every level: an essential episode is
+      always kept, and a season with any skippable episode is cut by its marks alone. "From our moderators" lists them,
+      and a show with notes can be cut even when too few of its episodes are rated. Backlog triage and the catch-up
+      planner use the same cut.
     - **From where you are:** for a show you've started, it shows the next episode the cut keeps and what's left in full and
       in the cut.
     - **Spoiler-safe:** episode titles stay hidden unless you ask for them.
@@ -682,8 +689,10 @@ How events flow:
     - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
       `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
       `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
-      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`. Anyone else gets 404. Behind the
-      `research` flag.
+      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`, and episode notes:
+      `GET /api/v1/research/{id}/episode-notes`, `PUT|DELETE /api/v1/research/{id}/episode-notes/{episodeId}`
+      (`{ "mark": "essential" | "skippable", "reason", "sourceUrl" }`). Anyone else gets 404. Behind the `research`
+      flag (and `episode-notes` for the notes).
   - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
     insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
     things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
@@ -699,6 +708,17 @@ How events flow:
     - **Nothing personal:** the tools have no user, so it knows shows, not your watches or ratings.
     - **API** (Assistant.API, port 5115): `POST /api/v1/ask` (`{ "question", "previousId" }`, 202 with the question's
       state), `GET /api/v1/ask/{id}` (poll until `answered` or `failed`), `GET /api/v1/ask/about`. Behind the `ask` flag.
+  - **Character trail** (`/people/{personId}/characters/{showId}`, from a show page's cast, where a character name
+    reads "Karen Page · 4 shows"): every show where the same actor plays the same character, in the order they first
+    aired.
+    - **Matching:** Universes' name rules ("Dr. Frasier W. Crane" is "Dr. Frasier Crane"), over the catalog's casts and
+      the actor's TVmaze credits, so Cheers is on Frasier's trail though it isn't in the catalog (it links to search,
+      which imports it). Roles as themselves have no trail.
+    - **Signed in:** your progress in each show you follow, and "Add all to your watchlist" for the rest.
+    - **Limits:** TVmaze lists main casts only, so guest appearances are missing, and a character who joins in a
+      later season counts for the whole show. Same actor only: a recast character isn't followed.
+    - **API:** `GET /api/v1/people/{personId}/characters/{showId}` on Catalog.API (public); show detail's cast has
+      `trailShows`. Behind the `character-trail` flag.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

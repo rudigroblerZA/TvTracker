@@ -161,6 +161,10 @@
                 <p class="small muted">@($"{insight.Trim().Length:N0} of 4,000 characters")</p>
             </section>
 
+            <Feature Flag="@FeatureFlags.EpisodeNotes">
+                <EpisodeNotesSection ShowId="ShowId" Sources="ws.Sources" />
+            </Feature>
+
             <section class="research-step research-save" aria-label="Save">
                                 <button type="button" class="btn" disabled="@(busy || string.IsNullOrWhiteSpace(insight))" @onclick="SaveAsync">
                     @(saving ? "Saving…" : $"Save version {(ws.Saved?.Version ?? 0) + 1}")

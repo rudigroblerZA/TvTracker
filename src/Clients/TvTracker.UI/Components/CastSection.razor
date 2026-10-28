@@ -24,7 +24,20 @@
                 {
                     <strong>@member.Name</strong>
                 }
-                <span class="muted">@member.Character</span>
+                @if (member.TrailShows > 1 && member.PersonId != Guid.Empty)
+                {
+                    <Feature Flag="@FeatureFlags.CharacterTrail">
+                        <ChildContent>
+                            <a href="people/@member.PersonId/characters/@ShowId" title="Every show they play @member.Character in">@member.Character</a>
+                            <span class="muted">@($" · {member.TrailShows} shows")</span>
+                        </ChildContent>
+                        <Off><span class="muted">@member.Character</span></Off>
+                    </Feature>
+                }
+                else
+                {
+                    <span class="muted">@member.Character</span>
+                }
                 @if (KnownFor(member) is { } face)
                 {
                     <span class="known-from">

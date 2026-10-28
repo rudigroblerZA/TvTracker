@@ -75,7 +75,15 @@ public record BlendMatch(ShowSummary Show, int Fit, int LikeA, IReadOnlyList<str
 public record SeasonSummary(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
 /// <param name="PersonId">Empty in responses cached before people had pages (e.g. offline on mobile); don't link then.</param>
-public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId);
+/// <param name="TrailShows">Shows where the actor plays this character, this one included (Catalog.API's CharacterApi).</param>
+public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId, int TrailShows = 0);
+
+/// <summary>Every show where an actor plays the same character, by premiere (see Catalog.API's CharacterApi).</summary>
+public record CharacterTrail(Guid PersonId, string PersonName, string? PhotoUrl, string Character, IReadOnlyList<TrailShow> Shows);
+
+/// <param name="ShowId">Null for a show outside the catalog.</param>
+public record TrailShow(Guid? ShowId, string? ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status,
+    string Character, bool Voice, double? Rating, DateTimeOffset? FirstAiredUtc, DateTimeOffset? LastAiredUtc, int? Episodes);
 
 public record PersonCredit(ShowSummary Show, string? Character);
 
@@ -344,18 +352,23 @@ public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? R
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
 
 /// <summary>A shorter path through a long show (see Analytics.API's EssentialCutApi).</summary>
+/// <param name="Noted">Episodes moderators marked essential or skippable, which the cut follows before ratings.</param>
 public record EssentialCut(Guid ShowId, string Title, string Level, bool Available, string? Reason, CutTotals Full, CutTotals Cut,
-    IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress);
+    IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress, int Noted = 0);
 
 public record CutTotals(int Episodes, int Minutes);
 
 public record CutSeason(int Number, int Episodes, int Kept, int MinutesSaved, IReadOnlyList<CutEpisode> Items);
 
 /// <param name="Why">"series-premiere", "season-premiere", "season-finale", "series-finale", "two-parter",
-/// "best-of-season", "above-average", "unrated" or "below-average" (skipped).</param>
-public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double? Rating, bool Keep, string Why, bool Watched);
+/// "best-of-season", "above-average", "unrated", "below-average" (skipped), "noted-essential" or "noted-skippable".</param>
+/// <param name="Note">A moderator's reason, for a noted episode, with its source.</param>
+public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double? Rating, bool Keep, string Why, bool Watched,
+    string? Note = null, string? NoteSource = null);
 
-public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double AverageRating, double SeasonAverage);
+/// <param name="Noted">Skipped by moderators' notes rather than ratings.</param>
+public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double? AverageRating, double SeasonAverage,
+    bool Noted = false);
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
 
@@ -558,6 +571,10 @@ public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtU
     IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
 
 /// <param name="Number">How drafts and the insight cite it, while it's included.</param>
+/// <param name="Mark">"essential" or "skippable".</param>
+public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Mark, string Reason, string SourceUrl,
+    DateTime NotedAtUtc, string NotedBy);
+
 public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
 
 /// <param name="Origin">"saved", "catalog" or "source".</param>

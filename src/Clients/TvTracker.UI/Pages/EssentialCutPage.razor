@@ -21,7 +21,8 @@ else
     <h1>Essential cut</h1>
     <p class="muted">
         A shorter way through @cut.Title, from its episode ratings: each season keeps its premiere, finale and best
-        episode, and drops its weakest. Only numbers and ratings are shown, so nothing is spoiled.
+        episode, and drops its weakest. Only numbers and ratings are shown, so nothing is spoiled. Where moderators
+        marked episodes essential or skippable, the cut follows them first.
     </p>
 
     @if (!cut.Available)
@@ -86,17 +87,45 @@ else
         {
             <h2>Biggest skips</h2>
             <ul class="cut-runs">
-                @foreach (var run in cut.Skips.OrderByDescending(r => r.Episodes).ThenByDescending(r => r.SeasonAverage - r.AverageRating).Take(5))
+                @foreach (var run in cut.Skips.OrderByDescending(r => r.Episodes).ThenByDescending(r => r.SeasonAverage - (r.AverageRating ?? r.SeasonAverage)).Take(5))
                 {
                     <li>
                         <span class="strong">@RunCode(run)</span>
                         <span class="muted small">
                             @(run.Episodes == 1 ? "1 episode" : $"{run.Episodes} episodes") · @Format.Duration(run.Minutes) ·
-                            rated @Format.Rating(run.AverageRating) against the season's @Format.Rating(run.SeasonAverage)
+                            @RunWhy(run)
                         </span>
                     </li>
                 }
             </ul>
+        }
+
+        @if (cut.Noted > 0)
+        {
+            <Feature Flag="@FeatureFlags.EpisodeNotes">
+                <h2>From our moderators</h2>
+                <p class="muted small">
+                    @(cut.Noted == 1 ? "One episode is" : $"{cut.Noted} episodes are") marked by hand, and the cut follows
+                    them first: a season with skippable episodes marked is cut by its marks alone, at every level.
+                </p>
+                <ul class="cut-notes">
+                    @foreach (var (number, episode) in Noted)
+                    {
+                        <li>
+                            <span class="cut-ep @(episode.Keep ? "keep" : "skip")">@episode.EpisodeNumber</span>
+                            <span>
+                                <a class="strong" href="episodes/@episode.EpisodeId">@Format.EpisodeCode(number, episode.EpisodeNumber)</a>
+                                <span>@(episode.Keep ? " essential: " : " skippable: ")</span>
+                                <span>@episode.Note</span>
+                                @if (episode.NoteSource is { } source)
+                                {
+                                    <span class="muted small"> · <a href="@source" target="_blank" rel="noopener noreferrer">source</a></span>
+                                }
+                            </span>
+                        </li>
+                    }
+                </ul>
+            </Feature>
         }
 
         <div class="section-head">
@@ -185,6 +214,14 @@ else
     private void ChangeLevel(string level) =>
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("level", level == "lean" ? null : level), replace: true);
 
+    private IEnumerable<(int Season, CutEpisode Episode)> Noted =>
+        cut!.Seasons.SelectMany(s => s.Items.Where(e => e.Note is not null).Select(e => (s.Number, e)));
+
+    private static string RunWhy(SkipRun run) =>
+        run.Noted ? "marked skippable by a moderator"
+        : run.AverageRating is { } rating ? $"rated {Format.Rating(rating)} against the season's {Format.Rating(run.SeasonAverage)}"
+        : "not rated";
+
     private static string RunCode(SkipRun run) =>
         run.FromEpisode == run.ToEpisode
             ? Format.EpisodeCode(run.SeasonNumber, run.FromEpisode)
@@ -195,7 +232,7 @@ else
         var parts = new List<string> { Format.EpisodeCode(season, episode.EpisodeNumber) };
         if (showTitles) parts.Add(episode.Title);
         parts.Add(episode.Rating is { } rating ? $"rated {Format.Rating(rating)}" : "not rated");
-        parts.Add(Why(episode.Why));
+        parts.Add(episode.Note is { } note ? $"{Why(episode.Why)}: {note}" : Why(episode.Why));
         if (episode.Watched) parts.Add("watched");
         return string.Join(" · ", parts);
     }
@@ -210,6 +247,8 @@ else
         "best-of-season" => "watch: the season's best",
         "unrated" => "watch: not rated, kept to be safe",
         "below-average" => "skip: well below the season's average",
+        "noted-essential" => "watch: marked essential",
+        "noted-skippable" => "skip: marked skippable",
         _ => "watch"
     };
 }

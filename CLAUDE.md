@@ -70,7 +70,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
   services (white label, see CONTEXT.md). New colours go in `app.css` as `light-dark(light, dark)` tokens.
 - **User posts** (comments, tips, anything people write for others) live in Ratings.API and go through `Moderation`:
   check the text, the hourly limit, and honour `HiddenReason` when reading.
-- **Docs:** update README.md for user-visible behaviour, and CONTEXT.md for architecture or a decision.
+- **Docs:** update README.md for user-visible behaviour, and CONTEXT.md for architecture or a decision. Planned work
+  is in BACKLOG.md; remove an item when it ships.
 
 ## Gotchas
 

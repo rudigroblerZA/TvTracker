@@ -427,6 +427,44 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
     }
 }
 
+/// <summary>
+/// Keeps the copy of Research's episode notes: each event replaces one show's notes, or every show's (the daily send),
+/// unless the copy already has a later read of that show. A note deleted after a daily send was read but before it
+/// arrived comes back until the next one.
+/// </summary>
+public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEventHandler<EpisodeNotesChangedIntegrationEvent>
+{
+    public async Task HandleAsync(EpisodeNotesChangedIntegrationEvent e, CancellationToken ct)
+    {
+        const string handler = nameof(EpisodeNotesHandler);
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var existing = await db.EpisodeNotes.Where(n => e.ShowId == null || n.ShowId == e.ShowId).ToListAsync(ct);
+        var newer = existing.Where(n => n.TakenAtUtc > e.TakenAtUtc).Select(n => n.ShowId).ToHashSet();
+        var incoming = e.Notes.Where(n => !newer.Contains(n.ShowId) && (e.ShowId == null || n.ShowId == e.ShowId))
+            .DistinctBy(n => n.EpisodeId).ToDictionary(n => n.EpisodeId);
+        foreach (var row in existing.Where(n => !newer.Contains(n.ShowId)))
+        {
+            if (!incoming.Remove(row.EpisodeId, out var note))
+            {
+                db.EpisodeNotes.Remove(row);
+                continue;
+            }
+            (row.ShowId, row.Mark, row.Reason, row.SourceUrl, row.TakenAtUtc) = (note.ShowId, note.Mark, note.Reason, note.SourceUrl, e.TakenAtUtc);
+        }
+        db.EpisodeNotes.AddRange(incoming.Values.Select(n => new EpisodeNoteCopy
+        {
+            EpisodeId = n.EpisodeId, ShowId = n.ShowId, Mark = n.Mark, Reason = n.Reason, SourceUrl = n.SourceUrl, TakenAtUtc = e.TakenAtUtc
+        }));
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
+    }
+}
+
 /// <summary>Deletes everything a deleted user left here; the next hourly run drops them from every aggregate.</summary>
 public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
