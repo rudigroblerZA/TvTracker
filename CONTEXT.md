@@ -528,7 +528,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Season verdict
 
 - **Part of the show document** (`SeasonVerdictInsight`), so it's computed hourly with the rest, and read by the show
-  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own.
+  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own,
+  cached 5 minutes, since reading every document took tens of milliseconds per visit.
+- **Released at once:** one UTC date for every episode (`ShowInsightContext.ReleaseDays`), the same test the
+  drops-at-once tag uses.
 - **When a season is over:** "every listed episode aired" isn't enough, since TVmaze lists a weekly show's next episode
   only days ahead (Cops in week 17 looked finished). Over means: the show ended, a later season is listed or announced,
   the season dropped at once, or it's been quiet for twice its usual gap (at least 7 days). The catalog doesn't keep
@@ -544,13 +547,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `DnaTraits`), so Notifications and the UI switch on the same constants as Analytics.
 - **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
   started (the privacy rule).
-- **Sent hourly, told once** (`SeasonVerdictPublication`): every run sends each verdict within 7 days of when it could
+- **Sent hourly, told once** (`SeasonVerdictPublication`): every run sends each verdict within 2 days of when it could
   first be given (`ReadyAtUtc`), with a `VerdictId` from the show and season. Notifications uses that id as the event's
   identity (inbox check and inbox items), so followers hear once.
   - **Why not "when the stored document lacked it":** the pipeline saves documents before it publishes, so a run that
     failed in between lost the verdict for good, and a verdict that dropped out of the document for one run was sent
     twice. The outbox keys on the event Id, so each send has its own and the `VerdictId` carries the identity.
-  - **Why 7 days:** without it, the first run would have notified followers about every season of the last six weeks.
+  - **Why 2 days:** enough sends (about 48) to outlast a day of failed runs; a week was about 168 per verdict for
+    nothing. And only fresh ones: otherwise the first run would have notified followers about every season of the last
+    six weeks.
+  - **Deeper fix, not done:** the pipeline adds publication events to the outbox after saving the documents, not in the
+    same save. Publishing in each batch's save, and an outbox that ignores an event Id it already holds, would let the
+    verdict be sent once, when it first appears, with a stable event Id; both change shared infrastructure.
 - **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
   Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
   some followers only.

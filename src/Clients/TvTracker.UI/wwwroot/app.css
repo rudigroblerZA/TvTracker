@@ -660,7 +660,5 @@ a.chip { text-decoration: none; }
 .ask-form textarea { width: 100%; font: inherit; resize: vertical; }
 .ask-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* Seasons that just ended (Insights) */
-.season-verdicts { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
-.season-verdict { padding: 8px 12px; border-left: 3px solid var(--tone); background: color-mix(in srgb, var(--tone) 6%, var(--surface));
-    border-radius: 0 var(--radius) var(--radius) 0; overflow-wrap: anywhere; }
+/* Seasons that just ended (Insights): the backlog's toned list, each item a block of text rather than a row */
+.season-verdicts > li { display: block; overflow-wrap: anywhere; }

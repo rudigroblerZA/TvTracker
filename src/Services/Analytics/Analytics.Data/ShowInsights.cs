@@ -56,8 +56,14 @@ public record ShowInsights(
 /// show that had to be quiet for a while first.</param>
 public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
     double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
-    int? Started, int? Finished, DateTime ReadyAtUtc = default);
+    int? Started, int? Finished, DateTime ReadyAtUtc)
+{
+    /// <summary>A verdict is given from this long after the finale…</summary>
+    public static readonly TimeSpan From = TimeSpan.FromDays(3);
 
+    /// <summary>…until this long after it; readers of stored documents check it too, in case the pipeline stalls.</summary>
+    public static readonly TimeSpan Until = TimeSpan.FromDays(45);
+}
 
 /// <summary>
 /// Whether an ended show sticks the landing, from the provider's ratings of its finale (its last aired episode) and

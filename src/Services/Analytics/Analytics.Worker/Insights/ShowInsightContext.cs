@@ -81,6 +81,13 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
         .ToList();
 
     /// <summary>
+    /// The distinct UTC dates a season's aired episodes came out on, in order: one date means the whole season dropped at
+    /// once. Shared by the drops-at-once tag and the season verdict, so both read a release the same way.
+    /// </summary>
+    public IReadOnlyList<DateTime> ReleaseDays(int season) =>
+        Aired.Where(e => e.SeasonNumber == season).Select(e => e.AirsAtUtc!.Value.UtcDateTime.Date).Distinct().Order().ToList();
+
+    /// <summary>
     /// Least-squares slope of <see cref="RatedSeasons"/>' ratings against their order (rating points per season); null
     /// with fewer than three.
     /// </summary>
