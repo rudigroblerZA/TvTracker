@@ -448,8 +448,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Taste twins** (`TasteTwinsApi`): computed on request from the ratings copy.
   - **Agreement, not correlation:** 1 − mean |stars difference| / 4 over 3+ shared shows, shrunk by n / (n + 3).
     Pearson on 3-10 shared ratings swings wildly, and most ratings sit at 3-5 stars, where a correlation says little.
-  - **The privacy rule:** 5+ twins or nothing, and 2+ twins behind each pick, so one person's ratings never show through
-    a pick. Twins aren't named or listed.
+  - **The privacy rule:** 5+ twins or nothing (not even the count), and 5+ twins behind each pick and shared favourite,
+    since "loved by n" and their average stars are figures about them. Twins aren't named or listed.
+  - **In SQL:** agreement is a join on the caller's ratings grouped by user, so only candidates come back, not every
+    rating of every show the caller rated.
   - **Picks:** Σ agreement × (stars − 3) over twins who rated it 4+, so 5 stars counts twice 4; shows the caller rated,
     follows or watched are left out.
   - **Dev data:** the load-test users' ratings are random 3-5 stars, so twins there are mechanical, not meaningful.
@@ -561,6 +563,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   (P166, one per win) and their labels for the popular shows. A moderator's saved awards fact replaces Wikidata's
   wording on the show page; ranking uses Wikidata's count either way. Wikidata's counts are uneven (The Sopranos 57,
   Game of Thrones 13), which a moderator can correct by researching the show.
+  - **Counting:** `COUNT(DISTINCT ?win)` with the English label optional, so a win whose award has no English label
+    still counts (it just isn't named), and labels don't multiply wins.
+  - **Isolated:** an awards query failure keeps the stored `show_awards` and still saves the day's `catalog_checks`.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see

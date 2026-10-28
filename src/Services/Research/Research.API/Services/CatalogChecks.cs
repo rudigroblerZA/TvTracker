@@ -15,7 +15,9 @@ namespace Research.API.Services;
 /// <para>
 /// <b>Awards:</b> a second query per batch counts each show's award statements (P166, one per win) and their labels,
 /// for the awards shelf; it's separate because counting them in the first query would multiply rows by networks and
-/// dates.
+/// dates. A win counts whether or not its award has an English label (only labelled ones are named in the summary). If
+/// the awards queries fail, the checks are still saved and the previous awards kept: the research queue shouldn't go
+/// stale over the shelf.
 /// </para>
 /// <para>
 /// <b>Wikidata's limits:</b> the query service answers 429 with a Retry-After (1,000 s from the sandbox's shared
@@ -70,12 +72,12 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
     private sealed record WikidataAwards(string Item, int Wins, IReadOnlyList<string> Labels);
 
     private const string AwardsSparql = """
-        SELECT ?tvmaze ?item (COUNT(?win) AS ?wins) (GROUP_CONCAT(?label; separator="|") AS ?labels)
+        SELECT ?tvmaze ?item (COUNT(DISTINCT ?win) AS ?wins) (GROUP_CONCAT(?label; separator="|") AS ?labels)
         WHERE {
           VALUES ?tvmaze { {IDS} }
           ?item wdt:P8600 ?tvmaze; p:P166 ?win.
           ?win ps:P166 ?award.
-          ?award rdfs:label ?label. FILTER(LANG(?label) = "en")
+          OPTIONAL { ?award rdfs:label ?label. FILTER(LANG(?label) = "en") }
         }
         GROUP BY ?tvmaze ?item
         """;
@@ -111,6 +113,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             .ToList();
         var wikidata = new Dictionary<string, WikidataFacts>();
         var awards = new Dictionary<string, WikidataAwards>();
+        var awardsComplete = true;
         foreach (var batch in shows.Chunk(BatchSize))
         {
             var ids = batch.Select(x => x.Show.ExternalId).ToList();
@@ -122,10 +125,22 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             {
                 wikidata[id] = facts;
             }
-            await Task.Delay(BetweenBatches, time, ct);
-            foreach (var (id, won) in await WithRetryAsync(ids.Count, () => QueryAwardsAsync(ids, ct), ct))
+            if (!awardsComplete)
             {
-                awards[id] = won;
+                continue;
+            }
+            await Task.Delay(BetweenBatches, time, ct);
+            try
+            {
+                foreach (var (id, won) in await WithRetryAsync(ids.Count, () => QueryAwardsAsync(ids, ct), ct))
+                {
+                    awards[id] = won;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Awards from Wikidata failed; keeping the previous awards until the next check");
+                awardsComplete = false;
             }
         }
 
@@ -180,8 +195,11 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await db.CatalogChecks.ExecuteDeleteAsync(ct);
             db.CatalogChecks.AddRange(checks);
-            await db.ShowAwards.ExecuteDeleteAsync(ct);
-            db.ShowAwards.AddRange(shelf);
+            if (awardsComplete)
+            {
+                await db.ShowAwards.ExecuteDeleteAsync(ct);
+                db.ShowAwards.AddRange(shelf);
+            }
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         });

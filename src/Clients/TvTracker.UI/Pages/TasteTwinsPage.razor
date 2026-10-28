@@ -10,7 +10,7 @@
     <Authorized>
         <p class="muted">
             People here whose ratings track yours, and the shows they loved that you haven't rated, followed or watched.
-            Nobody is named, and a pick needs at least two of them behind it.
+            Nobody is named, and a pick needs at least five of them behind it.
         </p>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
@@ -23,11 +23,12 @@
         }
         else
         {
-            @if (twins.Twins >= 5)
+            @* The server only sends an agreement when there are enough twins to show (the 5-user rule). *@
+            @if (twins.Agreement is { } agreement)
             {
                 <p>
                     <strong>@($"{twins.Twins} taste twins")</strong>
-                    <span class="muted">@($" · {Format.Percent(twins.Agreement ?? 0)} agreement on the shows you've both rated · from your {twins.RatedShows} ratings")</span>
+                    <span class="muted">@($" · {Format.Percent(agreement)} agreement on the shows you've both rated · from your {twins.RatedShows} ratings")</span>
                 </p>
             }
             @if (twins.Reason is { } reason)

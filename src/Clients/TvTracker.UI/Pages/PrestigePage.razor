@@ -34,7 +34,7 @@ else
                 <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
                 <div>
                     <a href="shows/@show.ShowId"><strong>@show.Title</strong></a>
-                    <div class="small">@($"🏆 {show.Wins} {(show.Wins == 1 ? "award" : "awards")}{(show.Checked ? " · checked" : "")}")</div>
+                    <div class="small">@(show.Checked ? "🏆 Checked by our moderators" : $"🏆 {show.Wins} {(show.Wins == 1 ? "award" : "awards")}")</div>
                     <div class="muted small">@show.Summary</div>
                     @if (followed.Contains(show.ShowId))
                     {

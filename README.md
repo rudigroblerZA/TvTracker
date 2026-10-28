@@ -762,16 +762,17 @@ How events flow:
     yours, and what they loved that you haven't rated, followed or watched.
     - **Twins:** agreement is 1 − the average star difference / 4 on shows you've both rated (3 or more), weighted
       towards bigger overlaps; the best 25 with 75% or more agreement count. You need 5 ratings.
-    - **Anonymous:** nobody is named; nothing shows with fewer than 5 twins, and a pick needs 2 twins behind it.
+    - **Anonymous:** nobody is named; nothing shows with fewer than 5 twins, and a pick or a shared favourite needs 5 twins behind it.
     - **The page:** how many twins and how closely you agree, the shows you agree on, and their picks ("Loved by 13 of
       your twins · ★ 4.7").
     - **API:** `GET /api/v1/me/taste-twins` on Analytics.API, signed in.
   - **Awards shelf** (`awards-shelf` flag): what a show has won, on its page ("🏆 57 awards: Primetime Emmy Award × 23,
     TCA Award × 11, …"), and **Prestige picks** (`/prestige`, linked from Discover): the most-awarded popular shows
-    you haven't started.
+    you haven't started (public; signed out, simply the most awarded).
     - **Where awards come from:** Wikidata's award wins (one statement per win) for the 300 most popular shows,
       read by the research queue's daily check. Where a moderator saved research with an awards fact, its checked
-      wording is shown instead ("checked by our moderators").
+      wording is shown instead ("checked by our moderators"), and Prestige picks says so rather than give Wikidata's
+      count. If Wikidata's awards query fails, the previous day's awards stay.
     - **API** (Research.API): `GET /api/v1/shows/{id}/awards` and `GET /api/v1/awards?limit=` (most wins first), public.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.

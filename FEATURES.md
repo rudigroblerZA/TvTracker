@@ -398,7 +398,7 @@ On For you.
 
 - **People who rate like you:** anonymous twins whose ratings track yours, the shows you agree on, and what they loved
   that you haven't seen ("Loved by 13 of your twins").
-- **Private by design:** no names, nothing with fewer than 5 twins, and every pick backed by at least 2 of them.
+- **Private by design:** no names, nothing with fewer than 5 twins, and every pick backed by at least 5 of them.
 
 ### 35. Awards shelf and Prestige picks
 
