@@ -5,7 +5,7 @@ using ModelContextProtocol.Server;
 
 namespace Mcp.Server.Tools;
 
-/// <summary>Catalog.API: shows, people, universes and holiday episodes. Public data, no user involved.</summary>
+/// <summary>Catalog.API (shows, people, universes, holiday episodes) and Research.API (saved research). Public data, no user involved.</summary>
 [McpServerToolType]
 public sealed class CatalogTools(Backends backends, ShowResolver resolver)
 {
@@ -61,6 +61,18 @@ public sealed class CatalogTools(Backends backends, ShowResolver resolver)
         }
         return await backends.GetAsync(Backends.Catalog, $"api/v1/shows/{found.Id}/universe", ct)
             ?? new JsonObject { ["show"] = found.Title, ["universe"] = null };
+    }
+
+    [McpServerTool(Name = "show_research", ReadOnly = true, Idempotent = true)]
+    [Description("The show's saved research, its trusted record: a moderator-approved insight citing numbered sources (Wikidata, Wikipedia, TMDB, articles), and checked facts (creators, network, dates, seasons and episodes, awards, IMDb/TMDB links). Prefer these facts over the catalog's where they differ. No research means none has been saved yet.")]
+    public async Task<JsonNode> ShowResearch([Description("The show's title or catalog id.")] string show, CancellationToken ct = default)
+    {
+        if (await resolver.ResolveAsync(show, ct) is not { } found)
+        {
+            return NotFound(show);
+        }
+        return await backends.GetAsync(Backends.Research, $"api/v1/shows/{found.Id}/research", ct)
+            ?? new JsonObject { ["show"] = found.Title, ["research"] = null, ["note"] = "No research has been saved for this show." };
     }
 
     [McpServerTool(Name = "holiday_episodes", ReadOnly = true, Idempotent = true)]

@@ -24,10 +24,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
+| Research.API | dossiers, sources, fact candidates, saved research versions | moderators only; saved catalog facts go to the sync worker as overrides; behind the `research` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
-| Mcp.Server | — | read-only MCP tools over Catalog.API and Analytics.API, for internal queries ("landman insights") |
+| Mcp.Server | — | read-only MCP tools over Catalog.API, Analytics.API and Research.API, for internal queries ("landman insights") |
 | Mcp.Gateway | — | one MCP endpoint (API key, tool allow-list, call logs) in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
@@ -217,6 +218,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
 - **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
+
+## Show detail cache
+
+- **In memory only, for a minute:** Catalog.API's show detail stays out of Redis. With a Redis copy (10 minutes), the
+  sync worker's `RemoveByTagAsync` didn't reach it: a corrected summary and network stayed stale in Catalog.API for over
+  2 minutes after the worker invalidated the tag. In memory, a correction, research save or refresh shows within a
+  minute in every Catalog.API process.
 
 ## Analytics domain
 
@@ -450,6 +458,36 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   to a scratch database and diffed (`pg_dump -s`) against the live one `EnsureCreated` made: identical apart from EF's
   history table.
 
+## Research
+
+- **What it is** (Research.API): moderators gather sources for a show, pick each fact, edit a model-drafted insight and
+  save a version. The latest saved version is the show's trusted record: the show page and the MCP tools read it.
+- **Field by field** (a product decision): a saved summary, network or premiere date becomes a `CatalogOverride`, the
+  same path accepted corrections take, so the sync worker applies it on every refresh. Other facts (creators, awards,
+  IMDb link, …) live only in Research.
+  - **One override per show and field:** its id is a hash of the show and field (a v8 GUID), so a new version replaces
+    the value in place (`AddOverrideAsync` upserts) rather than stacking overrides.
+  - **Overrides first:** saving applies them before writing the version, and saves nothing if the catalog refuses one,
+    so the record never says what the catalog doesn't. A catalog field dropped in a later version removes its
+    override, and TVmaze's value comes back on the next refresh.
+  - **New override fields:** `show-network` and `show-premiered` (catalog `CatalogOverrideFields`), added for this.
+- **Sources:**
+  - **Wikidata by TVmaze id:** a SPARQL query on property P8600 finds the item without guessing from the title, and
+    brings its English Wikipedia article. Wikidata's entity API and the MediaWiki API answered 429 from the sandbox;
+    the query service and the REST summary didn't.
+  - **Awards** are grouped by name ("Primetime Emmy Award × 6"; Breaking Bad has 30 categories): Wikidata lists one item per category.
+  - **TMDB** only with `Research:TmdbApiKey`.
+  - **Pages by address** (`WebPageSource`): fetched on a moderator's behalf, so only public addresses, checked again
+    at each redirect.
+  - **Plain HTTP clients:** the standard resilience handler retried Wikipedia's 429s until its 30 s total timeout and
+    failed the whole gather. Each source has one try, and a failure leaves that source out.
+- **Drafts in the background** (`DraftQueue`): Model Runner's small CPU model (qwen3 0.6B) took 92 s for Breaking Bad,
+  past the UI's 30 s request timeout. The draft is queued, the page polls, and a draft running over 15 minutes is
+  treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
+- **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
+  them as numbered, so its citations keep pointing at the right source.
+- **Deleted moderators:** their name comes off the versions they saved ("a former moderator"); the research stays.
+
 ## Social
 
 - **Following, not friending** (a product decision): one way, no approval, like Letterboxd. Privacy is the followed
@@ -604,7 +642,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Social and Tracking use EF Core migrations, applied at startup by
+- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations, applied at startup by
   their API.
   The other services still use `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
@@ -619,7 +657,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     Npgsql calls that transient, so EF's retry strategy backed off for up to 30 s: Tracking, which needed new
     connections last, answered in 2-30 s, reads as well as writes. Capped, the same load ran at 310 requests/s instead
     of 85, with no errors and p95 0.8 s instead of 3.9 s, and no database held more than 12 connections.
-  - **The rule:** keep the cap × the processes with a database (10 here, more with replicas) under the server's
+  - **The rule:** keep the cap × the processes with a database (11 here, so 88 of 100; more with replicas) under the server's
     `max_connections`, or put a pooler (Azure's built-in PgBouncer) in front once replicas multiply.
   - **Not a server setting:** raising `max_connections` with `WithArgs` on the persistent Postgres container didn't
     apply to an existing container, so the fix lives in the services.
@@ -628,7 +666,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## MCP server
 
-- **Over the APIs, not the databases:** `Mcp.Server` calls Catalog.API and Analytics.API like any other client, so
+- **Over the APIs, not the databases:** `Mcp.Server` calls Catalog.API, Analytics.API and Research.API like any other client, so
   the one-database-per-service rule holds and the tools see exactly what the app shows.
 - **Its own identity:** Analytics needs a token for everything, so the server signs in as the confidential client
   `tvtracker-mcp` (client credentials, with the `tvtracker-api` audience mapper). The token has no user, which suits

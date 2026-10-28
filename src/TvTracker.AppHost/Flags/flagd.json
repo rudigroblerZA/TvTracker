@@ -150,6 +150,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
+    },
+    "research": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Research: moderators enrich a show from Wikidata, Wikipedia, TMDB and pasted pages, with a model-drafted insight; the saved research shows on the show page and overrides catalog fields." }
     }
   }
 }

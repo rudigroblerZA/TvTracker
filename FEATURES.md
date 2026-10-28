@@ -331,7 +331,23 @@ At `/feed`.
 - **Flags that do something:** enough flags hide a post until a moderator looks, and spoiler flags mark it a spoiler.
 - **A light touch:** blocked words, links held for review, hourly limits, and a moderation page with a log.
 
-### 29. Smaller touches
+### 29. Research: a show's trusted record
+
+On show pages, written by moderators at `/research`.
+
+- **Checked by a person, with its sources:** a short insight citing numbered sources ([1] Wikidata, [2] Wikipedia,
+  a review someone added), and checked facts: creators, when it ended, seasons and episodes, awards, IMDb and TMDB
+  links. "Checked by App Admin, 27 October 2026 · version 2".
+- **Sources gathered for you:** Wikidata by the show's TVmaze id, the Wikipedia summary and TMDB, plus any page a
+  researcher pastes.
+- **A local model drafts, a person decides:** the model writes a first draft from the sources; the researcher edits it,
+  and picks each fact from the catalog, a source, or their own.
+- **The saved copy wins:** a checked summary, network or premiere date replaces TVmaze's in the catalog and stays
+  through every refresh. Breaking Bad's network reads "AMC (United States)" until a later version drops it.
+- **Also for questions:** the MCP tools answer from the saved research, so "what awards did Breaking Bad win?" comes
+  from checked facts.
+
+### 30. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

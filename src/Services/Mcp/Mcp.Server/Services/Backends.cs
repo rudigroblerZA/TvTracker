@@ -5,13 +5,14 @@ using System.Text.Json.Nodes;
 namespace Mcp.Server.Services;
 
 /// <summary>
-/// The two services the tools read, as JSON. Answers are passed through rather than remodelled, less image URLs,
+/// The services the tools read (Catalog, Analytics, Research), as JSON. Answers are passed through rather than remodelled, less image URLs,
 /// which cost tokens and say nothing to a model. A 404 is null, so a tool can say what wasn't found.
 /// </summary>
 public sealed class Backends(IHttpClientFactory factory)
 {
     public const string Catalog = "catalog";
     public const string Analytics = "analytics";
+    public const string Research = "research";
 
     private static readonly HashSet<string> ImageFields = ["posterUrl", "backdropUrl", "bannerUrl", "photoUrl", "imageUrl"];
 

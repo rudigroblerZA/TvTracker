@@ -319,11 +319,17 @@ public class CatalogOverride
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>The fields a correction can override, and how each value is written.</summary>
+/// <summary>The fields a correction or saved research can override, and how each value is written.</summary>
 public static class CatalogOverrideFields
 {
     /// <summary>The show's summary (plain text).</summary>
     public const string ShowSummary = "show-summary";
+
+    /// <summary>The show's network or streaming service, up to 128 characters.</summary>
+    public const string ShowNetwork = "show-network";
+
+    /// <summary>The show's premiere date, yyyy-MM-dd.</summary>
+    public const string ShowPremiered = "show-premiered";
 
     public const string EpisodeTitle = "episode-title";
 
@@ -336,7 +342,9 @@ public static class CatalogOverrideFields
     /// <summary>Whole minutes, 1-600.</summary>
     public const string EpisodeRuntime = "episode-runtime";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string> { ShowSummary, EpisodeTitle, EpisodeSummary, EpisodeAirDate, EpisodeRuntime };
+    public static readonly IReadOnlySet<string> ShowFields = new HashSet<string> { ShowSummary, ShowNetwork, ShowPremiered };
 
-    public static bool IsEpisodeField(string field) => field != ShowSummary;
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(ShowFields) { EpisodeTitle, EpisodeSummary, EpisodeAirDate, EpisodeRuntime };
+
+    public static bool IsEpisodeField(string field) => !ShowFields.Contains(field);
 }

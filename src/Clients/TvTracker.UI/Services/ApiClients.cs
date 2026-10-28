@@ -18,9 +18,10 @@ public static class ApiClients
     public const string Notifications = "notifications";
     public const string Analytics = "analytics";
     public const string Social = "social";
+    public const string Research = "research";
 
     public static readonly IReadOnlyList<string> All =
-        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social];
+        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social, Research];
 }
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
@@ -485,4 +486,41 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
 
     public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
+}
+
+public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
+{
+    /// <summary>The show's saved research, its trusted record; null when none is saved. Public.</summary>
+    public Task<SavedResearch?> GetSavedAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<SavedResearch>(ApiClients.Research, $"api/v1/shows/{showId}/research", ct, cacheForOffline: true);
+
+    /// <summary>The research workspace; null unless the user is a moderator.</summary>
+    public Task<ResearchWorkspace?> GetWorkspaceAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ResearchWorkspace>(ApiClients.Research, $"api/v1/research/{showId}", ct);
+
+    /// <summary>Shows with research, most recently worked on first; null unless the user is a moderator.</summary>
+    public Task<List<ResearchedShow>?> GetResearchedAsync(CancellationToken ct = default) =>
+        GetAsync<List<ResearchedShow>>(ApiClients.Research, "api/v1/research", ct);
+
+    public Task<ResearchWorkspace?> GatherAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync<ResearchWorkspace>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/gather", null, ct);
+
+    public Task<ResearchWorkspace?> AddSourceAsync(Guid showId, string url, CancellationToken ct = default) =>
+        SendAsync<ResearchWorkspace>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/sources", new { Url = url }, ct);
+
+    public Task IncludeSourceAsync(Guid showId, Guid sourceId, bool included, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Put, $"api/v1/research/{showId}/sources/{sourceId}", new { Included = included }, ct);
+
+    public Task RemoveSourceAsync(Guid showId, Guid sourceId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Delete, $"api/v1/research/{showId}/sources/{sourceId}", null, ct);
+
+    /// <summary>Starts a draft in the background; the workspace says when it's ready.</summary>
+    public Task StartDraftAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/draft", null, ct);
+
+    public Task KeepDraftAsync(Guid showId, string? text, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Put, $"api/v1/research/{showId}/draft", new { Text = text }, ct);
+
+    public Task<ResearchSaveResult?> SaveAsync(Guid showId, string insight, IReadOnlyList<ResearchFactChoice> facts, CancellationToken ct = default) =>
+        SendAsync<ResearchSaveResult>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/save", new { Insight = insight, Facts = facts }, ct);
 }

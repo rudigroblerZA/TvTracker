@@ -1,0 +1,63 @@
+@page "/research"
+@attribute [RequiresFeature(FeatureFlags.Research)]
+@inject ResearchClient Research
+
+<PageTitle>Research · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Research</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (shows is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notModerator ? "Only moderators can research shows." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p class="muted">Shows being researched, most recently worked on first. To start one, open the show and choose "Research this show".</p>
+            @if (shows.Count == 0)
+            {
+                <p class="muted">None yet.</p>
+            }
+            <ul class="research-list">
+                @foreach (var show in shows)
+                {
+                    <li @key="show.ShowId">
+                        <a href="research/@show.ShowId"><strong>@show.Title</strong></a>
+                        <span class="muted small">@(show.Version is { } v ? $" · version {v}, saved {Format.Relative(show.SavedAtUtc!.Value)}" : " · not saved yet")</span>
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in as a moderator to research shows." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<ResearchedShow>? shows;
+    private bool notModerator;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            shows = await Research.GetResearchedAsync();
+            notModerator = shows is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

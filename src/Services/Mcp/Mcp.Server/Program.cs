@@ -12,6 +12,7 @@ builder.Services.AddTransient<ServiceTokenHandler>();
 builder.Services.AddHttpClient(Backends.Catalog, client => client.BaseAddress = new Uri("https+http://catalog-api/"));
 builder.Services.AddHttpClient(Backends.Analytics, client => client.BaseAddress = new Uri("https+http://analytics-api/"))
     .AddHttpMessageHandler<ServiceTokenHandler>();
+builder.Services.AddHttpClient(Backends.Research, client => client.BaseAddress = new Uri("https+http://research-api/"));
 builder.Services.AddSingleton<Backends>();
 builder.Services.AddSingleton<ShowResolver>();
 

@@ -81,7 +81,9 @@ public record ShowDetailDto(
     EpisodeDto? LastEpisode,
     IReadOnlyList<CreativeDto>? Creatives = null,
     string? BannerUrl = null,
-    IReadOnlyList<NanogenreRefDto>? Nanogenres = null);
+    IReadOnlyList<NanogenreRefDto>? Nanogenres = null,
+    string? Source = null,
+    string? ExternalId = null);
 
 /// <summary>A nanogenre the show is in (see <see cref="Catalog.Data.Nanogenre"/>), most specific first.</summary>
 public record NanogenreRefDto(string Slug, string Name);
