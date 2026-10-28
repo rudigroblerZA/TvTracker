@@ -100,8 +100,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   the show's own `officialSite` is usually its page on that service (Netflix, Apple TV, Max, Prime Video, Disney+,
   Hulu, Peacock), which is the link kept, since phones open those addresses in the service's app. Otherwise
   Catalog.API offers the service's search for the title (only services whose search works signed out), else its
-  home page. `TvMaze:WatchRegions` was listed twice per show: configuration binding appends to a list property's
-  default, so the regions are made distinct.
+  home page.
+  - **Show pages by path, per service:** a link is a show's page only under a known service's show-page path
+    (`/title/` on Netflix, `/gp/video/detail/` on amazon.com). "Any path" was tried first, and took home pages with a
+    path (`/Prime-Video/b`, `/browse`), Amazon store pages and networks' own sites for show pages. A site that isn't the
+    service's is never stored under its name.
+  - **Duplicates:** `TvMaze:WatchRegions` was stored twice per show, since configuration binding appends to a list
+    property's default. The regions are made distinct, the sync dedupes, and migration `DedupeWatchProviders` removed
+    the stored copies.
 - **IDs:** Show, Season, Episode, Person and WatchProvider ids are set by the app, so they're configured
   `ValueGeneratedNever`. Without it, EF treats new rows with preset ids as existing and refreshes fail with
   `DbUpdateConcurrencyException`.

@@ -235,8 +235,10 @@ that goes straight to the show on the service: `netflix.com/title/…`, `tv.appl
 it's installed (iOS universal links, Android app links); the MAUI app hands external links to the OS. Where TVmaze has
 no page for the show on the service, the link searches the service for it ("Find it on Netflix") when the service has a
 search that works signed out, else goes to its home page. A show on a network whose official site is a streaming
-service's show page is listed under that service (House of the Dragon on HBO Max). The detail API's
-`watchProviders[].link` says which: `title`, `search` or `site`. Shows pick up their links on their next refresh.
+service's show page is listed under that service (House of the Dragon on HBO Max). Only a known service's show-page
+addresses count as the show's page (`netflix.com/title/…`, not `netflix.com/browse` or a network's own site). The detail
+API's `watchProviders[].link` says which (`WatchLink`: site, search or title). Shows pick up their links on their next
+refresh. The button is behind the `watch-now` flag.
 
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
@@ -372,7 +374,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -399,6 +401,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
+| `watch-now` | The "▶ Watch on Netflix" button on show pages |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".

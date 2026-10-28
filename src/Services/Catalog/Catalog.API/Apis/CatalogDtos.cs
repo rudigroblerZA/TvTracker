@@ -65,8 +65,8 @@ public record ShowRefDto(Guid Id, string Title);
 
 /// <param name="Url">The show's page on the service when known (on a phone it opens the service's app), else a search
 /// of the service for the show, else the service's site.</param>
-/// <param name="Link">"title" (the show's own page), "search" or "site".</param>
-public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url, string? Link = null);
+/// <param name="Link">What <paramref name="Url"/> opens; null without one.</param>
+public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url, WatchLink? Link = null);
 
 public record ShowDetailDto(
     Guid Id,

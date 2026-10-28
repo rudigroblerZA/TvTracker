@@ -169,6 +169,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode notes: moderators mark episodes essential or skippable with a source on the research page, and the essential cut follows them." }
     },
+    "watch-now": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "The \"Watch on Netflix\" button on show pages, linking to the show on its streaming service." }
+    },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

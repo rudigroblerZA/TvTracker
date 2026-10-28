@@ -1,79 +1,83 @@
 namespace Catalog.Data;
 
+/// <summary>What a where-to-watch link opens: the service's site, its search for the show, or the show's own page.</summary>
+public enum WatchLink
+{
+    Site,
+    Search,
+    Title
+}
+
 /// <summary>A streaming service the catalog knows how to link into.</summary>
-/// <param name="Name">The name shown when the provider gives none ("HBO Max" for a show page on hbo.com).</param>
-/// <param name="Hosts">Its web hosts, without "www."; a subdomain of one counts too.</param>
+/// <param name="Name">The name shown for a network show listed under the service (House of the Dragon on HBO Max).</param>
+/// <param name="Hosts">Its web hosts, without "www.", optionally with a path ("amazon.com/gp/video"); a subdomain of one
+/// counts too, and a path matches whole segments only.</param>
+/// <param name="TitlePaths">Path prefixes of its show pages ("/title/" on Netflix); an address under one, with more after
+/// it, is a show's page. Empty when its show pages can't be told from its other pages.</param>
 /// <param name="Search">Its search page, with <c>{q}</c> for the show's title; null when it has none that works signed out.</param>
-public sealed record StreamingService(string Name, IReadOnlyList<string> Hosts, string? Search = null);
+public sealed record StreamingService(string Name, IReadOnlyList<string> Hosts, IReadOnlyList<string> TitlePaths, string? Search = null);
 
 /// <summary>
 /// Where-to-watch links. TVmaze gives a streaming show's service ("Netflix", with its home page) and, separately, the
 /// show's official site, which for most streaming shows is its page on that service
 /// ("https://www.netflix.com/title/80057281"). That page is the link to keep: on a phone, the OS opens it in the
-/// service's app when it's installed (universal and app links), and in the browser otherwise. A service's home page is
-/// only a fallback, and a known service's search for the title beats it.
+/// service's app when it's installed (universal and app links), and in the browser otherwise.
+/// <para>
+/// Only a known service's show-page paths count as a show's page, so a home page with a path ("/browse", a country)
+/// or a site that isn't the service is never taken for one. Otherwise the link is the service's search for the title,
+/// when it has one that works signed out, else its site.
+/// </para>
 /// </summary>
 public static class StreamingServices
 {
     public static readonly IReadOnlyList<StreamingService> Known =
     [
-        new("Netflix", ["netflix.com"], "https://www.netflix.com/search?q={q}"),
-        new("Prime Video", ["primevideo.com", "amazon.com", "amazon.co.uk"], "https://www.primevideo.com/search/?phrase={q}"),
-        new("Apple TV", ["tv.apple.com"], "https://tv.apple.com/search?term={q}"),
-        new("Disney+", ["disneyplus.com"]),
-        new("HBO Max", ["hbomax.com", "max.com", "hbo.com"]),
-        new("Hulu", ["hulu.com"], "https://www.hulu.com/search?q={q}"),
-        new("Paramount+", ["paramountplus.com"]),
-        new("Peacock", ["peacocktv.com"]),
-        new("AMC+", ["amcplus.com"]),
-        new("BBC iPlayer", ["bbc.co.uk/iplayer"], "https://www.bbc.co.uk/iplayer/search?q={q}"),
-        new("ITVX", ["itvx.com"]),
-        new("Channel 4", ["channel4.com"]),
-        new("Crunchyroll", ["crunchyroll.com"], "https://www.crunchyroll.com/search?q={q}"),
-        new("YouTube", ["youtube.com"], "https://www.youtube.com/results?search_query={q}"),
-        new("Acorn TV", ["acorn.tv"]),
-        new("MGM+", ["mgmplus.com"]),
-        new("Starz", ["starz.com"]),
-        new("Showtime", ["sho.com"]),
-        new("CBC Gem", ["gem.cbc.ca"]),
-        new("ABC iview", ["iview.abc.net.au"]),
-        new("Binge", ["binge.com.au"]),
-        new("NOW", ["nowtv.com"])
+        new("Netflix", ["netflix.com"], ["/title/"], "https://www.netflix.com/search?q={q}"),
+        new("Prime Video", ["primevideo.com", "amazon.com/gp/video", "amazon.co.uk/gp/video"], ["/detail/", "/gp/video/detail/"],
+            "https://www.primevideo.com/search/?phrase={q}"),
+        new("Apple TV", ["tv.apple.com"], ["/show/"], "https://tv.apple.com/search?term={q}"),
+        new("Disney+", ["disneyplus.com"], ["/series/"]),
+        new("HBO Max", ["hbomax.com", "max.com"], ["/show/", "/shows/"]),
+        new("Hulu", ["hulu.com"], ["/series/"], "https://www.hulu.com/search?q={q}"),
+        new("Paramount+", ["paramountplus.com"], ["/shows/"]),
+        new("Peacock", ["peacocktv.com"], ["/watch/asset/", "/stream-tv/"]),
+        new("AMC+", ["amcplus.com"], ["/shows/"]),
+        new("BBC iPlayer", ["bbc.co.uk/iplayer"], ["/iplayer/episodes/"], "https://www.bbc.co.uk/iplayer/search?q={q}"),
+        new("ITVX", ["itvx.com"], ["/shows/"]),
+        new("Channel 4", ["channel4.com"], ["/programmes/"]),
+        new("Crunchyroll", ["crunchyroll.com"], ["/series/"], "https://www.crunchyroll.com/search?q={q}"),
+        new("Acorn TV", ["acorn.tv"], ["/series/"]),
+        new("MGM+", ["mgmplus.com"], ["/series/"]),
+        new("ABC iview", ["iview.abc.net.au"], ["/show/"]),
+        new("Binge", ["binge.com.au"], ["/shows/"]),
+        new("YouTube", ["youtube.com"], [], "https://www.youtube.com/results?search_query={q}"),
+        new("CBC Gem", ["gem.cbc.ca"], []),
+        new("NOW", ["nowtv.com"], [])
     ];
 
     /// <summary>The known service an address belongs to, if any.</summary>
     public static StreamingService? For(string? url) =>
         Parse(url) is { } uri ? Known.FirstOrDefault(s => s.Hosts.Any(h => Matches(uri, h))) : null;
 
+    /// <summary>Whether the address is a show's page on a known service (see <see cref="StreamingService.TitlePaths"/>).</summary>
+    public static bool IsTitlePage(string? url) =>
+        Parse(url) is { } uri && For(url) is { } service
+        && service.TitlePaths.Any(p => uri.AbsolutePath.StartsWith(p, StringComparison.OrdinalIgnoreCase)
+                                       && uri.AbsolutePath.Length > p.Length);
+
     /// <summary>
-    /// Whether the address is a page of its own on its site (a show's), not the site's home page or a section of it
-    /// ("https://www.netflix.com/", "https://www.bbc.co.uk/iplayer", "https://www.mgmplus.com/browse").
+    /// Whether two addresses belong to the same known service, or, when neither is a known service's, the same host.
     /// </summary>
-    public static bool IsTitlePage(string? url)
-    {
-        if (Parse(url) is not { } uri)
-        {
-            return false;
-        }
-        var prefix = For(url)?.Hosts.Select(h => h.IndexOf('/') is > 0 and var slash ? h[slash..] : "")
-            .FirstOrDefault(p => p.Length > 0 && uri.AbsolutePath.StartsWith(p, StringComparison.OrdinalIgnoreCase)) ?? "";
-        var rest = uri.AbsolutePath[prefix.Length..].Trim('/');
-        return rest.Length > 0 && !GenericPaths.Contains(rest);
-    }
-
-    private static readonly HashSet<string> GenericPaths = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "browse", "home", "index.html", "en", "en-us", "en-gb", "us", "uk", "gb", "za"
-    };
-
-    /// <summary>Whether two addresses are on the same service's site (or the same host, for unknown services).</summary>
     public static bool SameService(string? a, string? b)
     {
         if (Parse(a) is not { } x || Parse(b) is not { } y)
         {
             return false;
         }
-        return For(a) is { } service ? service == For(b) : string.Equals(Host(x), Host(y), StringComparison.OrdinalIgnoreCase);
+        var (first, second) = (For(a), For(b));
+        return first is not null || second is not null
+            ? first == second
+            : string.Equals(Host(x), Host(y), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -87,8 +91,11 @@ public static class StreamingServices
     {
         var (domain, path) = host.IndexOf('/') is > 0 and var slash ? (host[..slash], host[slash..]) : (host, "");
         var h = Host(uri);
-        return (string.Equals(h, domain, StringComparison.OrdinalIgnoreCase) || h.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase))
-            && uri.AbsolutePath.StartsWith(path, StringComparison.OrdinalIgnoreCase);
+        var onHost = string.Equals(h, domain, StringComparison.OrdinalIgnoreCase) || h.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase);
+        // Whole segments: "/iplayer" matches "/iplayer" and "/iplayer/…", not "/iplayerradio".
+        return onHost && (path.Length == 0
+            || string.Equals(uri.AbsolutePath.TrimEnd('/'), path, StringComparison.OrdinalIgnoreCase)
+            || uri.AbsolutePath.StartsWith(path + "/", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string Host(Uri uri) => uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;

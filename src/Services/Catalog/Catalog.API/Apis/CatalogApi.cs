@@ -275,8 +275,7 @@ public static class CatalogApi
             region,
             show.WatchProviders
                 .OrderBy(w => w.Type).ThenBy(w => w.ProviderName)
-                .DistinctBy(w => (w.ProviderName, w.Type))
-                .Select(w => WatchLink(w, show.Title))
+                .Select(w => WatchLinkFor(w, show.Title))
                 .ToList(),
             next is null ? null : Labeled(next),
             last is null ? null : Labeled(last),
@@ -291,10 +290,11 @@ public static class CatalogApi
     }
 
     /// <summary>The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.</summary>
-    private static WatchProviderDto WatchLink(WatchProvider provider, string title) =>
-        StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, "title")
-        : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search ? new(provider.ProviderName, provider.Type, search, "search")
-        : new(provider.ProviderName, provider.Type, provider.Url, provider.Url is null ? null : "site");
+    private static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
+        StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
+        : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search
+            ? new(provider.ProviderName, provider.Type, search, WatchLink.Search)
+        : new(provider.ProviderName, provider.Type, provider.Url, provider.Url is null ? null : WatchLink.Site);
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(
         Guid id, int number, CatalogContext db, CancellationToken ct)
