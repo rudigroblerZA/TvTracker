@@ -1,0 +1,298 @@
+@page "/ask"
+@attribute [RequiresFeature(FeatureFlags.Ask)]
+@implements IDisposable
+@inject AssistantClient Assistant
+
+<PageTitle>Ask · @Brand.AppName</PageTitle>
+
+<h1>Ask</h1>
+
+<AuthorizeView>
+    <NotAuthorized>
+        <p class="muted">Sign in to ask questions about shows.</p>
+    </NotAuthorized>
+    <Authorized>
+        <p class="muted ask-intro">
+            Questions about shows, answered from @Brand.AppName's catalog, insights and checked research by a small model running
+            on our own servers (@(about?.Model ?? "loading…")). It can be slow and it can be wrong: each answer shows what it looked up.
+        </p>
+        @if (about is { Available: false })
+        {
+            <p class="error-notice" role="status">The assistant isn't set up here: it needs Model Runner's chat model and the MCP gateway.</p>
+        }
+
+        @if (turns.Count == 0)
+        {
+            <section class="ask-examples" aria-label="Examples">
+                <p class="small muted">Try</p>
+                <div class="chips">
+                    @foreach (var example in Examples)
+                    {
+                        <button type="button" class="chip" disabled="@Waiting" @onclick="() => AskAsync(example)">@example</button>
+                    }
+                </div>
+            </section>
+        }
+
+        <ol class="ask-turns" aria-live="polite">
+            @foreach (var turn in turns)
+            {
+                <li class="ask-turn" @key="turn.Id">
+                    <p class="ask-question">@turn.Question</p>
+                    <div class="ask-answer">
+                        @switch (turn.Status)
+                        {
+                            case "queued":
+                                <p class="muted">@(turn.Ahead > 0 ? $"Waiting behind {turn.Ahead} other {(turn.Ahead == 1 ? "question" : "questions")}…" : "Starting…")</p>
+                                break;
+                            case "thinking":
+                                <p class="muted">
+                                    <span>Thinking…</span>
+                                    @if (turn.Steps.Count > 0)
+                                    {
+                                        <span>@($" looked at {string.Join(", ", turn.Steps.Select(StepLabel))}")</span>
+                                    }
+                                </p>
+                                break;
+                            case "failed":
+                                <p class="error-notice" role="alert">@turn.Problem</p>
+                                break;
+                            default:
+                                @foreach (var line in Lines(turn.Answer!))
+                                {
+                                    <p>
+                                        @foreach (var part in Parts(line, turn.Shows))
+                                        {
+                                            @if (part.Show is { } show)
+                                            {
+                                                <a href="shows/@show.Id">@part.Text</a>
+                                            }
+                                            else
+                                            {
+                                                <span>@part.Text</span>
+                                            }
+                                        }
+                                    </p>
+                                }
+                                break;
+                        }
+                        @if (turn.Status is "answered" or "failed" && turn.Steps.Count > 0)
+                        {
+                            <details class="ask-steps">
+                                <summary class="small muted">@($"How I got this: {turn.Steps.Count} {(turn.Steps.Count == 1 ? "lookup" : "lookups")}{(turn.Seconds is { } s ? $", {s:0} s" : "")}")</summary>
+                                <ul class="small">
+                                    @foreach (var step in turn.Steps)
+                                    {
+                                        <li>@StepLabel(step)@(step.Failed ? " (didn't answer)" : "")</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                        else if (turn.Status == "answered")
+                        {
+                            <p class="small muted">It answered without looking anything up, so treat this with care.</p>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+
+        <ErrorNotice Message="@error" />
+
+        <form class="ask-form" @onsubmit="() => AskAsync(question)" @onsubmit:preventDefault>
+            <textarea id="ask-input" aria-label="Your question" rows="2" maxlength="500" @bind="question" @bind:event="oninput"
+                      placeholder="@(LastAnswered is null ? "Ask about any show, person or list…" : "Ask a follow-up…")"></textarea>
+            <div class="ask-actions">
+                <button type="submit" class="btn" disabled="@(Waiting || question.Trim().Length < 3)">@(Waiting ? "Answering…" : "Ask")</button>
+                @if (turns.Count > 0 && !Waiting)
+                {
+                    <button type="button" class="btn btn-quiet" @onclick="StartOver">New conversation</button>
+                }
+            </div>
+        </form>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private static readonly string[] Examples =
+    [
+        "Landman insights",
+        "Hidden gems in drama",
+        "Which seasons premiere in the next month?",
+        "Who created Severance, and what else have they made?",
+        "Best Christmas episodes",
+        "Does Breaking Bad stick the landing?"
+    ];
+
+    private AssistantAbout? about;
+    private readonly List<AssistantAsk> turns = [];
+    private string question = "";
+    private string? error;
+    private System.Threading.Timer? poll;
+
+    private bool Waiting => turns.Count > 0 && turns[^1].Status is "queued" or "thinking";
+
+    private AssistantAsk? LastAnswered => turns.LastOrDefault(t => t.Status == "answered");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            about = await Assistant.GetAboutAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Signed out, or the service is down; asking says which.
+        }
+    }
+
+    private async Task AskAsync(string text)
+    {
+        if (Waiting || text.Trim().Length < 3)
+        {
+            return;
+        }
+        error = null;
+        try
+        {
+            if (await Assistant.AskAsync(text.Trim(), LastAnswered?.Id) is { } asked)
+            {
+                turns.Add(asked);
+                question = "";
+                SchedulePoll();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void StartOver()
+    {
+        turns.Clear();
+        error = null;
+    }
+
+    /// <summary>Checks every 2 s while the last question is being answered.</summary>
+    private void SchedulePoll()
+    {
+        poll?.Dispose();
+        poll = null;
+        if (!Waiting)
+        {
+            return;
+        }
+        var id = turns[^1].Id;
+        poll = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                var next = await Assistant.GetAsync(id);
+                await InvokeAsync(() =>
+                {
+                    var index = turns.FindIndex(t => t.Id == id);
+                    if (index >= 0)
+                    {
+                        // Forgotten by the service (it restarted): say so rather than wait for ever.
+                        turns[index] = next ?? turns[index] with { Status = "failed", Problem = "That question was lost. Ask it again." };
+                    }
+                    SchedulePoll();
+                    StateHasChanged();
+                });
+            }
+            catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or ObjectDisposedException)
+            {
+                await InvokeAsync(SchedulePoll);
+            }
+        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+    }
+
+    private static string StepLabel(AssistantStep step)
+    {
+        var name = step.Tool switch
+        {
+            "show_insights" => "show insights",
+            "show_details" => "the catalog",
+            "search_shows" => "search",
+            "season_episodes" => "a season's episodes",
+            "show_universe" => "the show's universe",
+            "show_research" => "checked research",
+            "person" => "a person's credits",
+            "person_insights" => "a person's insights",
+            "discover_list" => "a Discover list",
+            "upcoming_premieres" => "upcoming premieres",
+            "top_episodes" => "top episodes",
+            "holiday_episodes" => "holiday episodes",
+            _ => step.Tool.Replace('_', ' ')
+        };
+        var values = ArgumentValues(step.Arguments);
+        return values.Length == 0 ? name : $"{name} ({values})";
+    }
+
+    /// <summary>The call's argument values, without names or ids: "landman", "hidden-gems, drama".</summary>
+    private static string ArgumentValues(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return string.Join(", ", doc.RootElement.EnumerateObject()
+                .Select(p => p.Value.ToString())
+                .Where(v => v.Length > 0 && !Guid.TryParse(v, out _)));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return "";
+        }
+    }
+
+    /// <summary>The answer's lines, without the Markdown emphasis small models add.</summary>
+    private static IEnumerable<string> Lines(string answer) =>
+        answer.Replace("**", "").Replace("__", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0);
+
+    private sealed record Part(string Text, AssistantShow? Show);
+
+    /// <summary>The line split around show titles, each title linked to its show; longer titles first ("NCIS: Sydney" over "NCIS").</summary>
+    private static List<Part> Parts(string line, IReadOnlyList<AssistantShow> shows)
+    {
+        var parts = new List<Part>();
+        var ordered = shows.OrderByDescending(s => s.Title.Length).ToList();
+        var at = 0;
+        while (at < line.Length)
+        {
+            var next = ordered
+                .Select(s => (Show: s, Index: IndexOfWords(line, s.Title, at)))
+                .Where(x => x.Index >= 0)
+                .OrderBy(x => x.Index).ThenByDescending(x => x.Show.Title.Length)
+                .FirstOrDefault();
+            if (next.Show is null)
+            {
+                parts.Add(new Part(line[at..], null));
+                break;
+            }
+            if (next.Index > at)
+            {
+                parts.Add(new Part(line[at..next.Index], null));
+            }
+            parts.Add(new Part(line.Substring(next.Index, next.Show.Title.Length), next.Show));
+            at = next.Index + next.Show.Title.Length;
+        }
+        return parts;
+    }
+
+    /// <summary>Where the title appears as whole words, so a show called "Lost" doesn't link part of "lostness".</summary>
+    private static int IndexOfWords(string line, string title, int from)
+    {
+        for (var i = line.IndexOf(title, from, StringComparison.OrdinalIgnoreCase); i >= 0; i = line.IndexOf(title, i + 1, StringComparison.OrdinalIgnoreCase))
+        {
+            var end = i + title.Length;
+            if ((i == 0 || !char.IsLetterOrDigit(line[i - 1])) && (end == line.Length || !char.IsLetterOrDigit(line[end])))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void Dispose() => poll?.Dispose();
+}

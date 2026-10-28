@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using Mcp.Server.Services;
 using ModelContextProtocol.Server;
@@ -20,7 +21,7 @@ public sealed class CatalogTools(Backends backends, ShowResolver resolver)
     [McpServerTool(Name = "show_details", ReadOnly = true, Idempotent = true)]
     [Description("A show's catalog record: summary, status, network, genres, nanogenres, seasons, cast with character names and person ids, creators, the next and latest episode, and where to watch.")]
     public async Task<JsonNode> ShowDetails(
-        [Description("The show's title (\"landman\") or catalog id.")] string show,
+        [Description("The show's title or catalog id.")] string show,
         [Description("Two-letter region for where to watch, e.g. US or GB.")] string region = "US",
         CancellationToken ct = default)
     {
@@ -77,7 +78,9 @@ public sealed class CatalogTools(Backends backends, ShowResolver resolver)
 
     [McpServerTool(Name = "holiday_episodes", ReadOnly = true, Idempotent = true)]
     [Description("The best-known holiday episodes across the catalog, and shows made for the holiday. Holidays: halloween, thanksgiving, christmas, new-year, valentines.")]
-    public async Task<JsonNode> HolidayEpisodes([Description("halloween, thanksgiving, christmas, new-year or valentines.")] string holiday, CancellationToken ct = default) =>
+    public async Task<JsonNode> HolidayEpisodes(
+        [Description("halloween, thanksgiving, christmas, new-year or valentines."),
+            AllowedValues("halloween", "thanksgiving", "christmas", "new-year", "valentines")] string holiday, CancellationToken ct = default) =>
         await backends.GetAsync(Backends.Catalog, $"api/v1/holidays/{Uri.EscapeDataString(holiday.Trim().ToLowerInvariant())}", ct)
             ?? new JsonObject { ["error"] = "Unknown holiday. Use halloween, thanksgiving, christmas, new-year or valentines." };
 

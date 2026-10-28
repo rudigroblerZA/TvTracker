@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Assistant.API: "Ask the app". A chat model on Model Runner answers questions about shows by calling the app's MCP
+       tools through the MCP gateway, so every answer comes from the catalog, Analytics and saved research. -->
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

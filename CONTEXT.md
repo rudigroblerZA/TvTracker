@@ -25,10 +25,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
 | Research.API | dossiers, sources, fact candidates, saved research versions | moderators only; saved catalog facts go to the sync worker as overrides; behind the `research` flag |
+| Assistant.API | — (questions in memory) | "Ask the app": Model Runner's chat model with the MCP tools, through the gateway; behind the `ask` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
-| Mcp.Server | — | read-only MCP tools over Catalog.API, Analytics.API and Research.API, for internal queries ("landman insights") |
+| Mcp.Server | — | read-only MCP tools over Catalog.API, Analytics.API and Research.API, for internal queries ("landman insights") and Ask |
 | Mcp.Gateway | — | one MCP endpoint (API key, tool allow-list, call logs) in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
@@ -692,6 +693,36 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     setting in its database and ignores the environment afterwards, so a changed URL or key would silently not apply.
     The AppHost sets all of its configuration anyway; changes made in its admin settings last until a restart.
   - **Braces:** `ReferenceExpression` turns `}}` in its literal text into `}`, so the JSON keeps its closing braces apart.
+
+## Ask the app
+
+- **Tools, not retrieval** (Assistant.API, `AnswerLoop`): the chat model on Model Runner is offered the gateway's MCP
+  tools and answers from what they return. The tools already answer every question the app can, with the privacy rule
+  applied, so there's no index or copy of data to keep up.
+- **Through the gateway,** with its key, like Open WebUI: one tool list, and the gateway logs every call.
+- **Background queue** (`AskQueue`): one question at a time, since the model on a CPU takes 10 s to 2 minutes; the page
+  polls. One waiting question per person and 20 an hour. Kept in memory for 2 hours, never stored.
+- **Compact results** (`Toolbox`): nulls, empty values, show/episode ids and URLs go before the model reads a result
+  (10,000 characters of JSON became ~5,000, the cut-off). Show links are collected from the full result first.
+- **What qwen3 0.6B got wrong, and the guards** (a larger model may need fewer):
+  - **Answering without looking:** a follow-up was answered from the conversation with a guess, and after a refused
+    call it said "let me check that" and stopped. A reply without a tool call, while no lookup has worked, is sent
+    back with "look it up first", twice at most. Model Runner ignores `tool_choice: "required"`.
+  - **Made-up ids:** asked who created Severance, it called `person_insights` with "12345678-9012-…". A call with an
+    id no tool has returned isn't run; the model is told to look the show up first.
+  - **Missing arguments:** `discover_list` without its list got "An error occurred invoking 'discover_list'" from the
+    server. Required arguments are checked against the tool's schema, and the reply names what's missing.
+  - **Wrong values:** it asked `discover_list` for the list "drama" (hidden gems within drama). The tools' fixed
+    values are schema enums now (`[AllowedValues]` on the Mcp.Server parameters: discover lists, premiere sorts,
+    holidays), and a value outside one isn't run; the reply lists the allowed ones.
+  - **Copied examples:** asked for "best comedy finales", it looked up Landman, the example in show_insights'
+    description. Tool descriptions no longer name a show.
+  - **Misreading results:** it called Severance's cast its creators and read "as-it-ran" as a great finale. Two
+    reading hints in the system prompt didn't fix it, so the page says it can be wrong and lists what it looked up.
+- **Default chat model:** qwen3 0.6B (was smollm2, which doesn't call tools reliably). Larger models couldn't be pulled
+  in the sandbox (proxy certificate), so none were compared.
+- **Links:** only shows a tool returned, matched as whole words in the answer, so a show called "Lost" doesn't link
+  part of "lostness".
 
 ## Load testing
 

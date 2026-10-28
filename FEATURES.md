@@ -347,7 +347,19 @@ On show pages, written by moderators at `/research`.
 - **Also for questions:** the MCP tools answer from the saved research, so "what awards did Breaking Bad win?" comes
   from checked facts.
 
-### 30. Smaller touches
+### 30. Ask the app
+
+At `/ask`.
+
+- **Ask in plain words:** "Landman insights", "hidden gems in drama", "which seasons premiere in the next month?". The
+  answer comes from the app's own data: a model running on our servers looks things up with the same tools Claude Code
+  and Open WebUI use, then answers, linking the shows it names.
+- **Shows its work:** every answer lists what it looked up, so you can check it. Follow-up questions work ("and Better
+  Call Saul?").
+- **Honest about its size:** the default model is tiny (0.6B parameters, runs on a CPU). It finds the right data, but its
+  reading of it can be off, and the page says so; a bigger model is one setting away.
+
+### 31. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

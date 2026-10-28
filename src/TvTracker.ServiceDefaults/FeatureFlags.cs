@@ -36,6 +36,7 @@ public static class FeatureFlags
     public const string KnownFaces = "known-faces";
     public const string HolidayEpisodes = "holiday-episodes";
     public const string Research = "research";
+    public const string Ask = "ask";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

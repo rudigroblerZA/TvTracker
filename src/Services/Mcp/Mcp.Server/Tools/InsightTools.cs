@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using Mcp.Server.Services;
 using ModelContextProtocol.Server;
@@ -16,8 +17,8 @@ public sealed class InsightTools(Backends backends, ShowResolver resolver)
         ["hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable", "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings"];
 
     [McpServerTool(Name = "show_insights", ReadOnly = true, Idempotent = true)]
-    [Description("Everything computed about a show: seasons and their ratings, top and weakest episodes, consistency and arc, finales, when it gets good, whether it sticks the landing, show DNA (12 traits), tags, forecasts for its next season (renewal, timing, rating), shared cast, and our users' viewing (followers, drop-off) where enough users are behind it. Use for questions like \"landman insights\".")]
-    public async Task<JsonNode> ShowInsights([Description("The show's title (\"landman\") or catalog id.")] string show, CancellationToken ct = default)
+    [Description("Everything computed about a show: seasons and their ratings, top and weakest episodes, consistency and arc, finales, when it gets good, whether it sticks the landing, show DNA (12 traits), tags, forecasts for its next season (renewal, timing, rating), shared cast, and our users' viewing (followers, drop-off) where enough users are behind it. Use for questions like \"<show> insights\". landing.verdict says whether it sticks the landing: sticks (strong finale and final season), great-finale (strong finale after a weak season), finale-lets-down, fizzles (weak finale and season), weaker-last-season, or as-it-ran (ends as good as it ran).")]
+    public async Task<JsonNode> ShowInsights([Description("The show's title or catalog id.")] string show, CancellationToken ct = default)
     {
         if (await resolver.ResolveAsync(show, ct) is not { } found)
         {
@@ -37,7 +38,8 @@ public sealed class InsightTools(Backends backends, ShowResolver resolver)
     [McpServerTool(Name = "discover_list", ReadOnly = true, Idempotent = true)]
     [Description("A ranked discovery list: hidden-gems, most-consistent, rollercoasters, best-finales, bingeable, weekend-binges, fan-favorites, worth-the-wait (slow starters and where they turn) or great-endings. Optionally within one genre.")]
     public async Task<JsonNode> DiscoverList(
-        [Description("The list's key.")] string list,
+        [Description("The list's key."), AllowedValues("hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable",
+            "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings")] string list,
         [Description("A genre such as Drama or Comedy; omit for all.")] string? genre = null,
         [Description("How many, 1 to 50.")] int limit = 20,
         CancellationToken ct = default)
@@ -55,7 +57,8 @@ public sealed class InsightTools(Backends backends, ShowResolver resolver)
     [Description("Season premieres in the coming days, with the catch-up time before each (episodes and runtime) and how many of our users followed the show recently.")]
     public async Task<JsonNode> UpcomingPremieres(
         [Description("How many days ahead, 1 to 90.")] int days = 30,
-        [Description("date (soonest first), rating (highest rated first) or anticipated (most recent follows first).")] string sort = "date",
+        [Description("date (soonest first), rating (highest rated first) or anticipated (most recent follows first)."),
+            AllowedValues("date", "rating", "anticipated")] string sort = "date",
         [Description("How many, 1 to 100.")] int limit = 25,
         CancellationToken ct = default) =>
         await backends.GetAsync(Backends.Analytics,
