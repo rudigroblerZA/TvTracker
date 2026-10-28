@@ -710,6 +710,18 @@ How events flow:
     - **Trusted source of truth, field by field:** a saved summary, network or premiere date replaces TVmaze's in the
       catalog (like an accepted correction), and survives every refresh. Dropping one in a later version gives the
       field back to TVmaze on the show's next refresh. The other facts live with the research.
+    - **Queue** (`/research`, moderators): what to research next.
+      - **Wikidata disagrees:** popular shows where Wikidata's network, premiere date or (ended shows) episode count
+        differs from the catalog's, with both values and a link to the Wikidata item. Saving research with the right
+        value overrides the catalog's, and the show drops off after the next check.
+      - **Popular, not researched yet:** the catalog's most popular shows with no saved research, marked when started.
+      - **How:** Research.API checks the 300 most popular shows against Wikidata after start and daily (one SPARQL query
+        per 100 shows, by TVmaze id); a network matches when one name contains the other ("HBO" and "HBO Max") or by
+        initials ("American Broadcasting Company" and ABC), a premiere when within a day at Wikidata's precision (a
+        month-only date by month), and an episode count when within 2 or 10%. When Wikidata answers 429 it waits as
+        asked, and a failed run is tried again in an hour.
+      - **API:** `GET /api/v1/research/queue` (moderators), and `GET /api/v1/shows/facts?limit=` on Catalog.API (the
+        popular shows' network, premiere date and aired episodes; behind the `research` flag).
     - **MCP:** `show_research` returns the saved record.
     - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
       `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,

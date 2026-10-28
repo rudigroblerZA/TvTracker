@@ -126,6 +126,32 @@ public class EpisodeNote
     public const int MaxReason = 280;
 }
 
+/// <summary>
+/// Where Wikidata disagrees with the catalog about a popular show (<see cref="Services.CatalogChecks"/>), one row per
+/// show and field. The whole table is replaced by each check.
+/// </summary>
+public class CatalogCheck
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>"network", "premiered" or "episodes".</summary>
+    public required string Field { get; set; }
+
+    public required string ShowTitle { get; set; }
+
+    /// <summary>The catalog's value; null when it has none.</summary>
+    public string? CatalogValue { get; set; }
+
+    public required string WikidataValue { get; set; }
+
+    public required string WikidataUrl { get; set; }
+
+    /// <summary>The show's place among the catalog's most popular, 1 first.</summary>
+    public int Rank { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
 public static class SourceKinds
 {
     public const string Wikidata = "wikidata";
@@ -144,6 +170,7 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
     public DbSet<FactCandidate> Candidates => Set<FactCandidate>();
     public DbSet<SavedResearch> Saved => Set<SavedResearch>();
     public DbSet<EpisodeNote> EpisodeNotes => Set<EpisodeNote>();
+    public DbSet<CatalogCheck> CatalogChecks => Set<CatalogCheck>();
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
@@ -201,6 +228,17 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
             entity.Property(n => n.NotedById).HasMaxLength(64);
             entity.Property(n => n.NotedByName).HasMaxLength(256);
             entity.HasIndex(n => n.ShowId);
+        });
+
+        modelBuilder.Entity<CatalogCheck>(entity =>
+        {
+            entity.ToTable("catalog_checks");
+            entity.HasKey(c => new { c.ShowId, c.Field });
+            entity.Property(c => c.Field).HasMaxLength(16);
+            entity.Property(c => c.ShowTitle).HasMaxLength(256);
+            entity.Property(c => c.CatalogValue).HasMaxLength(256);
+            entity.Property(c => c.WikidataValue).HasMaxLength(256);
+            entity.Property(c => c.WikidataUrl).HasMaxLength(256);
         });
 
         modelBuilder.UseIntegrationEventLogs();

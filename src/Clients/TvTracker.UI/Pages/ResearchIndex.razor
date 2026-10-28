@@ -19,6 +19,53 @@
         }
         else
         {
+            @if (queue is not null)
+            {
+                <section aria-labelledby="disagree-title">
+                    <h2 id="disagree-title">Wikidata disagrees</h2>
+                    <p class="muted small">
+                        Popular shows where Wikidata's network, premiere date or (for ended shows) episode count differs from the
+                        catalog's@(queue.CheckedAtUtc is { } at ? $", checked {Format.Relative(at)}" : ", not checked yet").
+                        Saving research with the right value overrides the catalog's, and the show drops off after the next check.
+                    </p>
+                    @if (queue.Disagreements.Count == 0)
+                    {
+                        <p class="muted small">Nothing to look at.</p>
+                    }
+                    <ul class="research-list research-queue">
+                        @foreach (var show in queue.Disagreements)
+                        {
+                            <li @key="show.ShowId">
+                                <div>
+                                    <a href="research/@show.ShowId"><strong>@show.Title</strong></a>
+                                    <span class="muted small">@($" · #{show.Rank} most popular{(show.Researched ? " · researched" : "")} · ")</span><a class="small" href="@show.WikidataUrl" target="_blank" rel="noopener noreferrer">Wikidata</a>
+                                </div>
+                                <ul class="small">
+                                    @foreach (var field in show.Fields)
+                                    {
+                                        <li>@($"{FieldLabel(field.Field)}: catalog {field.Catalog ?? "none"}, Wikidata {field.Wikidata}")</li>
+                                    }
+                                </ul>
+                            </li>
+                        }
+                    </ul>
+                </section>
+
+                <section aria-labelledby="unresearched-title">
+                    <h2 id="unresearched-title">Popular, not researched yet</h2>
+                    <ul class="research-list">
+                        @foreach (var show in queue.Unresearched)
+                        {
+                            <li @key="show.ShowId">
+                                <a href="research/@show.ShowId"><strong>@show.Title</strong></a>
+                                <span class="muted small">@($" · #{show.Rank}{(show.Network is { } n ? $" · {n}" : "")}{(show.Year is { } y ? $" · {y}" : "")}{(show.Started ? " · started" : "")}")</span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            <h2>In progress and saved</h2>
             <p class="muted">Shows being researched, most recently worked on first. To start one, open the show and choose "Research this show".</p>
             @if (shows.Count == 0)
             {
@@ -42,6 +89,15 @@
 
 @code {
     private List<ResearchedShow>? shows;
+    private ResearchQueue? queue;
+
+    private static string FieldLabel(string field) => field switch
+    {
+        "network" => "Network",
+        "premiered" => "Premiere",
+        "episodes" => "Episodes",
+        _ => field
+    };
     private bool notModerator;
     private string? error;
 
@@ -54,6 +110,10 @@
         {
             shows = await Research.GetResearchedAsync();
             notModerator = shows is null;
+            if (shows is not null)
+            {
+                queue = await Research.GetQueueAsync();
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

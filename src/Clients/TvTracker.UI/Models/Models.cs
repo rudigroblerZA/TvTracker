@@ -596,6 +596,18 @@ public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtU
 public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Mark, string Reason, string SourceUrl,
     DateTime NotedAtUtc, string NotedBy);
 
+/// <summary>What to research next (Research.API's queue).</summary>
+public record ResearchQueue(IReadOnlyList<QueuedShow> Unresearched, IReadOnlyList<DisagreeingShow> Disagreements, DateTime? CheckedAtUtc);
+
+/// <param name="Rank">Its place among the catalog's most popular.</param>
+/// <param name="Started">Gathered or drafted, not saved.</param>
+public record QueuedShow(Guid ShowId, string Title, string? PosterUrl, int Rank, string? Network, int? Year, bool Started);
+
+public record DisagreeingShow(Guid ShowId, string Title, int Rank, bool Researched, string WikidataUrl, IReadOnlyList<Disagreement> Fields);
+
+/// <param name="Field">"network", "premiered" or "episodes".</param>
+public record Disagreement(string Field, string? Catalog, string Wikidata);
+
 public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
 
 /// <param name="Origin">"saved", "catalog" or "source".</param>

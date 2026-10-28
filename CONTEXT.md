@@ -531,6 +531,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
 - **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
   them as numbered, so its citations keep pointing at the right source.
+- **Research queue** (`ResearchQueueApi`, `CatalogChecks`): popular shows with no saved research, and popular shows
+  where Wikidata disagrees with the catalog.
+  - **Order:** TVmaze's popularity tops out, so the provider's rating breaks ties (the alphabet did at first).
+  - **Checked in bulk, by TVmaze id:** one SPARQL query per 100 shows (`VALUES` over P8600), so 300 shows are three
+    queries a day. Per-show gathers would be 300 queries, and Wikidata limits the sandbox's shared address hard: it
+    answered 429 with Retry-After 1,000 s after a handful of queries. The job waits as asked (up to 30 minutes), and a
+    failed run is retried in an hour. The table is replaced in a transaction run through the execution strategy, since
+    Npgsql's retrying strategy refuses a transaction begun by hand.
+  - **Loose matches:** a network matches when one name contains the other (a show that moved lists both) or by
+    initials ("American Broadcasting Company" is ABC), with "television" read as "TV"; a premiere within a day (time
+    zones), at Wikidata's precision (a month-only date is stored as the 1st, so it's compared by month); episodes within
+    2 or 10% and only for ended shows (Wikidata lags running ones, and counts specials and double episodes its own way).
+    The first run, without initials or precision, listed 66 differences in 300 shows; with them, 44, mostly a show's
+    streaming home against its first broadcaster (BBC iPlayer and BBC One), which a moderator judges.
+  - **Replaced each run:** the table is the latest check, so a fix (saved research overrides the catalog) clears its row
+    the next day; nothing to dismiss by hand.
+  - **Catalog facts by API:** Catalog.API's `/shows/facts` gives the popular shows' network, premiere date and aired
+    episodes as the catalog holds them, overrides applied.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see

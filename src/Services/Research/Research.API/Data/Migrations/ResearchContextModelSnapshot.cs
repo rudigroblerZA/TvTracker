@@ -22,6 +22,45 @@ namespace Research.API.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Research.API.Data.CatalogCheck", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("CatalogValue")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ShowTitle")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("WikidataUrl")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("WikidataValue")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("ShowId", "Field");
+
+                    b.ToTable("catalog_checks", (string)null);
+                });
+
             modelBuilder.Entity("Research.API.Data.Dossier", b =>
                 {
                     b.Property<Guid>("ShowId")

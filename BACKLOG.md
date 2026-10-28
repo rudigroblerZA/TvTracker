@@ -124,8 +124,6 @@ So the rest of the list reads in proportion:
 - **Why:**
   - It still uses `EnsureCreated` (`Identity.API/Program.cs:12`), which never changes an existing database.
     Notifications moved with the weekly digest.
-  - This has already cost a feature: the season verdict had to borrow the "new seasons" notification preference,
-    because a preference of its own needs a column.
 - **What:** the baseline pattern other services used. Make `InitialCreate` from the unchanged model, pass
   `baseline: "InitialCreate"`, diff it against an `EnsureCreated` database with `pg_dump -s`, and add the migration
   commands to CLAUDE.md.
@@ -289,14 +287,6 @@ So the rest of the list reads in proportion:
 - **Done when:** turning verdicts off stops them without stopping new-season notifications.
 
 ## Features
-
-### F4. Research queue
-
-**P3 · S**
-
-- **What:** a list for moderators of popular shows with no research, and of shows where Wikidata disagrees with TVmaze
-  (network, premiere date, episode count).
-- **Builds on:** Research's gather and the `/ops` data-quality checks.
 
 ### F5. Taste twins
 

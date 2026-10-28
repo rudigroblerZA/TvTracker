@@ -519,6 +519,10 @@ public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<List<ResearchedShow>?> GetResearchedAsync(CancellationToken ct = default) =>
         GetAsync<List<ResearchedShow>>(ApiClients.Research, "api/v1/research", ct);
 
+    /// <summary>What to research next; null unless the user is a moderator.</summary>
+    public Task<ResearchQueue?> GetQueueAsync(CancellationToken ct = default) =>
+        GetAsync<ResearchQueue>(ApiClients.Research, "api/v1/research/queue", ct);
+
     public Task<ResearchWorkspace?> GatherAsync(Guid showId, CancellationToken ct = default) =>
         SendAsync<ResearchWorkspace>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/gather", null, ct);
 

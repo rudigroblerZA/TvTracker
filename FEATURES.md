@@ -348,6 +348,8 @@ On show pages, written by moderators at `/research`.
   through every refresh. Breaking Bad's network reads "AMC (United States)" until a later version drops it.
 - **Also for questions:** the MCP tools answer from the saved research, so "what awards did Breaking Bad win?" comes
   from checked facts.
+- **What to research next:** the Research page lists the most popular shows nobody has researched, and popular shows
+  where Wikidata disagrees with the catalog about the network, the premiere date or an ended show's episode count.
 
 ### 30. Ask the app
 
