@@ -112,6 +112,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<MoodResponse?> GetMoodFitsAsync(string mood, IReadOnlyCollection<Guid> showIds, CancellationToken ct = default) =>
         SendAsync<MoodResponse>(ApiClients.Catalog, HttpMethod.Post, "api/v1/shows/mood", new { mood, showIds }, ct);
 
+    /// <summary>Every show where the person plays the character they play in <paramref name="showId"/>.</summary>
+    public Task<CharacterTrail?> GetCharacterTrailAsync(Guid personId, Guid showId, CancellationToken ct = default) =>
+        GetAsync<CharacterTrail>(ApiClients.Catalog, $"api/v1/people/{personId}/characters/{showId}", ct, cacheForOffline: true);
+
     public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
 
@@ -294,7 +298,7 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<ShowInsights>(ApiClients.Analytics, $"api/v1/shows/{showId}/insights", ct, cacheForOffline: true);
 
     /// <summary>Seasons that just ended (3 to 45 days after their finale), newest finale first.</summary>
-    public Task<List<SeasonVerdictItem>?> GetSeasonVerdictsAsync(int limit = 12, CancellationToken ct = default) =>
+    public Task<List<SeasonVerdictItem>?> GetSeasonVerdictsAsync(int limit = 20, CancellationToken ct = default) =>
         GetAsync<List<SeasonVerdictItem>>(ApiClients.Analytics, $"api/v1/insights/season-verdicts?limit={limit}", ct, cacheForOffline: true);
 
     public Task<List<PremiereItem>?> GetPremieresAsync(int days = 60, string sort = "date", CancellationToken ct = default) =>
@@ -525,6 +529,17 @@ public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t,
 
     public Task KeepDraftAsync(Guid showId, string? text, CancellationToken ct = default) =>
         SendAsync(ApiClients.Research, HttpMethod.Put, $"api/v1/research/{showId}/draft", new { Text = text }, ct);
+
+    /// <summary>The show's episode notes; null unless the user is a moderator.</summary>
+    public Task<List<EpisodeNote>?> GetEpisodeNotesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<List<EpisodeNote>>(ApiClients.Research, $"api/v1/research/{showId}/episode-notes", ct);
+
+    public Task<EpisodeNote?> SetEpisodeNoteAsync(Guid showId, Guid episodeId, string mark, string reason, string sourceUrl, CancellationToken ct = default) =>
+        SendAsync<EpisodeNote>(ApiClients.Research, HttpMethod.Put, $"api/v1/research/{showId}/episode-notes/{episodeId}",
+            new { Mark = mark, Reason = reason, SourceUrl = sourceUrl }, ct);
+
+    public Task RemoveEpisodeNoteAsync(Guid showId, Guid episodeId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Delete, $"api/v1/research/{showId}/episode-notes/{episodeId}", null, ct);
 
     public Task<ResearchSaveResult?> SaveAsync(Guid showId, string insight, IReadOnlyList<ResearchFactChoice> facts, CancellationToken ct = default) =>
         SendAsync<ResearchSaveResult>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/save", new { Insight = insight, Facts = facts }, ct);

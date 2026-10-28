@@ -28,6 +28,7 @@ public static class CatalogApi
         api.MapUniverseApi();
         api.MapMoodApi();
         api.MapHolidayApi();
+        api.MapCharacterApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
@@ -242,6 +243,8 @@ public static class CatalogApi
                 .ToListAsync(ct))
             .ToLookup(x => x.PersonId);
 
+        var trails = await CharacterApi.TrailLengthsAsync(db, show.Cast.Select(c => (c.PersonId, c.Person.Name, c.Character)).ToList(), ct);
+
         var next = show.Episodes
             .Where(e => e.AirsAtUtc > now)
             .OrderBy(e => e.AirsAtUtc)
@@ -267,12 +270,12 @@ public static class CatalogApi
                 .ToList(),
             show.Cast
                 .OrderBy(c => c.Order)
-                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl, c.PersonId))
+                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl, c.PersonId, trails.GetValueOrDefault(c.PersonId)))
                 .ToList(),
             region,
             show.WatchProviders
                 .OrderBy(w => w.Type).ThenBy(w => w.ProviderName)
-                .Select(w => new WatchProviderDto(w.ProviderName, w.Type, w.Url))
+                .Select(w => WatchLinkFor(w, show.Title))
                 .ToList(),
             next is null ? null : Labeled(next),
             last is null ? null : Labeled(last),
@@ -285,6 +288,13 @@ public static class CatalogApi
             show.Source,
             show.ExternalId);
     }
+
+    /// <summary>The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.</summary>
+    private static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
+        StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
+        : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search
+            ? new(provider.ProviderName, provider.Type, search, WatchLink.Search)
+        : new(provider.ProviderName, provider.Type, provider.Url, provider.Url is null ? null : WatchLink.Site);
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(
         Guid id, int number, CatalogContext db, CancellationToken ct)

@@ -68,9 +68,10 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
 }
 
 /// <summary>
-/// A part of the show document that another service keeps a copy of: tags for the catalog's search filter, DNA for
-/// recommendations. Each run starts a fresh <see cref="PublicationBuilder"/>, which compares every show's new document
-/// with the stored one; the pipeline publishes what changed through the outbox.
+/// A part of the show document that another service hears about: tags for the catalog's search filter, DNA for
+/// recommendations, a season's verdict for notifications. Each run starts a fresh <see cref="PublicationBuilder"/>,
+/// which compares every show's new document with the stored one; after each batch the pipeline adds the batch's events
+/// to the outbox in the same save as its documents, so a stored document's events are never lost.
 /// </summary>
 public interface IInsightPublication
 {
@@ -84,13 +85,14 @@ public abstract class PublicationBuilder
     /// <summary>For the log: "tags", "DNA".</summary>
     public abstract string Name { get; }
 
-    /// <summary>Shows sent by the last <see cref="Events"/>.</summary>
+    /// <summary>Shows sent so far this run.</summary>
     public int Count { get; protected set; }
 
     /// <param name="previous">The show's stored document from the last run; null for a show computed for the first time.</param>
     public abstract void Add(ShowInsights insights, JsonElement? previous);
 
-    public abstract IReadOnlyList<IntegrationEvent> Events();
+    /// <summary>The events for the shows added since the last call; the pipeline saves them with those shows' documents.</summary>
+    public abstract IReadOnlyList<IntegrationEvent> TakeEvents();
 }
 
 /// <summary>A publication of one value per show, sent in events of at most <paramref name="maxPerEvent"/> shows.</summary>
@@ -116,9 +118,11 @@ public abstract class PublicationBuilder<TValue>(bool publishAll, int maxPerEven
         }
     }
 
-    public override IReadOnlyList<IntegrationEvent> Events()
+    public override IReadOnlyList<IntegrationEvent> TakeEvents()
     {
-        Count = changed.Count;
-        return changed.Chunk(maxPerEvent).Select(chunk => EventFor(chunk)).ToList();
+        Count += changed.Count;
+        var events = changed.Chunk(maxPerEvent).Select(chunk => EventFor(chunk)).ToList();
+        changed.Clear();
+        return events;
     }
 }

@@ -229,6 +229,17 @@ TVmaze data is licensed CC BY-SA; the app footer carries the required credit. TV
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
+**Watch on Netflix:** a streaming show's page has a "▶ Watch on Netflix" button (and the same link under Where to watch)
+that goes straight to the show on the service: `netflix.com/title/…`, `tv.apple.com/show/…`, `hbomax.com/show/…`,
+`primevideo.com/detail/…`, Disney+, Hulu, Peacock and others. On a phone, the OS opens these in the service's app when
+it's installed (iOS universal links, Android app links); the MAUI app hands external links to the OS. Where TVmaze has
+no page for the show on the service, the link searches the service for it ("Find it on Netflix") when the service has a
+search that works signed out, else goes to its home page. A show on a network whose official site is a streaming
+service's show page is listed under that service (House of the Dragon on HBO Max). Only a known service's show-page
+addresses count as the show's page (`netflix.com/title/…`, not `netflix.com/browse` or a network's own site). The detail
+API's `watchProviders[].link` says which (`WatchLink`: site, search or title). Shows pick up their links on their next
+refresh. The button is behind the `watch-now` flag.
+
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
 neither keeps the plain poster layout. An image that fails to load falls back to the next. Shows imported earlier
@@ -344,22 +355,26 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
 - **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
   and the shows with the most shared cast.
 - **Backfills:** cast credits fetched this month (the reunion radar's data), shows with their makers, and careers.
-- **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest) and universes (the largest).
-- **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, and the top of
-  Worth the wait.
+- **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest), universes (the largest),
+  and characters the same actor plays across catalog shows (character trails).
+- **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, season verdicts out
+  now, and the top of Worth the wait.
+- **Research and curation:** shows with a trusted record, versions, sources and drafts running (Research.API); catalog
+  overrides by field (accepted corrections and saved research); and episode notes (essential, skippable).
 - **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
 - **Bulk import:** the latest bulk import job.
 - **Data quality:** how much of TVmaze's data is missing (unrated episodes, runtimes, placeholder titles, numbering,
-  genres), and whether Analytics' copy of the catalog is in step.
+  genres), whether Analytics' copy of the catalog is in step, and whether its copy of the episode notes matches
+  Research's (with any note events still waiting in Research's outbox).
 - **Feature flags:** every flag, on or off, as flagd answers a signed-out caller.
 
-Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
+Catalog.API gathers the other services' sections server-side (`/api/v1/ops/stats` on Analytics.API and Research.API,
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
-isn't signed in, it and the Analytics stats endpoint are only mapped in Development.
+isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, the season verdict, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -384,6 +399,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
 | `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
+| `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
+| `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
+| `watch-now` | The "▶ Watch on Netflix" button on show pages |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -543,6 +561,11 @@ How events flow:
       Breaking Bad loses 10% at "light".
     - **The page:** hours and episodes saved, the biggest runs to skip ("S2007 E35–E44, rated 7.2 against the
       season's 8.6") and a chip per episode.
+    - **Episode notes** (`episode-notes` flag): moderators mark episodes essential or skippable on the research page,
+      with a reason viewers see and a source. The cut follows them first, at every level: an essential episode is
+      always kept, and a season with any skippable episode is cut by its marks alone. "From our moderators" lists them,
+      and a show with notes can be cut even when too few of its episodes are rated. Backlog triage and the catch-up
+      planner use the same cut.
     - **From where you are:** for a show you've started, it shows the next episode the cut keeps and what's left in full and
       in the cut.
     - **Spoiler-safe:** episode titles stay hidden unless you ask for them.
@@ -635,7 +658,8 @@ How events flow:
     - **API:** `GET /api/v1/shows/{id}/known-faces` on Analytics.API, computed on request from your own data.
   - **Season verdict** (show pages, Insights, and the inbox of the show's followers): how a season that just ended did.
     - **What it says:** the season's TVmaze rating against the show's other seasons ("its best season yet", "one of its
-      better seasons", "as good as the others", "one of its weaker", "its weakest yet", or "first season"), whether
+      better seasons", "as good as the others", "one of its weaker", "its weakest yet", "first season", or just its
+      rating when its earlier seasons have too few ratings to compare), whether
       the finale was a high point or a let-down, and how many viewers here who started the season have finished it
       (with 5 or more who started).
     - **When:** from 3 days after the finale (ratings come in) until 45 days after. A season counts as over when the show
@@ -681,8 +705,10 @@ How events flow:
     - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
       `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
       `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
-      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`. Anyone else gets 404. Behind the
-      `research` flag.
+      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`, and episode notes:
+      `GET /api/v1/research/{id}/episode-notes`, `PUT|DELETE /api/v1/research/{id}/episode-notes/{episodeId}`
+      (`{ "mark": "essential" | "skippable", "reason", "sourceUrl" }`). Anyone else gets 404. Behind the `research`
+      flag (and `episode-notes` for the notes).
   - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
     insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
     things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
@@ -698,6 +724,17 @@ How events flow:
     - **Nothing personal:** the tools have no user, so it knows shows, not your watches or ratings.
     - **API** (Assistant.API, port 5115): `POST /api/v1/ask` (`{ "question", "previousId" }`, 202 with the question's
       state), `GET /api/v1/ask/{id}` (poll until `answered` or `failed`), `GET /api/v1/ask/about`. Behind the `ask` flag.
+  - **Character trail** (`/people/{personId}/characters/{showId}`, from a show page's cast, where a character name
+    reads "Karen Page · 4 shows"): every show where the same actor plays the same character, in the order they first
+    aired.
+    - **Matching:** Universes' name rules ("Dr. Frasier W. Crane" is "Dr. Frasier Crane"), over the catalog's casts and
+      the actor's TVmaze credits, so Cheers is on Frasier's trail though it isn't in the catalog (it links to search,
+      which imports it). Roles as themselves have no trail.
+    - **Signed in:** your progress in each show you follow, and "Add all to your watchlist" for the rest.
+    - **Limits:** TVmaze lists main casts only, so guest appearances are missing, and a character who joins in a
+      later season counts for the whole show. Same actor only: a recast character isn't followed.
+    - **API:** `GET /api/v1/people/{personId}/characters/{showId}` on Catalog.API (public); show detail's cast has
+      `trailShows`. Behind the `character-trail` flag.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

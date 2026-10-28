@@ -25,10 +25,10 @@
                 <section aria-labelledby="verdicts-title">
                     <h2 id="verdicts-title">Seasons that just ended</h2>
                     <p class="muted small">How each did against the show's other seasons, a few days after its finale.</p>
-                    <ul class="season-verdicts">
+                    <ul class="backlog-list season-verdicts">
                         @foreach (var item in verdicts)
                         {
-                            <li class="season-verdict tone-@SeasonVerdictText.Tone(item.Verdict)" @key="item.ShowId">
+                            <li class="tone-@SeasonVerdictText.Tone(item.Verdict)" @key="item.ShowId">
                                 <a href="shows/@item.ShowId"><strong>@item.Title</strong></a>
                                 <span class="muted">@($" · season {item.Verdict.Number}, ended {Format.Relative(item.Verdict.FinaleAiredAtUtc)}")</span>
                                 <div><strong>@SeasonVerdictText.Headline(item.Verdict)</strong><span class="muted small">@($" · {SeasonVerdictText.Details(item.Verdict)}")</span></div>
@@ -157,9 +157,7 @@
         {
             // The genre filter is optional.
         }
-        await LoadVerdictsAsync();
-        await LoadPremieresAsync();
-        await LoadTopEpisodesAsync();
+        await Task.WhenAll(LoadVerdictsAsync(), LoadPremieresAsync(), LoadTopEpisodesAsync());
     }
 
     /// <summary>Optional: hidden when the season-verdict flag is off (404) or the call fails.</summary>
@@ -169,8 +167,9 @@
         {
             verdicts = await Analytics.GetSeasonVerdictsAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
+            // The premieres and top episodes say so if the session has ended.
             verdicts = null;
         }
     }

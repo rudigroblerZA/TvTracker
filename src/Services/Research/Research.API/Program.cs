@@ -16,6 +16,8 @@ builder.Services.AddDatabaseInitializer<ResearchContext>();
 
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
+builder.Services.AddIntegrationEventOutbox<ResearchContext>();
+builder.Services.AddHostedService<EpisodeNotesPublisher>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<Researchers>();
@@ -41,6 +43,7 @@ app.MapDefaultEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapOpsApi();
 }
 
 app.UseAuthentication();
@@ -48,5 +51,6 @@ app.UseAuthorization();
 
 app.MapGet("/api/v1/status", () => new { Service = "research-api", Status = "ok" });
 app.MapResearchApi();
+app.MapEpisodeNotesApi();
 
 app.Run();

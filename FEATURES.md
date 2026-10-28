@@ -38,8 +38,10 @@ Finds spin-offs, sequels, revivals, crossovers and franchises on its own, then s
   best episode and two-parters. A weak season is thinned rather than skipped whole, so the story still holds.
 - **Levels:** Light, Lean and Essentials. One Piece goes from 510 hours to 443, 376 or 324; Breaking Bad loses only
   10% at Light.
-- **Accuracy:** it has no filler data, yet it skips 53–78% of One Piece's known filler. At Light, a skipped episode is
+- **Accuracy:** from ratings alone, it skips 53–78% of One Piece's known filler. At Light, a skipped episode is
   filler 3.6× as often as a random one.
+- **Episode notes:** where moderators have marked episodes essential or skippable (with a reason and a source), the
+  cut follows them first. A season with filler marked is cut by its marks alone.
 - **Spoiler-safe:** only numbers and ratings show unless you ask for titles. For a show you've started, it shows
   the next episode the cut keeps and the hours left.
 
@@ -369,23 +371,29 @@ On show pages, Insights, and in your inbox.
 - **Knows when a season is really over:** a weekly show between episodes isn't called finished; it waits until the
   show has been quiet for twice its usual gap.
 
-### 32. Smaller touches
+### 32. Character trail
+
+From a show page's cast: "Karen Page · 4 shows".
+
+- **Follow a character, not a show:** every show where the same actor plays the same character, in the order they
+  first aired: Karen Page through Daredevil, The Defenders, The Punisher and Daredevil: Born Again; Frasier Crane from
+  Cheers to the 2023 revival.
+- **Your place in each:** how far you are in each show, and one button to add the rest to your watchlist. Shows not
+  yet in the catalog link to search, which imports them.
+
+### 33. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
 - **Actor pages:** a person's shows' average rating, their best show, the years they worked, and co-stars they share
   two or more shows with.
 - **Privacy:** anything computed from our users' activity needs at least 5 users or ratings behind it.
+- **Watch it where it streams:** "▶ Watch on Netflix" on a show's page goes straight to the show on the service,
+  and on a phone opens the service's app; without a direct link it searches the service for the show.
 - **Light or dark:** one tap in the header, or follow the device (Settings).
 - **Flags from the app:** admins turn features on or off for everyone from Settings, without editing files.
 - **Your name on it:** the app's name is a setting, so it can be white-labelled without code changes.
 
 ## Ideas for next
 
-Ranked by value for the effort. Each builds on data and code that already exist.
-
-| # | Idea | What it does | Builds on | Effort |
-| --- | --- | --- | --- | --- |
-| 1 | **Crossover alerts** | Tell you when a crossover event is scheduled in a universe you're watching ("Reckoning airs across Fire, Med and P.D. on Wednesday"), so you're caught up on all three shows first. | Watch order's crossover detection, follows, Notifications | Small |
-| 2 | **Character trail** | Follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your progress. | Universes' character matching, watch order | Medium |
-| 3 | **Taste twins** | Find users whose ratings track yours, and what they loved that you haven't seen. Shown only with enough overlap to keep it anonymous. | Ratings, the 5-user privacy rule, Recommendations | Large |
+What's planned, features and fixes alike, is in [BACKLOG.md](BACKLOG.md), with priorities and sizes.

@@ -725,7 +725,7 @@ public sealed class CatalogSynchronizer(
     private static void SyncWatchProviders(Show show, IReadOnlyList<ProviderWatchOption> options)
     {
         show.WatchProviders.Clear();
-        foreach (var o in options)
+        foreach (var o in options.DistinctBy(o => (o.Region, o.ProviderName, o.Type)))
         {
             show.WatchProviders.Add(new WatchProvider
             {

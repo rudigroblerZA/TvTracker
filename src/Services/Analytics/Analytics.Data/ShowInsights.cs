@@ -43,51 +43,26 @@ public record ShowInsights(
 /// <param name="Number">The season.</param>
 /// <param name="FinaleAiredAtUtc">When its last episode aired.</param>
 /// <param name="Rating">The provider's average for its rated episodes.</param>
-/// <param name="Verdict">One of <see cref="SeasonVerdicts"/>.</param>
-/// <param name="OthersMedian">The median of the other seasons that count; null for a first season.</param>
+/// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>
+/// <param name="OthersMedian">The median of the other seasons that count; null when none does.</param>
 /// <param name="SeasonsCompared">Other seasons that count (3+ rated episodes).</param>
 /// <param name="SeasonsHigher">Of those, rated above this one; ties are in neither count.</param>
 /// <param name="SeasonsLower">Of those, rated below it.</param>
 /// <param name="FinaleRating">The finale's provider rating; null when it has none.</param>
-/// <param name="Finale">One of <see cref="FinaleVerdicts"/>; null without a finale rating.</param>
+/// <param name="Finale">One of <see cref="TvTracker.IntegrationEvents.FinaleVerdicts"/>; null without a finale rating.</param>
 /// <param name="Started">Our users who watched any of its episodes; null under <see cref="InsightRules.MinUsersToShow"/>.</param>
 /// <param name="Finished">Of those, who have watched its finale; null when <paramref name="Started"/> is.</param>
 /// <param name="ReadyAtUtc">When the season could first be called over: 3 days after the finale, or later for a running
 /// show that had to be quiet for a while first.</param>
 public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
     double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
-    int? Started, int? Finished, DateTime ReadyAtUtc = default);
-
-public static class SeasonVerdicts
+    int? Started, int? Finished, DateTime ReadyAtUtc)
 {
-    /// <summary>Rated above every other season (with two or more to compare).</summary>
-    public const string BestYet = "best-yet";
+    /// <summary>A verdict is given from this long after the finale…</summary>
+    public static readonly TimeSpan From = TimeSpan.FromDays(3);
 
-    /// <summary>0.3 or more above the other seasons' median.</summary>
-    public const string Above = "above";
-
-    /// <summary>Within 0.3 of the other seasons' median.</summary>
-    public const string InLine = "in-line";
-
-    /// <summary>0.3 or more below the other seasons' median.</summary>
-    public const string Below = "below";
-
-    /// <summary>Rated below every other season (with two or more to compare).</summary>
-    public const string WeakestYet = "weakest-yet";
-
-    /// <summary>The show's first season, with nothing to compare.</summary>
-    public const string FirstSeason = "first-season";
-}
-
-public static class FinaleVerdicts
-{
-    /// <summary>The finale rated 0.3 or more above the season's average.</summary>
-    public const string Strong = "strong";
-
-    public const string InLine = "in-line";
-
-    /// <summary>The finale rated 0.3 or more below the season's average.</summary>
-    public const string Weak = "weak";
+    /// <summary>…until this long after it; readers of stored documents check it too, in case the pipeline stalls.</summary>
+    public static readonly TimeSpan Until = TimeSpan.FromDays(45);
 }
 
 /// <summary>

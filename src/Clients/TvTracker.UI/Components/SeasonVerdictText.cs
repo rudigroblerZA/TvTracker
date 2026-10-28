@@ -1,3 +1,4 @@
+using TvTracker.IntegrationEvents;
 using TvTracker.UI.Models;
 
 namespace TvTracker.UI.Components;
@@ -7,19 +8,20 @@ public static class SeasonVerdictText
 {
     public static string Headline(SeasonVerdict v) => v.Verdict switch
     {
-        "best-yet" => "Its best season yet",
-        "above" => "One of its better seasons",
-        "below" => "One of its weaker seasons",
-        "weakest-yet" => "Its weakest season yet",
-        "in-line" => "As good as the others",
-        _ => "First season"
+        SeasonVerdicts.BestYet => "Its best season yet",
+        SeasonVerdicts.Above => "One of its better seasons",
+        SeasonVerdicts.Below => "One of its weaker seasons",
+        SeasonVerdicts.WeakestYet => "Its weakest season yet",
+        SeasonVerdicts.InLine => "As good as the others",
+        SeasonVerdicts.FirstSeason => "First season",
+        _ => $"Rated {Format.Rating(v.Rating)}"
     };
 
     /// <summary>"good" for its best or better seasons, "warn" for weaker ones, else "info".</summary>
     public static string Tone(SeasonVerdict v) => v.Verdict switch
     {
-        "best-yet" or "above" => "good",
-        "below" or "weakest-yet" => "warn",
+        SeasonVerdicts.BestYet or SeasonVerdicts.Above => "good",
+        SeasonVerdicts.Below or SeasonVerdicts.WeakestYet => "warn",
         _ => "info"
     };
 
@@ -33,10 +35,10 @@ public static class SeasonVerdictText
         }
         switch (v.Finale)
         {
-            case "strong":
+            case FinaleVerdicts.Strong:
                 parts.Add("finale a high point");
                 break;
-            case "weak":
+            case FinaleVerdicts.Weak:
                 parts.Add("finale below the season");
                 break;
         }

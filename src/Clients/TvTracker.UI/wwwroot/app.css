@@ -194,6 +194,7 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .code { font-variant-numeric: tabular-nums; color: var(--muted); }
 
 .providers, .cast, .lists, .devices, .comments { list-style: none; padding: 0; }
+.watch-now { margin: 8px 0; }
 .providers li, .cast li, .lists li, .devices li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .cast .known-from { flex-basis: 100%; font-size: 0.9rem; color: var(--muted); }
 .cast .known-from a { color: var(--text); }
@@ -263,6 +264,11 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .discovery { list-style: none; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .discovery li { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
 .discovery .poster { flex: none; }
+.trail { list-style: none; padding: 0; display: grid; gap: 12px; max-width: 640px; }
+.trail li { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.trail .poster { flex: none; }
+.trail-progress { display: flex; align-items: center; gap: 6px; }
+.trail-progress progress { width: 120px; }
 .top-episodes { padding-left: 1.4em; }
 .season-bests summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
 .top-episodes li, .shared-cast li { padding: 3px 0; }
@@ -314,6 +320,9 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .cut-arrow { font-size: 1.4rem; color: var(--muted); }
 .cut-runs { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
 .cut-runs li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.cut-notes { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.cut-notes li { display: flex; gap: 10px; align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.cut-notes .cut-ep { flex: none; }
 .cut-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .cut-legend .cut-ep { pointer-events: none; }
 .cut-legend .cut-ep + .cut-ep, .cut-legend .cut-ep:not(:first-child) { margin-left: 10px; }
@@ -645,6 +654,14 @@ a.chip { text-decoration: none; }
 .research-facts-list dt { font-size: 0.8rem; color: var(--muted); }
 .research-facts-list dd { margin: 0; overflow-wrap: anywhere; }
 .research-cited { padding-left: 22px; margin: 0; }
+.episode-notes { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.episode-notes li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; }
+.episode-note-body { min-width: 0; overflow-wrap: anywhere; }
+.episode-note-form { display: grid; gap: 8px; max-width: 640px; }
+.episode-note-form label { display: grid; gap: 2px; min-width: 0; }
+.episode-note-form input, .episode-note-form select { width: 100%; min-width: 0; }
+.episode-note-row { display: grid; grid-template-columns: 6rem 1fr 8rem; gap: 8px; }
+@media (max-width: 520px) { .episode-note-row { grid-template-columns: 5rem 1fr; } .episode-note-row label:last-child { grid-column: 1 / -1; } }
 
 /* Ask the app */
 .ask-intro { max-width: 72ch; }
@@ -660,7 +677,5 @@ a.chip { text-decoration: none; }
 .ask-form textarea { width: 100%; font: inherit; resize: vertical; }
 .ask-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* Seasons that just ended (Insights) */
-.season-verdicts { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
-.season-verdict { padding: 8px 12px; border-left: 3px solid var(--tone); background: color-mix(in srgb, var(--tone) 6%, var(--surface));
-    border-radius: 0 var(--radius) var(--radius) 0; overflow-wrap: anywhere; }
+/* Seasons that just ended (Insights): the backlog's toned list, each item a block of text rather than a row */
+.season-verdicts > li { display: block; overflow-wrap: anywhere; }

@@ -84,6 +84,25 @@ public class AnnouncedSeason
     public DateTimeOffset? PremieresAtUtc { get; set; }
 }
 
+/// <summary>
+/// A moderator's note on an episode (from Research's <c>EpisodeNotesChanged</c>): essential or skippable, why, and the
+/// source. The essential cut follows it before ratings.
+/// </summary>
+public class EpisodeNoteCopy
+{
+    public Guid EpisodeId { get; set; }
+    public Guid ShowId { get; set; }
+
+    /// <summary>One of <c>EpisodeMarks</c>.</summary>
+    public required string Mark { get; set; }
+
+    public required string Reason { get; set; }
+    public required string SourceUrl { get; set; }
+
+    /// <summary>When Research read the notes this came with; an older event leaves the show's notes alone.</summary>
+    public DateTimeOffset TakenAtUtc { get; set; }
+}
+
 public class CastCopy
 {
     public Guid ShowId { get; set; }

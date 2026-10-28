@@ -24,7 +24,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
-| Research.API | dossiers, sources, fact candidates, saved research versions | moderators only; saved catalog facts go to the sync worker as overrides; behind the `research` flag |
+| Research.API | dossiers, sources, fact candidates, saved research versions, episode notes | moderators only; saved catalog facts go to the sync worker as overrides; episode notes go to Analytics as events; behind the `research` flag |
 | Assistant.API | — (questions in memory) | "Ask the app": Model Runner's chat model with the MCP tools, through the gateway; behind the `ask` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
@@ -96,6 +96,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Search imports:** Catalog.API asks the worker (`POST /api/v1/imports/search`) to import TVmaze's top 5 matches.
   - Each term goes to TVmaze at most once every 6 h, and at most 30 new terms a minute overall.
   - It has a 10 s budget. Past that, search answers from the catalog.
+- **Where to watch** (`StreamingServices` in Catalog.Data): TVmaze's web channel gives the service and its home page;
+  the show's own `officialSite` is usually its page on that service (Netflix, Apple TV, Max, Prime Video, Disney+,
+  Hulu, Peacock), which is the link kept, since phones open those addresses in the service's app. Otherwise
+  Catalog.API offers the service's search for the title (only services whose search works signed out), else its
+  home page.
+  - **Show pages by path, per service:** a link is a show's page only under a known service's show-page path
+    (`/title/` on Netflix, `/gp/video/detail/` on amazon.com). "Any path" was tried first, and took home pages with a
+    path (`/Prime-Video/b`, `/browse`), Amazon store pages and networks' own sites for show pages. A site that isn't the
+    service's is never stored under its name.
+  - **Duplicates:** `TvMaze:WatchRegions` was stored twice per show, since configuration binding appends to a list
+    property's default. The regions are made distinct, the sync dedupes, and migration `DedupeWatchProviders` removed
+    the stored copies.
 - **IDs:** Show, Season, Episode, Person and WatchProvider ids are set by the app, so they're configured
   `ValueGeneratedNever`. Without it, EF treats new rows with preset ids as existing and refreshes fail with
   `DbUpdateConcurrencyException`.
@@ -184,6 +196,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
+- **Character trail** (`CharacterApi`): one actor's same-named character across shows, by Universes' `SameCharacter`
+  and `IsSelfRole`.
+  - **Catalog casts plus provider credits:** the actor's `PersonCastCredit` rows add shows outside the catalog (Cheers
+    on Frasier Crane's trail). A credit fetched before its show was imported has no `ShowId`, so it's matched to the
+    catalog by provider id.
+  - **Same actor only:** a recast character can't be told from a namesake by name alone, and TVmaze's character ids
+    are per show.
+  - **Counts in show detail:** `CastMemberDto.TrailShows` is computed with the show (two queries for the whole cast),
+    so the cast links only characters that go somewhere; the detail is cached a minute anyway.
+  - **Main casts only:** guest appearances never reach it, and a character who joins later counts for the whole show.
 - **Storage:** `show_embeddings` is a pgvector column with an HNSW cosine index. The Postgres image is
   `pgvector/pgvector:0.8.7-pg18-trixie`. It's trixie because existing databases were created with that collation
   version; bookworm reports a mismatch. The data volume is mounted explicitly at `/var/lib/postgresql`, because Aspire
@@ -234,8 +256,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Insights pipeline** (`Analytics.Worker/Insights`): `InsightsPipeline` does the plumbing, and each insight is its
   own small class that only computes. All of them are registered in `AddInsights`, where order matters.
   - **Plumbing:** loads `InsightSources` once (catalog copy, ratings, follows, cast, makers), then shows in batches of
-    100 (episodes, watches). It stores each document, publishes changed tags, and replaces every list in one
-    transaction.
+    100 (episodes, watches). Each batch's documents and the events they raise are saved together, then published; at
+    the end, every list is replaced in one transaction.
+  - **Events with their documents:** publications compare the new document with the stored one, so an event added
+    after its document was saved was lost for good when the run failed in between (the next run saw no change). Now a
+    stored document's events are always in the outbox, and its publisher retries any left behind.
   - **`IShowInsight`:** a stage of the show document (seasons, top episodes, run, next premiere, shared cast,
     patterns, tags, histograms, viewing, momentum). Stages run in registration order on `ShowInsightContext`, which
     works out the shared figures once: seasons, visible ratings, `WellRated`, `ListScore`.
@@ -244,8 +269,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     starts a fresh `ListBuilder` that sees every finished show document.
   - **`IInsightPublication`:** a part of the document another service keeps a copy of: tags for the catalog, DNA for
     Recommendations.
-    - Each run's builder compares the new document with the stored one, and the pipeline publishes what changed
-      through the outbox.
+    - Each run's builder compares the new document with the stored one; after each batch, the pipeline adds what
+      changed to the outbox in the same save as the documents.
     - Every show is also sent after start and daily, so lost events heal.
   - **New data:** an insight that needs data nothing loads yet adds it to `InsightSources`.
   - **Why:** it replaced a single 930-line `InsightsComputer`. The split was checked with a fixed clock, and every
@@ -254,7 +279,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `MinRatingsToShow`). The exception is "your taste" (`TasteApi`), which uses only the caller's own data.
 - **Show tags** (keys in `ShowTags`): `drops-at-once` (or "drops in parts"), `bingeable`, `weekend-binge`,
   `fan-favorite`, `limited-series`, `quick-episodes`, `long-running`, `prolific-creator` / prolific producer.
-  - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, in batches of at most 500.
+  - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, one per batch of 100 shows.
     They're also sent in full after start and daily.
   - Weekly release is deliberately not a tag, since nearly every show would have it.
 - **Show DNA** (`DnaInsight`): 12 traits of form, rhythm and quality, each scaled to 0-1. Keys, names, labels,
@@ -390,6 +415,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     7.8 average.
   - **Tuning:** One Piece's canonical filler list was the check. Smoothing ratings over neighbouring episodes
     didn't help, so it's per episode.
+  - **Episode notes first** (Research's, copied into `episode_notes`): an episode marked essential is protected, and a
+    season with any episode marked skippable is cut by its notes alone, at every level. A moderator who marked a
+    season's filler has said what to skip; ratings adding more would contradict them. A show with notes is cut even
+    when too few episodes are rated (anime filler is often unrated). Backlog and catch-up share `Decide`, so they
+    follow the notes too.
 - **Reunion radar** (`ReunionsApi`): computed on request from the caller's own data, like "your taste".
   - **What it is:** shows where two or more actors from one show the user loves are in the main cast again.
   - **Loved:** 5 stars weighs 1 and 4 stars 0.8. Followed, or 3+ episodes watched, and unrated weighs 0.5. Rated 3 or
@@ -487,7 +517,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
 - **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
   them as numbered, so its citations keep pointing at the right source.
-- **Deleted moderators:** their name comes off the versions they saved ("a former moderator"); the research stays.
+- **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
+  moderator"); the research stays.
+- **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
+  and a source.
+  - **Apply at once, outside versions:** a note is a judgement about one episode, not part of the show's record, and
+    waiting for the next saved version would hold back a season's worth of filler marks.
+  - **Whole lists:** each change sends the show's notes as they are after it (`EpisodeNotesChangedIntegrationEvent`),
+    through the outbox in the same save; Research got an outbox for this. `EpisodeNotesPublisher` sends every show's
+    notes in one event after start and daily (notes are hand-written, so few), and Analytics replaces its copy from
+    it, so a lost event heals. A copy read later than an event (`TakenAtUtc`) is kept.
+  - **Validated against the catalog:** the episode must be the show's (Catalog.API's `/episodes/{id}`).
 
 ## Social
 
@@ -528,7 +568,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Season verdict
 
 - **Part of the show document** (`SeasonVerdictInsight`), so it's computed hourly with the rest, and read by the show
-  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own.
+  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own,
+  cached 5 minutes, since reading every document took tens of milliseconds per visit.
+- **Released at once:** one UTC date for every episode (`ShowInsightContext.ReleaseDays`), the same test the
+  drops-at-once tag uses.
 - **When a season is over:** "every listed episode aired" isn't enough, since TVmaze lists a weekly show's next episode
   only days ahead (Cops in week 17 looked finished). Over means: the show ended, a later season is listed or announced,
   the season dropped at once, or it's been quiet for twice its usual gap (at least 7 days). The catalog doesn't keep
@@ -537,13 +580,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Window:** 3 days after the finale (the provider's episode ratings arrive after airing, and viewers catch up) to
   45 days. Daily shows (seasons over 60 episodes) and seasons with fewer than 3 rated episodes get none.
 - **Verdicts:** against the median of the show's other seasons that count (3+ rated episodes): 0.3 above or below, else
-  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. The finale against
-  the season's average, with the same 0.3.
+  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. With none to
+  compare, "first season", or "unranked" for a later season whose earlier ones have too few rated episodes (reality and
+  older shows). The finale against the season's average, with the same 0.3.
+- **Shared keys:** `SeasonVerdicts` and `FinaleVerdicts` are in IntegrationEvents (linked into the UI, like
+  `DnaTraits`), so Notifications and the UI switch on the same constants as Analytics.
 - **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
   started (the privacy rule).
-- **Sent once** (`SeasonVerdictPublication`): a verdict for a season the stored document didn't have, within 7 days of
-  when it could first be given (`ReadyAtUtc`). Not re-sent after start like tags and DNA, since it's news; and without
-  the 7 days, its first run would have notified followers about every season of the last six weeks (it sent 5 of 24).
+- **Sent once** (`SeasonVerdictPublication`): when a show's document has a verdict for a season its stored document
+  didn't, and the verdict is within 2 days of when it could first be given (`ReadyAtUtc`); the event is saved with the
+  document (see the insights pipeline), so a failed run can't lose it.
+  - **`VerdictId`** (from the show and season): a verdict that drops out of the document for a run and comes back is
+    sent again; Notifications uses the id as the event's identity (inbox check and inbox items), so followers hear once.
+  - **Why 2 days:** a first run over an empty store, or after a long outage, would otherwise notify followers about
+    every season of the last six weeks.
+  - **History:** it was briefly sent on every run for a week (then two days), because the pipeline saved documents
+    before their events, so a run that failed in between lost the verdict for good. The pipeline now saves them together.
 - **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
   Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
   some followers only.

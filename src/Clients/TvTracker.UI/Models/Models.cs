@@ -75,7 +75,15 @@ public record BlendMatch(ShowSummary Show, int Fit, int LikeA, IReadOnlyList<str
 public record SeasonSummary(int Number, string Name, int EpisodeCount, DateTimeOffset? PremieresAtUtc);
 
 /// <param name="PersonId">Empty in responses cached before people had pages (e.g. offline on mobile); don't link then.</param>
-public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId);
+/// <param name="TrailShows">Shows where the actor plays this character, this one included (Catalog.API's CharacterApi).</param>
+public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId, int TrailShows = 0);
+
+/// <summary>Every show where an actor plays the same character, by premiere (see Catalog.API's CharacterApi).</summary>
+public record CharacterTrail(Guid PersonId, string PersonName, string? PhotoUrl, string Character, IReadOnlyList<TrailShow> Shows);
+
+/// <param name="ShowId">Null for a show outside the catalog.</param>
+public record TrailShow(Guid? ShowId, string? ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status,
+    string Character, bool Voice, double? Rating, DateTimeOffset? FirstAiredUtc, DateTimeOffset? LastAiredUtc, int? Episodes);
 
 public record PersonCredit(ShowSummary Show, string? Character);
 
@@ -98,7 +106,13 @@ public record Career(int Shows, int Created, int ExecutiveProduced, bool Prolifi
 
 public record ShowRef(Guid Id, string Title);
 
-public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url);
+/// <param name="Url">The show's page on the service (on a phone the OS opens it in the service's app), else a search of
+/// the service for it, else the service's site.</param>
+/// <param name="Link">What <paramref name="Url"/> opens; null without one.</param>
+public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url, WatchLink? Link = null);
+
+/// <summary>What a where-to-watch link opens (Catalog.Data's <c>WatchLink</c>, same order).</summary>
+public enum WatchLink { Site, Search, Title }
 
 public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, string? Overview,
     DateTimeOffset? AirsAtUtc, int? RuntimeMinutes, EpisodeLabel Label);
@@ -221,11 +235,10 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     Landing? Landing = null, SeasonVerdict? SeasonVerdict = null);
 
 /// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
-/// <param name="Verdict">"best-yet", "above", "in-line", "below", "weakest-yet" or "first-season".</param>
-/// <param name="Finale">"strong", "in-line" or "weak"; null without a finale rating.</param>
+/// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>
+/// <param name="Finale">One of <see cref="TvTracker.IntegrationEvents.FinaleVerdicts"/>; null without a finale rating.</param>
 /// <param name="Started">Our users who watched any of it; null under 5. Finished: of those, who watched the finale.</param>
-public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
-    double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
+public record SeasonVerdict(int Number, DateTime FinaleAiredAtUtc, double Rating, string Verdict, double? OthersMedian, string? Finale,
     int? Started, int? Finished);
 
 public record SeasonVerdictItem(Guid ShowId, string Title, SeasonVerdict Verdict);
@@ -345,18 +358,23 @@ public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? R
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
 
 /// <summary>A shorter path through a long show (see Analytics.API's EssentialCutApi).</summary>
+/// <param name="Noted">Episodes moderators marked essential or skippable, which the cut follows before ratings.</param>
 public record EssentialCut(Guid ShowId, string Title, string Level, bool Available, string? Reason, CutTotals Full, CutTotals Cut,
-    IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress);
+    IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress, int Noted = 0);
 
 public record CutTotals(int Episodes, int Minutes);
 
 public record CutSeason(int Number, int Episodes, int Kept, int MinutesSaved, IReadOnlyList<CutEpisode> Items);
 
 /// <param name="Why">"series-premiere", "season-premiere", "season-finale", "series-finale", "two-parter",
-/// "best-of-season", "above-average", "unrated" or "below-average" (skipped).</param>
-public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double? Rating, bool Keep, string Why, bool Watched);
+/// "best-of-season", "above-average", "unrated", "below-average" (skipped), "noted-essential" or "noted-skippable".</param>
+/// <param name="Note">A moderator's reason, for a noted episode, with its source.</param>
+public record CutEpisode(Guid EpisodeId, int EpisodeNumber, string Title, double? Rating, bool Keep, string Why, bool Watched,
+    string? Note = null, string? NoteSource = null);
 
-public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double AverageRating, double SeasonAverage);
+/// <param name="Noted">Skipped by moderators' notes rather than ratings.</param>
+public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Episodes, int Minutes, double? AverageRating, double SeasonAverage,
+    bool Noted = false);
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
 
@@ -559,6 +577,10 @@ public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtU
     IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
 
 /// <param name="Number">How drafts and the insight cite it, while it's included.</param>
+/// <param name="Mark">"essential" or "skippable".</param>
+public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Mark, string Reason, string SourceUrl,
+    DateTime NotedAtUtc, string NotedBy);
+
 public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
 
 /// <param name="Origin">"saved", "catalog" or "source".</param>

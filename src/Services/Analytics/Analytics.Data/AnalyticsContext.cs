@@ -8,6 +8,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<ShowCopy> Shows => Set<ShowCopy>();
     public DbSet<EpisodeCopy> Episodes => Set<EpisodeCopy>();
     public DbSet<AnnouncedSeason> AnnouncedSeasons => Set<AnnouncedSeason>();
+    public DbSet<EpisodeNoteCopy> EpisodeNotes => Set<EpisodeNoteCopy>();
     public DbSet<CastCopy> Cast => Set<CastCopy>();
     public DbSet<CreativeCopy> Creatives => Set<CreativeCopy>();
     public DbSet<PersonCareerCopy> Careers => Set<PersonCareerCopy>();
@@ -44,6 +45,17 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             // The time machine's weeks are ranges of air time.
             entity.HasIndex(e => e.AirsAtUtc);
             entity.Property(e => e.Title).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<EpisodeNoteCopy>(entity =>
+        {
+            entity.ToTable("episode_notes");
+            entity.HasKey(n => n.EpisodeId);
+            entity.Property(n => n.EpisodeId).ValueGeneratedNever();
+            entity.Property(n => n.Mark).HasMaxLength(16);
+            entity.Property(n => n.Reason).HasMaxLength(280);
+            entity.Property(n => n.SourceUrl).HasMaxLength(2048);
+            entity.HasIndex(n => n.ShowId);
         });
 
         modelBuilder.Entity<AnnouncedSeason>(entity =>

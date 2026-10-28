@@ -32,14 +32,18 @@ public record ShowDnaValues(Guid ShowId, IReadOnlyDictionary<string, double> Tra
 
 /// <summary>
 /// A season finished airing a few days ago, and how it did: its rating against the show's other seasons, its finale
-/// against the season, and how many of our viewers who started it have finished it. Sent once per season, for
-/// Notifications to tell the show's followers. Not re-sent after start, so a lost one is lost (it's news, not state).
+/// against the season, and how many of our viewers who started it have finished it, for Notifications to tell the
+/// show's followers. Sent once, when the verdict first appears, in the same save as the show's document. A verdict
+/// that drops out for a run and comes back is sent again with the same <paramref name="VerdictId"/>, so Notifications
+/// tells followers once.
 /// </summary>
-/// <param name="Verdict">best-yet, above, in-line, below, weakest-yet or first-season.</param>
+/// <param name="Verdict">One of <see cref="SeasonVerdicts"/>.</param>
 /// <param name="OthersMedian">The other seasons' median rating; null for a first season.</param>
-/// <param name="Finale">strong, in-line or weak; null when the finale has no rating.</param>
+/// <param name="Finale">One of <see cref="FinaleVerdicts"/>; null when the finale has no rating.</param>
 /// <param name="Started">Our users who watched any of its episodes; null under 5.</param>
 /// <param name="Finished">Of those, who have watched the finale.</param>
+/// <param name="VerdictId">The same for every send of one season's verdict (from the show and season); the event's own Id
+/// differs each time.</param>
 public record SeasonVerdictIntegrationEvent(
     Guid ShowId,
     string ShowTitle,
@@ -50,4 +54,5 @@ public record SeasonVerdictIntegrationEvent(
     string? Finale,
     double? FinaleRating,
     int? Started,
-    int? Finished) : IntegrationEvent;
+    int? Finished,
+    Guid VerdictId = default) : IntegrationEvent;
