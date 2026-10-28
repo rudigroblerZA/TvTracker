@@ -43,6 +43,7 @@ app.MapDefaultEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapOpsApi();
 }
 
 app.UseAuthentication();

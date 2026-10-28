@@ -9,7 +9,9 @@ using TvTracker;
 
 namespace Catalog.API.Apis;
 
-public record OpsStats(DateTime GeneratedAtUtc, CatalogOpsStats Catalog, JsonElement? Analytics, JsonElement? BulkImport);
+/// <param name="Research">Research.API's counts; null when it's down or the research flag is off.</param>
+public record OpsStats(DateTime GeneratedAtUtc, CatalogOpsStats Catalog, JsonElement? Analytics, JsonElement? BulkImport,
+    JsonElement? Research = null);
 
 public record CatalogOpsStats(
     int Shows,
@@ -30,7 +32,11 @@ public record CatalogOpsStats(
     OpsNanogenres Nanogenres,
     OpsUniverses? Universes,
     IReadOnlyList<OpsFlag> Flags,
-    OpsDataQuality DataQuality);
+    OpsDataQuality DataQuality,
+    OpsOverrides? Overrides = null);
+
+/// <summary>Values that replace the provider's (accepted corrections and saved research), by field.</summary>
+public record OpsOverrides(int Count, int Shows, IReadOnlyDictionary<string, int> ByField);
 
 /// <summary>
 /// Gaps and oddities in the provider's data, over aired regular episodes. Mostly TVmaze's own: daily, reality and
@@ -54,7 +60,9 @@ public record OpsBackfills(int Actors, int ActorsWithCredits, int ProviderCastCr
 public record OpsNanogenres(int Count, int Clusters, int ShowsCovered, DateTime? ComputedAtUtc, IReadOnlyList<OpsNamedCount> Largest);
 
 /// <summary>Null until the universe map has been built (it's cached for 30 minutes).</summary>
-public record OpsUniverses(int Count, int ShowsCovered, IReadOnlyList<OpsNamedCount> Largest);
+/// <param name="Characters">Characters the same actor plays in two or more catalog shows: the character trails within
+/// the catalog (a trail also reaches shows outside it).</param>
+public record OpsUniverses(int Count, int ShowsCovered, IReadOnlyList<OpsNamedCount> Largest, int Characters = 0);
 
 public record OpsNamedCount(string Name, int Count);
 
@@ -94,9 +102,10 @@ public static class OpsApi
         // The other services' sections are optional: if one is down the page shows the rest.
         var analytics = FetchAsync(httpFactory, "analytics", "api/v1/ops/stats", logger, ct);
         var bulkImport = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/bulk/current", logger, ct);
+        var research = FetchAsync(httpFactory, "research", "api/v1/ops/stats", logger, ct);
         var catalog = await GetCatalogStatsAsync(db, model.Id, universes, features, now, ct);
 
-        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport);
+        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research);
     }
 
     private static async Task<CatalogOpsStats> GetCatalogStatsAsync(
@@ -162,8 +171,14 @@ public static class OpsApi
                     .Select(n => new OpsNamedCount(n.Name, n.ShowCount)).ToListAsync(ct)),
             Universes: await GetUniversesAsync(db, universes, ct),
             Flags: await GetFlagsAsync(features, ct),
-            DataQuality: await GetDataQualityAsync(db, ct));
+            DataQuality: await GetDataQualityAsync(db, ct),
+            Overrides: await GetOverridesAsync(db, ct));
     }
+
+    private static async Task<OpsOverrides> GetOverridesAsync(CatalogContext db, CancellationToken ct) =>
+        new(await db.Overrides.CountAsync(ct),
+            await db.Overrides.Select(o => o.ShowId).Distinct().CountAsync(ct),
+            await db.Overrides.GroupBy(o => o.Field).ToDictionaryAsync(g => g.Key, g => g.Count(), ct));
 
     private static async Task<OpsDataQuality> GetDataQualityAsync(CatalogContext db, CancellationToken ct) =>
         (await db.Database.SqlQueryRaw<OpsDataQuality>("""
@@ -212,8 +227,22 @@ public static class OpsApi
                     var members = u.Shows.Select(id => shows[id]).ToList();
                     return new OpsNamedCount(UniverseApi.Name(members, UniverseApi.Hub(members, u.Links)), members.Count);
                 })
-                .ToList());
+                .ToList(),
+            TrailCharacters(map));
     }
+
+    /// <summary>Distinct characters on the map's links: per actor, names that are the same character count once.</summary>
+    private static int TrailCharacters(UniverseMap map) =>
+        map.Universes.SelectMany(u => u.Links).SelectMany(l => l.Characters)
+            .GroupBy(c => c.PersonId)
+            .Sum(person => person.Select(c => c.Character).Aggregate(new List<string>(), (distinct, name) =>
+            {
+                if (!distinct.Any(d => Universes.SameCharacter(d, name)))
+                {
+                    distinct.Add(name);
+                }
+                return distinct;
+            }).Count);
 
     /// <summary>Every flag in <see cref="FeatureFlags"/>, as flagd answers for a signed-out caller.</summary>
     private static async Task<List<OpsFlag>> GetFlagsAsync(IFeatureClient features, CancellationToken ct)

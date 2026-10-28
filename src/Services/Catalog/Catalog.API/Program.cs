@@ -40,6 +40,12 @@ builder.Services.AddHttpClient("analytics", http =>
         http.Timeout = TimeSpan.FromSeconds(3);
     })
     .RemoveAllResilienceHandlers();
+builder.Services.AddHttpClient("research", http =>
+    {
+        http.BaseAddress = new Uri("https+http://research-api/");
+        http.Timeout = TimeSpan.FromSeconds(3);
+    })
+    .RemoveAllResilienceHandlers();
 builder.Services.AddHttpClient("catalog-sync", http =>
     {
         http.BaseAddress = new Uri("https+http://catalog-sync/");
