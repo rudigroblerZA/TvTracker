@@ -537,13 +537,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Window:** 3 days after the finale (the provider's episode ratings arrive after airing, and viewers catch up) to
   45 days. Daily shows (seasons over 60 episodes) and seasons with fewer than 3 rated episodes get none.
 - **Verdicts:** against the median of the show's other seasons that count (3+ rated episodes): 0.3 above or below, else
-  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. The finale against
-  the season's average, with the same 0.3.
+  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. With none to
+  compare, "first season", or "unranked" for a later season whose earlier ones have too few rated episodes (reality and
+  older shows). The finale against the season's average, with the same 0.3.
+- **Shared keys:** `SeasonVerdicts` and `FinaleVerdicts` are in IntegrationEvents (linked into the UI, like
+  `DnaTraits`), so Notifications and the UI switch on the same constants as Analytics.
 - **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
   started (the privacy rule).
-- **Sent once** (`SeasonVerdictPublication`): a verdict for a season the stored document didn't have, within 7 days of
-  when it could first be given (`ReadyAtUtc`). Not re-sent after start like tags and DNA, since it's news; and without
-  the 7 days, its first run would have notified followers about every season of the last six weeks (it sent 5 of 24).
+- **Sent hourly, told once** (`SeasonVerdictPublication`): every run sends each verdict within 7 days of when it could
+  first be given (`ReadyAtUtc`), with a `VerdictId` from the show and season. Notifications uses that id as the event's
+  identity (inbox check and inbox items), so followers hear once.
+  - **Why not "when the stored document lacked it":** the pipeline saves documents before it publishes, so a run that
+    failed in between lost the verdict for good, and a verdict that dropped out of the document for one run was sent
+    twice. The outbox keys on the event Id, so each send has its own and the `VerdictId` carries the identity.
+  - **Why 7 days:** without it, the first run would have notified followers about every season of the last six weeks.
 - **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
   Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
   some followers only.

@@ -294,7 +294,7 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<ShowInsights>(ApiClients.Analytics, $"api/v1/shows/{showId}/insights", ct, cacheForOffline: true);
 
     /// <summary>Seasons that just ended (3 to 45 days after their finale), newest finale first.</summary>
-    public Task<List<SeasonVerdictItem>?> GetSeasonVerdictsAsync(int limit = 12, CancellationToken ct = default) =>
+    public Task<List<SeasonVerdictItem>?> GetSeasonVerdictsAsync(int limit = 20, CancellationToken ct = default) =>
         GetAsync<List<SeasonVerdictItem>>(ApiClients.Analytics, $"api/v1/insights/season-verdicts?limit={limit}", ct, cacheForOffline: true);
 
     public Task<List<PremiereItem>?> GetPremieresAsync(int days = 60, string sort = "date", CancellationToken ct = default) =>

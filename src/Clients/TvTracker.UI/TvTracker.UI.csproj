@@ -10,6 +10,7 @@
     <Compile Include="..\..\TvTracker.ServiceDefaults\FeatureFlags.cs" Link="Services\FeatureFlags.cs" />
     <!-- Show DNA's traits and labels, shared with Analytics and Recommendations. -->
     <Compile Include="..\..\TvTracker.IntegrationEvents\DnaTraits.cs" Link="Models\DnaTraits.cs" />
+    <Compile Include="..\..\TvTracker.IntegrationEvents\SeasonVerdicts.cs" Link="Models\SeasonVerdicts.cs" />
   </ItemGroup>
 
   <ItemGroup>
