@@ -229,6 +229,15 @@ TVmaze data is licensed CC BY-SA; the app footer carries the required credit. TV
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
+**Watch on Netflix:** a streaming show's page has a "▶ Watch on Netflix" button (and the same link under Where to watch)
+that goes straight to the show on the service: `netflix.com/title/…`, `tv.apple.com/show/…`, `hbomax.com/show/…`,
+`primevideo.com/detail/…`, Disney+, Hulu, Peacock and others. On a phone, the OS opens these in the service's app when
+it's installed (iOS universal links, Android app links); the MAUI app hands external links to the OS. Where TVmaze has
+no page for the show on the service, the link searches the service for it ("Find it on Netflix") when the service has a
+search that works signed out, else goes to its home page. A show on a network whose official site is a streaming
+service's show page is listed under that service (House of the Dragon on HBO Max). The detail API's
+`watchProviders[].link` says which: `title`, `search` or `site`. Shows pick up their links on their next refresh.
+
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
 neither keeps the plain poster layout. An image that fails to load falls back to the next. Shows imported earlier
