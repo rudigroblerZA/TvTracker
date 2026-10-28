@@ -403,6 +403,10 @@ public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvid
     public Task<NotificationPreferences?> GetPreferencesAsync(CancellationToken ct = default) =>
         GetAsync<NotificationPreferences>(ApiClients.Notifications, "api/v1/preferences", ct);
 
+    /// <summary>This week's digest as it would go out now.</summary>
+    public Task<DigestPreview?> GetDigestPreviewAsync(CancellationToken ct = default) =>
+        GetAsync<DigestPreview>(ApiClients.Notifications, "api/v1/digest/preview", ct);
+
     public Task<NotificationPreferences?> UpdatePreferencesAsync(UpdateNotificationPreferences update, CancellationToken ct = default) =>
         SendAsync<NotificationPreferences>(ApiClients.Notifications, HttpMethod.Put, "api/v1/preferences", update, ct);
 

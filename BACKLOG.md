@@ -117,20 +117,20 @@ So the rest of the list reads in proportion:
 - **Done when:** a handler that throws twice and then succeeds still processes the event; one that always throws lands
   in the dead-letter queue, visible on `/ops`; CONTEXT.md's Events section is updated.
 
-### R3. Move Identity and Notifications to migrations
+### R3. Move Identity to migrations
 
-**P2 · S each**
+**P2 · S**
 
 - **Why:**
-  - Both still use `EnsureCreated` (`Identity.API/Program.cs:12`, `Notifications.API/Program.cs:15`), which never
-    changes an existing database.
+  - It still uses `EnsureCreated` (`Identity.API/Program.cs:12`), which never changes an existing database.
+    Notifications moved with the weekly digest.
   - This has already cost a feature: the season verdict had to borrow the "new seasons" notification preference,
     because a preference of its own needs a column.
 - **What:** the baseline pattern other services used. Make `InitialCreate` from the unchanged model, pass
   `baseline: "InitialCreate"`, diff it against an `EnsureCreated` database with `pg_dump -s`, and add the migration
   commands to CLAUDE.md.
-- **Done when:** both services start on an existing database and on an empty one, and CONTEXT.md's Persistence section
-  lists them as migrated.
+- **Done when:** it starts on an existing database and on an empty one, and CONTEXT.md's Persistence section lists it
+  as migrated.
 
 ### R4. Inbox and delivery retention in Notifications
 
@@ -280,7 +280,7 @@ So the rest of the list reads in proportion:
 
 ### D2. A notification preference of its own for season verdicts
 
-**P3 · S, after R3**
+**P3 · S** (Notifications has migrations now)
 
 - **Why:** verdicts use the "new seasons" preference (CONTEXT.md, Season verdict), so you can't have one without the
   other.
@@ -289,15 +289,6 @@ So the rest of the list reads in proportion:
 - **Done when:** turning verdicts off stops them without stopping new-season notifications.
 
 ## Features
-
-### F2. Weekly digest email
-
-**P2 · M**
-
-- **What:** one email a week, at the time the user picks: premieres of followed shows with catch-up time, season
-  verdicts, what's up next, and anything the person they follow finished. It replaces several separate notifications.
-- **Builds on:** Notifications' email sender (which logs until configured), premieres, season verdicts, Up Next.
-- **Note:** "isn't built yet" in CONTEXT.md's Known gaps.
 
 ### F4. Research queue
 

@@ -195,10 +195,19 @@ public record DnaTwin(Guid ShowId, string Title, string? PosterUrl, double Simil
 // Notifications
 
 public record NotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
-    bool EmailEnabled, string? Email, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd, string TimeZone);
+    bool EmailEnabled, string? Email, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd, string TimeZone,
+    bool WeeklyDigest = false, DayOfWeek DigestDay = DayOfWeek.Sunday, int DigestHour = 9);
 
 public record UpdateNotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
-    bool EmailEnabled, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd);
+    bool EmailEnabled, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd,
+    bool? WeeklyDigest = null, DayOfWeek? DigestDay = null, int? DigestHour = null);
+
+/// <summary>The weekly digest as it would go out now (Notifications.API).</summary>
+public record DigestPreview(string Subject, IReadOnlyList<DigestSection> Sections);
+
+public record DigestSection(string Heading, IReadOnlyList<DigestLine> Lines);
+
+public record DigestLine(string Text, string? Link);
 
 public record ShowNotificationPreference(Guid ShowId, bool Muted);
 

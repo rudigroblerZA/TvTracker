@@ -610,9 +610,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     every season of the last six weeks.
   - **History:** it was briefly sent on every run for a week (then two days), because the pipeline saved documents
     before their events, so a run that failed in between lost the verdict for good. The pipeline now saves them together.
-- **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
-  Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
+- **Notifications:** under the "new seasons" preference. Notifications has migrations now (since the weekly digest),
+  so a preference of its own is a column away (BACKLOG D2). The flag is checked once per event, without a user, so it can't target
   some followers only.
+
+## Weekly digest
+
+- **In Notifications** (`WeeklyDigest`, `DigestWorker`): one email a week instead of an email per alert. With it on, the
+  fan-out adds no email deliveries; push and web push carry on.
+- **What it reads:** Notifications' own copies (followers, mutes, the user's inbox since the last digest) and
+  Catalog.API's public schedule for the coming week. Up Next and friends' finishes aren't in it: they live in Tracking
+  and Social, which need the user's token (service-to-service auth is BACKLOG S2).
+- **When:** every 15 minutes the worker sends to users whose day it is, from their hour, in their time zone, and whose
+  last digest is six or more days old; six, not seven, so a run a few minutes late doesn't skip a week. An empty week
+  sends nothing but counts as sent.
+- **Migrations:** the digest's settings needed columns, so Notifications moved off `EnsureCreated` (baseline
+  `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
+- **Flag:** checked once per run without a user, so it can't target some users only.
 
 ## Holiday episodes
 
@@ -732,13 +746,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations, applied at startup by
-  their API.
-  The other services still use `EnsureCreated`.
+- **Migrations:** Catalog, Analytics, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
+  migrations, applied at startup by their API. Identity still uses `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+  - **Checked:** Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
   idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).
@@ -831,5 +844,4 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - There are no tests and no CI.
 - There's no dead-letter queue.
 - The MAUI app has never been compiled.
-- The weekly digest email isn't built yet.
 - Development secrets are in `AppHost.cs` and the realm file.

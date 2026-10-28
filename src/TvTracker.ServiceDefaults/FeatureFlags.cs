@@ -42,6 +42,7 @@ public static class FeatureFlags
     public const string EpisodeNotes = "episode-notes";
     public const string WatchNow = "watch-now";
     public const string CrossoverAlerts = "crossover-alerts";
+    public const string WeeklyDigest = "weekly-digest";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

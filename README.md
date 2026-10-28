@@ -381,7 +381,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -410,6 +410,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
 | `crossover-alerts` | Crossover notifications, "Crossover ahead" on Up Next, and the crossovers endpoints |
+| `weekly-digest` | The weekly digest email, its Settings section and preview |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -894,12 +895,13 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Recommendations, Research, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
-`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`,
-`Social.API/Data/Migrations`, `Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
-other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
-Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made
-before they moved to migrations is marked as having it and upgraded in place.
+Catalog, Analytics, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Notifications.API/Data/Migrations`,
+`Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
+`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity still uses `EnsureCreated`,
+which creates a missing database but never changes an existing one. Notifications', Recommendations' and Tracking's first
+migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
+marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
@@ -912,6 +914,8 @@ dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data 
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
 # or, for Research:
 dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
+# or, for Notifications:
+dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.API --output-dir Data/Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 # or, for Tracking:
@@ -934,6 +938,20 @@ Keycloak users are kept, since Keycloak has its own volume.
 
 Until configured, each notification channel logs what it would have sent (visible in the Aspire dashboard logs); the in-app inbox always works.
 
+**Weekly digest** (`weekly-digest` flag; Settings → Notifications): one email a week instead of an email per alert, on
+the day and from the hour you pick, in your time zone. Phone and browser alerts carry on.
+- **What's in it:** "Coming up this week", the next 7 days of episodes of the shows you follow and haven't muted, with
+  premieres marked; and what you were told since the last digest: crossovers, how seasons did, new seasons and endings,
+  and new episodes counted per show.
+- **Preview:** "Preview this week's digest" in Settings shows it as it would go out now.
+- **Sending:** checked every 15 minutes; at most one in six days, and a week with nothing in it sends nothing. Links
+  in the email go to `Digest:BaseUrl` (the web app, `https://localhost:7120` by default). Like other email, it logs
+  until `Email:*` is configured.
+- **Not in it yet:** Up Next and what people you follow finished, which live in Tracking and Social; Notifications
+  can't read them for a user without the user's token.
+- **API:** `GET /api/v1/digest/preview` on Notifications.API (signed in), and the `weeklyDigest`, `digestDay` and
+  `digestHour` preference fields.
+
 ## Before production
 
 - Move the remaining services from `EnsureCreated` to EF Core migrations, as Catalog has (see Database schema).
@@ -948,8 +966,6 @@ Versions live in `Directory.Packages.props` (the MAUI app pins its own in its pr
 Run `aspire update` (or `dotnet list package --outdated`) to bring them up to date.
 
 ## Not built yet
-
-The weekly digest email is planned for a later round.
 
 **Qwen3-Embedding-8B as a built-in embedding model** (backlog; started and set aside). What the first attempt found:
 - **The model:** `ai/qwen3-embedding:8B-Q4_K_M` on Docker Hub (4.7 GB; also `hf.co/Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M`,

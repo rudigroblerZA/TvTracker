@@ -84,6 +84,52 @@
                         <label class="checkbox"><input type="checkbox" @bind="prefs.WebPushEnabled" /> Browser notifications</label>
                         <label class="checkbox"><input type="checkbox" @bind="prefs.EmailEnabled" /> Email @(string.IsNullOrEmpty(prefs.Email) ? "" : $"({prefs.Email})")</label>
                     </fieldset>
+                    <Feature Flag="@FeatureFlags.WeeklyDigest">
+                        <fieldset>
+                            <legend>Weekly digest</legend>
+                            <label class="checkbox"><input type="checkbox" @bind="prefs.WeeklyDigest" disabled="@string.IsNullOrEmpty(prefs.Email)" /> One email a week instead of an email per alert</label>
+                            @if (string.IsNullOrEmpty(prefs.Email))
+                            {
+                                <span class="muted small">It needs an email address on your account.</span>
+                            }
+                            <span class="inline">
+                                <label>On <select @bind="prefs.DigestDay">
+                                    @foreach (var day in Enum.GetValues<DayOfWeek>())
+                                    {
+                                        <option value="@day">@day</option>
+                                    }
+                                </select></label>
+                                <label>from <select @bind="prefs.DigestHour">
+                                    @for (var h = 0; h < 24; h++)
+                                    {
+                                        <option value="@h">@($"{h:00}:00")</option>
+                                    }
+                                </select></label>
+                            </span>
+                            <span class="muted small">What's coming up on your shows that week, and what you were told since the last one. Phone and browser alerts carry on as they are.</span>
+                            <div><button type="button" class="btn btn-quiet small" @onclick="PreviewDigestAsync">Preview this week's digest</button></div>
+                            @if (digest is not null)
+                            {
+                                <div class="digest-preview">
+                                    <strong>@digest.Subject</strong>
+                                    @if (digest.Sections.Count == 0)
+                                    {
+                                        <p class="muted small">Nothing this week, so nothing would be sent.</p>
+                                    }
+                                    @foreach (var section in digest.Sections)
+                                    {
+                                        <h3>@section.Heading</h3>
+                                        <ul>
+                                            @foreach (var line in section.Lines)
+                                            {
+                                                <li>@if (line.Link is { } link) { <a href="@link.TrimStart('/')">@line.Text</a> } else { <span>@line.Text</span> }</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            }
+                        </fieldset>
+                    </Feature>
                     <fieldset>
                         <legend>Quiet hours</legend>
                         <span class="inline">
@@ -310,7 +356,10 @@
                     EmailEnabled = p.EmailEnabled,
                     Email = p.Email,
                     QuietHoursStart = p.QuietHoursStart,
-                    QuietHoursEnd = p.QuietHoursEnd
+                    QuietHoursEnd = p.QuietHoursEnd,
+                    WeeklyDigest = p.WeeklyDigest,
+                    DigestDay = p.DigestDay,
+                    DigestHour = p.DigestHour
                 };
             }
             devices = await Notifications.GetDevicesAsync();
@@ -344,9 +393,11 @@
     {
         await Notifications.UpdatePreferencesAsync(new UpdateNotificationPreferences(
             prefs!.NewEpisodes, prefs.NewSeasons, prefs.StatusChanges, prefs.PushEnabled, prefs.WebPushEnabled,
-            prefs.EmailEnabled, prefs.QuietHoursStart, prefs.QuietHoursEnd));
+            prefs.EmailEnabled, prefs.QuietHoursStart, prefs.QuietHoursEnd, prefs.WeeklyDigest, prefs.DigestDay, prefs.DigestHour));
         saved = "Notification settings saved.";
     });
+
+    private Task PreviewDigestAsync() => RunAsync(async () => digest = await Notifications.GetDigestPreviewAsync());
 
     private Task EnablePushAsync() => RunAsync(async () =>
     {
@@ -392,6 +443,8 @@
         }
     }
 
+    private DigestPreview? digest;
+
     private sealed class EditablePreferences
     {
         public bool NewEpisodes { get; set; }
@@ -403,5 +456,8 @@
         public string? Email { get; set; }
         public TimeOnly? QuietHoursStart { get; set; }
         public TimeOnly? QuietHoursEnd { get; set; }
+        public bool WeeklyDigest { get; set; }
+        public DayOfWeek DigestDay { get; set; }
+        public int DigestHour { get; set; }
     }
 }
