@@ -61,6 +61,13 @@ else
                 </Authorized>
             </AuthorizeView>
 
+            @if (WatchNow is { } now)
+            {
+                <p class="watch-now">
+                    <a class="btn" href="@now.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(now)</a>
+                </p>
+            }
+
             <div class="rating-line">
                 @if (summary is { Count: > 0 })
                 {
@@ -239,7 +246,7 @@ else
                     <li>
                         @if (!string.IsNullOrEmpty(provider.Url))
                         {
-                            <a href="@provider.Url" target="_blank" rel="noopener">@provider.ProviderName</a>
+                            <a href="@provider.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(provider)</a>
                         }
                         else
                         {
@@ -276,6 +283,17 @@ else
 }
 
 @code {
+    /// <summary>The first streaming service with a link to the show's page or a search for it, for the button up top.</summary>
+    private WatchProvider? WatchNow => show?.WatchProviders.FirstOrDefault(p => p.Type is WatchProviderType.Stream or WatchProviderType.Free
+        && p.Link is "title" or "search");
+
+    private static string WatchLabel(WatchProvider provider) => provider.Link switch
+    {
+        "title" => $"▶ Watch on {provider.ProviderName}",
+        "search" => $"Find it on {provider.ProviderName}",
+        _ => provider.ProviderName
+    };
+
     [Parameter] public Guid Id { get; set; }
 
     private ShowDetail? show;

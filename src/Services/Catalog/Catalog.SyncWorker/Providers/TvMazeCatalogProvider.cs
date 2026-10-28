@@ -334,17 +334,38 @@ public sealed partial class TvMazeCatalogProvider(
         _ => ShowStatus.Airing
     };
 
-    /// <summary>Only streaming services count as "where to watch"; a broadcast network is shown as the show's network.</summary>
+    /// <summary>
+    /// Only streaming services count as "where to watch"; a broadcast network is shown as the show's network. The link
+    /// is the show's own page on the service when its official site is one (see <see cref="StreamingServices"/>), else
+    /// the service's site. A network show whose official site is a known service's show page (House of the Dragon on
+    /// hbomax.com) is listed under that service.
+    /// </summary>
     private List<ProviderWatchOption> WatchOptions(TvMazeShow s)
     {
-        if (s.WebChannel?.Name is not { } name)
+        var site = s.OfficialSite;
+        string name;
+        string? url;
+        TvMazeCountry? country;
+        if (s.WebChannel?.Name is { } channel)
+        {
+            var home = s.WebChannel.OfficialSite;
+            var titlePage = StreamingServices.IsTitlePage(site) && (home is null || StreamingServices.SameService(site, home));
+            (name, url, country) = (channel, titlePage ? site : home ?? site, s.WebChannel.Country);
+        }
+        else if (StreamingServices.For(site) is { } service && StreamingServices.IsTitlePage(site))
+        {
+            (name, url, country) = (service.Name, site, s.Network?.Country);
+        }
+        else
         {
             return [];
         }
 
-        var regions = s.WebChannel.Country?.Code is { Length: 2 } code ? [code.ToUpperInvariant()] : _options.WatchRegions;
+        // Distinct: configuration binding appends to the default list rather than replacing it.
+        var regions = country?.Code is { Length: 2 } code ? [code.ToUpperInvariant()] : _options.WatchRegions;
         return regions
-            .Select(region => new ProviderWatchOption(region, Truncate(name, 128), WatchProviderType.Stream, s.WebChannel.OfficialSite ?? s.OfficialSite))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(region => new ProviderWatchOption(region, Truncate(name, 128), WatchProviderType.Stream, url))
             .ToList();
     }
 

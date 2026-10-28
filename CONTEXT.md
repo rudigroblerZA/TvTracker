@@ -96,6 +96,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Search imports:** Catalog.API asks the worker (`POST /api/v1/imports/search`) to import TVmaze's top 5 matches.
   - Each term goes to TVmaze at most once every 6 h, and at most 30 new terms a minute overall.
   - It has a 10 s budget. Past that, search answers from the catalog.
+- **Where to watch** (`StreamingServices` in Catalog.Data): TVmaze's web channel gives the service and its home page;
+  the show's own `officialSite` is usually its page on that service (Netflix, Apple TV, Max, Prime Video, Disney+,
+  Hulu, Peacock), which is the link kept, since phones open those addresses in the service's app. Otherwise
+  Catalog.API offers the service's search for the title (only services whose search works signed out), else its
+  home page. `TvMaze:WatchRegions` was listed twice per show: configuration binding appends to a list property's
+  default, so the regions are made distinct.
 - **IDs:** Show, Season, Episode, Person and WatchProvider ids are set by the app, so they're configured
   `ValueGeneratedNever`. Without it, EF treats new rows with preset ids as existing and refreshes fail with
   `DbUpdateConcurrencyException`.

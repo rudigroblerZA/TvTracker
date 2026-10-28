@@ -63,7 +63,10 @@ public record CareerDto(int Shows, int Created, int ExecutiveProduced, bool Prol
 
 public record ShowRefDto(Guid Id, string Title);
 
-public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url);
+/// <param name="Url">The show's page on the service when known (on a phone it opens the service's app), else a search
+/// of the service for the show, else the service's site.</param>
+/// <param name="Link">"title" (the show's own page), "search" or "site".</param>
+public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url, string? Link = null);
 
 public record ShowDetailDto(
     Guid Id,
