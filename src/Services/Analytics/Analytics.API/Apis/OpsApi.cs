@@ -26,8 +26,10 @@ public record AnalyticsOpsStats(
 /// <param name="GoodFromTheStart">Shows whose first episodes already rate as well as the rest.</param>
 /// <param name="Forecasts">Running shows with at least one forecast (rating, renewal or timing).</param>
 /// <param name="CastCreditCopies">The provider's cast credits copied for the reunion radar.</param>
+/// <param name="SeasonVerdicts">Shows with a season verdict now (a season that ended 3 to 45 days ago).</param>
+/// <param name="EpisodeNotes">The copy of Research's episode notes the essential cut follows.</param>
 public record OpsComputed(int ShowsWithDna, int GetsGoodTurns, int GoodFromTheStart, int Forecasts, int CreatorFingerprints,
-    int ActorInsights, int CastCreditCopies);
+    int ActorInsights, int CastCreditCopies, int SeasonVerdicts = 0, int EpisodeNotes = 0, int NotedShows = 0);
 
 /// <param name="Lift">How much better it rates from the turn than before it.</param>
 public record OpsWorthTheWait(Guid ShowId, string ShowTitle, int SeasonNumber, int EpisodeNumber, double Lift);
@@ -110,15 +112,17 @@ public static class OpsApi
                 "SELECT COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'dna') = 'object')::int AS \"Dna\", " +
                 "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'getsGood'->'turn') = 'object')::int AS \"Turns\", " +
                 "COUNT(*) FILTER (WHERE (\"Document\"->'getsGood'->>'fromTheStart') = 'true')::int AS \"FromTheStart\", " +
-                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'outlook') = 'object')::int AS \"Forecasts\" " +
+                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'outlook') = 'object')::int AS \"Forecasts\", " +
+                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'seasonVerdict') = 'object')::int AS \"Verdicts\" " +
                 "FROM show_insights")
             .SingleAsync(ct);
 
         return new OpsComputed(parts.Dna, parts.Turns, parts.FromTheStart, parts.Forecasts,
-            await db.CreatorFingerprints.CountAsync(ct), await db.PersonInsights.CountAsync(ct), await db.CastCredits.CountAsync(ct));
+            await db.CreatorFingerprints.CountAsync(ct), await db.PersonInsights.CountAsync(ct), await db.CastCredits.CountAsync(ct),
+            parts.Verdicts, await db.EpisodeNotes.CountAsync(ct), await db.EpisodeNotes.Select(n => n.ShowId).Distinct().CountAsync(ct));
     }
 
     private sealed record ShowLinks(Guid ShowId, int Links);
 
-    private sealed record DocumentParts(int Dna, int Turns, int FromTheStart, int Forecasts);
+    private sealed record DocumentParts(int Dna, int Turns, int FromTheStart, int Forecasts, int Verdicts);
 }

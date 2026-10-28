@@ -344,18 +344,22 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
 - **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
   and the shows with the most shared cast.
 - **Backfills:** cast credits fetched this month (the reunion radar's data), shows with their makers, and careers.
-- **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest) and universes (the largest).
-- **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, and the top of
-  Worth the wait.
+- **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest), universes (the largest),
+  and characters the same actor plays across catalog shows (character trails).
+- **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, season verdicts out
+  now, and the top of Worth the wait.
+- **Research and curation:** shows with a trusted record, versions, sources and drafts running (Research.API); catalog
+  overrides by field (accepted corrections and saved research); and episode notes (essential, skippable).
 - **Actors, shows and genres:** the most-credited actors, recently added shows (and whether they're indexed yet), and genres.
 - **Bulk import:** the latest bulk import job.
 - **Data quality:** how much of TVmaze's data is missing (unrated episodes, runtimes, placeholder titles, numbering,
-  genres), and whether Analytics' copy of the catalog is in step.
+  genres), whether Analytics' copy of the catalog is in step, and whether its copy of the episode notes matches
+  Research's (with any note events still waiting in Research's outbox).
 - **Feature flags:** every flag, on or off, as flagd answers a signed-out caller.
 
-Catalog.API gathers the Analytics and sync worker sections server-side (`/api/v1/ops/stats` on Analytics.API,
+Catalog.API gathers the other services' sections server-side (`/api/v1/ops/stats` on Analytics.API and Research.API,
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
-isn't signed in, it and the Analytics stats endpoint are only mapped in Development.
+isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 

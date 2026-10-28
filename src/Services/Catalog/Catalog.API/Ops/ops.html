@@ -115,7 +115,8 @@ const tile = (label, value, detail = "", extra = "") =>
 const meter = parts => `<div class="meter">${parts.map(([v, total, color]) => `<span style="width:${pct(v, total)}%;background:${color}"></span>`).join("")}</div>`;
 
 function render(data) {
-  const c = data.catalog, a = data.analytics, b = data.bulkImport, ix = c.semanticIndex;
+  const c = data.catalog, a = data.analytics, b = data.bulkImport, r = data.research, ix = c.semanticIndex;
+  const o = c.overrides;
   const bf = c.backfills, ng = c.nanogenres, u = c.universes;
   const unavailable = empty("Analytics.API unavailable");
   const statuses = Object.entries(c.showsByStatus).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${n(v)} ${esc(k.toLowerCase())}`).join(" · ");
@@ -141,15 +142,21 @@ function render(data) {
       `${n(bf.showsWithCrew)} shows with makers · ${n(bf.peopleWithCareers)} careers`,
       meter([[bf.showsWithCrew, c.shows, "var(--good)"]])),
     tile("Nanogenres", n(ng.count), `${n(ng.clusters)} clusters · ${n(ng.count - ng.clusters)} pairings<br>${n(ng.showsCovered)} shows (${pct(ng.showsCovered, c.shows)}%) · ${ago(ng.computedAtUtc)}`),
-    u ? tile("Universes", n(u.count), `${n(u.showsCovered)} shows in one`)
+    u ? tile("Universes", n(u.count), `${n(u.showsCovered)} shows in one<br>${n(u.characters)} characters across shows (character trails)`)
       : tile("Universes", `<span class="down">—</span>`, "map not built"),
     a ? tile("Show DNA", `${n(a.computed.showsWithDna)}<span class="muted small"> / ${n(a.shows)}</span>`,
           `shows with DNA · ${n(a.computed.creatorFingerprints)} creator fingerprints<br>${n(a.computed.actorInsights)} actor insights · ${n(a.computed.castCreditCopies)} reunion credits`,
           meter([[a.computed.showsWithDna, a.shows, "var(--accent)"]]))
       : tile("Show DNA", `<span class="down">—</span>`, "Analytics.API unavailable"),
     a ? tile("Forecasts & turns", n(a.computed.forecasts),
-          `running shows forecast<br>${n(a.computed.getsGoodTurns)} get good later · ${n(a.computed.goodFromTheStart)} good from the start`)
+          `running shows forecast<br>${n(a.computed.getsGoodTurns)} get good later · ${n(a.computed.goodFromTheStart)} good from the start<br>${n(a.computed.seasonVerdicts)} season verdicts out now`)
       : tile("Forecasts & turns", `<span class="down">—</span>`, "Analytics.API unavailable"),
+    r ? tile("Research", n(r.showsSaved),
+          `shows with a trusted record · ${n(r.versions)} versions<br>${n(r.dossiers)} researched · ${n(r.sources)} sources · last saved ${ago(r.lastSavedAtUtc)}${r.drafting ? ` · ${n(r.drafting)} drafting` : ""}`)
+      : tile("Research", `<span class="down">—</span>`, "Research.API unavailable"),
+    tile("Curation", n((o ? o.count : 0) + (r ? r.episodeNotes : 0)),
+      `${o ? `${n(o.count)} catalog overrides on ${n(o.shows)} show${o.shows === 1 ? "" : "s"}` : "overrides unknown"}${o && o.count ? ` (${Object.entries(o.byField).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${n(v)} ${esc(k)}`).join(", ")})` : ""}`
+      + `<br>${r ? `${n(r.episodeNotes)} episode notes on ${n(r.notedShows)} show${r.notedShows === 1 ? "" : "s"} · ${n(r.essential)} essential · ${n(r.skippable)} skippable` : "episode notes unknown"}`),
   ].join("");
 
   $("nanogenres").innerHTML = ng.largest.length ? ng.largest.map(x => `
@@ -163,6 +170,7 @@ function render(data) {
   const qrow = (label, value, detail, tone) => `<li><div class="grow"><div class="clip">${esc(label)}</div><div class="muted small">${detail}</div></div>`
     + `<span class="badge ${tone}">${value}</span></li>`;
   const inStep = a && a.shows === c.shows && a.episodes === c.episodes;
+  const notesInStep = a && r && a.computed.episodeNotes === r.episodeNotes && !r.unsentEvents;
   $("quality").innerHTML = [
     qrow("Episode ratings", `${pct(q.rated, q.airedEpisodes)}% rated`, `${n(q.airedEpisodes - q.rated)} of ${n(q.airedEpisodes)} aired episodes unrated on TVmaze`, pct(q.rated, q.airedEpisodes) >= 50 ? "good" : "warn"),
     qrow("Runtimes", n(q.withoutRuntime), "aired episodes without one (counted as the show's typical runtime)", q.withoutRuntime ? "warn" : "good"),
@@ -171,6 +179,9 @@ function render(data) {
     qrow("Show details", n(q.showsWithoutGenres + q.showsWithoutEpisodes), `${n(q.showsWithoutGenres)} without genres · ${n(q.showsWithoutEpisodes)} without episodes`, q.showsWithoutEpisodes ? "warn" : "good"),
     a ? qrow("Analytics' copy", inStep ? "in step" : "behind", `${n(a.shows)} / ${n(c.shows)} shows · ${n(a.episodes)} / ${n(c.episodes)} episodes`, inStep ? "good" : "warn")
       : qrow("Analytics' copy", "—", "Analytics.API unavailable", "bad"),
+    a && r ? qrow("Episode notes in the cut", notesInStep ? "in step" : "behind",
+        `${n(a.computed.episodeNotes)} / ${n(r.episodeNotes)} notes copied to Analytics${r.unsentEvents ? ` · ${n(r.unsentEvents)} events waiting in Research's outbox` : ""}`, notesInStep ? "good" : "warn")
+      : qrow("Episode notes in the cut", "—", `${a ? "Research" : "Analytics"}.API unavailable`, "bad"),
   ].join("");
 
   $("flags").innerHTML = c.flags.map(f => `<span class="badge ${f.on ? "good" : "bad"}">${esc(f.key)} ${f.on ? "on" : "off"}</span>`).join("");

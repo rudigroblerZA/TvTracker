@@ -383,8 +383,9 @@ catalogApi.WithReference(catalogSync);
 ratingsApi.WithReference(catalogSync);
 researchApi.WithReference(catalogSync);
 
-// The ops dashboard (/ops on Catalog.API) includes Analytics' stats.
+// The ops dashboard (/ops on Catalog.API) includes Analytics' and Research's stats.
 catalogApi.WithReference(analyticsApi);
+catalogApi.WithReference(researchApi);
 
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
 analyticsWorker.WithReference(catalogSync);
