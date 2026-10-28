@@ -199,6 +199,18 @@
       "defaultVariant": "on",
       "metadata": { "description": "Awards shelf: awards from saved research on show pages, and Prestige picks: the most-awarded shows you haven't started." }
     },
+    "network-reports": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Network report cards: how each network's and streamer's shows rate, end, come back and how long they keep you waiting." }
+    },
+    "year-in-tv": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows." }
+    },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

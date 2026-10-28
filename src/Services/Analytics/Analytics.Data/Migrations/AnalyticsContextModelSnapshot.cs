@@ -231,6 +231,27 @@ namespace Analytics.Data.Migrations
                     b.ToTable("episode_notes", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.NetworkReportRow", b =>
+                {
+                    b.Property<string>("Network")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("ComputedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Shows")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Network");
+
+                    b.ToTable("network_reports", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.PersonCareerCopy", b =>
                 {
                     b.Property<Guid>("PersonId")
@@ -378,6 +399,13 @@ namespace Analytics.Data.Migrations
                     b.PrimitiveCollection<List<string>>("Genres")
                         .IsRequired()
                         .HasColumnType("text[]");
+
+                    b.Property<string>("Network")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("NetworkKnown")
+                        .HasColumnType("boolean");
 
                     b.Property<double>("Popularity")
                         .HasColumnType("double precision");

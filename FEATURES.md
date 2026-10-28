@@ -408,7 +408,24 @@ On show pages and Discover.
   moderator's checked list from saved research.
 - **Prestige picks:** the most-awarded popular shows you haven't started.
 
-### 36. Smaller touches
+### 36. Network report cards
+
+On Discover.
+
+- **Which networks end shows well:** for each network and streamer, the share of its ended shows that stick the
+  landing, how often seasons come back, the typical wait between seasons, and its best shows, all against the whole
+  catalog. Netflix makes you wait over a year between seasons; CBS and NBC about four months.
+
+### 37. Year in TV
+
+On Stats.
+
+- **Your year, any year:** hours and episodes, your longest run of days, busiest month and biggest day, most watched
+  shows, genres and network, what you finished and left behind, and the best episode you watched.
+- **How your taste moved:** the DNA of this year's viewing against last year's.
+- **Called it:** the well-rated show you followed before most people here did.
+
+### 38. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

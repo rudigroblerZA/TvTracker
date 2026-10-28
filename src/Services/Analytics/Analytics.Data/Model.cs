@@ -19,6 +19,12 @@ public class ShowCopy
     /// <summary>Whether a catalog event has carried the show's creatives yet (they may be none).</summary>
     public bool CreativesKnown { get; set; }
 
+    /// <summary>Its network or streaming service ("HBO", "Netflix"), for the network report cards.</summary>
+    public string? Network { get; set; }
+
+    /// <summary>Whether a catalog event has carried the network yet (it may be none).</summary>
+    public bool NetworkKnown { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; }
 }
 
@@ -223,6 +229,15 @@ public class DiscoveryRow
 public class CreatorFingerprintRow
 {
     public Guid PersonId { get; set; }
+    public required string Document { get; set; }
+    public DateTime ComputedAtUtc { get; set; }
+}
+
+/// <summary>A network's report card (<see cref="NetworkReport"/> as JSON), recomputed hourly with the shows'.</summary>
+public class NetworkReportRow
+{
+    public required string Network { get; set; }
+    public int Shows { get; set; }
     public required string Document { get; set; }
     public DateTime ComputedAtUtc { get; set; }
 }

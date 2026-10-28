@@ -455,6 +455,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Picks:** Σ agreement × (stars − 3) over twins who rated it 4+, so 5 stars counts twice 4; shows the caller rated,
     follows or watched are left out.
   - **Dev data:** the load-test users' ratings are random 3-5 stars, so twins there are mechanical, not meaningful.
+- **Network report cards** (`NetworkReportList`, table `network_reports`): per network with 5+ catalog shows, from the
+  provider's data and the shows' documents, so the privacy rule doesn't apply. A `*` row is the whole catalog, the
+  baseline each figure is compared with.
+  - **Network on the copy:** `ShowCopy.Network` came with this; catalog events carry it as an optional trailing
+    `Network` plus `NetworkKnown` (an older event's null means "not sent", not "no network"), and the replay is
+    requested while any show lacks it.
+  - **Renewals:** a season counts once its fate is known (every season of an ended show; a running show's seasons that
+    a later one follows). The catalog is survivor-heavy, so the baseline is ~93%, and networks differ by a few points.
+  - **Not "over after one season":** TVmaze has no "cancelled", so every ended one-season show is tagged a limited
+    series; leaving those out left none, and keeping them would call every miniseries a cancellation.
+  - **Endings** are the shows' `Landing` verdicts; sticks includes "great finale".
+- **Year in TV** (`YearInTvApi`): computed on request from the caller's own watches and follows, in their time zone.
+  - **Bulk marks left out:** a mark of 8+ of a show's episodes at one moment says when they were marked, not watched
+    (seeding a back catalog read as a record year). The count left out is returned and shown.
+  - **Taste shift:** DNA traits averaged over the year's shows, weighted by minutes watched, against the year before's;
+    a move of 0.1+ is named, towards the trait's end.
+  - **Called it** is the only part about other users: the share of a show's followers here who followed after the
+    caller, shown with 5+ followers (the privacy rule) and when they were ahead of half.
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
