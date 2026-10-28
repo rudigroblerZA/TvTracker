@@ -354,6 +354,9 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
     /// <summary>Shows where actors from the user's favourites work together again (the reunion radar).</summary>
+    public Task<TasteTwins?> GetTasteTwinsAsync(CancellationToken ct = default) =>
+        GetAsync<TasteTwins>(ApiClients.Analytics, "api/v1/me/taste-twins", ct, cacheForOffline: true);
+
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
         GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
 
@@ -508,6 +511,14 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
 public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
     /// <summary>The show's saved research, its trusted record; null when none is saved. Public.</summary>
+    /// <summary>What the show has won; null when nothing is known.</summary>
+    public Task<AwardedShow?> GetAwardsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<AwardedShow>(ApiClients.Research, $"api/v1/shows/{showId}/awards", ct, cacheForOffline: true);
+
+    /// <summary>The most-awarded popular shows, most wins first.</summary>
+    public Task<List<AwardedShow>?> GetMostAwardedAsync(int limit = 60, CancellationToken ct = default) =>
+        GetAsync<List<AwardedShow>>(ApiClients.Research, $"api/v1/awards?limit={limit}", ct, cacheForOffline: true);
+
     public Task<SavedResearch?> GetSavedAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SavedResearch>(ApiClients.Research, $"api/v1/shows/{showId}/research", ct, cacheForOffline: true);
 

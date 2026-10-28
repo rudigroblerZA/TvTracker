@@ -250,6 +250,43 @@ namespace Research.API.Data.Migrations
                     b.ToTable("saved_research", (string)null);
                 });
 
+            modelBuilder.Entity("Research.API.Data.ShowAward", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PosterUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("ShowTitle")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("WikidataUrl")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("Wins")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ShowId");
+
+                    b.HasIndex("Wins");
+
+                    b.ToTable("show_awards", (string)null);
+                });
+
             modelBuilder.Entity("TvTracker.Persistence.IntegrationEventLogEntry", b =>
                 {
                     b.Property<Guid>("EventId")

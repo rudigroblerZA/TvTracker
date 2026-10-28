@@ -1,0 +1,43 @@
+@inject ResearchClient Research
+
+@* Show page: what the show has won, from saved research (checked) or Wikidata; nothing when it's won nothing known. *@
+@if (awards is not null)
+{
+    <p class="awards-line">
+        <span aria-hidden="true">🏆</span>
+        @* A checked summary is a moderator's wording; Wikidata's count beside it would read as a mismatch. *@
+        <span>@(!awards.Checked && awards.Wins is { } wins ? $" {wins} {(wins == 1 ? "award" : "awards")}: " : " ")</span>
+        <span>@awards.Summary</span>
+        <span class="muted small">
+            @(awards.Checked ? " · checked by our moderators" : " · ")@if (!awards.Checked && awards.SourceUrl is { } url)
+            {
+                <a href="@url" target="_blank" rel="noopener noreferrer">Wikidata</a>
+            }
+        </span>
+    </p>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private AwardedShow? awards;
+    private Guid loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowId == loadedFor)
+        {
+            return;
+        }
+        loadedFor = ShowId;
+        awards = null;
+        try
+        {
+            awards = await Research.GetAwardsAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Awards are a nicety; the page carries on without them.
+        }
+    }
+}

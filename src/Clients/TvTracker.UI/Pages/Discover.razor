@@ -11,6 +11,9 @@
 <AuthorizeView>
     <Authorized>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        <Feature Flag="@FeatureFlags.AwardsShelf">
+            <p><a href="prestige"><strong>Prestige picks</strong></a><span class="muted">: the most-awarded shows you haven't started.</span></p>
+        </Feature>
         <Feature Flag="@FeatureFlags.Nanogenres">
             <p><a href="nanogenres"><strong>Browse by nanogenre</strong></a><span class="muted">: fine-grained genres like sports comedy or cooking reality, found in the catalog.</span></p>
         </Feature>

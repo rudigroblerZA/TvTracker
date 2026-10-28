@@ -288,21 +288,7 @@ So the rest of the list reads in proportion:
 
 ## Features
 
-### F5. Taste twins
-
-**P3 · L**
-
-- **What:** users whose ratings track yours, and what they loved that you haven't seen. It's shown only with enough
-  overlap and enough twins to stay anonymous (the 5-user rule).
-- **Builds on:** Ratings, Recommendations' co-follow signal.
-
-### F6. Awards shelf
-
-**P3 · S**
-
-- **What:** awards from saved research on person and show pages, and a "Prestige picks" list: the most-awarded shows
-  you haven't started.
-- **Builds on:** Research's awards fact, Backlog's show value.
+All the features from the review have shipped; new ideas go here.
 
 ## Technical debt
 

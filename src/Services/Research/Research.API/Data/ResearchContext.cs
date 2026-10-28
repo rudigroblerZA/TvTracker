@@ -152,6 +152,30 @@ public class CatalogCheck
     public DateTime CheckedAtUtc { get; set; }
 }
 
+/// <summary>
+/// A popular show's award wins on Wikidata (P166, one statement per win), from the daily check
+/// (<see cref="Services.CatalogChecks"/>): the awards shelf and Prestige picks. Replaced by each check; saved research's
+/// awards fact, checked by a moderator, is shown instead where there is one.
+/// </summary>
+public class ShowAward
+{
+    public Guid ShowId { get; set; }
+
+    public required string ShowTitle { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    /// <summary>Award statements on the show's Wikidata item: wins, by award and category.</summary>
+    public int Wins { get; set; }
+
+    /// <summary>Grouped by award, most won first ("Primetime Emmy Award × 6, Golden Globe Award").</summary>
+    public required string Summary { get; set; }
+
+    public required string WikidataUrl { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
 public static class SourceKinds
 {
     public const string Wikidata = "wikidata";
@@ -171,6 +195,7 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
     public DbSet<SavedResearch> Saved => Set<SavedResearch>();
     public DbSet<EpisodeNote> EpisodeNotes => Set<EpisodeNote>();
     public DbSet<CatalogCheck> CatalogChecks => Set<CatalogCheck>();
+    public DbSet<ShowAward> ShowAwards => Set<ShowAward>();
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
@@ -239,6 +264,18 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
             entity.Property(c => c.CatalogValue).HasMaxLength(256);
             entity.Property(c => c.WikidataValue).HasMaxLength(256);
             entity.Property(c => c.WikidataUrl).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<ShowAward>(entity =>
+        {
+            entity.ToTable("show_awards");
+            entity.HasKey(a => a.ShowId);
+            entity.Property(a => a.ShowId).ValueGeneratedNever();
+            entity.Property(a => a.ShowTitle).HasMaxLength(256);
+            entity.Property(a => a.PosterUrl).HasMaxLength(1024);
+            entity.Property(a => a.Summary).HasMaxLength(2000);
+            entity.Property(a => a.WikidataUrl).HasMaxLength(256);
+            entity.HasIndex(a => a.Wins);
         });
 
         modelBuilder.UseIntegrationEventLogs();

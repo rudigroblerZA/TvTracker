@@ -13,6 +13,11 @@ namespace Research.API.Services;
 /// gather finds them, so a few queries cover the lot. Each check replaces the table, so a value a moderator fixed (by
 /// saving research, which overrides the catalog) drops off the next day.
 /// <para>
+/// <b>Awards:</b> a second query per batch counts each show's award statements (P166, one per win) and their labels,
+/// for the awards shelf; it's separate because counting them in the first query would multiply rows by networks and
+/// dates.
+/// </para>
+/// <para>
 /// <b>Wikidata's limits:</b> the query service answers 429 with a Retry-After (1,000 s from the sandbox's shared
 /// address), so a batch waits that long (up to half an hour) and tries again, batches are spaced out, and a run that
 /// fails is tried again in an hour rather than a day.
@@ -62,6 +67,19 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
 
     private sealed record WikidataFacts(string Item, WikidataDate? Started, int? Episodes, IReadOnlyList<string> Networks);
 
+    private sealed record WikidataAwards(string Item, int Wins, IReadOnlyList<string> Labels);
+
+    private const string AwardsSparql = """
+        SELECT ?tvmaze ?item (COUNT(?win) AS ?wins) (GROUP_CONCAT(?label; separator="|") AS ?labels)
+        WHERE {
+          VALUES ?tvmaze { {IDS} }
+          ?item wdt:P8600 ?tvmaze; p:P166 ?win.
+          ?win ps:P166 ?award.
+          ?award rdfs:label ?label. FILTER(LANG(?label) = "en")
+        }
+        GROUP BY ?tvmaze ?item
+        """;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Delay(FirstDelay, time, stoppingToken);
@@ -92,15 +110,22 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             .Where(x => x.Show.Source == "tvmaze" && int.TryParse(x.Show.ExternalId, out _))
             .ToList();
         var wikidata = new Dictionary<string, WikidataFacts>();
+        var awards = new Dictionary<string, WikidataAwards>();
         foreach (var batch in shows.Chunk(BatchSize))
         {
+            var ids = batch.Select(x => x.Show.ExternalId).ToList();
             if (wikidata.Count > 0)
             {
                 await Task.Delay(BetweenBatches, time, ct);
             }
-            foreach (var (id, facts) in await QueryWithRetryAsync(batch.Select(x => x.Show.ExternalId).ToList(), ct))
+            foreach (var (id, facts) in await WithRetryAsync(ids.Count, () => QueryAsync(ids, ct), ct))
             {
                 wikidata[id] = facts;
+            }
+            await Task.Delay(BetweenBatches, time, ct);
+            foreach (var (id, won) in await WithRetryAsync(ids.Count, () => QueryAwardsAsync(ids, ct), ct))
+            {
+                awards[id] = won;
             }
         }
 
@@ -138,6 +163,16 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             }
         }
 
+        var shelf = shows
+            .Where(x => awards.TryGetValue(x.Show.ExternalId, out var a) && a.Wins > 0)
+            .Select(x => (x.Show, Won: awards[x.Show.ExternalId]))
+            .Select(x => new ShowAward
+            {
+                ShowId = x.Show.Id, ShowTitle = x.Show.Title, PosterUrl = x.Show.PosterUrl, Wins = x.Won.Wins,
+                Summary = WikimediaSource.Awards(x.Won.Labels), WikidataUrl = x.Won.Item, CheckedAtUtc = now
+            })
+            .ToList();
+
         // Replaced in one transaction, run through the retrying execution strategy as one retriable unit.
         await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
@@ -145,42 +180,55 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await db.CatalogChecks.ExecuteDeleteAsync(ct);
             db.CatalogChecks.AddRange(checks);
+            await db.ShowAwards.ExecuteDeleteAsync(ct);
+            db.ShowAwards.AddRange(shelf);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         });
-        logger.LogInformation("Checked {Shows} popular shows against Wikidata ({Found} found there): {Differences} differences",
-            shows.Count, wikidata.Count, checks.Count);
+        logger.LogInformation("Checked {Shows} popular shows against Wikidata ({Found} found there): {Differences} differences, {Awarded} with awards",
+            shows.Count, wikidata.Count, checks.Count, shelf.Count);
     }
 
-    /// <summary>A batch, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.</summary>
-    private async Task<Dictionary<string, WikidataFacts>> QueryWithRetryAsync(List<string> tvmazeIds, CancellationToken ct)
+    /// <summary>A batch's query, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.</summary>
+    private async Task<T> WithRetryAsync<T>(int shows, Func<Task<T>> query, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                return await QueryAsync(tvmazeIds, ct);
+                return await query();
             }
             catch (WikidataBusyException busy) when (attempt < Attempts)
             {
                 var wait = busy.RetryAfter is { } after && after < MaxWait ? after : MaxWait;
-                logger.LogInformation("Wikidata is busy; checking the next {Count} shows in {Minutes:0} minutes", tvmazeIds.Count, wait.TotalMinutes);
+                logger.LogInformation("Wikidata is busy; checking the next {Count} shows in {Minutes:0} minutes", shows, wait.TotalMinutes);
                 await Task.Delay(wait, time, ct);
             }
         }
     }
 
-    private sealed class WikidataBusyException(TimeSpan? retryAfter) : Exception("Wikidata answered 429 Too Many Requests.")
+    private static async Task<Dictionary<string, WikidataAwards>> QueryAwardsAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
-        public TimeSpan? RetryAfter { get; } = retryAfter;
+        var found = new Dictionary<string, WikidataAwards>();
+        foreach (var row in await SparqlAsync(AwardsSparql, tvmazeIds, ct))
+        {
+            string? Get(string name) => row.TryGetProperty(name, out var v) && v.GetProperty("value").GetString() is { Length: > 0 } s ? s : null;
+            if (Get("tvmaze") is { } id && Get("item") is { } item && int.TryParse(Get("wins"), out var wins))
+            {
+                found.TryAdd(id, new WikidataAwards(item.Replace("http://www.wikidata.org/entity/", "https://www.wikidata.org/wiki/"), wins,
+                    (Get("labels") ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+            }
+        }
+        return found;
     }
 
-    private static async Task<Dictionary<string, WikidataFacts>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
+    /// <summary>A SPARQL query over a batch of TVmaze ids (<c>{IDS}</c>), its result rows.</summary>
+    private static async Task<List<JsonElement>> SparqlAsync(string sparql, IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://query.wikidata.org/sparql")
         {
-            Content = new FormUrlEncodedContent([new("query", Sparql.Replace("{IDS}", values))])
+            Content = new FormUrlEncodedContent([new("query", sparql.Replace("{IDS}", values))])
         };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/sparql-results+json"));
         using var response = await Http.SendAsync(request, ct);
@@ -190,9 +238,19 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         }
         response.EnsureSuccessStatusCode();
         using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return json.RootElement.GetProperty("results").GetProperty("bindings").EnumerateArray().Select(r => r.Clone()).ToList();
+    }
 
+    private sealed class WikidataBusyException(TimeSpan? retryAfter) : Exception("Wikidata answered 429 Too Many Requests.")
+    {
+        public TimeSpan? RetryAfter { get; } = retryAfter;
+    }
+
+    private static async Task<Dictionary<string, WikidataFacts>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
+    {
+        var rows = await SparqlAsync(Sparql, tvmazeIds, ct);
         var found = new Dictionary<string, WikidataFacts>();
-        foreach (var row in json.RootElement.GetProperty("results").GetProperty("bindings").EnumerateArray())
+        foreach (var row in rows)
         {
             string? Get(string name) => row.TryGetProperty(name, out var v) && v.GetProperty("value").GetString() is { Length: > 0 } s ? s : null;
             if (Get("tvmaze") is not { } id || Get("item") is not { } item)

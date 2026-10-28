@@ -393,6 +393,18 @@ public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Epis
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
 
+/// <summary>Taste twins (Analytics.API): anonymous people whose ratings track the user's, and what they loved.</summary>
+public record TasteTwins(int RatedShows, int Twins, double? Agreement, string? Reason, IReadOnlyList<TwinShow> AgreeOn, IReadOnlyList<TwinPick> Picks);
+
+public record TwinShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <param name="Loved">How many twins rated it 4 or 5 stars.</param>
+public record TwinPick(Guid ShowId, string Title, string? PosterUrl, int Loved, double Stars, double? Rating);
+
+/// <param name="Wins">Award wins on Wikidata; null when only saved research has them.</param>
+/// <param name="Checked">From saved research, checked by a moderator.</param>
+public record AwardedShow(Guid ShowId, string Title, string? PosterUrl, int? Wins, string Summary, bool Checked, string? SourceUrl);
+
 public record ReunionRadar(int LovedShows, int ActorsPending, IReadOnlyList<Reunion> Reunions);
 
 /// <param name="IsNew">Premiering soon or in the last year.</param>

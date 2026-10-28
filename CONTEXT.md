@@ -445,6 +445,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why the provider's credits:** within the catalog alone (587 shows), only 73 shows had any reunion, and none of
     the demo user's favourites did. Across TVmaze, NCIS finds Chicago Hope (three of its cast) and The Wire finds Oz,
     Treme and Bosch.
+- **Taste twins** (`TasteTwinsApi`): computed on request from the ratings copy.
+  - **Agreement, not correlation:** 1 − mean |stars difference| / 4 over 3+ shared shows, shrunk by n / (n + 3).
+    Pearson on 3-10 shared ratings swings wildly, and most ratings sit at 3-5 stars, where a correlation says little.
+  - **The privacy rule:** 5+ twins or nothing, and 2+ twins behind each pick, so one person's ratings never show through
+    a pick. Twins aren't named or listed.
+  - **Picks:** Σ agreement × (stars − 3) over twins who rated it 4+, so 5 stars counts twice 4; shows the caller rated,
+    follows or watched are left out.
+  - **Dev data:** the load-test users' ratings are random 3-5 stars, so twins there are mechanical, not meaningful.
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
@@ -549,6 +557,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     the next day; nothing to dismiss by hand.
   - **Catalog facts by API:** Catalog.API's `/shows/facts` gives the popular shows' network, premiere date and aired
     episodes as the catalog holds them, overrides applied.
+- **Awards shelf** (`AwardsApi`, `show_awards`): the daily check's second query per batch counts award statements
+  (P166, one per win) and their labels for the popular shows. A moderator's saved awards fact replaces Wikidata's
+  wording on the show page; ranking uses Wikidata's count either way. Wikidata's counts are uneven (The Sopranos 57,
+  Game of Thrones 13), which a moderator can correct by researching the show.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see

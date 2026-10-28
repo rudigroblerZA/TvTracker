@@ -1,0 +1,78 @@
+@page "/prestige"
+@attribute [RequiresFeature(FeatureFlags.AwardsShelf)]
+@inject ResearchClient Research
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>Prestige picks · @Brand.AppName</PageTitle>
+
+<h1>Prestige picks</h1>
+<p class="muted">
+    The most-awarded popular shows@(Session.IsSignedIn ? " you haven't started" : ""), by wins on Wikidata. Awards checked
+    by our moderators say so.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (picks is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else if (picks.Count == 0)
+{
+    <p class="muted">Nothing to show yet: awards are read from Wikidata once a day.</p>
+}
+else
+{
+    <ol class="discovery">
+        @foreach (var show in picks)
+        {
+            <li @key="show.ShowId">
+                <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
+                <div>
+                    <a href="shows/@show.ShowId"><strong>@show.Title</strong></a>
+                    <div class="small">@($"🏆 {show.Wins} {(show.Wins == 1 ? "award" : "awards")}{(show.Checked ? " · checked" : "")}")</div>
+                    <div class="muted small">@show.Summary</div>
+                    @if (followed.Contains(show.ShowId))
+                    {
+                        <div class="muted small">On your list, not started</div>
+                    }
+                </div>
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    private List<AwardedShow>? picks;
+    private HashSet<Guid> followed = [];
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>The most awarded, less what the user has started (any episode watched); followed but unstarted stays.</summary>
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            var all = await Research.GetMostAwardedAsync() ?? [];
+            if (Session.IsSignedIn)
+            {
+                var follows = await Tracking.GetFollowsAsync() ?? [];
+                var started = follows.Where(f => f.WatchedCount > 0).Select(f => f.ShowId).ToHashSet();
+                followed = follows.Where(f => f.WatchedCount == 0).Select(f => f.ShowId).ToHashSet();
+                all = all.Where(s => !started.Contains(s.ShowId)).ToList();
+            }
+            picks = all.Take(30).ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

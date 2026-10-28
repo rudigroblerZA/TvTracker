@@ -54,5 +54,6 @@ app.MapGet("/api/v1/status", () => new { Service = "research-api", Status = "ok"
 app.MapResearchApi();
 app.MapEpisodeNotesApi();
 app.MapResearchQueueApi();
+app.MapAwardsApi();
 
 app.Run();

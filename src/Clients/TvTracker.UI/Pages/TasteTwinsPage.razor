@@ -1,0 +1,94 @@
+@page "/taste-twins"
+@attribute [RequiresFeature(FeatureFlags.TasteTwins)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>Taste twins · @Brand.AppName</PageTitle>
+
+<h1>Taste twins</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            People here whose ratings track yours, and the shows they loved that you haven't rated, followed or watched.
+            Nobody is named, and a pick needs at least two of them behind it.
+        </p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (twins is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Comparing ratings…</p>
+            }
+        }
+        else
+        {
+            @if (twins.Twins >= 5)
+            {
+                <p>
+                    <strong>@($"{twins.Twins} taste twins")</strong>
+                    <span class="muted">@($" · {Format.Percent(twins.Agreement ?? 0)} agreement on the shows you've both rated · from your {twins.RatedShows} ratings")</span>
+                </p>
+            }
+            @if (twins.Reason is { } reason)
+            {
+                <p class="notice">@reason</p>
+            }
+
+            @if (twins.AgreeOn.Count > 0)
+            {
+                <section>
+                    <h2>You agree on</h2>
+                    <div class="chips">
+                        @foreach (var show in twins.AgreeOn)
+                        {
+                            <a class="chip" href="shows/@show.ShowId">@show.Title</a>
+                        }
+                    </div>
+                </section>
+            }
+
+            @if (twins.Picks.Count > 0)
+            {
+                <section>
+                    <h2>They loved, you haven't seen</h2>
+                    <ol class="discovery">
+                        @foreach (var pick in twins.Picks)
+                        {
+                            <li @key="pick.ShowId">
+                                <a href="shows/@pick.ShowId"><Poster Title="@pick.Title" Url="@pick.PosterUrl" Size="small" /></a>
+                                <div>
+                                    <a href="shows/@pick.ShowId"><strong>@pick.Title</strong></a>
+                                    <div class="muted small">@($"Loved by {pick.Loved} of your twins · ★ {pick.Stars:0.0}{(pick.Rating is { } r ? $" · rated {Format.Rating(r)}" : "")}")</div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in and rate a few shows to find your taste twins." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private TasteTwins? twins;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            twins = await Analytics.GetTasteTwinsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}
