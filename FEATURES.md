@@ -381,7 +381,16 @@ From a show page's cast: "Karen Page · 4 shows".
 - **Your place in each:** how far you are in each show, and one button to add the rest to your watchlist. Shows not
   yet in the catalog link to search, which imports them.
 
-### 33. Smaller touches
+### 33. Crossover alerts
+
+On Up Next and in your inbox.
+
+- **Don't miss the crossover:** two weeks before a crossover across a franchise you follow ("Reckoning" across Chicago
+  Fire, Med and P.D.), you hear about it, once.
+- **What to watch first:** Up Next lists each part and how far behind you are in each show ("2 to catch up"), and links
+  to the franchise's watch order.
+
+### 34. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

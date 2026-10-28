@@ -140,13 +140,10 @@ public static class UniverseApi
             dtoLinks));
     }
 
-    // A crossover event's parts air within a week, usually the same night.
-    private static readonly TimeSpan CrossoverWindow = TimeSpan.FromDays(7);
-
     /// <summary>
     /// A universe's episodes in the order they aired, across all its shows, so crossovers land in sequence: One
     /// Chicago's "Infection" runs Chicago Fire, then Med, then P.D. Crossover events are named where the shows' episode
-    /// titles say so (see <see cref="CrossoverName"/>); airing the same night isn't enough, since One Chicago airs back
+    /// titles say so (see <see cref="Crossovers"/>); airing the same night isn't enough, since One Chicago airs back
     /// to back every week.
     /// </summary>
     private static async Task<Results<Ok<WatchOrderDto>, NotFound>> GetWatchOrderAsync(
@@ -173,22 +170,7 @@ public static class UniverseApi
             .OrderBy(e => e.AirsAtUtc).ThenBy(e => order[e.ShowId]).ThenBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
             .ToList();
 
-        var crossover = new string?[dated.Count];
-        for (var i = 0; i < dated.Count; i++)
-        {
-            if (CrossoverName(dated[i].Title) is not { } name)
-            {
-                continue;
-            }
-            for (var j = i + 1; j < dated.Count && dated[j].AirsAtUtc - dated[i].AirsAtUtc <= CrossoverWindow; j++)
-            {
-                if (dated[j].ShowId != dated[i].ShowId && string.Equals(CrossoverName(dated[j].Title), name, StringComparison.OrdinalIgnoreCase))
-                {
-                    crossover[i] ??= TrimPart(dated[i].Title);
-                    crossover[j] = crossover[i];
-                }
-            }
-        }
+        var crossover = Crossovers.Label(dated.Select(e => (e.ShowId, e.Title, e.AirsAtUtc!.Value)).ToList());
 
         var hub = Hub(members, universe.Links);
         return TypedResults.Ok(new WatchOrderDto(
@@ -198,27 +180,6 @@ public static class UniverseApi
             dated.Select((e, i) => new WatchOrderEpisodeDto(e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc!.Value,
                 e.RuntimeMinutes, crossover[i])).ToList(),
             all.Count - dated.Count));
-    }
-
-    private static readonly System.Text.RegularExpressions.Regex PartMarker = new(
-        @"[\s,:;-]*(\(\s*(part\s*)?(\d+|i{1,3}|iv)\s*\)|\bpart\s*(\d+|one|two|three|four|i{1,3}|iv)\b)\s*$",
-        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
-
-    private static readonly HashSet<string> Placeholders = new(StringComparer.OrdinalIgnoreCase) { "tba", "tbd", "untitled", "pilot" };
-
-    /// <summary>The title without its part marker: "Infection" for "Infection, Part II" or "Sister City (Part I)".</summary>
-    private static string TrimPart(string title) => PartMarker.Replace(title, "").Trim();
-
-    /// <summary>
-    /// What two shows' episodes must share to be one crossover event: the title without its part marker, normalised.
-    /// Null for placeholder titles ("TBA", "Episode 5"), which every show uses.
-    /// </summary>
-    private static string? CrossoverName(string title)
-    {
-        var name = TrimPart(title);
-        return name.Length < 3 || Placeholders.Contains(name) || name.StartsWith("Episode ", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : string.Join(' ', System.Text.RegularExpressions.Regex.Matches(name.ToLowerInvariant(), @"[\p{L}\p{N}']+").Select(m => m.Value));
     }
 
     /// <summary>

@@ -193,6 +193,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     - **Why not same night:** same-night airing flagged 534 of One Chicago's 798 episodes, since the shows air back
       to back weekly.
     - **Progress:** the UI reads the user's progress from Tracking, one `/progress/{showId}` call per show.
+  - **Crossover alerts** (`Crossovers`, `CrossoverAlerts` in Catalog.API): the watch order's detection, shared, over
+    each universe's episodes from a week back to 37 days ahead; events with a part still to come and starting within
+    30 days are cached for half an hour.
+    - **Straight to the bus:** Catalog.API is the read side and keeps no outbox, so the hourly job publishes
+      `CrossoverScheduledIntegrationEvent` directly, for each crossover starting within 14 days, and again every hour
+      while it's ahead. A lost event heals on the next send; Notifications keys on `CrossoverId` (universe, name,
+      year), as it does on a season verdict's id, so followers hear once.
+    - **One item per person:** Notifications fans out per show with that one identity, so someone following Fire and
+      Med gets one item. The text says "in 6 days" rather than a date: one text goes to every time zone, and a US
+      evening is the next day in UTC.
+    - **Catch-up count:** aired episodes not yet watched, only for shows the user has started; for an unstarted show
+      "298 to catch up" isn't about the crossover.
+    - **Tested** by retitling two upcoming One Chicago episodes as a crossover: 56 followers got one item each, and a
+      second send after a restart added none.
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).

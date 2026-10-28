@@ -114,6 +114,7 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
         NotificationKind.NewEpisode => pref.NewEpisodes,
         NotificationKind.NewSeason => pref.NewSeasons,
         NotificationKind.SeasonVerdict => pref.NewSeasons,
+        NotificationKind.Crossover => pref.NewEpisodes,
         NotificationKind.StatusChange => pref.StatusChanges,
         _ => false
     };

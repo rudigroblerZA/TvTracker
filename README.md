@@ -146,6 +146,13 @@ franchises. The 625-show dev catalog has 35, all real:
   - **Opens where you are:** the year of your next episode, or the first year if you haven't started. A universe
     like NCIS has over 1,100 episodes, so only open years are drawn.
   - **API:** `GET /api/v1/shows/{id}/universe/watch-order` (public).
+- **Crossover alerts** (`crossover-alerts` flag): when a crossover is coming up in a universe whose shows you follow:
+  - **Notification:** two weeks ahead, once ("Crossover ahead: Reckoning. Airs across Chicago Fire, Chicago Med and
+    Chicago P.D., starting in 6 days."), to followers of any of its shows, under the "new episodes" preference.
+  - **Up Next:** "Crossover ahead" lists each show's part and air date, and where you are in it: caught up, so many
+    to catch up on, not started or not following. The total to catch up on links to the universe's watch order.
+  - **API:** `GET /api/v1/crossovers` (the next 30 days) and `POST /api/v1/crossovers` with `{ "showIds": [...] }`
+    (those involving the shows), on Catalog.API, public.
 - **Links:** a map of the shows with arcs joining linked ones. Colour shows the kind of link: continues the story,
   crossover, revival, or same franchise (dashed). Thickness shows how many characters they share. Selecting a show
   lists its links, with the characters and actors.
@@ -374,7 +381,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -402,6 +409,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
+| `crossover-alerts` | Crossover notifications, "Crossover ahead" on Up Next, and the crossovers endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".

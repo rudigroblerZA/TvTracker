@@ -1,0 +1,98 @@
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+@* Up Next: crossovers coming up across the shows the user follows, and what to catch up on first. *@
+@if (items is { Count: > 0 })
+{
+    <section class="crossovers-ahead">
+        <h2>Crossover ahead</h2>
+        <ul class="up-next">
+            @foreach (var item in items)
+            {
+                var c = item.Crossover;
+                <li @key="c.Id">
+                    <a href="universes/@c.UniverseId"><Poster Title="@c.Parts[0].ShowTitle" Url="@c.Parts[0].PosterUrl" Size="small" /></a>
+                    <div class="up-next-body">
+                        <a class="strong" href="universes/@c.UniverseId">@c.Name</a>
+                        <div class="muted small">@($"{c.UniverseName} · starts {When(c.StartsAtUtc)}")</div>
+                        <ul class="crossover-parts small">
+                            @foreach (var part in c.Parts)
+                            {
+                                <li>
+                                    <a href="shows/@part.ShowId">@part.ShowTitle</a>
+                                    <span class="code">@(" " + Format.EpisodeCode(part.SeasonNumber, part.EpisodeNumber))</span>
+                                    <span class="muted">@($" · {Session.ToLocal(part.AirsAtUtc):ddd d MMM}")</span>
+                                    <span class="tag @Tone(item, part.ShowId)">@Behind(item, part.ShowId)</span>
+                                </li>
+                            }
+                        </ul>
+                        @if (item.ToCatchUp > 0)
+                        {
+                            <a class="small" href="universes/@c.UniverseId">@($"{item.ToCatchUp} {(item.ToCatchUp == 1 ? "episode" : "episodes")} to catch up on first: see the watch order")</a>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private sealed record Item(Crossover Crossover, Dictionary<Guid, ShowProgress?> Progress, int ToCatchUp);
+
+    private List<Item>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var follows = await Tracking.GetFollowsAsync() ?? [];
+            if (follows.Count == 0)
+            {
+                return;
+            }
+            var followed = follows.Select(f => f.ShowId).ToHashSet();
+            var crossovers = await Catalog.GetCrossoversAsync(followed.ToList()) ?? [];
+            var shows = crossovers.SelectMany(c => c.Parts).Select(p => p.ShowId).Where(followed.Contains).Distinct().ToList();
+            var progress = (await Task.WhenAll(shows.Select(id => Tracking.GetProgressAsync(id)))).OfType<ShowProgress>().ToDictionary(p => p.ShowId);
+
+            items = crossovers.Select(c =>
+            {
+                var byShow = c.Parts.Select(p => p.ShowId).Distinct()
+                    .ToDictionary(id => id, id => followed.Contains(id) ? progress.GetValueOrDefault(id) : null);
+                // Only shows they've started: catching up on a show from the beginning isn't "before the crossover".
+                return new Item(c, byShow, byShow.Values.OfType<ShowProgress>().Where(p => p.WatchedCount > 0).Sum(Unwatched));
+            }).ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Up Next shows its own errors; this section just stays away.
+        }
+    }
+
+    /// <summary>Aired episodes not yet watched: what stands between the user and the crossover.</summary>
+    private static int Unwatched(ShowProgress p) => Math.Max(0, p.AiredCount - p.WatchedCount);
+
+    private static string Behind(Item item, Guid showId) => item.Progress.GetValueOrDefault(showId) switch
+    {
+        null when !item.Progress.ContainsKey(showId) => "",
+        null => "not following",
+        { WatchedCount: 0 } p => $"not started ({p.AiredCount} aired)",
+        var p when Unwatched(p) == 0 => "caught up",
+        var p => $"{Unwatched(p)} to catch up"
+    };
+
+    private static string Tone(Item item, Guid showId) => item.Progress.GetValueOrDefault(showId) switch
+    {
+        { } p when Unwatched(p) == 0 => "tone-good",
+        { } => "tone-warn",
+        _ => ""
+    };
+
+    private string When(DateTimeOffset utc)
+    {
+        var days = (Session.ToLocal(utc).Date - Session.Now.Date).Days;
+        return days switch { 0 => "today", 1 => "tomorrow", < 7 => $"{Session.ToLocal(utc):dddd}", _ => $"{Session.ToLocal(utc):ddd d MMM}" };
+    }
+}

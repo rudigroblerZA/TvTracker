@@ -73,7 +73,8 @@ public enum NotificationKind
     NewEpisode,
     NewSeason,
     StatusChange,
-    SeasonVerdict
+    SeasonVerdict,
+    Crossover
 }
 
 public class InboxItem

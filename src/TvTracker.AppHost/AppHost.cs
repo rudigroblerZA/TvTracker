@@ -100,6 +100,7 @@ var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(catalogDb).WaitFor(catalogDb)
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
+    .WithReference(eventBus).WaitFor(eventBus)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
