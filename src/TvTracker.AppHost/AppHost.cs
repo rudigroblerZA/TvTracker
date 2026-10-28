@@ -29,6 +29,7 @@ var identityDb = postgres.AddDatabase("identitydb");
 var catalogDb = postgres.AddDatabase("catalogdb");
 var trackingDb = postgres.AddDatabase("trackingdb");
 var ratingsDb = postgres.AddDatabase("ratingsdb");
+var researchDb = postgres.AddDatabase("researchdb");
 var recommendationsDb = postgres.AddDatabase("recommendationsdb");
 var notificationsDb = postgres.AddDatabase("notificationsdb");
 var analyticsDb = postgres.AddDatabase("analyticsdb");
@@ -129,6 +130,7 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
 var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
     .WithReference(notificationsDb).WaitFor(notificationsDb)
     .WithReference(eventBus).WaitFor(eventBus)
+    .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
@@ -155,6 +157,21 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
+// Research: moderators enrich a show from Wikidata, Wikipedia, TMDB (Research:TmdbApiKey) and pages they add, with an
+// insight drafted by Model Runner's chat model; saved research is the show's trusted record, and its catalog fields
+// (summary, network, premiere date) override the provider's through the sync worker.
+var researchApi = builder.AddProject<Projects.Research_API>("research-api")
+    .WithReference(researchDb).WaitFor(researchDb)
+    .WithReference(eventBus).WaitFor(eventBus)
+    .WithReference(flagd)
+    .WithReference(catalogApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithHttpHealthCheck("/health");
+if (builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
+{
+    researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
+}
+
 // Internal MCP server (http://localhost:5112/mcp): read-only tools over the catalog and Analytics, for questions like
 // "landman insights" from an MCP client. It signs in to Analytics as its own Keycloak client, which it creates in
 // development if the realm predates it. Development only unless Mcp:ApiKey is set.
@@ -162,6 +179,7 @@ var mcpServer = builder.AddProject<Projects.Mcp_Server>("mcp-server")
     .WithReference(catalogApi)
     .WithReference(analyticsApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithReference(researchApi)
     .WithEnvironment("Mcp__ClientSecret", McpClientSecret)
     .WithEnvironment("Keycloak__AdminUsername", "admin")
     .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
@@ -177,6 +195,16 @@ var mcpGateway = builder.AddProject<Projects.Mcp_Gateway>("mcp-gateway")
     .WithEnvironment("Gateway__Servers__tvtracker__Url", ReferenceExpression.Create($"{mcpServer.GetEndpoint("http")}/mcp"))
     .WaitFor(mcpServer)
     .WithHttpHealthCheck("/health");
+// Ask the app: questions about shows, answered by Model Runner's chat model calling the app's MCP tools through the
+// gateway (its endpoint and model are set with Model Runner's below). Signed in, behind the "ask" flag.
+var assistantApi = builder.AddProject<Projects.Assistant_API>("assistant-api")
+    .WithReference(flagd)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithEnvironment("Assistant__GatewayUrl", ReferenceExpression.Create($"{mcpGateway.GetEndpoint("http")}/mcp"))
+    .WithEnvironment("Assistant__GatewayKey", McpGatewayKey)
+    .WaitFor(mcpGateway)
+    .WithHttpHealthCheck("/health");
+
 foreach (var server in builder.Configuration.GetSection("Gateway:Servers").GetChildren())
 {
     foreach (var setting in server.GetChildren().Where(c => c.Value is not null))
@@ -192,6 +220,10 @@ foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:B
     foreach (var item in builder.Configuration.GetSection(section).GetChildren())
     {
         ratingsApi.WithEnvironment($"{section.Replace(":", "__")}__{item.Key}", item.Value);
+        if (section != "Moderation:BlockedTerms")
+        {
+            researchApi.WithEnvironment($"{section.Replace(":", "__")}__{item.Key}", item.Value);
+        }
     }
 }
 
@@ -246,6 +278,11 @@ foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExt
 // until it's ready, search matches titles only. Not started for an in-process model: the built-in server models
 // are the dmr/ ones, and a custom one says Source: Server.
 var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
+// The chat model Open WebUI chats with, Research drafts insights with and the assistant answers with; pulled with the
+// dashboard's command. The default is the smallest that calls tools reliably (qwen3 0.6B, ~400 MB, fine on a CPU).
+var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/qwen3:0.6B-Q4_K_M";
+researchApi.WithEnvironment("Research__ChatModel", chatModel);
+assistantApi.WithEnvironment("Assistant__ChatModel", chatModel);
 var servedModel = embeddingModelId.StartsWith("dmr/", StringComparison.Ordinal)
     || string.Equals(builder.Configuration[$"Embeddings:Models:{embeddingModelId}:Source"], "Server", StringComparison.OrdinalIgnoreCase);
 if (!servedModel)
@@ -257,6 +294,8 @@ else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunner
     var endpoint = modelRunnerUrl.TrimEnd('/') + "/engines/v1/";
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
+    researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
+    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Open WebUI runs in a container, where localhost is the container itself.
     var fromContainer = new UriBuilder(modelRunnerUrl);
@@ -276,15 +315,16 @@ else
     var endpoint = ReferenceExpression.Create($"{modelRunner.GetEndpoint("http")}/engines/v1/");
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
+    researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
+    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Model Runner serves only the embedding model until a chat model is pulled: this adds a "Pull <model>" command to
     // the model-runner resource on the dashboard (Model Runner's own pull API, which the sync worker also uses).
-    var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/smollm2";
     modelRunner.WithHttpCommand("/models/create", $"Pull {chatModel}", commandName: "pull-chat-model",
         commandOptions: new HttpCommandOptions
         {
             Method = HttpMethod.Post,
-            Description = $"Pulls {chatModel} for chatting in Open WebUI. Large models take minutes; it shows there once pulled.",
+            Description = $"Pulls {chatModel} for chatting in Open WebUI, drafting research insights and answering Ask. Large models take minutes.",
             IconName = "ArrowDownload",
             PrepareRequest = context =>
             {
@@ -339,8 +379,9 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
 catalogApi.WithReference(catalogSync);
 
-// Moderators' accepted corrections are applied to the catalog by the sync worker.
+// Moderators' accepted corrections, and saved research, are applied to the catalog by the sync worker.
 ratingsApi.WithReference(catalogSync);
+researchApi.WithReference(catalogSync);
 
 // The ops dashboard (/ops on Catalog.API) includes Analytics' stats.
 catalogApi.WithReference(analyticsApi);
@@ -364,7 +405,9 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(recommendationsApi)
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
-    .WithReference(socialApi);
+    .WithReference(socialApi)
+    .WithReference(researchApi)
+    .WithReference(assistantApi);
 
 builder.AddProject<Projects.WebApp>("webapp")
     .WithEnvironment("Branding__AppName", appName)
@@ -381,6 +424,8 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(recommendationsApi)
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
-    .WithReference(socialApi);
+    .WithReference(socialApi)
+    .WithReference(researchApi)
+    .WithReference(assistantApi);
 
 builder.Build().Run();

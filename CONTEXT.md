@@ -24,10 +24,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
 | Social.API | follows between users, blocks, privacy settings, activity feed | copies of shows, episodes, names, each user's follows/watches/ratings and shared lists, from events and snapshots; behind the `social` flag |
+| Research.API | dossiers, sources, fact candidates, saved research versions | moderators only; saved catalog facts go to the sync worker as overrides; behind the `research` flag |
+| Assistant.API | — (questions in memory) | "Ask the app": Model Runner's chat model with the MCP tools, through the gateway; behind the `ask` flag |
 | Notifications.API | inbox, devices, preferences | push/web push/email log instead of sending until configured |
 | Analytics.Worker | write side of `analyticsdb` | own copy of catalog + user activity from events; hourly `InsightsPipeline`; publishes show tags |
 | Analytics.API | read side of `analyticsdb` | insights, discovery lists, person insights, tags, "your taste"; applies Analytics migrations |
-| Mcp.Server | — | read-only MCP tools over Catalog.API and Analytics.API, for internal queries ("landman insights") |
+| Mcp.Server | — | read-only MCP tools over Catalog.API, Analytics.API and Research.API, for internal queries ("landman insights") and Ask |
 | Mcp.Gateway | — | one MCP endpoint (API key, tool allow-list, call logs) in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | — | YARP; the mobile app only talks to this (`/catalog/**`, `/tracking/**`, ..., `/features/**` for flag evaluation over OFREP) |
 | WebApp | — | Blazor Server host; OIDC, tokens in Redis |
@@ -40,6 +42,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outboxes still deserialize. Don't rename or reorder existing ones.
 - **Publishing:** add the event to `IIntegrationEventOutbox` in the same `SaveChanges` as the change, then
   `PublishAddedAsync`. `OutboxPublisher` retries anything left behind.
+  - **Channels:** `RabbitMQEventBus` rents publishing channels from a small pool and declares the exchange once per
+    connection. A channel opened, declared and closed per event added three round trips to every write; pooling took
+    follow and mark-watched from p50 ~50 ms to ~30 ms at 20 load-test users.
 - **Consuming:** an `IIntegrationEventHandler<T>` starts with `db.HasProcessedAsync(@event, nameof(Handler))`, and
   calls `db.MarkProcessed(...)` before saving. This is the inbox; redeliveries become no-ops.
 - **RabbitMQ:** one queue per service; a failing message is retried once, then dropped (no DLQ yet). Lost-event
@@ -214,6 +219,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
 - **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
+
+## Show detail cache
+
+- **In memory only, for a minute:** Catalog.API's show detail stays out of Redis. With a Redis copy (10 minutes), the
+  sync worker's `RemoveByTagAsync` didn't reach it: a corrected summary and network stayed stale in Catalog.API for over
+  2 minutes after the worker invalidated the tag. In memory, a correction, research save or refresh shows within a
+  minute in every Catalog.API process.
 
 ## Analytics domain
 
@@ -447,6 +459,36 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   to a scratch database and diffed (`pg_dump -s`) against the live one `EnsureCreated` made: identical apart from EF's
   history table.
 
+## Research
+
+- **What it is** (Research.API): moderators gather sources for a show, pick each fact, edit a model-drafted insight and
+  save a version. The latest saved version is the show's trusted record: the show page and the MCP tools read it.
+- **Field by field** (a product decision): a saved summary, network or premiere date becomes a `CatalogOverride`, the
+  same path accepted corrections take, so the sync worker applies it on every refresh. Other facts (creators, awards,
+  IMDb link, …) live only in Research.
+  - **One override per show and field:** its id is a hash of the show and field (a v8 GUID), so a new version replaces
+    the value in place (`AddOverrideAsync` upserts) rather than stacking overrides.
+  - **Overrides first:** saving applies them before writing the version, and saves nothing if the catalog refuses one,
+    so the record never says what the catalog doesn't. A catalog field dropped in a later version removes its
+    override, and TVmaze's value comes back on the next refresh.
+  - **New override fields:** `show-network` and `show-premiered` (catalog `CatalogOverrideFields`), added for this.
+- **Sources:**
+  - **Wikidata by TVmaze id:** a SPARQL query on property P8600 finds the item without guessing from the title, and
+    brings its English Wikipedia article. Wikidata's entity API and the MediaWiki API answered 429 from the sandbox;
+    the query service and the REST summary didn't.
+  - **Awards** are grouped by name ("Primetime Emmy Award × 6"; Breaking Bad has 30 categories): Wikidata lists one item per category.
+  - **TMDB** only with `Research:TmdbApiKey`.
+  - **Pages by address** (`WebPageSource`): fetched on a moderator's behalf, so only public addresses, checked again
+    at each redirect.
+  - **Plain HTTP clients:** the standard resilience handler retried Wikipedia's 429s until its 30 s total timeout and
+    failed the whole gather. Each source has one try, and a failure leaves that source out.
+- **Drafts in the background** (`DraftQueue`): Model Runner's small CPU model (qwen3 0.6B) took 92 s for Breaking Bad,
+  past the UI's 30 s request timeout. The draft is queued, the page polls, and a draft running over 15 minutes is
+  treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
+- **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
+  them as numbered, so its citations keep pointing at the right source.
+- **Deleted moderators:** their name comes off the versions they saved ("a former moderator"); the research stays.
+
 ## Social
 
 - **Following, not friending** (a product decision): one way, no approval, like Letterboxd. Privacy is the followed
@@ -482,6 +524,29 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   out of order. Tracking's snapshot carries shared lists too (an optional trailing parameter), so a lost event heals.
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
+
+## Season verdict
+
+- **Part of the show document** (`SeasonVerdictInsight`), so it's computed hourly with the rest, and read by the show
+  page as it is; Insights' list reads the stored documents' `seasonVerdict` (jsonb) rather than a table of its own.
+- **When a season is over:** "every listed episode aired" isn't enough, since TVmaze lists a weekly show's next episode
+  only days ahead (Cops in week 17 looked finished). Over means: the show ended, a later season is listed or announced,
+  the season dropped at once, or it's been quiet for twice its usual gap (at least 7 days). The catalog doesn't keep
+  TVmaze's planned episode count per season, which would settle it; adding it means a provider, catalog, event and
+  Analytics change. A reality show back from a long break can still be called over early.
+- **Window:** 3 days after the finale (the provider's episode ratings arrive after airing, and viewers catch up) to
+  45 days. Daily shows (seasons over 60 episodes) and seasons with fewer than 3 rated episodes get none.
+- **Verdicts:** against the median of the show's other seasons that count (3+ rated episodes): 0.3 above or below, else
+  in line; "best yet" / "weakest yet" when above or below every other, with two or more to compare. The finale against
+  the season's average, with the same 0.3.
+- **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
+  started (the privacy rule).
+- **Sent once** (`SeasonVerdictPublication`): a verdict for a season the stored document didn't have, within 7 days of
+  when it could first be given (`ReadyAtUtc`). Not re-sent after start like tags and DNA, since it's news; and without
+  the 7 days, its first run would have notified followers about every season of the last six weeks (it sent 5 of 24).
+- **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
+  Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
+  some followers only.
 
 ## Holiday episodes
 
@@ -601,7 +666,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Social and Tracking use EF Core migrations, applied at startup by
+- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations, applied at startup by
   their API.
   The other services still use `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
@@ -609,12 +674,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     as at that migration and migrated from there, rather than refusing to start.
   - **Checked:** Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
+- **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
+  idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).
+  - **Why:** with Npgsql's defaults (100 per pool, idle kept 5 minutes), services that had been busy held their
+    connections, and under 80 load-test users Postgres refused ~6,000 new ones in 5 minutes ("too many clients").
+    Npgsql calls that transient, so EF's retry strategy backed off for up to 30 s: Tracking, which needed new
+    connections last, answered in 2-30 s, reads as well as writes. Capped, the same load ran at 310 requests/s instead
+    of 85, with no errors and p95 0.8 s instead of 3.9 s, and no database held more than 12 connections.
+  - **The rule:** keep the cap × the processes with a database (11 here, so 88 of 100; more with replicas) under the server's
+    `max_connections`, or put a pooler (Azure's built-in PgBouncer) in front once replicas multiply.
+  - **Not a server setting:** raising `max_connections` with `WithArgs` on the persistent Postgres container didn't
+    apply to an existing container, so the fix lives in the services.
 - **Array columns:** EF can't translate a GroupBy over an array column's elements, so use raw SQL with `unnest`
   (see `OpsApi`).
 
 ## MCP server
 
-- **Over the APIs, not the databases:** `Mcp.Server` calls Catalog.API and Analytics.API like any other client, so
+- **Over the APIs, not the databases:** `Mcp.Server` calls Catalog.API, Analytics.API and Research.API like any other client, so
   the one-database-per-service rule holds and the tools see exactly what the app shows.
 - **Its own identity:** Analytics needs a token for everything, so the server signs in as the confidential client
   `tvtracker-mcp` (client credentials, with the `tvtracker-api` audience mapper). The token has no user, which suits
@@ -640,6 +716,36 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     setting in its database and ignores the environment afterwards, so a changed URL or key would silently not apply.
     The AppHost sets all of its configuration anyway; changes made in its admin settings last until a restart.
   - **Braces:** `ReferenceExpression` turns `}}` in its literal text into `}`, so the JSON keeps its closing braces apart.
+
+## Ask the app
+
+- **Tools, not retrieval** (Assistant.API, `AnswerLoop`): the chat model on Model Runner is offered the gateway's MCP
+  tools and answers from what they return. The tools already answer every question the app can, with the privacy rule
+  applied, so there's no index or copy of data to keep up.
+- **Through the gateway,** with its key, like Open WebUI: one tool list, and the gateway logs every call.
+- **Background queue** (`AskQueue`): one question at a time, since the model on a CPU takes 10 s to 2 minutes; the page
+  polls. One waiting question per person and 20 an hour. Kept in memory for 2 hours, never stored.
+- **Compact results** (`Toolbox`): nulls, empty values, show/episode ids and URLs go before the model reads a result
+  (10,000 characters of JSON became ~5,000, the cut-off). Show links are collected from the full result first.
+- **What qwen3 0.6B got wrong, and the guards** (a larger model may need fewer):
+  - **Answering without looking:** a follow-up was answered from the conversation with a guess, and after a refused
+    call it said "let me check that" and stopped. A reply without a tool call, while no lookup has worked, is sent
+    back with "look it up first", twice at most. Model Runner ignores `tool_choice: "required"`.
+  - **Made-up ids:** asked who created Severance, it called `person_insights` with "12345678-9012-…". A call with an
+    id no tool has returned isn't run; the model is told to look the show up first.
+  - **Missing arguments:** `discover_list` without its list got "An error occurred invoking 'discover_list'" from the
+    server. Required arguments are checked against the tool's schema, and the reply names what's missing.
+  - **Wrong values:** it asked `discover_list` for the list "drama" (hidden gems within drama). The tools' fixed
+    values are schema enums now (`[AllowedValues]` on the Mcp.Server parameters: discover lists, premiere sorts,
+    holidays), and a value outside one isn't run; the reply lists the allowed ones.
+  - **Copied examples:** asked for "best comedy finales", it looked up Landman, the example in show_insights'
+    description. Tool descriptions no longer name a show.
+  - **Misreading results:** it called Severance's cast its creators and read "as-it-ran" as a great finale. Two
+    reading hints in the system prompt didn't fix it, so the page says it can be wrong and lists what it looked up.
+- **Default chat model:** qwen3 0.6B (was smollm2, which doesn't call tools reliably). Larger models couldn't be pulled
+  in the sandbox (proxy certificate), so none were compared.
+- **Links:** only shows a tool returned, matched as whole words in the answer, so a show called "Lost" doesn't link
+  part of "lostness".
 
 ## Load testing
 

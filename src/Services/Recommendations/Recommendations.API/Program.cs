@@ -3,6 +3,7 @@ using Recommendations.API.Data;
 using Recommendations.API.IntegrationEvents;
 using Recommendations.API.Services;
 using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,7 @@ builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
 
-builder.AddNpgsqlDbContext<RecommendationsContext>("recommendationsdb");
+builder.AddNpgsqlDbContext<RecommendationsContext>("recommendationsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 // Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
 builder.Services.AddDatabaseInitializer<RecommendationsContext>(baseline: "InitialCreate");
 

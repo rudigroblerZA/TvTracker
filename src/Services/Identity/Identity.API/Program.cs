@@ -1,13 +1,14 @@
 using Identity.API.Apis;
 using Identity.API.Data;
 using Identity.API.Services;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 
-builder.AddNpgsqlDbContext<IdentityContext>("identitydb");
+builder.AddNpgsqlDbContext<IdentityContext>("identitydb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<IdentityContext>();
 
 builder.AddRabbitMQEventBus("eventbus");

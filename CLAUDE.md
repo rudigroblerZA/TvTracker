@@ -17,12 +17,13 @@ dotnet build src/Tools/Catalog.ImportCli
 # (app admin: admin / admin).
 dotnet run --project src/TvTracker.AppHost
 
-# Migrations (Catalog, Analytics, Ratings, Recommendations, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
+# Migrations (Catalog, Analytics, Ratings, Recommendations, Research, Social and Tracking; dotnet-ef is pinned in dotnet-tools.json)
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
 

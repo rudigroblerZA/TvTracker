@@ -190,6 +190,11 @@ public static class CatalogApi
         return TypedResults.Ok(ordered);
     }
 
+    /// <summary>
+    /// Show details are cached in this process only, for a minute. The sync worker's tag invalidations didn't reach a
+    /// copy in Redis: Catalog.API served a corrected network and summary unchanged for over 2 minutes after the worker
+    /// invalidated the tag. In memory, every change shows within a minute.
+    /// </summary>
     private static async Task<Results<Ok<ShowDetailDto>, NotFound>> GetShowAsync(
         Guid id, CatalogContext db, HybridCache cache, string? region, TimeProvider time, CancellationToken ct)
     {
@@ -198,7 +203,7 @@ public static class CatalogApi
         var detail = await cache.GetOrCreateAsync(
             CacheKeys.Show(id, region),
             async token => await LoadShowAsync(id, region, db, time, token),
-            new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(10), LocalCacheExpiration = TimeSpan.FromMinutes(1) },
+            new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(1), Flags = HybridCacheEntryFlags.DisableDistributedCache },
             tags: [CacheKeys.ShowTag(id)],
             cancellationToken: ct);
 
@@ -276,7 +281,9 @@ public static class CatalogApi
                     otherShows[c.PersonId].OrderByDescending(o => o.Popularity).Select(o => new ShowRefDto(o.Id, o.Title)).ToList()))
                 .ToList(),
             show.BannerUrl,
-            await NanogenreApi.RefsAsync(db, show.Nanogenres, ct));
+            await NanogenreApi.RefsAsync(db, show.Nanogenres, ct),
+            show.Source,
+            show.ExternalId);
     }
 
     private static async Task<Results<Ok<SeasonDetailDto>, NotFound>> GetSeasonAsync(

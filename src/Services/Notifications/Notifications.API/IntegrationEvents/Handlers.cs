@@ -1,6 +1,9 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using Notifications.API.Services;
+using OpenFeature;
+using TvTracker;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
@@ -41,6 +44,55 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
             ? Task.CompletedTask
             : fanOut.NotifyFollowersAsync(e, new NotificationContent(
                 NotificationKind.StatusChange, e.ShowId, null, e.ShowTitle, body, $"/shows/{e.ShowId}"), ct);
+    }
+}
+
+/// <summary>
+/// How a season that just ended did, from Analytics (<see cref="SeasonVerdictIntegrationEvent"/>), for the show's
+/// followers. Under the "new seasons" preference, which is about a show's seasons; a preference of its own would need
+/// a new column, and this service still uses EnsureCreated. Sent only while the season-verdict flag is on (evaluated
+/// without a user, so it can't target some followers only).
+/// </summary>
+public sealed class AnalyticsNotificationHandlers(NotificationFanOut fanOut, IFeatureClient flags) : IIntegrationEventHandler<SeasonVerdictIntegrationEvent>
+{
+    public async Task HandleAsync(SeasonVerdictIntegrationEvent e, CancellationToken ct)
+    {
+        if (!await flags.GetBooleanValueAsync(FeatureFlags.SeasonVerdict, FeatureFlags.DefaultValue, cancellationToken: ct))
+        {
+            return;
+        }
+        await fanOut.NotifyFollowersAsync(e, new NotificationContent(
+            NotificationKind.SeasonVerdict, e.ShowId, null,
+            $"{e.ShowTitle}: how season {e.SeasonNumber} did",
+            SeasonVerdictText(e),
+            $"/shows/{e.ShowId}"), ct);
+    }
+
+    /// <summary>"Its best season yet, rated 8.6 against 8.1 for the others. The finale was a high point. 12 of 20 …"</summary>
+    internal static string SeasonVerdictText(SeasonVerdictIntegrationEvent e)
+    {
+        var rating = e.Rating.ToString("0.0", CultureInfo.InvariantCulture);
+        var others = e.OthersMedian?.ToString("0.0", CultureInfo.InvariantCulture);
+        var text = e.Verdict switch
+        {
+            "best-yet" => $"Its best season yet, rated {rating} against {others} for the others.",
+            "weakest-yet" => $"Its weakest season yet, rated {rating} against {others} for the others.",
+            "above" => $"One of its better seasons, rated {rating} against {others} for the others.",
+            "below" => $"One of its weaker seasons, rated {rating} against {others} for the others.",
+            "in-line" => $"Rated {rating}, in line with its other seasons ({others}).",
+            _ => $"Its first season rated {rating}."
+        };
+        text += e.Finale switch
+        {
+            "strong" => " The finale was a high point.",
+            "weak" => " The finale rated below the season.",
+            _ => ""
+        };
+        if (e.Started is { } started && e.Finished is { } finished)
+        {
+            text += $" {finished} of the {started} viewers here who started it have finished it.";
+        }
+        return text;
     }
 }
 

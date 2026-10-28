@@ -91,7 +91,7 @@ default model, so semantic search needs nothing installed beyond Docker.
 - **Open WebUI** (`open-webui` on the dashboard): a web UI for Model Runner, to see what it serves and chat with it.
   - **Sign-in is off,** since it's for development; it's named after the app (`Branding:AppName`).
   - **Chat needs a chat model.** Model Runner only has the embedding model until you pull one: the `model-runner`
-    resource on the dashboard has a "Pull ai/smollm2" command (another model: `ModelRunner:ChatModel`), or run
+    resource on the dashboard has a "Pull ai/qwen3:0.6B-Q4_K_M" command (another model: `ModelRunner:ChatModel`), or run
     `docker model pull` against your own Model Runner. It shows in Open WebUI once pulled.
   - **Its document search** embeds with the same embedding model, so it downloads no model of its own.
   - **With your own Model Runner** (`ModelRunner:Url`), it's reached from the container through
@@ -299,7 +299,7 @@ dotnet run -- cleanup                          # delete the users and everything
 ### MCP server (internal queries)
 
 `mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the
-catalog and Analytics, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
+catalog, Analytics and saved research, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
 the running app. Add it to Claude Code with:
 
 ```bash
@@ -312,6 +312,7 @@ claude mcp add --transport http tvtracker http://localhost:5112/mcp
 | `show_details` | The catalog record: summary, status, genres, nanogenres, seasons, cast and creators (with person ids), next and latest episode, where to watch |
 | `search_shows` | Search by title or description, as in the app (imports from TVmaze when missing) |
 | `season_episodes`, `show_universe`, `holiday_episodes` | A season's episodes; the franchise a show is in; a holiday's best-known episodes |
+| `show_research` | The show's saved research: the checked insight with its sources, and the checked facts |
 | `discover_list`, `upcoming_premieres`, `top_episodes` | Discover's lists, premieres with catch-up time, best-rated episodes |
 | `person`, `person_insights` | A person's credits; their insights and, for creators, their fingerprint |
 
@@ -358,7 +359,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, the season verdict, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -380,6 +381,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 | `known-faces` | "You know them from" on show pages' cast, and its endpoint |
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
+| `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
+| `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
+| `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -453,9 +457,11 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions, viewers' tips, flags, corrections and moderation |
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
+| Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
+| Assistant.API | `src/Services/Assistant` | "Ask the app": Model Runner's chat model answers questions by calling the MCP tools through the gateway |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
-| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog and Analytics for internal queries |
+| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog, Analytics and Research for internal queries |
 | Mcp.Gateway | `src/Services/Mcp/Mcp.Gateway` | One MCP endpoint with an API key in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
@@ -627,6 +633,18 @@ How events flow:
       they read "a show you're partway through" until selected.
     - **Main casts only:** TVmaze doesn't list guest roles, so a guest spot isn't found.
     - **API:** `GET /api/v1/shows/{id}/known-faces` on Analytics.API, computed on request from your own data.
+  - **Season verdict** (show pages, Insights, and the inbox of the show's followers): how a season that just ended did.
+    - **What it says:** the season's TVmaze rating against the show's other seasons ("its best season yet", "one of its
+      better seasons", "as good as the others", "one of its weaker", "its weakest yet", or "first season"), whether
+      the finale was a high point or a let-down, and how many viewers here who started the season have finished it
+      (with 5 or more who started).
+    - **When:** from 3 days after the finale (ratings come in) until 45 days after. A season counts as over when the show
+      has ended, a later season is listed or announced, or the whole season dropped at once; otherwise once it's been
+      quiet for twice its usual gap between episodes (14 days for a weekly show).
+    - **Where:** the first highlight on the show page; "Seasons that just ended" on Insights; and once, as a
+      notification to the show's followers, under the "new seasons" preference.
+    - **API:** the show document's `seasonVerdict`, and `GET /api/v1/insights/season-verdicts?limit=` (Analytics.API).
+      Behind the `season-verdict` flag, which also stops the notifications.
   - **Holiday episodes** (`/holidays`; on Home within 3 weeks of a holiday, and linked from Insights): Halloween,
     Thanksgiving, Christmas and the holidays, New Year's Eve and Valentine's Day.
     - **From your shows** (signed in): every holiday episode of the shows you follow, placed against how far you are:
@@ -641,6 +659,45 @@ How events flow:
     - **API** (Catalog.API, public): `GET /api/v1/holidays`, `GET /api/v1/holidays/{key}` (best known), and
       `POST /api/v1/holidays/{key}/shows` with `{ "showIds": [...] }` (all of those shows' episodes; a POST, since a
       follow list doesn't fit in a URL).
+  - **Research** (show pages; moderators research, everyone reads): a show's trusted record, checked by a person.
+    - **On the show page:** an insight with numbered citations ([1] links to its source), the checked facts (ended,
+      creators, seasons and episodes, country, awards, tagline, TMDB rating, IMDb/TMDB/Wikipedia/Wikidata links), its
+      sources, and who checked it when.
+    - **Researching** (moderators: "Research this show" on the show page, or Settings → Admin → Research):
+      1. **Gather:** Wikidata (found by the show's TVmaze id), the Wikipedia article's summary, and TMDB when
+         `Research:TmdbApiKey` is set. Gathering again replaces those and keeps pages added by hand.
+      2. **Add pages:** any public web page (a review, an interview); its text is read and kept as a source. Private
+         and local addresses are refused.
+      3. **Pick the facts:** for each fact, the catalog's value, a source's, or your own. Summary, network and premiere
+         date follow TVmaze until you pick a value for them.
+      4. **Write the insight:** "Draft with the model" asks the local model (Model Runner's chat model,
+         `ModelRunner:ChatModel`) for a draft from the included sources, in the background (a minute or two on a
+         CPU). Edit it; `[n]` cites source n.
+      5. **Save:** a new version. Earlier versions stay as history.
+    - **Trusted source of truth, field by field:** a saved summary, network or premiere date replaces TVmaze's in the
+      catalog (like an accepted correction), and survives every refresh. Dropping one in a later version gives the
+      field back to TVmaze on the show's next refresh. The other facts live with the research.
+    - **MCP:** `show_research` returns the saved record.
+    - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
+      `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
+      `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
+      `POST|PUT /api/v1/research/{id}/draft`, `POST /api/v1/research/{id}/save`. Anyone else gets 404. Behind the
+      `research` flag.
+  - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
+    insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
+    things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
+    - **Grounded, and shows its work:** the model is told to answer only from what the tools returned. Each answer lists
+      what it looked up ("How I got this"), and links the shows it names that a tool returned.
+    - **Follow-ups:** "which of those is shortest?" carries the last two questions and answers.
+    - **A small model:** the default, qwen3 0.6B (`ModelRunner:ChatModel`), runs on a CPU and takes 10 s to 2 minutes
+      an answer. It picks the right tools, but often misreads what they return: on Severance it named the cast as
+      creators, and on Breaking Bad it read "ends as it ran" as a great finale. A larger chat model answers better
+      where the hardware allows; none was tried here, since only the 0.6B one could be pulled.
+    - **Limits:** questions are answered one at a time; each person may have one waiting and ask 20 an hour.
+      Questions are kept in memory for 2 hours and never stored; a restart forgets them.
+    - **Nothing personal:** the tools have no user, so it knows shows, not your watches or ratings.
+    - **API** (Assistant.API, port 5115): `POST /api/v1/ask` (`{ "question", "previousId" }`, 202 with the question's
+      state), `GET /api/v1/ask/{id}` (poll until `answered` or `failed`), `GET /api/v1/ask/about`. Behind the `ask` flag.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.
@@ -792,9 +849,9 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Recommendations, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
-`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Social.API/Data/Migrations`,
-`Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
+Catalog, Analytics, Recommendations, Research, Social and Tracking use EF Core migrations (`Catalog.Data/Migrations`,
+`Analytics.Data/Migrations`, `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`,
+`Social.API/Data/Migrations`, `Tracking.API/Data/Migrations`); each service's API applies its own at startup. The
 other services still use `EnsureCreated`, which creates a missing database but never changes an existing one.
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made
 before they moved to migrations is marked as having it and upgraded in place.
@@ -808,6 +865,8 @@ dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --ou
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
 # or, for Recommendations:
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
+# or, for Research:
+dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 # or, for Tracking:

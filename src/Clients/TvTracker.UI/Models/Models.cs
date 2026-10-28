@@ -11,7 +11,7 @@ public enum EpisodeLabel { None, SeriesPremiere, SeasonPremiere, SeasonFinale }
 
 public enum WatchProviderType { Stream, Free, Rent, Buy }
 
-public enum NotificationKind { NewEpisode, NewSeason, StatusChange }
+public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict }
 
 public enum DevicePlatform { Android, iOS, Web }
 
@@ -218,7 +218,17 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
     EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
-    Landing? Landing = null);
+    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null);
+
+/// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
+/// <param name="Verdict">"best-yet", "above", "in-line", "below", "weakest-yet" or "first-season".</param>
+/// <param name="Finale">"strong", "in-line" or "weak"; null without a finale rating.</param>
+/// <param name="Started">Our users who watched any of it; null under 5. Finished: of those, who watched the finale.</param>
+public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
+    double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
+    int? Started, int? Finished);
+
+public record SeasonVerdictItem(Guid ShowId, string Title, SeasonVerdict Verdict);
 
 /// <summary>Whether an ended show sticks the landing; spoiler-free (no titles).</summary>
 /// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles", "weaker-last-season" or "as-it-ran".</param>
@@ -542,3 +552,48 @@ public record HolidayEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, G
     string Title, DateTimeOffset? AirsAtUtc, int? RuntimeMinutes, double? Rating, bool InTitle, bool StandsAlone);
 
 public record HolidayShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <summary>Research workspace for moderators (see Research.API's ResearchApi).</summary>
+public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtUtc, string? Draft, DateTime? DraftingSinceUtc, string? DraftProblem,
+    IReadOnlyList<ResearchSourceItem> Sources, IReadOnlyList<ResearchFact> Facts, SavedResearch? Saved, IReadOnlyList<ResearchVersion> Versions,
+    IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
+
+/// <param name="Number">How drafts and the insight cite it, while it's included.</param>
+public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
+
+/// <param name="Origin">"saved", "catalog" or "source".</param>
+public record ResearchFactOption(string Value, string Origin, Guid? SourceId, string? SourceTitle);
+
+/// <param name="CatalogField">Set when saving this fact overrides the catalog's (TVmaze's) value.</param>
+public record ResearchFact(string Key, string Label, string Kind, string? CatalogField, string? Saved, string? Catalog, IReadOnlyList<ResearchFactOption> Options);
+
+public record ResearchVersion(int Version, DateTime SavedAtUtc, string SavedBy);
+
+public record SavedResearch(Guid ShowId, int Version, string Insight, IReadOnlyList<SavedResearchFact> Facts, IReadOnlyList<SavedResearchSource> Sources,
+    DateTime SavedAtUtc, string SavedBy);
+
+/// <param name="Source">The number of the source it came from, as the insight cites it; null when typed by hand.</param>
+public record SavedResearchFact(string Key, string Label, string Kind, string Value, int? Source);
+
+public record SavedResearchSource(int Number, Guid Id, string Kind, string Title, string Url, DateTime RetrievedAtUtc);
+
+public record ResearchedShow(Guid ShowId, string Title, int? Version, DateTime? SavedAtUtc, DateTime UpdatedAtUtc);
+
+public record ResearchFactChoice(string Key, string Value, Guid? SourceId);
+
+public record ResearchSaveResult(SavedResearch Saved, IReadOnlyList<ResearchCatalogOutcome> Catalog);
+
+/// <param name="Outcome">"applied" or "removed".</param>
+public record ResearchCatalogOutcome(string Key, string Field, string Outcome);
+
+// Ask the app (Assistant.API)
+
+public record AssistantAbout(bool Available, string Model, int PerHour);
+
+public record AssistantStep(string Tool, string Arguments, bool Failed);
+
+public record AssistantShow(Guid Id, string Title);
+
+/// <param name="Status">"queued", "thinking", "answered" or "failed".</param>
+public record AssistantAsk(Guid Id, string Question, Guid? PreviousId, string Status, int Ahead, List<AssistantStep> Steps, string? Answer,
+    List<AssistantShow> Shows, string? Problem, DateTime AskedAtUtc, double? Seconds);

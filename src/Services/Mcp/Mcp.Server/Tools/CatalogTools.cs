@@ -1,11 +1,12 @@
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using Mcp.Server.Services;
 using ModelContextProtocol.Server;
 
 namespace Mcp.Server.Tools;
 
-/// <summary>Catalog.API: shows, people, universes and holiday episodes. Public data, no user involved.</summary>
+/// <summary>Catalog.API (shows, people, universes, holiday episodes) and Research.API (saved research). Public data, no user involved.</summary>
 [McpServerToolType]
 public sealed class CatalogTools(Backends backends, ShowResolver resolver)
 {
@@ -20,7 +21,7 @@ public sealed class CatalogTools(Backends backends, ShowResolver resolver)
     [McpServerTool(Name = "show_details", ReadOnly = true, Idempotent = true)]
     [Description("A show's catalog record: summary, status, network, genres, nanogenres, seasons, cast with character names and person ids, creators, the next and latest episode, and where to watch.")]
     public async Task<JsonNode> ShowDetails(
-        [Description("The show's title (\"landman\") or catalog id.")] string show,
+        [Description("The show's title or catalog id.")] string show,
         [Description("Two-letter region for where to watch, e.g. US or GB.")] string region = "US",
         CancellationToken ct = default)
     {
@@ -63,9 +64,23 @@ public sealed class CatalogTools(Backends backends, ShowResolver resolver)
             ?? new JsonObject { ["show"] = found.Title, ["universe"] = null };
     }
 
+    [McpServerTool(Name = "show_research", ReadOnly = true, Idempotent = true)]
+    [Description("The show's saved research, its trusted record: a moderator-approved insight citing numbered sources (Wikidata, Wikipedia, TMDB, articles), and checked facts (creators, network, dates, seasons and episodes, awards, IMDb/TMDB links). Prefer these facts over the catalog's where they differ. No research means none has been saved yet.")]
+    public async Task<JsonNode> ShowResearch([Description("The show's title or catalog id.")] string show, CancellationToken ct = default)
+    {
+        if (await resolver.ResolveAsync(show, ct) is not { } found)
+        {
+            return NotFound(show);
+        }
+        return await backends.GetAsync(Backends.Research, $"api/v1/shows/{found.Id}/research", ct)
+            ?? new JsonObject { ["show"] = found.Title, ["research"] = null, ["note"] = "No research has been saved for this show." };
+    }
+
     [McpServerTool(Name = "holiday_episodes", ReadOnly = true, Idempotent = true)]
     [Description("The best-known holiday episodes across the catalog, and shows made for the holiday. Holidays: halloween, thanksgiving, christmas, new-year, valentines.")]
-    public async Task<JsonNode> HolidayEpisodes([Description("halloween, thanksgiving, christmas, new-year or valentines.")] string holiday, CancellationToken ct = default) =>
+    public async Task<JsonNode> HolidayEpisodes(
+        [Description("halloween, thanksgiving, christmas, new-year or valentines."),
+            AllowedValues("halloween", "thanksgiving", "christmas", "new-year", "valentines")] string holiday, CancellationToken ct = default) =>
         await backends.GetAsync(Backends.Catalog, $"api/v1/holidays/{Uri.EscapeDataString(holiday.Trim().ToLowerInvariant())}", ct)
             ?? new JsonObject { ["error"] = "Unknown holiday. Use halloween, thanksgiving, christmas, new-year or valentines." };
 

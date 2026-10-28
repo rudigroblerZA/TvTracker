@@ -3,13 +3,14 @@ using Analytics.Worker;
 using Analytics.Worker.Insights;
 using Analytics.Worker.IntegrationEvents;
 using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
 // The schema is created by Analytics.API; the AppHost starts this worker once that service is healthy.
-builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb");
+builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowAddedIntegrationEvent, CatalogEventHandlers>()

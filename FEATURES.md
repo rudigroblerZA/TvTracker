@@ -331,7 +331,45 @@ At `/feed`.
 - **Flags that do something:** enough flags hide a post until a moderator looks, and spoiler flags mark it a spoiler.
 - **A light touch:** blocked words, links held for review, hourly limits, and a moderation page with a log.
 
-### 29. Smaller touches
+### 29. Research: a show's trusted record
+
+On show pages, written by moderators at `/research`.
+
+- **Checked by a person, with its sources:** a short insight citing numbered sources ([1] Wikidata, [2] Wikipedia,
+  a review someone added), and checked facts: creators, when it ended, seasons and episodes, awards, IMDb and TMDB
+  links. "Checked by App Admin, 27 October 2026 · version 2".
+- **Sources gathered for you:** Wikidata by the show's TVmaze id, the Wikipedia summary and TMDB, plus any page a
+  researcher pastes.
+- **A local model drafts, a person decides:** the model writes a first draft from the sources; the researcher edits it,
+  and picks each fact from the catalog, a source, or their own.
+- **The saved copy wins:** a checked summary, network or premiere date replaces TVmaze's in the catalog and stays
+  through every refresh. Breaking Bad's network reads "AMC (United States)" until a later version drops it.
+- **Also for questions:** the MCP tools answer from the saved research, so "what awards did Breaking Bad win?" comes
+  from checked facts.
+
+### 30. Ask the app
+
+At `/ask`.
+
+- **Ask in plain words:** "Landman insights", "hidden gems in drama", "which seasons premiere in the next month?". The
+  answer comes from the app's own data: a model running on our servers looks things up with the same tools Claude Code
+  and Open WebUI use, then answers, linking the shows it names.
+- **Shows its work:** every answer lists what it looked up, so you can check it. Follow-up questions work ("and Better
+  Call Saul?").
+- **Honest about its size:** the default model is tiny (0.6B parameters, runs on a CPU). It finds the right data, but its
+  reading of it can be off, and the page says so; a bigger model is one setting away.
+
+### 31. Season verdict
+
+On show pages, Insights, and in your inbox.
+
+- **How did that season do?** A few days after a season ends, it's put against the show's others: "Strange New Worlds
+  season 4: its weakest season yet, rated 6.5 against 7.8 for the others, though the finale was a high point."
+- **For the shows you follow,** it arrives as a notification; Insights lists every season that just ended.
+- **Knows when a season is really over:** a weekly show between episodes isn't called finished; it waits until the
+  show has been quiet for twice its usual gap.
+
+### 32. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
