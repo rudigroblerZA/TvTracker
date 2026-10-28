@@ -130,6 +130,7 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
 var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
     .WithReference(notificationsDb).WaitFor(notificationsDb)
     .WithReference(eventBus).WaitFor(eventBus)
+    .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 

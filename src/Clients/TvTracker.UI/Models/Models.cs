@@ -11,7 +11,7 @@ public enum EpisodeLabel { None, SeriesPremiere, SeasonPremiere, SeasonFinale }
 
 public enum WatchProviderType { Stream, Free, Rent, Buy }
 
-public enum NotificationKind { NewEpisode, NewSeason, StatusChange }
+public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict }
 
 public enum DevicePlatform { Android, iOS, Web }
 
@@ -218,7 +218,17 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
     EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
-    Landing? Landing = null);
+    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null);
+
+/// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
+/// <param name="Verdict">"best-yet", "above", "in-line", "below", "weakest-yet" or "first-season".</param>
+/// <param name="Finale">"strong", "in-line" or "weak"; null without a finale rating.</param>
+/// <param name="Started">Our users who watched any of it; null under 5. Finished: of those, who watched the finale.</param>
+public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
+    double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
+    int? Started, int? Finished);
+
+public record SeasonVerdictItem(Guid ShowId, string Title, SeasonVerdict Verdict);
 
 /// <summary>Whether an ended show sticks the landing; spoiler-free (no titles).</summary>
 /// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles", "weaker-last-season" or "as-it-ran".</param>

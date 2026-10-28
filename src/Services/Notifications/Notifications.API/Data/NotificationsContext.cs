@@ -72,7 +72,8 @@ public enum NotificationKind
 {
     NewEpisode,
     NewSeason,
-    StatusChange
+    StatusChange,
+    SeasonVerdict
 }
 
 public class InboxItem

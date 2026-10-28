@@ -359,7 +359,7 @@ isn't signed in, it and the Analytics stats endpoint are only mapped in Developm
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, Ask, the season verdict, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -381,6 +381,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `forecasts` | "What's next" on show pages, "Will you finish them?" on Stats, and the finish-outlook endpoints |
 | `known-faces` | "You know them from" on show pages' cast, and its endpoint |
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
+| `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
 | `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
 
@@ -632,6 +633,18 @@ How events flow:
       they read "a show you're partway through" until selected.
     - **Main casts only:** TVmaze doesn't list guest roles, so a guest spot isn't found.
     - **API:** `GET /api/v1/shows/{id}/known-faces` on Analytics.API, computed on request from your own data.
+  - **Season verdict** (show pages, Insights, and the inbox of the show's followers): how a season that just ended did.
+    - **What it says:** the season's TVmaze rating against the show's other seasons ("its best season yet", "one of its
+      better seasons", "as good as the others", "one of its weaker", "its weakest yet", or "first season"), whether
+      the finale was a high point or a let-down, and how many viewers here who started the season have finished it
+      (with 5 or more who started).
+    - **When:** from 3 days after the finale (ratings come in) until 45 days after. A season counts as over when the show
+      has ended, a later season is listed or announced, or the whole season dropped at once; otherwise once it's been
+      quiet for twice its usual gap between episodes (14 days for a weekly show).
+    - **Where:** the first highlight on the show page; "Seasons that just ended" on Insights; and once, as a
+      notification to the show's followers, under the "new seasons" preference.
+    - **API:** the show document's `seasonVerdict`, and `GET /api/v1/insights/season-verdicts?limit=` (Analytics.API).
+      Behind the `season-verdict` flag, which also stops the notifications.
   - **Holiday episodes** (`/holidays`; on Home within 3 weeks of a holiday, and linked from Insights): Halloween,
     Thanksgiving, Christmas and the holidays, New Year's Eve and Valentine's Day.
     - **From your shows** (signed in): every holiday episode of the shows you follow, placed against how far you are:

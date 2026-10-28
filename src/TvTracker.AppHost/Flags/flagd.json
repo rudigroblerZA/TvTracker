@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "season-verdict": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Season verdict: how a season that just ended did, on show pages, on Insights and as a notification to followers." }
+    },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

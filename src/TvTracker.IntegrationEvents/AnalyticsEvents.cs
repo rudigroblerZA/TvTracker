@@ -29,3 +29,25 @@ public record ShowDnaChangedIntegrationEvent(IReadOnlyList<ShowDnaValues> Shows)
 
 /// <param name="Traits">Trait key to value, 0-1 (see <see cref="DnaTraits"/>). Traits without enough data are absent.</param>
 public record ShowDnaValues(Guid ShowId, IReadOnlyDictionary<string, double> Traits);
+
+/// <summary>
+/// A season finished airing a few days ago, and how it did: its rating against the show's other seasons, its finale
+/// against the season, and how many of our viewers who started it have finished it. Sent once per season, for
+/// Notifications to tell the show's followers. Not re-sent after start, so a lost one is lost (it's news, not state).
+/// </summary>
+/// <param name="Verdict">best-yet, above, in-line, below, weakest-yet or first-season.</param>
+/// <param name="OthersMedian">The other seasons' median rating; null for a first season.</param>
+/// <param name="Finale">strong, in-line or weak; null when the finale has no rating.</param>
+/// <param name="Started">Our users who watched any of its episodes; null under 5.</param>
+/// <param name="Finished">Of those, who have watched the finale.</param>
+public record SeasonVerdictIntegrationEvent(
+    Guid ShowId,
+    string ShowTitle,
+    int SeasonNumber,
+    string Verdict,
+    double Rating,
+    double? OthersMedian,
+    string? Finale,
+    double? FinaleRating,
+    int? Started,
+    int? Finished) : IntegrationEvent;

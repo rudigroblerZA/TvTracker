@@ -359,7 +359,17 @@ At `/ask`.
 - **Honest about its size:** the default model is tiny (0.6B parameters, runs on a CPU). It finds the right data, but its
   reading of it can be off, and the page says so; a bigger model is one setting away.
 
-### 31. Smaller touches
+### 31. Season verdict
+
+On show pages, Insights, and in your inbox.
+
+- **How did that season do?** A few days after a season ends, it's put against the show's others: "Strange New Worlds
+  season 4: its weakest season yet, rated 6.5 against 7.8 for the others, though the finale was a high point."
+- **For the shows you follow,** it arrives as a notification; Insights lists every season that just ended.
+- **Knows when a season is really over:** a weekly show between episodes isn't called finished; it waits until the
+  show has been quiet for twice its usual gap.
+
+### 32. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.
