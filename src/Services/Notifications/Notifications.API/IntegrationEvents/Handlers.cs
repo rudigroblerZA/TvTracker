@@ -51,13 +51,14 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
 /// How a season that just ended did, from Analytics (<see cref="SeasonVerdictIntegrationEvent"/>), for the show's
 /// followers.
 /// <list type="bullet">
-/// <item><b>Once per season:</b> Analytics sends the verdict hourly for a week, so a failed run loses nothing; each send
-/// has its own event Id but the same <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>, which stands in as the
-/// event's identity here, for the inbox check and for the inbox items' source.</item>
+/// <item><b>Once per season:</b> Analytics sends a verdict when it first appears, and again only if it dropped out of
+/// the show's document for a run. Each send has its own event Id but the same
+/// <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>, which stands in as the event's identity here, for the inbox
+/// check and for the inbox items' source.</item>
 /// <item><b>Preference:</b> "new seasons", which is about a show's seasons; a preference of its own would need a new
 /// column, and this service still uses EnsureCreated.</item>
-/// <item><b>Flag:</b> evaluated without a user, so it can't target some followers only. While it's off nothing is
-/// marked processed, so turning it back on within the week still sends.</item>
+/// <item><b>Flag:</b> evaluated without a user, so it can't target some followers only. A verdict that arrives while
+/// it's off isn't marked processed, but it isn't sent again either, so it's dropped.</item>
 /// </list>
 /// </summary>
 public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut, IFeatureClient flags)

@@ -234,8 +234,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Insights pipeline** (`Analytics.Worker/Insights`): `InsightsPipeline` does the plumbing, and each insight is its
   own small class that only computes. All of them are registered in `AddInsights`, where order matters.
   - **Plumbing:** loads `InsightSources` once (catalog copy, ratings, follows, cast, makers), then shows in batches of
-    100 (episodes, watches). It stores each document, publishes changed tags, and replaces every list in one
-    transaction.
+    100 (episodes, watches). Each batch's documents and the events they raise are saved together, then published; at
+    the end, every list is replaced in one transaction.
+  - **Events with their documents:** publications compare the new document with the stored one, so an event added
+    after its document was saved was lost for good when the run failed in between (the next run saw no change). Now a
+    stored document's events are always in the outbox, and its publisher retries any left behind.
   - **`IShowInsight`:** a stage of the show document (seasons, top episodes, run, next premiere, shared cast,
     patterns, tags, histograms, viewing, momentum). Stages run in registration order on `ShowInsightContext`, which
     works out the shared figures once: seasons, visible ratings, `WellRated`, `ListScore`.
@@ -244,8 +247,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     starts a fresh `ListBuilder` that sees every finished show document.
   - **`IInsightPublication`:** a part of the document another service keeps a copy of: tags for the catalog, DNA for
     Recommendations.
-    - Each run's builder compares the new document with the stored one, and the pipeline publishes what changed
-      through the outbox.
+    - Each run's builder compares the new document with the stored one; after each batch, the pipeline adds what
+      changed to the outbox in the same save as the documents.
     - Every show is also sent after start and daily, so lost events heal.
   - **New data:** an insight that needs data nothing loads yet adds it to `InsightSources`.
   - **Why:** it replaced a single 930-line `InsightsComputer`. The split was checked with a fixed clock, and every
@@ -254,7 +257,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `MinRatingsToShow`). The exception is "your taste" (`TasteApi`), which uses only the caller's own data.
 - **Show tags** (keys in `ShowTags`): `drops-at-once` (or "drops in parts"), `bingeable`, `weekend-binge`,
   `fan-favorite`, `limited-series`, `quick-episodes`, `long-running`, `prolific-creator` / prolific producer.
-  - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, in batches of at most 500.
+  - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, one per batch of 100 shows.
     They're also sent in full after start and daily.
   - Weekly release is deliberately not a tag, since nearly every show would have it.
 - **Show DNA** (`DnaInsight`): 12 traits of form, rhythm and quality, each scaled to 0-1. Keys, names, labels,
@@ -547,18 +550,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `DnaTraits`), so Notifications and the UI switch on the same constants as Analytics.
 - **Viewers:** "finished" is who watched the finale, out of who watched any of the season, shown with 5 or more who
   started (the privacy rule).
-- **Sent hourly, told once** (`SeasonVerdictPublication`): every run sends each verdict within 2 days of when it could
-  first be given (`ReadyAtUtc`), with a `VerdictId` from the show and season. Notifications uses that id as the event's
-  identity (inbox check and inbox items), so followers hear once.
-  - **Why not "when the stored document lacked it":** the pipeline saves documents before it publishes, so a run that
-    failed in between lost the verdict for good, and a verdict that dropped out of the document for one run was sent
-    twice. The outbox keys on the event Id, so each send has its own and the `VerdictId` carries the identity.
-  - **Why 2 days:** enough sends (about 48) to outlast a day of failed runs; a week was about 168 per verdict for
-    nothing. And only fresh ones: otherwise the first run would have notified followers about every season of the last
-    six weeks.
-  - **Deeper fix, not done:** the pipeline adds publication events to the outbox after saving the documents, not in the
-    same save. Publishing in each batch's save, and an outbox that ignores an event Id it already holds, would let the
-    verdict be sent once, when it first appears, with a stable event Id; both change shared infrastructure.
+- **Sent once** (`SeasonVerdictPublication`): when a show's document has a verdict for a season its stored document
+  didn't, and the verdict is within 2 days of when it could first be given (`ReadyAtUtc`); the event is saved with the
+  document (see the insights pipeline), so a failed run can't lose it.
+  - **`VerdictId`** (from the show and season): a verdict that drops out of the document for a run and comes back is
+    sent again; Notifications uses the id as the event's identity (inbox check and inbox items), so followers hear once.
+  - **Why 2 days:** a first run over an empty store, or after a long outage, would otherwise notify followers about
+    every season of the last six weeks.
+  - **History:** it was briefly sent on every run for a week (then two days), because the pipeline saved documents
+    before their events, so a run that failed in between lost the verdict for good. The pipeline now saves them together.
 - **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
   Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
   some followers only.

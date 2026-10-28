@@ -33,8 +33,9 @@ public record ShowDnaValues(Guid ShowId, IReadOnlyDictionary<string, double> Tra
 /// <summary>
 /// A season finished airing a few days ago, and how it did: its rating against the show's other seasons, its finale
 /// against the season, and how many of our viewers who started it have finished it, for Notifications to tell the
-/// show's followers. Sent on every hourly run for a week after it can first be given, each time with the same
-/// <paramref name="VerdictId"/>, so a run that fails before publishing loses nothing and Notifications tells followers once.
+/// show's followers. Sent once, when the verdict first appears, in the same save as the show's document. A verdict
+/// that drops out for a run and comes back is sent again with the same <paramref name="VerdictId"/>, so Notifications
+/// tells followers once.
 /// </summary>
 /// <param name="Verdict">One of <see cref="SeasonVerdicts"/>.</param>
 /// <param name="OthersMedian">The other seasons' median rating; null for a first season.</param>

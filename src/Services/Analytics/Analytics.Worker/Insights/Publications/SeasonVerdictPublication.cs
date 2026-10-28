@@ -8,16 +8,15 @@ using TvTracker.IntegrationEvents;
 namespace Analytics.Worker.Insights;
 
 /// <summary>
-/// A season's verdict for Notifications (<see cref="SeasonVerdictIntegrationEvent"/>), sent on every run while it's
-/// within <see cref="FreshFor"/> of when it could first be given (<see cref="SeasonVerdict.ReadyAtUtc"/>), each time with
-/// the same <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>; Notifications tells followers once.
+/// A season's verdict for Notifications (<see cref="SeasonVerdictIntegrationEvent"/>), sent once: when a show's document
+/// has a verdict for a season its stored document didn't. The pipeline saves the event with the document, so it can't be
+/// lost to a failed run. It's news rather than state, so a full send after start doesn't repeat it.
 /// <list type="bullet">
-/// <item><b>Why every run:</b> the pipeline saves documents before it publishes, so "send when the stored document
-/// lacked it" lost the verdict for good when a run failed in between, and sent it twice when a verdict dropped out of
-/// the document for a run and came back.</item>
-/// <item><b>Why two days:</b> enough sends to outlast a day of failed runs (about 48 per verdict; it was a week, ~168).
-/// And only fresh ones: otherwise the first run after this shipped would have told followers about every season that
-/// ended in the last six weeks.</item>
+/// <item><b>Fresh only</b> (within <see cref="FreshFor"/> of <see cref="SeasonVerdict.ReadyAtUtc"/>): a first run over
+/// an empty store, or after a long outage, would otherwise tell followers about every season of the last six weeks.</item>
+/// <item><b>Same season again:</b> a verdict that drops out of the document for a run (its ratings briefly missing) and
+/// comes back is sent again; its <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>, the same for a show and
+/// season, lets Notifications tell followers once.</item>
 /// </list>
 /// </summary>
 public sealed class SeasonVerdictPublication : IInsightPublication
@@ -38,7 +37,8 @@ public sealed class SeasonVerdictPublication : IInsightPublication
 
         public override void Add(ShowInsights insights, JsonElement? previous)
         {
-            if (insights.SeasonVerdict is not { } verdict || insights.ComputedAtUtc - verdict.ReadyAtUtc > FreshFor)
+            if (insights.SeasonVerdict is not { } verdict || insights.ComputedAtUtc - verdict.ReadyAtUtc > FreshFor
+                || PreviousSeason(previous) == verdict.Number)
             {
                 return;
             }
@@ -47,10 +47,18 @@ public sealed class SeasonVerdictPublication : IInsightPublication
                 VerdictId(insights.ShowId, verdict.Number)));
         }
 
-        public override IReadOnlyList<IntegrationEvent> Events()
+        public override IReadOnlyList<IntegrationEvent> TakeEvents()
         {
-            Count = events.Count;
-            return events;
+            Count += events.Count;
+            var taken = events.ToList();
+            events.Clear();
+            return taken;
         }
+
+        /// <summary>The season the stored document had a verdict for, if any.</summary>
+        private static int? PreviousSeason(JsonElement? previous) =>
+            previous is { } document && document.TryGetProperty("seasonVerdict", out var stored) && stored.ValueKind == JsonValueKind.Object
+                ? stored.GetProperty("number").GetInt32()
+                : null;
     }
 }
