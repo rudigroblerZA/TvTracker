@@ -195,7 +195,7 @@ public sealed partial class Universes(IServiceScopeFactory scopeFactory, HybridC
         return sharedMakers >= 2 && FranchiseWord(titleA) == FranchiseWord(titleB);
     }
 
-    private static bool IsSelfRole(string character, string actor) =>
+    internal static bool IsSelfRole(string character, string actor) =>
         SelfRoles.Contains(character.Trim().ToLowerInvariant())
         || character.Contains("(voice)", StringComparison.OrdinalIgnoreCase) && character.Length < 12
         || string.Equals(Normalize(character), Normalize(actor), StringComparison.Ordinal);

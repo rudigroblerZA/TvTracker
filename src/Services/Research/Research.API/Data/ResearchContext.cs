@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TvTracker.Persistence;
 
 namespace Research.API.Data;
 
@@ -94,6 +95,37 @@ public class SavedResearch
     public required string SavedByName { get; set; }
 }
 
+/// <summary>
+/// A moderator's note on an episode: essential or skippable (<see cref="TvTracker.IntegrationEvents.EpisodeMarks"/>),
+/// why, and where they read it. Analytics keeps a copy for the essential cut, which follows the notes before ratings.
+/// </summary>
+public class EpisodeNote
+{
+    /// <summary>The catalog's episode id; one note per episode.</summary>
+    public Guid EpisodeId { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    public int SeasonNumber { get; set; }
+
+    public int EpisodeNumber { get; set; }
+
+    public required string Mark { get; set; }
+
+    public required string Reason { get; set; }
+
+    public required string SourceUrl { get; set; }
+
+    public DateTime NotedAtUtc { get; set; }
+
+    /// <summary>Keycloak id of the moderator who wrote it; cleared when their account is deleted.</summary>
+    public string? NotedById { get; set; }
+
+    public required string NotedByName { get; set; }
+
+    public const int MaxReason = 280;
+}
+
 public static class SourceKinds
 {
     public const string Wikidata = "wikidata";
@@ -105,12 +137,15 @@ public static class SourceKinds
     public static readonly IReadOnlySet<string> Gathered = new HashSet<string> { Wikidata, Wikipedia, Tmdb };
 }
 
-public class ResearchContext(DbContextOptions<ResearchContext> options) : DbContext(options)
+public class ResearchContext(DbContextOptions<ResearchContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<Dossier> Dossiers => Set<Dossier>();
     public DbSet<ResearchSource> Sources => Set<ResearchSource>();
     public DbSet<FactCandidate> Candidates => Set<FactCandidate>();
     public DbSet<SavedResearch> Saved => Set<SavedResearch>();
+    public DbSet<EpisodeNote> EpisodeNotes => Set<EpisodeNote>();
+    public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
+    public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -154,5 +189,20 @@ public class ResearchContext(DbContextOptions<ResearchContext> options) : DbCont
             entity.Property(s => s.SavedByName).HasMaxLength(256);
             entity.HasIndex(s => new { s.ShowId, s.Version }).IsUnique();
         });
+
+        modelBuilder.Entity<EpisodeNote>(entity =>
+        {
+            entity.ToTable("episode_notes");
+            entity.HasKey(n => n.EpisodeId);
+            entity.Property(n => n.EpisodeId).ValueGeneratedNever();
+            entity.Property(n => n.Mark).HasMaxLength(16);
+            entity.Property(n => n.Reason).HasMaxLength(EpisodeNote.MaxReason);
+            entity.Property(n => n.SourceUrl).HasMaxLength(2048);
+            entity.Property(n => n.NotedById).HasMaxLength(64);
+            entity.Property(n => n.NotedByName).HasMaxLength(256);
+            entity.HasIndex(n => n.ShowId);
+        });
+
+        modelBuilder.UseIntegrationEventLogs();
     }
 }

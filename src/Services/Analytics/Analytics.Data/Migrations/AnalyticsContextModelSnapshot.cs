@@ -198,6 +198,39 @@ namespace Analytics.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.EpisodeNoteCopy", b =>
+                {
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Mark")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTimeOffset>("TakenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EpisodeId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("episode_notes", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.PersonCareerCopy", b =>
                 {
                     b.Property<Guid>("PersonId")

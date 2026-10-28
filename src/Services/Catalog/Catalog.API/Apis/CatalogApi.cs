@@ -28,6 +28,7 @@ public static class CatalogApi
         api.MapUniverseApi();
         api.MapMoodApi();
         api.MapHolidayApi();
+        api.MapCharacterApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
@@ -242,6 +243,8 @@ public static class CatalogApi
                 .ToListAsync(ct))
             .ToLookup(x => x.PersonId);
 
+        var trails = await CharacterApi.TrailLengthsAsync(db, show.Cast.Select(c => (c.PersonId, c.Person.Name, c.Character)).ToList(), ct);
+
         var next = show.Episodes
             .Where(e => e.AirsAtUtc > now)
             .OrderBy(e => e.AirsAtUtc)
@@ -267,7 +270,7 @@ public static class CatalogApi
                 .ToList(),
             show.Cast
                 .OrderBy(c => c.Order)
-                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl, c.PersonId))
+                .Select(c => new CastMemberDto(c.Person.Name, c.Character, c.Person.PhotoUrl, c.PersonId, trails.GetValueOrDefault(c.PersonId)))
                 .ToList(),
             region,
             show.WatchProviders

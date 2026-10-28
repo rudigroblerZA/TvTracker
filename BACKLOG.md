@@ -308,14 +308,6 @@ So the rest of the list reads in proportion:
 - **Builds on:** Notifications' email sender (which logs until configured), premieres, season verdicts, Up Next.
 - **Note:** "isn't built yet" in CONTEXT.md's Known gaps.
 
-### F3. Character trail
-
-**P3 · M**
-
-- **What:** follow a character, not a show: everywhere Karen Page or Frasier Crane appears, in air order, with your
-  progress.
-- **Builds on:** Universes' character matching and the watch order.
-
 ### F4. Research queue
 
 **P3 · S**
@@ -339,14 +331,6 @@ So the rest of the list reads in proportion:
 - **What:** awards from saved research on person and show pages, and a "Prestige picks" list: the most-awarded shows
   you haven't started.
 - **Builds on:** Research's awards fact, Backlog's show value.
-
-### F7. Episode notes from research
-
-**P3 · M**
-
-- **What:** moderators mark episodes essential or skippable, with a source. The essential cut uses those marks before
-  ratings.
-- **Builds on:** Research's saved versions and `EssentialCutApi.Decide`.
 
 ## Technical debt
 

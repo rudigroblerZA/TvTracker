@@ -38,6 +38,8 @@ public static class FeatureFlags
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
+    public const string CharacterTrail = "character-trail";
+    public const string EpisodeNotes = "episode-notes";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage
