@@ -290,15 +290,6 @@ So the rest of the list reads in proportion:
 
 ## Features
 
-### F1. Crossover alerts
-
-**P2 · S**
-
-- **What:** when a crossover event in a universe you follow is scheduled ("Reckoning airs across Fire, Med and P.D. on
-  Wednesday"), a notification and an Up Next line, with how many episodes you need to catch up on first.
-- **Builds on:** watch order's crossover detection (`GetWatchOrderAsync`), follows, and the notifications path
-  Season verdict used.
-
 ### F2. Weekly digest email
 
 **P2 · M**

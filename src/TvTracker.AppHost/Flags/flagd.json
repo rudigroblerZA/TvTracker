@@ -175,6 +175,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "The \"Watch on Netflix\" button on show pages, linking to the show on its streaming service." }
     },
+    "crossover-alerts": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Crossover alerts: a notification when a crossover across a followed universe's shows is near, and \"Crossover ahead\" on Up Next with what to catch up on first." }
+    },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

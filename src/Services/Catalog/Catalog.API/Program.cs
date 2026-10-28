@@ -59,6 +59,11 @@ builder.Services.AddSearchRateLimiting(builder.Configuration);
 builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions);
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddSingleton<Universes>();
+builder.Services.AddSingleton<Crossovers>();
+
+// Publishes only (crossover alerts); Catalog.API subscribes to nothing.
+builder.AddRabbitMQEventBus("eventbus");
+builder.Services.AddHostedService<CrossoverAlerts>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 

@@ -113,6 +113,53 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
     }
 }
 
+/// <summary>
+/// A crossover across a universe's shows starting soon (<see cref="CrossoverScheduledIntegrationEvent"/>), for the
+/// followers of any of its shows: one inbox item each, however many of the shows they follow.
+/// <list type="bullet">
+/// <item><b>Once per crossover:</b> Catalog.API sends it every hour while it's ahead, each time with a new event Id;
+/// <see cref="CrossoverScheduledIntegrationEvent.CrossoverId"/> stands in as its identity, as a season verdict's does.
+/// Fanning out per show with that one identity skips anyone already told through another of the shows.</item>
+/// <item><b>When, not a date:</b> the text says how many days away it starts, since one text goes to followers in
+/// every time zone and a US evening is the next day in UTC.</item>
+/// <item><b>Preference:</b> "new episodes", since it's about episodes airing.</item>
+/// </list>
+/// </summary>
+public sealed class CrossoverNotificationHandler(NotificationsContext db, NotificationFanOut fanOut, IFeatureClient flags, TimeProvider time)
+    : IIntegrationEventHandler<CrossoverScheduledIntegrationEvent>
+{
+    public async Task HandleAsync(CrossoverScheduledIntegrationEvent e, CancellationToken ct)
+    {
+        var crossover = e with { Id = e.CrossoverId };
+        if (e.Parts.Count == 0
+            || await db.HasProcessedAsync(crossover, nameof(CrossoverNotificationHandler), ct)
+            || !await flags.GetBooleanValueAsync(FeatureFlags.CrossoverAlerts, FeatureFlags.DefaultValue, cancellationToken: ct))
+        {
+            return;
+        }
+
+        var body = CrossoverText(e, time.GetUtcNow());
+        foreach (var show in e.Parts.Select(p => p.ShowId).Distinct())
+        {
+            await fanOut.NotifyFollowersAsync(crossover, new NotificationContent(
+                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}"), ct);
+        }
+
+        db.MarkProcessed(crossover, nameof(CrossoverNotificationHandler));
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>"Airs across Chicago Fire, Chicago Med and Chicago P.D., starting in 6 days."</summary>
+    internal static string CrossoverText(CrossoverScheduledIntegrationEvent e, DateTimeOffset now)
+    {
+        var shows = e.Parts.Select(p => p.ShowTitle).Distinct().ToList();
+        var across = shows.Count == 1 ? shows[0] : $"{string.Join(", ", shows[..^1])} and {shows[^1]}";
+        var days = (int)Math.Ceiling((e.Parts[0].AirsAtUtc - now).TotalDays);
+        var when = days <= 0 ? "today" : days == 1 ? "tomorrow" : $"in {days} days";
+        return $"Airs across {across}, starting {when}. Catch up first: the watch order has every episode in sequence.";
+    }
+}
+
 /// <summary>Keeps the local follower list and user details current.</summary>
 public sealed class UserEventHandlers(NotificationsContext db, NotificationHubPush push, TimeProvider time) :
     IIntegrationEventHandler<ShowFollowedIntegrationEvent>,

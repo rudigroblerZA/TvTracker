@@ -169,3 +169,19 @@ public record ShowStatusChangedIntegrationEvent(
     string ShowTitle,
     ShowStatus OldStatus,
     ShowStatus NewStatus) : IntegrationEvent;
+
+/// <summary>
+/// A crossover event across a universe's shows starting soon (Catalog.API's crossover alerts). Sent every hour while
+/// it's ahead, so a lost one heals; consumers use <paramref name="CrossoverId"/> as its identity, so followers hear once.
+/// </summary>
+/// <param name="CrossoverId">Stable for the event (its universe, name and year).</param>
+/// <param name="UniverseId">The universe's hub show, which addresses its pages.</param>
+/// <param name="Parts">One per show's episode, in air order.</param>
+public record CrossoverScheduledIntegrationEvent(
+    Guid CrossoverId,
+    string Name,
+    Guid UniverseId,
+    string UniverseName,
+    IReadOnlyList<CrossoverPartItem> Parts) : IntegrationEvent;
+
+public record CrossoverPartItem(Guid ShowId, string ShowTitle, Guid EpisodeId, int SeasonNumber, int EpisodeNumber, DateTimeOffset AirsAtUtc);

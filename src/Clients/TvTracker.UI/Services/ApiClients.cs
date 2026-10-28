@@ -116,6 +116,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<CharacterTrail?> GetCharacterTrailAsync(Guid personId, Guid showId, CancellationToken ct = default) =>
         GetAsync<CharacterTrail>(ApiClients.Catalog, $"api/v1/people/{personId}/characters/{showId}", ct, cacheForOffline: true);
 
+    /// <summary>Crossover events in the next 30 days involving any of the shows (the user's follows).</summary>
+    public Task<List<Crossover>?> GetCrossoversAsync(IReadOnlyList<Guid> showIds, CancellationToken ct = default) =>
+        SendAsync<List<Crossover>>(ApiClients.Catalog, HttpMethod.Post, "api/v1/crossovers", new { showIds }, ct);
+
     public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
 

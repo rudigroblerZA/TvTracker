@@ -11,7 +11,7 @@ public enum EpisodeLabel { None, SeriesPremiere, SeasonPremiere, SeasonFinale }
 
 public enum WatchProviderType { Stream, Free, Rent, Buy }
 
-public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict }
+public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict, Crossover }
 
 public enum DevicePlatform { Android, iOS, Web }
 
@@ -57,6 +57,12 @@ public record TonightEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber
 public record MoodResponse(bool Available, IReadOnlyList<MoodFit> Fits);
 
 public record MoodFit(Guid ShowId, double Fit, double Distance);
+
+/// <summary>A crossover event across a universe's shows (see Catalog.API's CrossoverApi); parts in air order.</summary>
+public record Crossover(Guid Id, string Name, Guid UniverseId, string UniverseName, DateTimeOffset StartsAtUtc, IReadOnlyList<CrossoverPart> Parts);
+
+public record CrossoverPart(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
+    string Title, DateTimeOffset AirsAtUtc);
 
 /// <summary>A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).</summary>
 public record WatchOrder(Guid Id, string Name, IReadOnlyList<ShowSummary> Shows, IReadOnlyList<WatchOrderEpisode> Episodes, int Undated);
