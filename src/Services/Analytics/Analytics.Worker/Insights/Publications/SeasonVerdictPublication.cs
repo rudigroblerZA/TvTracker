@@ -15,18 +15,19 @@ namespace Analytics.Worker.Insights;
 /// <item><b>Why every run:</b> the pipeline saves documents before it publishes, so "send when the stored document
 /// lacked it" lost the verdict for good when a run failed in between, and sent it twice when a verdict dropped out of
 /// the document for a run and came back.</item>
-/// <item><b>Why fresh only:</b> without it, the first run after this shipped would have told followers about every
-/// season that ended in the last six weeks.</item>
+/// <item><b>Why two days:</b> enough sends to outlast a day of failed runs (about 48 per verdict; it was a week, ~168).
+/// And only fresh ones: otherwise the first run after this shipped would have told followers about every season that
+/// ended in the last six weeks.</item>
 /// </list>
 /// </summary>
 public sealed class SeasonVerdictPublication : IInsightPublication
 {
-    public static readonly TimeSpan FreshFor = TimeSpan.FromDays(7);
+    public static readonly TimeSpan FreshFor = TimeSpan.FromDays(2);
 
     public PublicationBuilder Begin(bool publishAll) => new Builder();
 
     /// <summary>Stable for a show and season, so every send of its verdict is the same notification.</summary>
-    public static Guid VerdictId(Guid showId, int season) =>
+    private static Guid VerdictId(Guid showId, int season) =>
         new(SHA256.HashData(Encoding.UTF8.GetBytes($"season-verdict:{showId}:{season}"))[..16]);
 
     private sealed class Builder : PublicationBuilder

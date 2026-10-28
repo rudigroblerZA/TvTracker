@@ -19,8 +19,7 @@ public sealed class DropsAtOnceRule : IShowTagRule
             return null;
         }
 
-        var days = show.Aired.Where(e => e.SeasonNumber == latestFull.Number && e.AirsAtUtc is not null)
-            .Select(e => e.AirsAtUtc!.Value.UtcDateTime.Date).Distinct().Order().ToList();
+        var days = show.ReleaseDays(latestFull.Number);
         if (days.Count == 1)
         {
             return new ShowTag(ShowTags.DropsAtOnce, "Drops all at once",

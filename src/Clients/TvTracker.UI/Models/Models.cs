@@ -224,8 +224,7 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
 /// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>
 /// <param name="Finale">One of <see cref="TvTracker.IntegrationEvents.FinaleVerdicts"/>; null without a finale rating.</param>
 /// <param name="Started">Our users who watched any of it; null under 5. Finished: of those, who watched the finale.</param>
-public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc, double Rating, int RatedEpisodes, string Verdict,
-    double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
+public record SeasonVerdict(int Number, DateTime FinaleAiredAtUtc, double Rating, string Verdict, double? OthersMedian, string? Finale,
     int? Started, int? Finished);
 
 public record SeasonVerdictItem(Guid ShowId, string Title, SeasonVerdict Verdict);
