@@ -333,6 +333,7 @@ claude mcp add --transport http tvtracker http://localhost:5112/mcp
 | `show_research` | The show's saved research: the checked insight with its sources, and the checked facts |
 | `discover_list`, `upcoming_premieres`, `top_episodes` | Discover's lists, premieres with catch-up time, best-rated episodes |
 | `person`, `person_insights` | A person's credits; their insights and, for creators, their fingerprint |
+| `network_reports` | Each network's report card (endings, renewals, waits, best shows) against the whole catalog |
 
 - **Shows by name:** every show argument takes a title ("landman") or an id. A title goes through catalog search
   and takes the exact match, else the most popular.
@@ -381,7 +382,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -413,6 +414,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `weekly-digest` | The weekly digest email, its Settings section and preview |
 | `taste-twins` | `/taste-twins`, its For you link, and its endpoint |
 | `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
+| `network-reports` | `/networks`, its Discover link, and its endpoint |
+| `year-in-tv` | `/year`, its Stats link, and its endpoint |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -774,6 +777,22 @@ How events flow:
       wording is shown instead ("checked by our moderators"), and Prestige picks says so rather than give Wikidata's
       count. If Wikidata's awards query fails, the previous day's awards stay.
     - **API** (Research.API): `GET /api/v1/shows/{id}/awards` and `GET /api/v1/awards?limit=` (most wins first), public.
+  - **Network report cards** (`/networks`, linked from Discover; `network-reports` flag): for every network or streamer
+    with 5 or more shows here, how its shows rate, how its ended shows land (sticks the landing, fizzles), the share of
+    seasons that come back, the typical wait between seasons, how often it drops whole seasons at once, and its best
+    shows and great endings. Each figure is set against the whole catalog (green when clearly better, red when clearly
+    worse), and the cards sort by any of them.
+    - **From the provider's data,** recomputed hourly, so nothing about our users is in it.
+    - **API:** `GET /api/v1/insights/networks` on Analytics.API, signed in (`baseline` is the whole catalog).
+  - **Year in TV** (`/year`, linked from Stats; `year-in-tv` flag): your year of viewing, any year you watched in.
+    - **What's in it:** hours, episodes, shows (and how many were new to you), days with TV and your longest run of
+      days, your busiest month and biggest day, most watched shows, time by genre, the network you watched most,
+      the best rated episode you watched, and what you finished, caught up on and left behind.
+    - **Taste shift:** how the DNA of what you watched moved since the year before ("more short episodes").
+    - **Called it:** a show rated 7.5+ that you followed before at least half of its followers here (with 5 or more).
+    - **Bulk marks:** 8 or more of a show's episodes marked at once ("watched up to S05E10") aren't counted, since when
+      you watched them isn't known; the page says how many were left out.
+    - **API:** `GET /api/v1/me/year?year=&tz=` on Analytics.API, signed in.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

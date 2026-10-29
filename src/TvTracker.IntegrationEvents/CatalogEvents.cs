@@ -17,6 +17,8 @@ public enum ShowStatus
 /// <param name="ExternalRating">The provider's average rating (0-10), if any.</param>
 /// <param name="Cast">The cast with character ids, in billing order. Null in events published before it was added.</param>
 /// <param name="Creatives">Its creators and executive producers, creators first. Null in events published before it was added.</param>
+/// <param name="Network">Its network or streaming service ("HBO", "Netflix"), if any. Null in events published before it
+/// was added too, so <paramref name="NetworkKnown"/> tells the two apart.</param>
 public record ShowAddedIntegrationEvent(
     Guid ShowId,
     string Title,
@@ -29,9 +31,12 @@ public record ShowAddedIntegrationEvent(
     double Popularity,
     double? ExternalRating = null,
     IReadOnlyList<CastCredit>? Cast = null,
-    IReadOnlyList<CreativeCredit>? Creatives = null) : IntegrationEvent;
+    IReadOnlyList<CreativeCredit>? Creatives = null,
+    string? Network = null,
+    bool NetworkKnown = false) : IntegrationEvent;
 
-/// <summary>A show's details changed (title, poster, genres, keywords, cast, creatives, similar shows, rating).</summary>
+/// <summary>A show's details changed (title, poster, genres, keywords, cast, creatives, similar shows, rating, network).</summary>
+/// <param name="Network">As in <see cref="ShowAddedIntegrationEvent"/>.</param>
 public record ShowUpdatedIntegrationEvent(
     Guid ShowId,
     string Title,
@@ -44,7 +49,9 @@ public record ShowUpdatedIntegrationEvent(
     double Popularity,
     double? ExternalRating = null,
     IReadOnlyList<CastCredit>? Cast = null,
-    IReadOnlyList<CreativeCredit>? Creatives = null) : IntegrationEvent;
+    IReadOnlyList<CreativeCredit>? Creatives = null,
+    string? Network = null,
+    bool NetworkKnown = false) : IntegrationEvent;
 
 /// <param name="CharacterExternalIds">
 /// The provider's ids for the characters played (empty if it has none). The same id in two shows means a shared character.

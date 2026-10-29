@@ -658,3 +658,36 @@ public record AssistantShow(Guid Id, string Title);
 /// <param name="Status">"queued", "thinking", "answered" or "failed".</param>
 public record AssistantAsk(Guid Id, string Question, Guid? PreviousId, string Status, int Ahead, List<AssistantStep> Steps, string? Answer,
     List<AssistantShow> Shows, string? Problem, DateTime AskedAtUtc, double? Seconds);
+
+/// <summary>Network report cards: every network with enough catalog shows, and the whole catalog to compare with.</summary>
+public record NetworkReportCards(NetworkReport? Baseline, IReadOnlyList<NetworkReport> Networks);
+
+public record NetworkReport(string Network, int Shows, int Ended, double? AverageRating, NetworkEndings? Endings,
+    NetworkRenewals? Renewals, int? MedianWaitDays, int Waits, double DropsAtOnce, IReadOnlyList<NetworkShow> Best,
+    IReadOnlyList<NetworkShow> GreatEndings);
+
+public record NetworkEndings(int Judged, int Sticks, int AsItRan, int Weaker, int Fizzles);
+
+public record NetworkRenewals(int Decided, int Renewed);
+
+public record NetworkShow(Guid ShowId, string Title, string? PosterUrl, double? Rating);
+
+/// <summary>A year of the user's viewing (Year in TV).</summary>
+public record YearInTv(int Year, IReadOnlyList<int> Years, int Episodes, int Minutes, int Shows, int NewShows, int Bulk,
+    int DaysWatched, int LongestStreak, YearDay? BusiestDay, YearMonth? BusiestMonth, IReadOnlyList<YearShow> TopShows,
+    IReadOnlyList<YearShare> Genres, YearShare? TopNetwork, IReadOnlyList<YearShow> Finished, IReadOnlyList<YearShow> CaughtUp,
+    IReadOnlyList<YearShow> LeftBehind, YearEpisode? BestEpisode, IReadOnlyList<YearShift> Shift, YearCalledIt? CalledIt);
+
+public record YearShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes);
+
+public record YearDay(DateOnly Date, int Episodes, int Minutes);
+
+public record YearMonth(int Month, string Name, int Episodes, int Minutes);
+
+public record YearShare(string Name, int Minutes, double Share);
+
+public record YearEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, int SeasonNumber, int EpisodeNumber, string Title, double Rating);
+
+public record YearShift(string Key, string Name, double From, double To, string Toward);
+
+public record YearCalledIt(Guid ShowId, string Title, string? PosterUrl, DateTime FollowedAtUtc, double Ahead, int Followers, double? Rating);

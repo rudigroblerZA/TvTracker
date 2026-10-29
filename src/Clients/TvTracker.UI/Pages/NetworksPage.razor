@@ -1,0 +1,150 @@
+@page "/networks"
+@attribute [RequiresFeature(FeatureFlags.NetworkReports)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>Network report cards · @Brand.AppName</PageTitle>
+
+<h1>Network report cards</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            How each network's and streamer's shows rate, end, come back, and how long they keep you waiting, from the
+            catalog's shows and TVmaze's ratings. Each figure is set against the whole catalog.
+        </p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (cards is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (cards.Networks.Count == 0)
+        {
+            <p class="muted">Nothing yet: report cards are worked out hourly, for networks with five or more shows here.</p>
+        }
+        else
+        {
+            <nav class="chips" aria-label="Sort by">
+                @foreach (var (key, label) in Sorts)
+                {
+                    <button type="button" class="chip @(sort == key ? "active" : "")" aria-pressed="@(sort == key)" @onclick="() => sort = key">@label</button>
+                }
+            </nav>
+
+            <div class="network-cards">
+                @foreach (var n in Sorted())
+                {
+                    <article class="network-card" @key="n.Network">
+                        <h2>@n.Network</h2>
+                        <p class="muted small">@($"{n.Shows} shows · {n.Ended} ended{(n.AverageRating is { } r ? $" · rated {Format.Rating(r)} on average" : "")}")</p>
+                        <dl class="report">
+                            @if (n.Endings is { } e)
+                            {
+                                <dt>Sticks the landing</dt>
+                                <dd class="@Tone(EndsWell(n), EndsWell(cards.Baseline))">@Format.Percent(EndsWell(n)!.Value)<span class="muted small">@($" of {e.Judged} endings{Versus(EndsWell(cards.Baseline))}")</span></dd>
+                                @if (e.Fizzles > 0)
+                                {
+                                    <dt>Fizzles out</dt>
+                                    <dd>@Format.Percent((double)e.Fizzles / e.Judged)</dd>
+                                }
+                            }
+                            @if (n.Renewals is not null)
+                            {
+                                <dt>Seasons that come back</dt>
+                                <dd class="@Tone(ComesBack(n), ComesBack(cards.Baseline))">@Format.Percent(ComesBack(n)!.Value)<span class="muted small">@Versus(ComesBack(cards.Baseline))</span></dd>
+                            }
+                            @if (n.MedianWaitDays is { } wait)
+                            {
+                                <dt>Typical wait between seasons</dt>
+                                <dd class="@Tone(cards.Baseline?.MedianWaitDays, wait)">@Wait(wait)<span class="muted small">@(cards.Baseline?.MedianWaitDays is { } all ? $" · catalog {Wait(all)}" : "")</span></dd>
+                            }
+                            @if (n.DropsAtOnce >= 0.1)
+                            {
+                                <dt>Drops whole seasons at once</dt>
+                                <dd>@Format.Percent(n.DropsAtOnce)</dd>
+                            }
+                        </dl>
+                        @if (n.Best.Count > 0)
+                        {
+                            <p class="small"><span class="muted">Best rated: </span>@Links(n.Best)</p>
+                        }
+                        @if (n.GreatEndings.Count > 0)
+                        {
+                            <p class="small"><span class="muted">Great endings: </span>@Links(n.GreatEndings)</p>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to compare networks and streamers." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly (string Key, string Label)[] Sorts =
+        [("shows", "Most shows"), ("endings", "Best endings"), ("renewals", "Most renewals"), ("wait", "Shortest waits"), ("rating", "Best rated")];
+
+    private NetworkReportCards? cards;
+    private string? error;
+    private string sort = "shows";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            cards = await Analytics.GetNetworkReportsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    // Networks without the figure sort last.
+    private IEnumerable<NetworkReport> Sorted() => sort switch
+    {
+        "endings" => cards!.Networks.OrderByDescending(n => EndsWell(n) ?? -1),
+        "renewals" => cards!.Networks.OrderByDescending(n => ComesBack(n) ?? -1),
+        "wait" => cards!.Networks.OrderBy(n => n.MedianWaitDays ?? int.MaxValue),
+        "rating" => cards!.Networks.OrderByDescending(n => n.AverageRating ?? -1),
+        _ => cards!.Networks
+    };
+
+    private static double? EndsWell(NetworkReport? n) => n?.Endings is { } e ? (double)e.Sticks / e.Judged : null;
+
+    private static double? ComesBack(NetworkReport? n) => n?.Renewals is { Decided: > 0 } r ? (double)r.Renewed / r.Decided : null;
+
+    private static string Versus(double? catalog) => catalog is { } c ? $" · catalog {Format.Percent(c)}" : "";
+
+    /// <summary>"good" when the first is clearly above the second (by 5 points, or 10%), "bad" when clearly below.</summary>
+    private static string Tone(double? value, double? against) =>
+        value is not { } v || against is not { } a ? "" : v - a >= Math.Max(0.05, Math.Abs(a) * 0.1) ? "tone-good"
+            : a - v >= Math.Max(0.05, Math.Abs(a) * 0.1) ? "tone-bad" : "";
+
+    private static string Wait(int days) => days < 60 ? $"{days} days" : $"{Math.Round(days / 30.4):0} months";
+
+    private static RenderFragment Links(IReadOnlyList<NetworkShow> shows) => __builder =>
+    {
+        for (var i = 0; i < shows.Count; i++)
+        {
+            var show = shows[i];
+            @if (i > 0)
+            {
+                <span>@(", ")</span>
+            }
+            <a href="shows/@show.ShowId">@show.Title</a>
+            @if (show.Rating is { } rating)
+            {
+                <span class="muted">@($" {Format.Rating(rating)}")</span>
+            }
+        }
+    };
+}

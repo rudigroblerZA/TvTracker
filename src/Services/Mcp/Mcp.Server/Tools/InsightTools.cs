@@ -73,6 +73,11 @@ public sealed class InsightTools(Backends backends, ShowResolver resolver)
         await backends.GetAsync(Backends.Analytics,
             $"api/v1/insights/top-episodes?limit={Math.Clamp(limit, 1, 50)}" + (genre is { Length: > 0 } ? $"&genre={Uri.EscapeDataString(genre)}" : ""), ct) ?? new JsonArray();
 
+    [McpServerTool(Name = "network_reports", ReadOnly = true, Idempotent = true)]
+    [Description("Report cards for networks and streaming services with five or more catalog shows: average rating, how their ended shows land (sticks the landing, fizzles), the share of seasons that come back, shows over after one season, the typical wait between seasons, and their best shows. 'baseline' is the whole catalog, for comparison.")]
+    public async Task<JsonNode> NetworkReports(CancellationToken ct = default) =>
+        await backends.GetAsync(Backends.Analytics, "api/v1/insights/networks", ct) ?? new JsonObject();
+
     [McpServerTool(Name = "person_insights", ReadOnly = true, Idempotent = true)]
     [Description("What's computed about a person: their shows' ratings, best show, years active and frequent co-stars; for creators, their fingerprint (the DNA their shows share), shows made their way, and kindred creators. Person ids come from show_details.")]
     public async Task<JsonNode> PersonInsights([Description("The person's catalog id.")] Guid personId, CancellationToken ct = default)

@@ -24,6 +24,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<DiscoveryRow> Discovery => Set<DiscoveryRow>();
     public DbSet<PersonInsightsRow> PersonInsights => Set<PersonInsightsRow>();
     public DbSet<CreatorFingerprintRow> CreatorFingerprints => Set<CreatorFingerprintRow>();
+    public DbSet<NetworkReportRow> NetworkReports => Set<NetworkReportRow>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -35,6 +36,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.ToTable("shows");
             entity.HasKey(s => s.ShowId);
             entity.Property(s => s.Title).HasMaxLength(256);
+            entity.Property(s => s.Network).HasMaxLength(128);
         });
 
         modelBuilder.Entity<EpisodeCopy>(entity =>
@@ -167,6 +169,14 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.ToTable("creator_fingerprints");
             entity.HasKey(p => p.PersonId);
             entity.Property(p => p.Document).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<NetworkReportRow>(entity =>
+        {
+            entity.ToTable("network_reports");
+            entity.HasKey(n => n.Network);
+            entity.Property(n => n.Network).HasMaxLength(128);
+            entity.Property(n => n.Document).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<PersonInsightsRow>(entity =>

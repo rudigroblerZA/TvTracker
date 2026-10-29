@@ -6,7 +6,7 @@ namespace Analytics.Worker;
 
 /// <summary>
 /// Backfill: when Analytics has no shows yet (first deployment, or a new database), or holds cast credits from before
-/// catalog events carried person ids, or shows from before they carried creatives, asks the catalog sync worker to
+/// catalog events carried person ids, or shows from before they carried creatives or their network, asks the catalog sync worker to
 /// republish every show, its episodes, and people's careers.
 /// Shows imported before then reach it like new ones. Our users' earlier ratings aren't replayed; they accumulate.
 /// </summary>
@@ -23,7 +23,7 @@ public sealed class CatalogReplayRequester(
             var db = scope.ServiceProvider.GetRequiredService<AnalyticsContext>();
             var hasShows = await db.Shows.AnyAsync(stoppingToken);
             var castWithoutPersonIds = await db.Cast.AnyAsync(c => c.PersonId == null, stoppingToken);
-            var showsWithoutCreatives = await db.Shows.AnyAsync(s => !s.CreativesKnown, stoppingToken);
+            var showsWithoutCreatives = await db.Shows.AnyAsync(s => !s.CreativesKnown || !s.NetworkKnown, stoppingToken);
             if (hasShows && !castWithoutPersonIds && !showsWithoutCreatives)
             {
                 return;

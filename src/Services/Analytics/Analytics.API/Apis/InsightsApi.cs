@@ -73,6 +73,8 @@ public static class InsightsApi
         api.MapTimeOffApi();
         api.MapKnownFacesApi();
         api.MapSeasonVerdictsApi();
+        api.MapNetworkReportsApi();
+        api.MapYearInTvApi();
 
         return api;
     }

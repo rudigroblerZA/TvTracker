@@ -353,6 +353,19 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
+    /// <summary>Network report cards, most shows first, with the whole catalog as the baseline.</summary>
+    public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>
+        GetAsync<NetworkReportCards>(ApiClients.Analytics, "api/v1/insights/networks", ct, cacheForOffline: true);
+
+    /// <summary>The user's year in TV; the latest year with viewing when <paramref name="year"/> is null.</summary>
+    public Task<YearInTv?> GetYearInTvAsync(int? year, string? timeZone, CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (year is { } y) query.Add($"year={y}");
+        if (!string.IsNullOrEmpty(timeZone)) query.Add($"tz={Uri.EscapeDataString(timeZone)}");
+        return GetAsync<YearInTv>(ApiClients.Analytics, "api/v1/me/year" + (query.Count > 0 ? "?" + string.Join('&', query) : ""), ct);
+    }
+
     /// <summary>The user's taste twins and what they loved; nothing shown with fewer than five twins.</summary>
     public Task<TasteTwins?> GetTasteTwinsAsync(CancellationToken ct = default) =>
         GetAsync<TasteTwins>(ApiClients.Analytics, "api/v1/me/taste-twins", ct, cacheForOffline: true);
