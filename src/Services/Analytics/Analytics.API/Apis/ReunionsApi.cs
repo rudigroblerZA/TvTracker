@@ -50,14 +50,10 @@ public static partial class ReunionsApi
     public static void MapReunionsApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/reunions", GetRadarAsync).RequireFeature(FeatureFlags.ReunionRadar);
 
-    private static async Task<Results<Ok<ReunionRadarDto>, UnauthorizedHttpResult>> GetRadarAsync(
+    private static async Task<Ok<ReunionRadarDto>> GetRadarAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var stars = await db.ShowRatings.AsNoTracking().Where(r => r.UserId == userId).ToDictionaryAsync(r => r.ShowId, r => r.Stars, ct);
         var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
         var watched = await db.Watches.AsNoTracking().Where(w => w.UserId == userId)

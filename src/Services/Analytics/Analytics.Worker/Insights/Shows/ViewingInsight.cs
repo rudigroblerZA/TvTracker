@@ -14,7 +14,8 @@ public sealed class ViewingInsight : IShowInsight
             return insights with { Viewing = null };
         }
 
-        var aired = show.Aired.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
+        // Finished means every regular episode, as Tracking counts it; a viewer who skipped the specials has finished.
+        var aired = show.RegularAired.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
         var position = aired.Select((e, i) => (e.EpisodeId, i)).ToDictionary(x => x.EpisodeId, x => x.i);
         var seasonOf = show.Episodes.ToDictionary(e => e.EpisodeId, e => e.SeasonNumber);
 

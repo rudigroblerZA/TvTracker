@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -60,70 +59,60 @@ public static class FinishOutlookApi
         api.MapGet("/shows/{showId:guid}/finish-outlook", GetOneAsync).RequireFeature(FeatureFlags.Forecasts);
     }
 
-    private static async Task<Results<Ok<List<FinishOutlookDto>>, UnauthorizedHttpResult>> GetAllAsync(
+    private static async Task<Ok<List<FinishOutlookDto>>> GetAllAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct) =>
-        user.FindFirst("sub")?.Value is { } userId
-            ? TypedResults.Ok(await OutlooksAsync(db, userId, null, time.GetUtcNow(), ct))
-            : TypedResults.Unauthorized();
+        TypedResults.Ok(await OutlooksAsync(db, user.GetUserId(), null, time.GetUtcNow(), ct));
 
     /// <summary>204 when you haven't started the show, or are caught up.</summary>
-    private static async Task<Results<Ok<FinishOutlookDto>, NoContent, UnauthorizedHttpResult>> GetOneAsync(
+    private static async Task<Results<Ok<FinishOutlookDto>, NoContent>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
-        var outlooks = await OutlooksAsync(db, userId, showId, time.GetUtcNow(), ct);
+        var outlooks = await OutlooksAsync(db, user.GetUserId(), showId, time.GetUtcNow(), ct);
         return outlooks.FirstOrDefault(o => o.ShowId == showId) is { } outlook ? TypedResults.Ok(outlook) : TypedResults.NoContent();
     }
 
     /// <param name="only">One show to describe; the record still looks at all of the user's shows.</param>
     private static async Task<List<FinishOutlookDto>> OutlooksAsync(AnalyticsContext db, string userId, Guid? only, DateTimeOffset now, CancellationToken ct)
     {
-        var watches = await db.Watches.AsNoTracking().Where(w => w.UserId == userId).ToListAsync(ct);
-        var showIds = watches.Select(w => w.ShowId).Distinct().ToList();
-        var aired = (await db.Episodes.AsNoTracking()
-                .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
-                .ToListAsync(ct))
+        // Progress on every show the user has watched (one aggregate), for the record; episodes only for the shows described.
+        var progress = (await Viewer.ProgressAsync(db, userId, now, null, ct)).Values.Where(p => p.Started).ToList();
+        var inProgress = progress.Where(p => !p.AllWatched && (only is null || p.ShowId == only)).ToList();
+        var ids = inProgress.Select(p => p.ShowId).ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
+        var aired = (await db.Episodes.AsNoTracking().AiredRegular(now).Where(e => ids.Contains(e.ShowId))
+                .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToListAsync(ct))
             .ToLookup(e => e.ShowId);
-        var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
-
-        // Progress on every show the user has watched: the share of what's aired, and whether they got to the end.
-        var progress = watches.GroupBy(w => w.ShowId)
-            .Where(g => aired[g.Key].Any())
-            .Select(g =>
-            {
-                var episodes = aired[g.Key].ToList();
-                var ids = g.Select(w => w.EpisodeId).ToHashSet();
-                var watched = episodes.Count(e => ids.Contains(e.EpisodeId));
-                return (ShowId: g.Key, Watched: watched, Aired: episodes.Count, Episodes: episodes, Ids: ids,
-                    Last: g.Max(w => w.WatchedAtUtc), Recent: g.Count(w => w.WatchedAtUtc >= now.UtcDateTime.AddDays(-PaceDays)));
-            })
-            .Where(p => p.Watched > 0)
-            .ToList();
-
-        var inProgress = progress.Where(p => p.Watched < p.Aired && shows.ContainsKey(p.ShowId) && (only is null || p.ShowId == only)).ToList();
-        var insights = await InsightsAsync(db, inProgress.Select(p => p.ShowId).ToList(), ct);
+        var since = now.UtcDateTime.AddDays(-PaceDays);
+        var watches = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && ids.Contains(w.ShowId))
+                .Select(w => new { w.ShowId, w.EpisodeId, w.WatchedAtUtc }).ToListAsync(ct))
+            .ToLookup(w => w.ShowId);
+        var insights = await ShowDocuments.LoadAsync(db, ids, ct);
 
         return inProgress
+            .Where(p => shows.ContainsKey(p.ShowId))
             .Select(p =>
             {
                 var show = shows[p.ShowId];
-                var left = p.Episodes.Where(e => !p.Ids.Contains(e.EpisodeId)).ToList();
-                var days = (now.UtcDateTime - p.Last).TotalDays;
-                var perWeek = Math.Round(p.Recent / (PaceDays / 7.0), 1);
+                var ordered = aired[p.ShowId].ToList();
+                var watched = watches[p.ShowId].Select(w => w.EpisodeId).ToHashSet();
+                var left = ordered.Where(e => !watched.Contains(e.EpisodeId)).ToList();
+                var last = watches[p.ShowId].Max(w => w.WatchedAtUtc);
+                var days = (now.UtcDateTime - last).TotalDays;
+                var perWeek = Math.Round(watches[p.ShowId].Count(w => w.WatchedAtUtc >= since) / (PaceDays / 7.0), 1);
                 var share = (double)p.Watched / p.Aired;
 
                 var comparable = progress.Where(o => o.ShowId != p.ShowId && (double)o.Watched / o.Aired >= share).ToList();
                 var record = comparable.Count >= MinComparable
-                    ? new FinishRecordDto(comparable.Count, comparable.Count(o => o.Watched == o.Aired))
+                    ? new FinishRecordDto(comparable.Count, comparable.Count(o => o.AllWatched))
                     : null;
 
                 // The drop-off is ahead when it's past the furthest episode the user has watched.
-                var ordered = p.Episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
-                var furthest = ordered.FindLastIndex(e => p.Ids.Contains(e.EpisodeId));
+                var (furthest, _) = Viewer.Split(ordered, watched);
                 var showInsights = insights.GetValueOrDefault(p.ShowId);
                 DropOff? ahead = null;
                 if (showInsights?.Viewing?.DropOff is { } dropOff
@@ -131,19 +120,14 @@ public static class FinishOutlookApi
                 {
                     ahead = dropOff;
                 }
-
-                GetsGoodAheadDto? getsGood = null;
-                if (showInsights?.GetsGood?.Turn is { } turn
-                    && ordered.FindIndex(e => e.EpisodeId == turn.EpisodeId) is var turnIndex && turnIndex > furthest)
-                {
-                    var between = ordered.Skip(furthest + 1).Take(turnIndex - furthest - 1).ToList();
-                    getsGood = new GetsGoodAheadDto(turn.SeasonNumber, turn.EpisodeNumber, turn.Title, between.Count, between.Sum(e => e.RuntimeMinutes ?? 0));
-                }
+                var getsGood = Viewer.TurnAhead(ordered, furthest, showInsights?.GetsGood?.Turn, e => e.RuntimeMinutes ?? 0) is { } turn
+                    ? new GetsGoodAheadDto(turn.Turn.SeasonNumber, turn.Turn.EpisodeNumber, turn.Turn.Title, turn.EpisodesAway, turn.MinutesAway)
+                    : null;
 
                 return new FinishOutlookDto(
                     p.ShowId, show.Title, show.PosterUrl, p.Watched, p.Aired, left.Sum(e => e.RuntimeMinutes ?? 0),
                     days <= OnTrackDays ? "on-track" : days <= InsightRules.StoppedAfterDays ? "slowing" : "stalled",
-                    p.Last,
+                    last,
                     perWeek,
                     perWeek > 0 ? DateOnly.FromDateTime(now.UtcDateTime.AddDays(Math.Ceiling(left.Count / perWeek * 7))) : null,
                     record,
@@ -153,15 +137,5 @@ public static class FinishOutlookApi
             .OrderBy(o => o.Status switch { "on-track" => 0, "slowing" => 1, _ => 2 })
             .ThenByDescending(o => o.LastWatchedAtUtc)
             .ToList();
-    }
-
-    /// <summary>The shows' insights documents, for their drop-off points (there only with enough viewers) and turns.</summary>
-    internal static async Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct)
-    {
-        var documents = await db.ShowInsights.AsNoTracking().Where(i => showIds.Contains(i.ShowId)).Select(i => new { i.ShowId, i.Document }).ToListAsync(ct);
-        return documents
-            .Select(d => (d.ShowId, Insights: JsonSerializer.Deserialize<ShowInsights>(d.Document, JsonSerializerOptions.Web)))
-            .Where(d => d.Insights is not null)
-            .ToDictionary(d => d.ShowId, d => d.Insights!);
     }
 }

@@ -25,6 +25,7 @@ public class ShowCopy
     /// <summary>Whether a catalog event has carried the network yet (it may be none).</summary>
     public bool NetworkKnown { get; set; }
 
+    /// <summary>When the copy last heard about the show; not read by any insight, kept for looking into a stale copy.</summary>
     public DateTime UpdatedAtUtc { get; set; }
 }
 
@@ -144,8 +145,11 @@ public class UserEpisodeWatch
     public Guid EpisodeId { get; set; }
     public Guid ShowId { get; set; }
 
-    /// <summary>When the mark was made (the event's time), for telling stopped viewers from ones mid-binge.</summary>
+    /// <summary>When the user watched (the mark's time, which the phone backdates), for pace and bulk marks.</summary>
     public DateTime WatchedAtUtc { get; set; }
+
+    /// <summary>When the mark reached us (the event's time), which a snapshot repair compares with when it was taken.</summary>
+    public DateTime RecordedAtUtc { get; set; }
 }
 
 /// <summary>A user following a show (from ShowFollowed; removed by ShowUnfollowed).</summary>

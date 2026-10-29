@@ -71,7 +71,7 @@ public sealed class CreatorFingerprintList : IListInsight
                     return new CreatorFingerprintRow
                     {
                         PersonId = f.PersonId,
-                        Document = JsonSerializer.Serialize(document, InsightsPipeline.JsonOptions),
+                        Document = InsightDocuments.Serialize(document),
                         ComputedAtUtc = sources.ComputedAtUtc
                     };
                 })

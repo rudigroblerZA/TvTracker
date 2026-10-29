@@ -32,7 +32,6 @@ public sealed class InsightsPipeline(
     TimeProvider time,
     ILogger<InsightsPipeline> logger)
 {
-    public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private const int ShowBatchSize = 100;
 
@@ -55,7 +54,7 @@ public sealed class InsightsPipeline(
             {
                 var insights = stages.Aggregate(Blank(show), (document, stage) => stage.Apply(show, document));
 
-                var document = JsonSerializer.Serialize(insights, JsonOptions);
+                var document = InsightDocuments.Serialize(insights);
                 existing.TryGetValue(show.ShowId, out var row);
                 using (var previous = row is null ? null : JsonDocument.Parse(row.Document))
                 {

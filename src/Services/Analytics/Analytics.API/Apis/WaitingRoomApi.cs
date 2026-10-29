@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -32,46 +31,32 @@ public static class WaitingRoomApi
     public static void MapWaitingRoomApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/waiting", GetAsync).RequireFeature(FeatureFlags.WaitingRoom);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    private static async Task<Results<Ok<WaitingRoomDto>, UnauthorizedHttpResult>> GetAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Ok<WaitingRoomDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
 
-        var watched = await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => new { w.ShowId, w.EpisodeId }).ToListAsync(ct);
-        var showIds = watched.Select(w => w.ShowId).Distinct().ToList();
+        // Caught up: every aired regular episode watched (the aggregate), on a show that's still running.
+        var progress = (await Viewer.ProgressAsync(db, userId, now, null, ct)).Values.Where(p => p.AllWatched).Select(p => p.ShowId).ToList();
         var shows = await db.Shows.AsNoTracking()
-            .Where(s => showIds.Contains(s.ShowId) && s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled)
+            .Where(s => progress.Contains(s.ShowId) && s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled)
             .ToDictionaryAsync(s => s.ShowId, ct);
-        var running = shows.Keys.ToList();
-        var episodes = (await db.Episodes.AsNoTracking()
-                .Where(e => running.Contains(e.ShowId) && e.SeasonNumber > 0)
-                .Select(e => new { e.ShowId, e.EpisodeId, e.SeasonNumber, e.AirsAtUtc })
+        var caughtUp = shows.Keys.ToList();
+        var latest = await Viewer.ProgressAsync(db, userId, now, caughtUp, ct);
+        var upcoming = (await db.Episodes.AsNoTracking()
+                .Where(e => caughtUp.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc > now)
+                .Select(e => new { e.ShowId, e.SeasonNumber, e.AirsAtUtc })
                 .ToListAsync(ct))
             .ToLookup(e => e.ShowId);
-        var seen = watched.Select(w => w.EpisodeId).ToHashSet();
-
-        var caughtUp = running.Where(id =>
-            {
-                var aired = episodes[id].Where(e => e.AirsAtUtc <= now).ToList();
-                return aired.Count > 0 && aired.All(e => seen.Contains(e.EpisodeId));
-            })
-            .ToList();
-        var documents = await db.ShowInsights.AsNoTracking().Where(i => caughtUp.Contains(i.ShowId))
-            .ToDictionaryAsync(i => i.ShowId, i => i.Document, ct);
+        var documents = await ShowDocuments.LoadAsync(db, caughtUp, ct);
 
         var result = caughtUp.Select(id =>
             {
                 var show = shows[id];
-                var insights = documents.TryGetValue(id, out var json) ? JsonSerializer.Deserialize<ShowInsights>(json, JsonOptions) : null;
-                var lastAired = episodes[id].Where(e => e.AirsAtUtc <= now).Max(e => e.AirsAtUtc);
-                var next = episodes[id].Where(e => e.AirsAtUtc > now).MinBy(e => e.AirsAtUtc);
-                var currentSeason = episodes[id].Where(e => e.AirsAtUtc <= now).Max(e => e.SeasonNumber);
+                var insights = documents.GetValueOrDefault(id);
+                var lastAired = latest[id].LastAiredAtUtc;
+                var next = upcoming[id].MinBy(e => e.AirsAtUtc);
+                var currentSeason = latest[id].LatestSeason;
 
                 if (next is not null && next.SeasonNumber == currentSeason)
                 {

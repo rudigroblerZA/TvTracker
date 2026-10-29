@@ -47,7 +47,13 @@ internal static class ShowValue
         return genres.SelectMany(g => g).GroupBy(g => g).Where(g => g.Count() >= needed).Select(g => g.Key).ToHashSet();
     }
 
-    internal static Assessment Assess(ShowCopy show, ShowInsights? insights, HashSet<string> liked)
+    internal static Assessment Assess(ShowCopy show, ShowInsights? insights, HashSet<string> liked) =>
+        Assess(show, insights?.Landing?.Verdict, insights?.GetsGood?.Turn, insights?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true, liked);
+
+    /// <param name="landing">The show's <see cref="LandingVerdicts"/> verdict, when it has one.</param>
+    /// <param name="turn">Where a slow start turns, when the document found one.</param>
+    /// <param name="limited">Tagged a limited series.</param>
+    internal static Assessment Assess(ShowCopy show, string? landing, GetsGoodTurn? turn, bool limited, HashSet<string> liked)
     {
         var reasons = new List<string>();
         var value = show.ExternalRating ?? UnratedValue;
@@ -66,7 +72,6 @@ internal static class ShowValue
             }
         }
 
-        var landing = insights?.Landing?.Verdict;
         value += landing switch
         {
             LandingVerdicts.Sticks or LandingVerdicts.GreatFinale => 0.3,
@@ -88,25 +93,26 @@ internal static class ShowValue
             reasons.Add(ending);
         }
 
-        var slowStart = insights?.GetsGood?.Turn is { MinutesBefore: >= SlowStartMinutes } turn ? turn : null;
+        var slowStart = turn is { MinutesBefore: >= SlowStartMinutes } ? turn : null;
         if (slowStart is not null)
         {
             reasons.Add($"Slow start: gets good at S{slowStart.SeasonNumber:00}E{slowStart.EpisodeNumber:00}, {Hours(slowStart.MinutesBefore)} in");
         }
 
-        var limited = insights?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true;
         return new Assessment(Math.Round(value, 2), reasons, landing, slowStart, limited);
     }
 
     /// <summary>
-    /// Aired regular episodes and their running time per show. Missing runtimes count as the show's average known one,
-    /// as the essential cut does with its typical runtime.
+    /// Aired regular episodes and their running time per show, in one aggregate. Missing runtimes count as the show's
+    /// average known one (the mean, which SQL can give for many shows at once; the essential cut, with one show's
+    /// episodes in memory, uses the median).
     /// </summary>
     internal static async Task<Dictionary<Guid, (int Episodes, int Minutes)>> RunTimesAsync(AnalyticsContext db, List<Guid> showIds,
         DateTimeOffset now, CancellationToken ct)
     {
         var rows = await db.Episodes.AsNoTracking()
-            .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
+            .AiredRegular(now)
+            .Where(e => showIds.Contains(e.ShowId))
             .GroupBy(e => e.ShowId)
             .Select(g => new
             {
@@ -122,7 +128,7 @@ internal static class ShowValue
 
     /// <summary>The shows' insights documents, keyed by show.</summary>
     internal static Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct) =>
-        FinishOutlookApi.InsightsAsync(db, showIds, ct);
+        ShowDocuments.LoadAsync(db, showIds, ct);
 
     /// <summary>"45 min", "3 h": hours rounded once past two.</summary>
     internal static string Hours(int minutes) => minutes < 120 ? $"{minutes} min" : $"{Math.Round(minutes / 60.0):N0} h";

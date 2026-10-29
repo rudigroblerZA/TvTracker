@@ -38,7 +38,7 @@ public sealed class NetworkReportList : IListInsight
             var aired = seasons.Where(s => s.Aired > 0).OrderBy(s => s.Number).ToList();
             var latest = seasons.Select(s => s.Number).Concat(announced).DefaultIfEmpty(0).Max();
             var followed = aired.Count(s => s.Number < latest);
-            var ended = show.Show.Status is TvTracker.IntegrationEvents.ShowStatus.Ended or TvTracker.IntegrationEvents.ShowStatus.Cancelled;
+            var ended = show.Show.HasEnded();
 
             var waits = aired.Zip(aired.Skip(1))
                 .Where(p => p.First.LastAired is not null && p.Second.First is not null)
@@ -66,7 +66,7 @@ public sealed class NetworkReportList : IListInsight
                     {
                         Network = g.Name,
                         Shows = report.Shows,
-                        Document = JsonSerializer.Serialize(report, InsightsPipeline.JsonOptions),
+                        Document = InsightDocuments.Serialize(report),
                         ComputedAtUtc = sources.ComputedAtUtc
                     };
                 })
@@ -76,8 +76,7 @@ public sealed class NetworkReportList : IListInsight
         private NetworkReport ReportOf(string name, List<ShowFacts> facts)
         {
             var rated = facts.Where(f => f.Show.ExternalRating is not null).ToList();
-            var ended = facts.Where(f => f.Show.Status is TvTracker.IntegrationEvents.ShowStatus.Ended
-                or TvTracker.IntegrationEvents.ShowStatus.Cancelled).ToList();
+            var ended = facts.Where(f => f.Show.HasEnded()).ToList();
 
             var judged = facts.Where(f => f.Landing is not null).Select(f => f.Landing!.Verdict).ToList();
             var endings = judged.Count < NetworkReports.MinJudged ? null : new NetworkEndings(judged.Count,

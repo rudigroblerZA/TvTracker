@@ -57,8 +57,8 @@ public sealed class SeasonVerdictPublication : IInsightPublication
 
         /// <summary>The season the stored document had a verdict for, if any.</summary>
         private static int? PreviousSeason(JsonElement? previous) =>
-            previous is { } document && document.TryGetProperty("seasonVerdict", out var stored) && stored.ValueKind == JsonValueKind.Object
-                ? stored.GetProperty("number").GetInt32()
+            previous is { } document && document.TryGetProperty(InsightDocuments.Paths.SeasonVerdict, out var stored) && stored.ValueKind == JsonValueKind.Object
+                ? stored.GetProperty(InsightDocuments.Paths.Number).GetInt32()
                 : null;
     }
 }

@@ -60,7 +60,7 @@ public static class InsightsApi
         api.MapGet("/insights/tags", GetTagsAsync);
         api.MapGet("/people/{personId:guid}/insights", GetPersonInsightsAsync);
         api.MapGet("/people/{personId:guid}/fingerprint", GetCreatorFingerprintAsync).RequireFeature(FeatureFlags.CreatorFingerprint);
-        api.MapGet("/me/taste", TasteApi.GetTasteAsync);
+        api.MapTasteApi();
         api.MapEssentialCutApi();
         api.MapReunionsApi();
         api.MapTasteTwinsApi();
@@ -77,6 +77,7 @@ public static class InsightsApi
         api.MapYearInTvApi();
         api.MapWaitingRoomApi();
         api.MapServicesApi();
+        api.MapExportApi();
         api.MapCallItApi();
 
         return api;
@@ -140,16 +141,14 @@ public static class InsightsApi
 
         // Only the tags, not the whole documents.
         var rows = await db.Database
-            .SqlQuery<TagsRow>($"SELECT \"ShowId\", (\"Document\"->'tags')::text AS \"Tags\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
+            .SqlQuery<TagsRow>($"SELECT \"ShowId\", (\"Document\"->{InsightDocuments.Paths.Tags})::text AS \"Tags\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
             .ToListAsync(ct);
 
         return TypedResults.Ok(rows
             .Where(r => r.Tags is not null)
             .ToDictionary(r => r.ShowId,
-                r => (IReadOnlyList<ShowTag>)(JsonSerializer.Deserialize<List<ShowTag>>(r.Tags!, JsonOptions) ?? [])));
+                r => (IReadOnlyList<ShowTag>)(InsightDocuments.Deserialize<List<ShowTag>>(r.Tags!) ?? [])));
     }
-
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private sealed record TagsRow(Guid ShowId, string? Tags);
 

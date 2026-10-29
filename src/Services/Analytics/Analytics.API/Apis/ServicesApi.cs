@@ -49,7 +49,7 @@ public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownP
 /// or the phone never asks a third party for them (and needs no route to this service for an image).</item>
 /// <item><b>Prices</b> are estimates: US list prices of the cheapest plan, checked by hand (<see cref="NetworkServices.PricesAsOf"/>).</item>
 /// <item><b>The report</b> looks at the last 30 days of watching and the next 30 days of the user's followed shows.
-/// Bulk marks (8+ of a show's episodes at one moment, as Year in TV) say when episodes were marked, not watched, so they're
+/// Bulk marks (<see cref="CopyRules.BulkMark"/>+ of a show's episodes at one moment, as Year in TV) say when episodes were marked, not watched, so they're
 /// left out. A service with nothing watched and nothing coming is one to pause; over $2 an hour (a rental's price) is pricey.
 /// A free or unpriced service gets neither: there's no cost to weigh.</item>
 /// <item><b>The limit</b> applies only while the <c>plans</c> flag is on for the caller, as Tracking's list limits.</item>
@@ -58,7 +58,6 @@ public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownP
 public static class ServicesApi
 {
     public const int WindowDays = 30;
-    private const int BulkMark = 8;
     private const decimal PriceyPerHour = 2m;
     private const int MaxShowsListed = 5;
 
@@ -72,19 +71,6 @@ public static class ServicesApi
         api.MapGet("/me/services", GetMineAsync).RequireFeature(FeatureFlags.YourServices);
         api.MapPut("/me/services", SetMineAsync).RequireFeature(FeatureFlags.YourServices);
         api.MapGet("/me/services/report", GetReportAsync).RequireFeature(FeatureFlags.YourServices);
-
-        // The only data here the user gave us (their services and season calls; everything else is a copy of other
-        // services'), for Identity's data export.
-        api.MapGet("/me/export", async (ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct) =>
-            user.FindFirst("sub")?.Value is not { } userId
-                ? Results.Unauthorized()
-                : Results.Ok(new
-                {
-                    services = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId)
-                        .Select(s => new { s.ServiceKey, s.AddedAtUtc }).ToListAsync(ct),
-                    seasonCalls = await db.SeasonCalls.AsNoTracking().Where(c => c.UserId == userId)
-                        .Select(c => new { c.ShowId, c.SeasonNumber, c.Rating, c.CalledAtUtc, c.Actual }).ToListAsync(ct)
-                }));
     }
 
     private static async Task<Ok<ServiceDirectoryDto>> GetDirectoryAsync(HybridCache cache, IHttpClientFactory http, CancellationToken ct)
@@ -133,26 +119,20 @@ public static class ServicesApi
         return fetched.Where(f => f.Logo is not null).ToDictionary(f => f.Key, f => f.Logo!);
     }
 
-    private static async Task<Results<Ok<MyServicesDto>, UnauthorizedHttpResult>> GetMineAsync(
+    private static async Task<Ok<MyServicesDto>> GetMineAsync(
         ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
         var services = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId).Select(s => s.ServiceKey).ToListAsync(ct);
         return TypedResults.Ok(new MyServicesDto(plan, allowed, services));
     }
 
     /// <summary>Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.</summary>
-    private static async Task<Results<Ok<MyServicesDto>, UnauthorizedHttpResult, ValidationProblem, ProblemHttpResult>> SetMineAsync(
+    private static async Task<Results<Ok<MyServicesDto>, ValidationProblem, ProblemHttpResult>> SetMineAsync(
         SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
         if (!allowed)
         {
@@ -177,13 +157,10 @@ public static class ServicesApi
         return TypedResults.Ok(new MyServicesDto(plan, true, keys));
     }
 
-    private static async Task<Results<Ok<ServicesReportDto>, UnauthorizedHttpResult, ProblemHttpResult>> GetReportAsync(
+    private static async Task<Results<Ok<ServicesReportDto>, ProblemHttpResult>> GetReportAsync(
         ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
         if (!allowed)
         {
@@ -199,14 +176,14 @@ public static class ServicesApi
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= from)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, e.RuntimeMinutes })
             .ToListAsync(ct);
-        var bulk = watches.GroupBy(w => (w.ShowId, w.WatchedAtUtc)).Where(g => g.Count() >= BulkMark).Select(g => g.Key).ToHashSet();
+        var bulk = watches.GroupBy(w => (w.ShowId, w.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).Select(g => g.Key).ToHashSet();
         var watched = watches.Where(w => !bulk.Contains((w.ShowId, w.WatchedAtUtc)))
             .GroupBy(w => w.ShowId)
             .ToDictionary(g => g.Key, g => (Minutes: g.Sum(w => w.RuntimeMinutes ?? 0), Episodes: g.Count()));
 
         var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
         var coming = await db.Episodes.AsNoTracking()
-            .Where(e => followed.Contains(e.ShowId) && e.AirsAtUtc > now && e.AirsAtUtc <= until)
+            .Where(e => followed.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc > now && e.AirsAtUtc <= until)
             .GroupBy(e => e.ShowId)
             .Select(g => new { ShowId = g.Key, Episodes = g.Count(), Next = g.Min(e => e.AirsAtUtc) })
             .ToDictionaryAsync(g => g.ShowId, ct);

@@ -50,14 +50,10 @@ public static class TasteTwinsApi
     public static void MapTasteTwinsApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/taste-twins", GetTwinsAsync).RequireFeature(FeatureFlags.TasteTwins);
 
-    private static async Task<Results<Ok<TasteTwinsDto>, UnauthorizedHttpResult>> GetTwinsAsync(
+    private static async Task<Ok<TasteTwinsDto>> GetTwinsAsync(
         ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var mine = await db.ShowRatings.AsNoTracking().Where(r => r.UserId == userId).ToDictionaryAsync(r => r.ShowId, r => r.Stars, ct);
         if (mine.Count < MinRated)
         {

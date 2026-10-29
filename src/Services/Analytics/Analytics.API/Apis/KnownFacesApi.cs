@@ -41,14 +41,10 @@ public static class KnownFacesApi
     public static void MapKnownFacesApi(this RouteGroupBuilder api) =>
         api.MapGet("/shows/{showId:guid}/known-faces", GetAsync).RequireFeature(FeatureFlags.KnownFaces);
 
-    private static async Task<Results<Ok<KnownFacesDto>, UnauthorizedHttpResult>> GetAsync(
+    private static async Task<Ok<KnownFacesDto>> GetAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var cast = await db.Cast.AsNoTracking()
             .Where(c => c.ShowId == showId && c.PersonId != null)
             .OrderBy(c => c.Order)
@@ -73,7 +69,7 @@ public static class KnownFacesApi
         var fromIds = elsewhere.SelectMany(g => g).Select(c => c.ShowId).Distinct().ToList();
 
         var shows = await db.Shows.AsNoTracking().Where(s => fromIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
-        var progress = await ProgressAsync(db, userId, fromIds, time.GetUtcNow(), ct);
+        var progress = await Viewer.ProgressAsync(db, userId, time.GetUtcNow(), fromIds, ct);
         var ratedSet = rated.ToHashSet();
 
         var people = cast
@@ -84,10 +80,11 @@ public static class KnownFacesApi
                     .DistinctBy(c => c.ShowId)
                     .Select(c =>
                     {
-                        var (watched, aired, lastSeen) = progress.GetValueOrDefault(c.ShowId);
+                        var p = progress.GetValueOrDefault(c.ShowId);
                         var show = shows[c.ShowId];
-                        return new KnownFromDto(c.ShowId, show.Title, show.PosterUrl, c.Character, watched, aired,
-                            lastSeen || watched == 0 && ratedSet.Contains(c.ShowId));
+                        // Caught up is the latest episode rather than every one, since people skip the odd episode.
+                        return new KnownFromDto(c.ShowId, show.Title, show.PosterUrl, c.Character, p?.Watched ?? 0, p?.Aired ?? 0,
+                            p?.LatestWatched == true || p?.Watched is null or 0 && ratedSet.Contains(c.ShowId));
                     })
                     .OrderByDescending(f => f.CaughtUp)
                     .ThenByDescending(f => f.Watched)
@@ -97,29 +94,5 @@ public static class KnownFacesApi
             .ToList();
 
         return TypedResults.Ok(new KnownFacesDto(showId, personIds.Count, people));
-    }
-
-    /// <summary>
-    /// Per show: regular episodes watched and aired, and whether the latest aired one is watched (season 0 left out, as
-    /// Tracking does). Caught up is the latest episode rather than every one, since people skip the odd episode.
-    /// </summary>
-    private static async Task<Dictionary<Guid, (int Watched, int Aired, bool CaughtUp)>> ProgressAsync(
-        AnalyticsContext db, string userId, List<Guid> showIds, DateTimeOffset now, CancellationToken ct)
-    {
-        var aired = await db.Episodes.AsNoTracking()
-            .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
-            .Select(e => new { e.EpisodeId, e.ShowId, e.SeasonNumber, e.EpisodeNumber })
-            .ToListAsync(ct);
-        var watched = (await db.Watches.AsNoTracking()
-                .Where(w => w.UserId == userId && showIds.Contains(w.ShowId))
-                .Select(w => w.EpisodeId)
-                .ToListAsync(ct))
-            .ToHashSet();
-
-        return aired.GroupBy(e => e.ShowId).ToDictionary(g => g.Key, g =>
-        {
-            var latest = g.MaxBy(e => (e.SeasonNumber, e.EpisodeNumber))!;
-            return (g.Count(e => watched.Contains(e.EpisodeId)), g.Count(), watched.Contains(latest.EpisodeId));
-        });
     }
 }

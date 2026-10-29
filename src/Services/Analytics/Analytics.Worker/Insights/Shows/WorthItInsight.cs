@@ -1,6 +1,8 @@
 using Analytics.Data;
 using TvTracker.IntegrationEvents;
 
+using static Analytics.Worker.Insights.InsightMath;
+
 namespace Analytics.Worker.Insights;
 
 /// <summary>
@@ -85,7 +87,7 @@ public sealed class WorthItInsight : IShowInsight
         var value = InsightMath.Round(rating + factors.Sum(f => f.Points));
         var score = WorthItScale.Score(value);
         return new WorthIt(score, WorthItScale.Verdict(score), rating, value, factors, insights.Run.RuntimeMinutes,
-            show.Show.Status != ShowStatus.Ended);
+            !show.Show.HasEnded());
     }
 
     /// <summary>The ending's points, as the backlog and time off weigh it (Analytics.API's ShowValue).</summary>
@@ -99,5 +101,4 @@ public sealed class WorthItInsight : IShowInsight
         _ => null
     };
 
-    private static string Hours(int minutes) => minutes < 120 ? $"{minutes} min" : $"{Math.Round(minutes / 60.0):N0} h";
 }

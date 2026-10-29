@@ -40,17 +40,17 @@ public static class SeasonVerdictsApi
         var rows = await db.Database
             .SqlQuery<VerdictRow>($"""
                 SELECT "ShowId", "Title", "Verdict"::text AS "Verdict"
-                FROM (SELECT "ShowId", "Document"->>'title' AS "Title", "Document"->'seasonVerdict' AS "Verdict"
+                FROM (SELECT "ShowId", "Document"->>{InsightDocuments.Paths.Title} AS "Title", "Document"->{InsightDocuments.Paths.SeasonVerdict} AS "Verdict"
                       FROM show_insights) v
                 WHERE jsonb_typeof("Verdict") = 'object'
-                  AND ("Verdict"->>'finaleAiredAtUtc')::timestamptz >= {since}
-                ORDER BY ("Verdict"->>'finaleAiredAtUtc')::timestamptz DESC
+                  AND ("Verdict"->>{InsightDocuments.Paths.FinaleAiredAtUtc})::timestamptz >= {since}
+                ORDER BY ("Verdict"->>{InsightDocuments.Paths.FinaleAiredAtUtc})::timestamptz DESC
                 LIMIT {take}
                 """)
             .ToListAsync(ct);
 
         return rows
-            .Select(r => new SeasonVerdictItem(r.ShowId, r.Title, JsonSerializer.Deserialize<SeasonVerdict>(r.Verdict, JsonSerializerOptions.Web)!))
+            .Select(r => new SeasonVerdictItem(r.ShowId, r.Title, InsightDocuments.Deserialize<SeasonVerdict>(r.Verdict)!))
             .ToList();
     }
 

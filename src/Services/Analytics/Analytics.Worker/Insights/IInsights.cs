@@ -1,6 +1,9 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using TvTracker.EventBus;
 
 namespace Analytics.Worker.Insights;
@@ -46,24 +49,113 @@ public abstract class ListBuilder
     public abstract void Add(ShowInsightContext show, ShowInsights insights);
 
     /// <summary>
-    /// Deletes the table's rows and adds the new ones. Runs inside the pipeline's transaction, which saves and
-    /// commits every list together, so readers never see a list empty mid-refresh.
+    /// Makes the table's rows the new ones. Runs inside the pipeline's transaction, which saves and commits every
+    /// list together, so readers never see a list empty mid-refresh.
     /// </summary>
     public abstract Task ReplaceAsync(AnalyticsContext db, CancellationToken ct);
 }
 
-/// <summary>A list stored in one table, replaced whole each run.</summary>
+/// <summary>
+/// A list stored in one table. Each run's rows are compared with the stored ones by primary key: changed rows are
+/// updated, new ones added, missing ones deleted, and an unchanged row isn't written at all. Deleting and re-inserting
+/// every row each hour (~15,000 across the lists, most of them the same hour to hour) left Postgres a table's worth
+/// of dead tuples per run for autovacuum to clear. "Computed at" stamps (on the row and inside its document) are left
+/// out of the comparison, so a row whose values haven't moved keeps the time they were last computed. A jsonb document
+/// is compared as JSON with its keys sorted: Postgres stores jsonb in its own key order and spacing, so the text read
+/// back never equals the compact text written (which made every document look changed).
+/// </summary>
 public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> table) : ListBuilder where TRow : class
 {
+    private static readonly JsonSerializerOptions Comparison = new(JsonSerializerDefaults.Web);
+
+    private const string ComputedAt = "ComputedAtUtc";
+
+    /// <summary>The row's values as one comparable string: every mapped property but the computed-at stamp, documents canonical.</summary>
+    private static string Comparable(TRow row, IEnumerable<IProperty> properties)
+    {
+        var text = new StringBuilder();
+        foreach (var property in properties.OrderBy(p => p.Name, StringComparer.Ordinal))
+        {
+            if (property.Name.Equals(ComputedAt, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            var value = property.PropertyInfo!.GetValue(row);
+            text.Append(property.Name).Append('=');
+            if (property.GetColumnType() == "jsonb" && value is string json)
+            {
+                Canonical(JsonNode.Parse(json), text);
+            }
+            else
+            {
+                text.Append(JsonSerializer.Serialize(value, Comparison));
+            }
+            text.Append(';');
+        }
+        return text.ToString();
+    }
+
+    /// <summary>Compact JSON with object keys sorted, computed-at stamps left out at any depth.</summary>
+    private static void Canonical(JsonNode? node, StringBuilder text)
+    {
+        switch (node)
+        {
+            case JsonObject o:
+                text.Append('{');
+                foreach (var (key, value) in o.Where(p => !p.Key.Equals(ComputedAt, StringComparison.OrdinalIgnoreCase)).OrderBy(p => p.Key, StringComparer.Ordinal))
+                {
+                    text.Append(key).Append(':');
+                    Canonical(value, text);
+                    text.Append(',');
+                }
+                text.Append('}');
+                break;
+            case JsonArray a:
+                text.Append('[');
+                foreach (var item in a)
+                {
+                    Canonical(item, text);
+                    text.Append(',');
+                }
+                text.Append(']');
+                break;
+            default:
+                text.Append(node?.ToJsonString() ?? "null");
+                break;
+        }
+    }
+
     /// <summary>The rows to store, once every show has been added.</summary>
     protected abstract IReadOnlyCollection<TRow> Rows();
 
     public override async Task ReplaceAsync(AnalyticsContext db, CancellationToken ct)
     {
         var rows = Rows();
-        await table(db).ExecuteDeleteAsync(ct);
-        table(db).AddRange(rows);
-        Count = rows.Count;
+        var entity = db.Model.FindEntityType(typeof(TRow))!;
+        var key = entity.FindPrimaryKey()!.Properties;
+        var properties = entity.GetProperties().ToList();
+        string KeyOf(TRow row) => string.Join('|', key.Select(p => p.PropertyInfo!.GetValue(row)));
+
+        var stored = (await table(db).ToListAsync(ct)).ToDictionary(KeyOf);
+        var seen = new HashSet<string>();
+        foreach (var row in rows)
+        {
+            var k = KeyOf(row);
+            if (!seen.Add(k))
+            {
+                continue;
+            }
+            if (!stored.TryGetValue(k, out var existing))
+            {
+                table(db).Add(row);
+            }
+            else if (Comparable(existing, properties) != Comparable(row, properties))
+            {
+                db.Entry(existing).CurrentValues.SetValues(row);
+            }
+        }
+        table(db).RemoveRange(stored.Where(s => !seen.Contains(s.Key)).Select(s => s.Value));
+        Count = seen.Count;
     }
 }
 

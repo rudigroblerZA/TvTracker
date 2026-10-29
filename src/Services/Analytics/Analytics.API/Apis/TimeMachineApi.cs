@@ -57,7 +57,8 @@ public static class TimeMachineApi
 
     private static readonly DateOnly Earliest = new(1950, 1, 1);
 
-    private static readonly HybridCacheEntryOptions CacheFor = new() { Expiration = TimeSpan.FromHours(1), LocalCacheExpiration = TimeSpan.FromHours(1) };
+    /// <summary>The key carries the day and time zone, so a day's answer can stay the day.</summary>
+    private static readonly HybridCacheEntryOptions CacheFor = new() { Expiration = TimeSpan.FromHours(24), LocalCacheExpiration = TimeSpan.FromHours(24) };
 
     public static void MapTimeMachineApi(this RouteGroupBuilder api) =>
         api.MapGet("/insights/time-machine", GetAsync).RequireFeature(FeatureFlags.TimeMachine);

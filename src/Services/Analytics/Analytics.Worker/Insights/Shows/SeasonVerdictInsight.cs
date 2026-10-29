@@ -95,7 +95,7 @@ public sealed class SeasonVerdictInsight : IShowInsight
     {
         var number = episodes[0].SeasonNumber;
         var finale = episodes[^1].AirsAtUtc!.Value;
-        var said = show.Show.Status is ShowStatus.Ended or ShowStatus.Cancelled
+        var said = show.Show.HasEnded()
             || show.Episodes.Any(e => e.SeasonNumber > number)
             || show.Sources.AnnouncedSeasons[show.ShowId].Any(a => a.SeasonNumber > number)
             || episodes.Count > 1 && show.ReleaseDays(number).Count == 1;

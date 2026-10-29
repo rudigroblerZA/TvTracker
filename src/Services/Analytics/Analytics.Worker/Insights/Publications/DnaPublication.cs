@@ -19,8 +19,8 @@ public sealed class DnaPublication : IInsightPublication
 
         /// <summary>Documents from before DNA have none; a show that now has DNA is then sent.</summary>
         protected override ShowDnaValues PreviousValueOf(JsonElement document) =>
-            new(Guid.Empty, document.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object
-                ? dna.GetProperty("traits").EnumerateArray().ToDictionary(t => t.GetProperty("key").GetString()!, t => t.GetProperty("value").GetDouble())
+            new(Guid.Empty, document.TryGetProperty(InsightDocuments.Paths.Dna, out var dna) && dna.ValueKind == JsonValueKind.Object
+                ? dna.GetProperty(InsightDocuments.Paths.Traits).EnumerateArray().ToDictionary(t => t.GetProperty(InsightDocuments.Paths.Key).GetString()!, t => t.GetProperty(InsightDocuments.Paths.Value).GetDouble())
                 : new Dictionary<string, double>());
 
         protected override bool Same(ShowDnaValues previous, ShowDnaValues current) =>

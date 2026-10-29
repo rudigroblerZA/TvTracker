@@ -69,7 +69,7 @@ public sealed class PersonInsightsList : IListInsight
                     return new PersonInsightsRow
                     {
                         PersonId = person.Key,
-                        Document = JsonSerializer.Serialize(insights, InsightsPipeline.JsonOptions),
+                        Document = InsightDocuments.Serialize(insights),
                         ComputedAtUtc = sources.ComputedAtUtc
                     };
                 })

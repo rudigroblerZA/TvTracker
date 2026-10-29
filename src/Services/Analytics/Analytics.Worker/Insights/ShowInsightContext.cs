@@ -37,7 +37,14 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     /// <summary>Every episode, including those still to air.</summary>
     public List<EpisodeCopy> Episodes => episodes;
 
+    /// <summary>Every aired episode, specials included (season 0).</summary>
     public List<EpisodeCopy> Aired { get; } = episodes.Where(e => e.AirsAtUtc <= sources.Now).ToList();
+
+    /// <summary>
+    /// Aired regular episodes: specials left out, as Tracking's progress and every on-request endpoint count. What a
+    /// show's run, tags and completion are measured over.
+    /// </summary>
+    public List<EpisodeCopy> RegularAired => field ??= Aired.Where(e => e.SeasonNumber > 0).ToList();
 
     /// <summary>Aired episodes with a provider rating.</summary>
     public List<EpisodeCopy> RatedAired => field ??= Aired.Where(e => e.ExternalRating is not null).ToList();
@@ -71,6 +78,9 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
 
     public IReadOnlyList<SeasonStats> SeasonStats => field ??= Seasons.Select(s => s.Stats).ToList();
 
+    /// <summary>The regular seasons' stats (season 0 left out).</summary>
+    public IReadOnlyList<SeasonStats> RegularSeasonStats => field ??= SeasonStats.Where(s => s.Number > 0).ToList();
+
     /// <summary>
     /// The provider's ratings of the seasons that count (<see cref="SeasonSummary.RatingCounts"/>), in season order:
     /// the points behind the trend, the arc and the DNA's trajectory and peak.
@@ -91,20 +101,19 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     /// Least-squares slope of <see cref="RatedSeasons"/>' ratings against their order (rating points per season); null
     /// with fewer than three.
     /// </summary>
-    public double? SeasonSlope
-    {
-        get
-        {
-            var points = RatedSeasons.Select((s, i) => (X: (double)i, Y: s.Rating)).ToList();
-            if (points.Count < 3)
-            {
-                return null;
-            }
+    public double? SeasonSlope => field ??= Slope();
 
-            var meanX = points.Average(p => p.X);
-            var meanY = points.Average(p => p.Y);
-            return points.Sum(p => (p.X - meanX) * (p.Y - meanY)) / points.Sum(p => (p.X - meanX) * (p.X - meanX));
+    private double? Slope()
+    {
+        var points = RatedSeasons.Select((s, i) => (X: (double)i, Y: s.Rating)).ToList();
+        if (points.Count < 3)
+        {
+            return null;
         }
+
+        var meanX = points.Average(p => p.X);
+        var meanY = points.Average(p => p.Y);
+        return points.Sum(p => (p.X - meanX) * (p.Y - meanY)) / points.Sum(p => (p.X - meanX) * (p.X - meanX));
     }
 
     /// <summary>

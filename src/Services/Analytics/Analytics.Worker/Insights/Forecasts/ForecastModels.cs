@@ -32,7 +32,7 @@ public sealed class ForecastModels
     }
 
     /// <summary>A show that has ended gets no forecasts.</summary>
-    public static bool Running(ShowCopy show) => show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled);
+    public static bool Running(ShowCopy show) => !show.HasEnded();
 
     /// <summary>The value below which a share <paramref name="q"/> of the sorted values fall.</summary>
     internal static double Quantile(IReadOnlyList<double> sorted, double q) => sorted[(int)Math.Clamp(q * (sorted.Count - 1), 0, sorted.Count - 1)];

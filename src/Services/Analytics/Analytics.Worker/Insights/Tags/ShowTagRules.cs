@@ -13,7 +13,7 @@ public sealed class DropsAtOnceRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
-        var latestFull = show.SeasonStats.LastOrDefault(s => s.AiredCount > 0 && s.AiredCount == s.EpisodeCount && s.AiredCount >= 3);
+        var latestFull = show.RegularSeasonStats.LastOrDefault(IsFull);
         if (latestFull is null)
         {
             return null;
@@ -26,10 +26,21 @@ public sealed class DropsAtOnceRule : IShowTagRule
                 $"Season {latestFull.Number}: all {latestFull.AiredCount} episodes on {days[0]:d MMM yyyy}");
         }
 
-        return days.Count <= ShowTags.MaxDropDays && latestFull.AiredCount >= 2 * days.Count
+        return IsDrop(latestFull, days)
             ? new ShowTag(ShowTags.DropsAtOnce, "Drops in parts", $"Season {latestFull.Number}: {latestFull.AiredCount} episodes in {days.Count} drops")
             : null;
     }
+
+    /// <summary>A season the rule can judge: fully aired, three or more episodes.</summary>
+    public static bool IsFull(SeasonStats season) => season.AiredCount > 0 && season.AiredCount == season.EpisodeCount && season.AiredCount >= 3;
+
+    /// <summary>
+    /// Whether a full season came out at once or in a few batches: one release day, or at most
+    /// <see cref="ShowTags.MaxDropDays"/> days with two or more episodes each on average. Shared with the DNA's
+    /// release trait, so both read a release the same way.
+    /// </summary>
+    public static bool IsDrop(SeasonStats season, IReadOnlyList<DateTime> releaseDays) =>
+        releaseDays.Count == 1 || releaseDays.Count <= ShowTags.MaxDropDays && season.AiredCount >= 2 * releaseDays.Count;
 }
 
 /// <summary>Short seasons, not too long in all, with nothing left to air (see <see cref="ShowTags.Bingeable"/>).</summary>
@@ -37,8 +48,8 @@ public sealed class BingeableRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
-        var aired = show.Aired;
-        var airedSeasons = show.SeasonStats.Count(s => s.AiredCount > 0);
+        var aired = show.RegularAired;
+        var airedSeasons = show.RegularSeasonStats.Count(s => s.AiredCount > 0);
         var runtime = aired.Sum(e => e.RuntimeMinutes ?? 0);
         var perSeason = airedSeasons == 0 ? 0 : (double)aired.Count / airedSeasons;
         if (!AllOut(show) || perSeason > ShowTags.BingeableMaxEpisodesPerSeason || runtime > ShowTags.BingeableMaxMinutes)
@@ -54,7 +65,8 @@ public sealed class BingeableRule : IShowTagRule
 
     /// <summary>Everything announced so far has aired (no season part-way through), and there are a few episodes.</summary>
     public static bool AllOut(ShowInsightContext show) =>
-        show.SeasonStats.Any(s => s.AiredCount > 0) && show.SeasonStats.All(s => s.AiredCount == s.EpisodeCount) && show.Aired.Count >= 3;
+        show.RegularSeasonStats.Any(s => s.AiredCount > 0) && show.RegularSeasonStats.All(s => s.AiredCount == s.EpisodeCount)
+        && show.RegularAired.Count >= 3;
 }
 
 /// <summary>Everything aired fits in <see cref="ShowTags.WeekendBingeMaxMinutes"/>, with nothing left to air.</summary>
@@ -62,7 +74,7 @@ public sealed class WeekendBingeRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
-        var runtime = show.Aired.Sum(e => e.RuntimeMinutes ?? 0);
+        var runtime = show.RegularAired.Sum(e => e.RuntimeMinutes ?? 0);
         return BingeableRule.AllOut(show) && runtime is > 0 and <= ShowTags.WeekendBingeMaxMinutes
             ? new ShowTag(ShowTags.WeekendBinge, "Weekend binge", $"All of it in {Hours(runtime)}")
             : null;
@@ -90,8 +102,8 @@ public sealed class FanFavoriteRule(Branding brand) : IShowTagRule
 public sealed class LimitedSeriesRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show) =>
-        show.SeasonStats.Count(s => s.AiredCount > 0) == 1 && show.Show.Status is ShowStatus.Ended or ShowStatus.Cancelled
-            ? new ShowTag(ShowTags.LimitedSeries, "Limited series", $"One season, {show.Aired.Count} episodes")
+        show.RegularSeasonStats.Count(s => s.AiredCount > 0) == 1 && show.Show.HasEnded()
+            ? new ShowTag(ShowTags.LimitedSeries, "Limited series", $"One season, {show.RegularAired.Count} episodes")
             : null;
 }
 
@@ -100,7 +112,7 @@ public sealed class QuickEpisodesRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
-        var runtimes = show.Aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
+        var runtimes = show.RegularAired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
         return runtimes.Count > 0 && runtimes[runtimes.Count / 2] <= ShowTags.QuickEpisodeMaxMinutes
             ? new ShowTag(ShowTags.QuickEpisodes, "Quick episodes", $"About {runtimes[runtimes.Count / 2]} min each")
             : null;
@@ -112,13 +124,13 @@ public sealed class LongRunningRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
-        var seasons = show.SeasonStats.Count(s => s.AiredCount > 0);
+        var seasons = show.RegularSeasonStats.Count(s => s.AiredCount > 0);
         if (seasons < ShowTags.LongRunningMinSeasons)
         {
             return null;
         }
 
-        var since = show.Aired.Min(e => e.AirsAtUtc)?.Year;
+        var since = show.RegularAired.Min(e => e.AirsAtUtc)?.Year;
         return new ShowTag(ShowTags.LongRunning, "Long-running", since is null ? $"{seasons} seasons" : $"{seasons} seasons since {since}");
     }
 }

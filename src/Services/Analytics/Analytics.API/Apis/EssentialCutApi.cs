@@ -155,20 +155,30 @@ public static class EssentialCutApi
         db.EpisodeNotes.AsNoTracking().Where(n => n.ShowId == showId).ToDictionaryAsync(n => n.EpisodeId, ct);
 
     /// <summary>The ratings the cut goes by: the provider's, averaged with our users' once enough rated an episode.</summary>
-    internal static async Task<Func<EpisodeCopy, double?>> RatingsAsync(AnalyticsContext db, Guid showId, CancellationToken ct)
+    internal static async Task<Func<EpisodeCopy, double?>> RatingsAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
+        (await RatingsAsync(db, [showId], ct))(showId);
+
+    /// <summary>The same, for several shows in one query: a rating function per show.</summary>
+    internal static async Task<Func<Guid, Func<EpisodeCopy, double?>>> RatingsAsync(AnalyticsContext db, IReadOnlyCollection<Guid> showIds,
+        CancellationToken ct)
     {
-        var ours = await db.EpisodeRatings.AsNoTracking()
-            .Where(r => r.ShowId == showId)
-            .GroupBy(r => r.EpisodeId)
-            .Where(g => g.Count() >= InsightRules.MinRatingsToShow)
-            .Select(g => new { EpisodeId = g.Key, Average = g.Average(r => r.Stars * 2.0) })
-            .ToDictionaryAsync(g => g.EpisodeId, g => g.Average, ct);
-        return e => (e.ExternalRating, ours.TryGetValue(e.EpisodeId, out var mine) ? mine : (double?)null) switch
+        var ours = (await db.EpisodeRatings.AsNoTracking()
+                .Where(r => showIds.Contains(r.ShowId))
+                .GroupBy(r => new { r.ShowId, r.EpisodeId })
+                .Where(g => g.Count() >= InsightRules.MinRatingsToShow)
+                .Select(g => new { g.Key.ShowId, g.Key.EpisodeId, Average = g.Average(r => r.Stars * 2.0) })
+                .ToListAsync(ct))
+            .ToLookup(g => g.ShowId);
+        return showId =>
         {
-            ({ } theirs, { } us) => Math.Round((theirs + us) / 2, 1),
-            ({ } theirs, null) => theirs,
-            (null, { } us) => Math.Round(us, 1),
-            _ => null
+            var mine = ours[showId].ToDictionary(g => g.EpisodeId, g => g.Average);
+            return e => (e.ExternalRating, mine.TryGetValue(e.EpisodeId, out var us) ? us : (double?)null) switch
+            {
+                ({ } theirs, { } ours) => Math.Round((theirs + ours) / 2, 1),
+                ({ } theirs, null) => theirs,
+                (null, { } ours) => Math.Round(ours, 1),
+                _ => null
+            };
         };
     }
 

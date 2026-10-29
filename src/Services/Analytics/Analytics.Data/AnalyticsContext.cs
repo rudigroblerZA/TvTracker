@@ -96,7 +96,8 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
         {
             entity.ToTable("cast_credits");
             entity.HasKey(c => new { c.ShowId, c.PersonName });
-            entity.HasIndex(c => c.PersonName);
+            // Known faces looks a viewer's actors up by id; nothing filters by name (the worker loads the table whole).
+            entity.HasIndex(c => c.PersonId).HasFilter("\"PersonId\" IS NOT NULL");
             entity.Property(c => c.PersonName).HasMaxLength(256);
             entity.Property(c => c.Character).HasMaxLength(256);
         });

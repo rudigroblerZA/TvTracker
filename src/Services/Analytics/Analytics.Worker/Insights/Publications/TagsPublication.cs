@@ -19,8 +19,8 @@ public sealed class TagsPublication : IInsightPublication
 
         /// <summary>No tags in documents from before tags.</summary>
         protected override ShowTagKeys PreviousValueOf(JsonElement document) =>
-            new(Guid.Empty, document.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
-                ? tags.EnumerateArray().Select(t => t.GetProperty("key").GetString()!).ToList()
+            new(Guid.Empty, document.TryGetProperty(InsightDocuments.Paths.Tags, out var tags) && tags.ValueKind == JsonValueKind.Array
+                ? tags.EnumerateArray().Select(t => t.GetProperty(InsightDocuments.Paths.Key).GetString()!).ToList()
                 : []);
 
         protected override bool Same(ShowTagKeys previous, ShowTagKeys current) => previous.Tags.SequenceEqual(current.Tags);

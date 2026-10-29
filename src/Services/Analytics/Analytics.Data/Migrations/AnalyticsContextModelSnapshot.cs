@@ -64,7 +64,8 @@ namespace Analytics.Data.Migrations
 
                     b.HasKey("ShowId", "PersonName");
 
-                    b.HasIndex("PersonName");
+                    b.HasIndex("PersonId")
+                        .HasFilter("\"PersonId\" IS NOT NULL");
 
                     b.ToTable("cast_credits", (string)null);
                 });
@@ -565,6 +566,9 @@ namespace Analytics.Data.Migrations
 
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");

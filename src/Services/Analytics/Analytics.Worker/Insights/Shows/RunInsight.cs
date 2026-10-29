@@ -2,13 +2,16 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>How long the show has run: seasons, episodes, hours, first and last air dates, and its longest break.</summary>
+/// <summary>
+/// How long the show has run: seasons, episodes, hours, first and last air dates, and its longest break. Regular
+/// episodes only: a Christmas special is neither a season nor part of the run's length.
+/// </summary>
 public sealed class RunInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
     {
-        var aired = show.Aired;
-        var airedSeasons = show.SeasonStats.Where(s => s.AiredCount > 0).ToList();
+        var aired = show.RegularAired;
+        var airedSeasons = show.RegularSeasonStats.Where(s => s.AiredCount > 0).ToList();
 
         SeasonBreak? longest = null;
         foreach (var (previous, next) in airedSeasons.Zip(airedSeasons.Skip(1)))
