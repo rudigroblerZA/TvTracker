@@ -1,0 +1,147 @@
+@page "/settings/family"
+@attribute [RequiresFeature(FeatureFlags.FamilyPlan)]
+@inject IdentityClient Identity
+@inject IPlatformServices Platform
+
+<PageTitle>Your family · @Brand.AppName</PageTitle>
+
+<p><a href="settings/plan">← Your plan</a></p>
+<h1>Your family</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (family is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (family.Role == "member")
+        {
+            <p>
+                You're in <strong>@family.OwnerName</strong>'s family.
+                @(family.Active ? $"You get {Plans.Name(Plans.Family)}'s benefits from their plan." : $"Their {Plans.Name(Plans.Family)} plan has ended, so it gives you nothing for now.")
+            </p>
+            @Members(false)
+            <p><button class="btn btn-quiet" type="button" @onclick="LeaveAsync">Leave this family</button></p>
+            <p class="muted small">If you leave, anything you made stays yours, as with any change of plan.</p>
+        }
+        else if (family.Role == "owner")
+        {
+            <p>
+                Your @Plans.Name(Plans.Family) plan covers you and up to @family.Seats people you invite. They get the same
+                benefits as @Plans.Name(Plans.Plus), with their own lists, ratings and watches.
+            </p>
+            @if (!family.Active)
+            {
+                <p class="notice">@($"You're not on the {Plans.Name(Plans.Family)} plan now, so your family gets nothing from it until you are.")</p>
+            }
+            <h2>@($"Members ({family.Members.Count} of {family.Seats})")</h2>
+            @Members(true)
+
+            <h2>Invite</h2>
+            @if (family.InviteToken is { } token)
+            {
+                <div class="list-link small">
+                    <span class="muted">@("Anyone with this link can join while there's room: ")</span>
+                    <input class="list-link-url" readonly value="@LinkFor(token)" aria-label="Your family's invite link" />
+                    <button class="btn btn-quiet small" type="button" @onclick="() => ShareAsync(token)">@(copied ? "Copied" : "Share link")</button>
+                    <button class="link small" type="button" @onclick="TurnOffInvitesAsync">Turn off invites</button>
+                </div>
+            }
+            else if (family.Active && family.Members.Count < family.Seats)
+            {
+                <p><button class="btn" type="button" @onclick="CreateInviteAsync">Get an invite link</button></p>
+            }
+        }
+        else
+        {
+            <p>
+                A @Plans.Name(Plans.Family) plan is one subscription for up to @(Plans.FamilyMembers + 1) people. To join one,
+                open the invite link its owner sends you.
+            </p>
+            <p><a href="settings/plan">See plans</a></p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private FamilyInfo? family;
+    private string? error;
+    private bool copied;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            family = await Identity.GetFamilyAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private RenderFragment Members(bool owner) => __builder =>
+    {
+        if (family!.Members.Count == 0)
+        {
+            <p class="muted">Nobody yet.</p>
+            return;
+        }
+        <ul class="plan-users">
+            @foreach (var member in family.Members)
+            {
+                <li class="panel" @key="@(member.UserId ?? member.DisplayName)">
+                    <div>
+                        <div class="strong">@member.DisplayName</div>
+                        <div class="muted small">@($"Joined {member.JoinedAtUtc:d MMM yyyy}")</div>
+                    </div>
+                    @if (owner && member.UserId is { } id)
+                    {
+                        <button class="link small" type="button" @onclick="() => RemoveAsync(id)">Remove</button>
+                    }
+                </li>
+            }
+        </ul>
+    };
+
+    private string LinkFor(string token) => $"{Platform.PublicWebAddress}family/join/{token}";
+
+    private Task CreateInviteAsync() => RunAsync(() => Identity.CreateFamilyInviteAsync());
+
+    private Task TurnOffInvitesAsync() => RunAsync(async () =>
+    {
+        await Identity.DeleteFamilyInviteAsync();
+        copied = false;
+    });
+
+    private Task RemoveAsync(string userId) => RunAsync(() => Identity.RemoveFamilyMemberAsync(userId));
+
+    private Task LeaveAsync() => RunAsync(() => Identity.LeaveFamilyAsync());
+
+    private async Task ShareAsync(string token) =>
+        copied = await Platform.ShareLinkAsync($"Join my {Plans.Name(Plans.Family)} plan on {Brand.AppName}", LinkFor(token));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

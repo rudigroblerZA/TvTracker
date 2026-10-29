@@ -247,7 +247,8 @@ identityApi
     .WithReference(ratingsApi)
     .WithReference(recommendationsApi)
     .WithReference(notificationsApi)
-    .WithReference(socialApi);
+    .WithReference(socialApi)
+    .WithReference(analyticsApi);
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.

@@ -435,6 +435,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `your-services` | Logos and prices on network report cards, `/services`, and its endpoints |
+| `family-plan` | The Family plan's invites and members: `/settings/family`, `/family/join/{token}`, and their endpoints |
 | `list-links` | A list's link (`/l/{token}`), its section on the list page, and its endpoints |
 | `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
@@ -470,10 +472,22 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 ### Plans
 
-Free and Plus, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
+Free, Plus and Family, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
 
-- **Free:** up to 3 lists. **Plus:** as many lists as you like (up to the service's cap of 100). Both can share lists,
-  on their profile and by link; sharing was Plus-only at first and opened to everyone, since shared lists bring people in.
+- **Free:** up to 3 lists. **Plus:** as many lists as you like (up to the service's cap of 100), and Your services.
+  Every plan can share lists, on its profile and by link; sharing was Plus-only at first and opened to everyone, since
+  shared lists bring people in.
+- **Family** (`family-plan` flag): Plus for the owner and up to 5 people they invite, on one subscription.
+  - **Inviting:** `/settings/family` gives the owner an invite link (`/family/join/{token}`), which they can share or
+    turn off. Whoever opens it signs in (or signs up) and joins while there's room.
+  - **Members** get Plus's benefits while the owner pays for Family, with their own lists, ratings and watches; the
+    owner sees only their names. A person is in one family at most; an owner with members can't join another.
+  - **Leaving:** a member can leave, the owner can remove them, and a family ends when its owner stops paying for it or
+    deletes their account. Anything made on the plan stays, as with any downgrade.
+  - **API** (Identity): `GET /api/v1/me/family`, `POST`/`DELETE /api/v1/me/family/invite`,
+    `DELETE /api/v1/me/family/members/{userId}`, `DELETE /api/v1/me/family/membership`,
+    `GET /api/v1/family/invites/{token}` and `POST /api/v1/family/join` (`{"token":…}`; 409 with the reason when the
+    family is full, ended, or you're in another).
 - **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit, and `/settings/plan`
   compares the plans and shows yours. Sharing still goes through the plan's `ShareLists`, so a plan can take it away
   again without new plumbing.
@@ -862,7 +876,22 @@ How events flow:
     shows and great endings. Each figure is set against the whole catalog (green when clearly better, red when clearly
     worse), and the cards sort by any of them.
     - **From the provider's data,** recomputed hourly, so nothing about our users is in it.
+    - **Logos and prices** (`your-services` flag): each card shows the logo of the service the network's shows are on
+      and its estimated price ("On Paramount+ · from $8.99 a month · free over the air in the US"), and "You have it"
+      for services you've picked. Prices are the cheapest US plan, checked by hand (October 2026, from
+      [Stream-Wiser](https://stream-wiser.com/prices)); MGM+ and discovery+ are shown without one, since it couldn't
+      be confirmed. Directory: `NetworkServices` in IntegrationEvents.
     - **API:** `GET /api/v1/insights/networks` on Analytics.API, signed in (`baseline` is the whole catalog).
+  - **Your services** (`/services`, from the report cards; Plus and Family; `your-services` flag): pick the streaming
+    services you pay for.
+    - **The report:** your monthly total, and per service the hours you watched on it in the last 30 days, its cost per
+      hour, the shows behind them, and the shows you follow with episodes on it in the next 30 days.
+    - **Verdicts:** good value (up to $2 an hour, a rental's price), pricey (more), quiet (nothing watched, but your
+      shows are coming) and could pause (nothing watched, nothing coming).
+    - **Not on your services:** services you haven't picked that have your followed shows coming.
+    - **Bulk marks** (8+ of a show's episodes at once) aren't counted as watching, as in Year in TV.
+    - **API** (Analytics.API): `GET /api/v1/networks/services` (directory, prices and logos), `GET`/`PUT
+      /api/v1/me/services`, `GET /api/v1/me/services/report`. Free gets 403 `plan-limit` on saving and the report.
   - **Year in TV** (`/year`, linked from Stats; `year-in-tv` flag): your year of viewing, any year you watched in.
     - **What's in it:** hours, episodes, shows (and how many were new to you), days with TV and your longest run of
       days, your busiest month and biggest day, most watched shows, time by genre, the network you watched most,

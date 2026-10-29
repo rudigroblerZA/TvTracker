@@ -561,6 +561,43 @@ namespace Analytics.Data.Migrations
                     b.ToTable("user_follows", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.UserPlanCopy", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_plans", (string)null);
+                });
+
+            modelBuilder.Entity("Analytics.Data.UserService", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ServiceKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("AddedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "ServiceKey");
+
+                    b.ToTable("user_services", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.UserShowRating", b =>
                 {
                     b.Property<string>("UserId")
