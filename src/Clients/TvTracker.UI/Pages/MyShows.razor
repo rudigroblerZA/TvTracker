@@ -7,6 +7,9 @@
 
 <AuthorizeView>
     <Authorized>
+        <div class="tool-links">
+            <ToolLink Href="lists" Title="Lists">Your own lists of shows, to keep or share.</ToolLink>
+        </div>
         <div class="tabs" role="tablist">
             <button role="tab" class="@(filter is null ? "active" : "")" @onclick="() => SetFilterAsync(null)">All</button>
             @foreach (var status in Enum.GetValues<WatchStatus>())

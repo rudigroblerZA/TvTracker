@@ -382,14 +382,14 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
 | Flag | Gates |
 | --- | --- |
-| `blend` | `/blend`, the Blend nav link and the "Blend … with another show" link on show pages |
-| `universes` | `/universes` and universe pages, the nav link, and the "Shared universe" section on show pages |
+| `blend` | `/blend`, its Discover card (and nav link when signed out), the "Blend … with another show" link on show pages |
+| `universes` | `/universes` and universe pages, its Discover card (and nav link when signed out), and the "Shared universe" section on show pages |
 | `essential-cut` | `/shows/{id}/essential-cut` and its teaser on show pages |
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `tonight-together` | Tonight for two: the "Watching" choice on `/tonight`, the link on people's pages, and its endpoint |
@@ -406,7 +406,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
-| `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
+| `ask` | `/ask`, its Insights card, and Assistant.API's endpoints |
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
@@ -416,6 +416,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
+| `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
+| `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -443,6 +445,19 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
     flagd, so it needs the two on one disk.
   - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
     Identity.API.
+
+### Navigation
+
+- **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Calendar, Discover, For you,
+  Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
+  - Up Next: backlog, waiting room, Tonight's plan and time off.
+  - My shows: lists.
+  - Discover: Prestige picks, Blend, Universes, nanogenres and network report cards.
+  - For you: reunion radar and taste twins.
+  - Insights: Ask, the time machine and holiday episodes.
+  - Stats: Year in TV.
+- **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
+- **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
 ### White label and theme
 
@@ -621,7 +636,7 @@ How events flow:
       of the same", "It doesn't recover" (0.3+ lower: Dexter after season 4), or "Hard to say" (too few ratings).
     - **Spoiler-free:** the turn ahead is named by its number only.
     - **API:** `GET /api/v1/shows/{id}/comeback` (204 unless you dropped it) on Analytics.API, signed in.
-  - **Backlog triage** (`/backlog`, signed in; in the menu and on Up Next): the shows you follow but haven't started,
+  - **Backlog triage** (`/backlog`, signed in; linked from Up Next): the shows you follow but haven't started,
     ranked by how much they're likely worth your time, plus the ones you dropped.
     - **Worth your time:** TVmaze's rating, ±0.3 for whether its genres are ones you like (from shows you rated 4+ or
       watched 80% of), and how it ends (+0.3 sticks the landing, −0.5 fizzles). Each show lists its reasons.
@@ -735,7 +750,7 @@ How events flow:
       `GET /api/v1/research/{id}/episode-notes`, `PUT|DELETE /api/v1/research/{id}/episode-notes/{episodeId}`
       (`{ "mark": "essential" | "skippable", "reason", "sourceUrl" }`). Anyone else gets 404. Behind the `research`
       flag (and `episode-notes` for the notes).
-  - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
+  - **Ask** (`/ask`, signed in; linked from Insights): questions about shows in plain words ("Landman
     insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
     things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
     - **Grounded, and shows its work:** the model is told to answer only from what the tools returned. Each answer lists
@@ -793,6 +808,19 @@ How events flow:
     - **Bulk marks:** 8 or more of a show's episodes marked at once ("watched up to S05E10") aren't counted, since when
       you watched them isn't known; the page says how many were left out.
     - **API:** `GET /api/v1/me/year?year=&tz=` on Analytics.API, signed in.
+  - **Episode duels** (`/shows/{id}/duels`, linked from show pages; `episode-duels` flag): rank a show's episodes you've
+    watched by picking the better of two, or skipping a pair you can't call. Your ranking builds as you go, with each
+    episode's wins and losses; "Start over" forgets them.
+    - **Pairs:** the episode in the fewest duels against one close to it in your ranking that it hasn't met, since
+      close calls are what the ranking still needs to learn.
+    - **Ranking:** a Bradley-Terry model of your answers, so the order doesn't depend on when you answered, and one
+      lucky win doesn't put an episode on top.
+    - **Only watched episodes;** unwatching one takes it out of the ranking.
+    - **API** (Ratings.API, signed in): `GET`, `POST {winnerId, loserId}` and `DELETE` on `/api/v1/shows/{id}/duels`.
+  - **Waiting room** (`/waiting`, linked from Up Next; `waiting-room` flag): running shows you're caught up on, soonest
+    back first: the next episode or season premiere when it's dated, else the forecast from the show's own past waits
+    (with "overdue" past its range), with how often comparable shows came back as a weak signal.
+    - **API:** `GET /api/v1/me/waiting` on Analytics.API, signed in.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

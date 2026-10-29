@@ -16,6 +16,9 @@
     --warn: light-dark(#92400e, #fbbf24);
     --bad: light-dark(#991b1b, #f87171);
     --info: light-dark(#1d4ed8, #93c5fd);
+    --offline-bg: light-dark(#92400e, #78350f);
+    --offline-text: light-dark(#ffffff, #fef3c7);
+    --franchise: light-dark(#7c3aed, #a78bfa);
     --good-fill: light-dark(#15803d, #4ade80);
     --on-good-fill: light-dark(#ffffff, #052e16);
     --radius: 10px;
@@ -79,7 +82,7 @@ h3 { font-size: 1rem; margin: 1rem 0 0.5rem; }
 .app-main { max-width: 1040px; margin: 0 auto; padding: 16px; padding-bottom: max(32px, env(safe-area-inset-bottom)); }
 .app-footer { max-width: 1040px; margin: 0 auto; padding: 0 16px max(16px, env(safe-area-inset-bottom)); text-align: center; }
 
-.offline-banner { background: #92400e; color: #fff; padding: 6px 16px; font-size: 0.9rem; text-align: center; }
+.offline-banner { background: var(--offline-bg); color: var(--offline-text); padding: 6px 16px; font-size: 0.9rem; text-align: center; }
 
 @media (max-width: 640px) {
     .nav { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
@@ -128,6 +131,7 @@ fieldset { border: 1px solid var(--border); border-radius: var(--radius); displa
 .search-form input { flex: 1 1 240px; }
 
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
+.panel > :first-child { margin-top: 0; }
 .notice { padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); margin-bottom: 12px; }
 .error-notice { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); margin-bottom: 12px; }
 
@@ -359,7 +363,7 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .universe-key.continuation, .universe-arc.continuation { background: var(--accent); stroke: var(--accent); }
 .universe-key.crossover, .universe-arc.crossover { background: var(--muted); stroke: var(--muted); }
 .universe-key.revival, .universe-arc.revival { background: var(--star); stroke: var(--star); }
-.universe-key.franchise, .universe-arc.franchise { background: #8b5cf6; stroke: #8b5cf6; }
+.universe-key.franchise, .universe-arc.franchise { background: var(--franchise); stroke: var(--franchise); }
 .universe-arc.franchise { stroke-dasharray: 5 4; }
 /* Rows down the page, oldest first; arcs in the gutter on the left join shows that share characters. */
 .universe-map { position: relative; padding-left: var(--gutter); margin: 12px 0 20px; }
@@ -514,7 +518,6 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .refresher { margin: 20px 0; }
 .refresher .insight-card { border-left: 4px solid var(--info); background: color-mix(in srgb, var(--info) 6%, var(--surface)); }
 .refresher .insight-card > h2:first-child { margin-top: 0; scroll-margin-top: 16px; }
-.refresher h2:focus { outline: none; }
 .refresher-why { color: var(--muted); }
 .refresher-plan { list-style: none; padding: 0; margin: 12px 0 8px; display: flex; flex-direction: column; gap: 6px; }
 .refresher-plan li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
@@ -564,7 +567,6 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .catch-up { margin: 20px 0; }
 .catch-up .insight-card { border-left: 4px solid var(--accent); }
 .catch-up .insight-card > h2:first-child { margin-top: 0; scroll-margin-top: 16px; }
-.catch-up h2:focus { outline: none; }
 .catch-up-verdict { padding: 8px 12px; border-radius: 8px; color: var(--tone); background: color-mix(in srgb, var(--tone) 10%, var(--surface)); }
 .catch-up-verdict span { color: var(--text); }
 .before-premiere .tag { color: var(--tone); border-color: color-mix(in srgb, var(--tone) 35%, var(--border)); background: color-mix(in srgb, var(--tone) 10%, var(--surface)); }
@@ -701,3 +703,38 @@ a.chip { text-decoration: none; }
 .report dd .small { font-weight: 400; }
 .report dd.tone-good { color: var(--good); }
 .report dd.tone-bad { color: var(--bad); }
+
+/* Episode duels */
+
+.duel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.duel-option { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 18px; min-height: 120px;
+    background: var(--surface); color: inherit; font: inherit; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.duel-option:hover:not(:disabled), .duel-option:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.duel-option:disabled { opacity: 0.6; cursor: default; }
+.duel-code { color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+.duel-ranking li { padding: 3px 0; }
+@media (max-width: 520px) { .duel { grid-template-columns: 1fr; } .duel-option { min-height: 0; } }
+
+/* Tool links on hub pages */
+
+.tool-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 4px 0 20px; }
+.tool-link { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface); color: inherit;
+    border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; }
+.tool-link strong { color: var(--accent); }
+.tool-link:hover, .tool-link:focus-visible { border-color: var(--accent); text-decoration: none; }
+/* On a phone the cards are just their names, so the page's own content starts on the first screen. */
+@media (max-width: 520px) {
+    .tool-links { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .tool-link { padding: 10px 12px; justify-content: center; }
+    .tool-link .small { display: none; }
+}
+
+/* Headings that take focus after navigation (FocusOnNavigate) or a scroll-to (refresher, catch-up) are focused for
+   screen readers, not keyboard users, so they get no focus ring. */
+h1:focus, h2:focus { outline: none; }
+
+/* Calendar: Earlier and Later stay together on one row on a phone, with the range between them. */
+@media (max-width: 520px) {
+    .calendar-nav { display: grid; grid-template-columns: auto 1fr auto; text-align: center; gap: 8px; }
+    .calendar-nav > .muted { grid-column: 1 / -1; text-align: left; }
+}

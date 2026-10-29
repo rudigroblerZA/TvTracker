@@ -22,7 +22,9 @@
                 }
             </p>
         }
-        <p><a href="feed/people"><strong>Find people</strong></a><span class="muted">: follow friends to see what they watch and rate.</span></p>
+        <div class="tool-links">
+            <ToolLink Href="feed/people" Title="Find people">Follow friends to see what they watch and rate.</ToolLink>
+        </div>
 
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 

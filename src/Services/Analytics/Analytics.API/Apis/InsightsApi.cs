@@ -75,6 +75,7 @@ public static class InsightsApi
         api.MapSeasonVerdictsApi();
         api.MapNetworkReportsApi();
         api.MapYearInTvApi();
+        api.MapWaitingRoomApi();
 
         return api;
     }

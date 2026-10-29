@@ -425,7 +425,21 @@ On Stats.
 - **How your taste moved:** the DNA of this year's viewing against last year's.
 - **Called it:** the well-rated show you followed before most people here did.
 
-### 38. Smaller touches
+### 38. Episode duels
+
+On show pages.
+
+- **Better of two:** rank a show's episodes you've watched by picking the better of two; your own ranking builds as
+  you answer, close calls first.
+
+### 39. Waiting room
+
+On Up Next.
+
+- **When is it back?** Every running show you're caught up on, soonest first: the date when it's set, else a forecast
+  from the show's own waits, and "overdue" when it's later than usual.
+
+### 40. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

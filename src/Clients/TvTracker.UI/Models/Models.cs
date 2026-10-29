@@ -691,3 +691,18 @@ public record YearEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, int 
 public record YearShift(string Key, string Name, double From, double To, string Toward);
 
 public record YearCalledIt(Guid ShowId, string Title, string? PosterUrl, DateTime FollowedAtUtc, double Ahead, int Followers, double? Rating);
+
+/// <summary>Episode duels for one show: the next pair to compare and the user's ranking so far.</summary>
+public record DuelState(int Watched, int Duels, DuelPair? Pair, IReadOnlyList<DuelRank> Ranking);
+
+public record DuelPair(Guid First, Guid Second);
+
+/// <param name="Score">0-100: the chance it beats an average episode of the show, by the user's answers.</param>
+public record DuelRank(Guid EpisodeId, int Score, int Wins, int Losses);
+
+/// <summary>Running shows the user is caught up on, soonest back first.</summary>
+public record WaitingRoom(IReadOnlyList<WaitingShow> Shows);
+
+/// <param name="Kind">episode, season, forecast or unknown.</param>
+public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? Network, string Kind, DateTimeOffset? BackAtUtc,
+    int? SeasonNumber, DateOnly? Likely, DateOnly? Earliest, DateOnly? Latest, bool Overdue, double? Renewal, DateTimeOffset? LastAiredUtc);

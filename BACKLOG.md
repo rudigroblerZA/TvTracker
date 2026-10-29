@@ -10,15 +10,13 @@ that shows it), what done looks like, its priority and its size.
 
 ## Now
 
-In this order. The first four make every later change safer; the last two are cheap, visible speed-ups.
+In this order. The first three make every later change safer; the last is a cheap speed-up.
 
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
 | Q1 | [Tests and CI](#q1-tests-and-ci) | P1 | M |
-| R1 | [Outbox and inbox retention](#r1-outbox-and-inbox-retention) | P1 | S |
 | R2 | [Retry with backoff, and a dead-letter queue](#r2-retry-with-backoff-and-a-dead-letter-queue) | P1 | M |
 | S1 | [Secrets out of the AppHost](#s1-secrets-out-of-the-apphost) (before any deployment) | P1 | M |
-| P1 | [Show page loads its data in parallel](#p1-show-page-loads-its-data-in-parallel) | P2 | S |
 | P2 | [Cache feature-flag answers in services](#p2-cache-feature-flag-answers-in-services) | P2 | S |
 
 ## What the review found sound
@@ -80,24 +78,6 @@ So the rest of the list reads in proportion:
 - **Done when:** it builds in CI, and fixes for whatever was broken are merged.
 
 ## Reliability
-
-### R1. Outbox and inbox retention
-
-**P1 · S**
-
-- **Why:**
-  - `integration_event_log` (the outbox) and `processed_integration_events` (the inbox) are never trimmed; nothing in
-    `TvTracker.Persistence` deletes from them.
-  - After about two weeks of development use, Catalog's outbox held 8,645 rows (45 MB), and Social's inbox 27,117 rows.
-    Production grows them with every write and every handled event.
-  - `OutboxPublisher` (`OutboxPublisher.cs:26`) scans the outbox every 15 seconds; its `(State, CreatedAtUtc)` index
-    keeps that cheap, but table bloat and backups grow regardless.
-- **What:** a retention pass in `OutboxPublisher` (or a sibling background service in TvTracker.Persistence):
-  - delete published outbox rows older than 7 days;
-  - delete inbox rows older than 30 days, longer than any redelivery or snapshot window, so a late redelivery is still
-    recognised.
-  - Delete in batches (`ExecuteDeleteAsync` with a limit), hourly.
-- **Done when:** both tables stay bounded on a long-running AppHost, with a CONTEXT.md note on the two windows.
 
 ### R2. Retry with backoff, and a dead-letter queue
 
@@ -219,18 +199,6 @@ So the rest of the list reads in proportion:
 
 ## Performance
 
-### P1. Show page loads its data in parallel
-
-**P2 · S**
-
-- **Why:**
-  - After the show itself, `ShowPage.razor` awaits seven independent calls one after another (lines 313-323): summary,
-    similar, follow, progress, rating, mute and lists.
-  - Its sections add about 13 more, for about 25 calls per show page.
-- **What:** start the seven together (`Task.WhenAll`), as Insights now does, keeping the "signed in" branch.
-- **Done when:** the show page's time to full render drops measurably in `tvtracker-load` (record before and after with
-  `--csv`).
-
 ### P2. Cache feature-flag answers in services
 
 **P2 · S**
@@ -250,7 +218,7 @@ So the rest of the list reads in proportion:
 
 - **Why:** about 25 calls per show page, each with its own token handling and a flag check, from Blazor Server to many
   services.
-- **What:** measure first (P1 and P2 may be enough). If not, batch what goes together, such as Tracking's follow,
+- **What:** measure first (the show page's own calls now run in parallel; P2 may be enough). If not, batch what goes together, such as Tracking's follow,
   progress and lists, or Ratings' summary and the user's rating, into one call per service.
 - **Done when:** decided by measurement and recorded in CONTEXT.md.
 

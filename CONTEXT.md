@@ -42,6 +42,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outboxes still deserialize. Don't rename or reorder existing ones.
 - **Publishing:** add the event to `IIntegrationEventOutbox` in the same `SaveChanges` as the change, then
   `PublishAddedAsync`. `OutboxPublisher` retries anything left behind.
+  - **Retention** (`IntegrationEventRetention`, hourly, in batches of 5,000): published outbox rows go after 7 days
+    (kept only to look into what was sent; unpublished and failed rows stay), inbox rows after 30. An inbox row is what
+    makes a redelivery a no-op, so it must outlive any redelivery; Notifications also uses it to alert once by a stable
+    id (crossovers re-sent for up to 14 days, verdicts within 2), both inside 30 days. Before this nothing was deleted:
+    Catalog's outbox reached 10,753 rows and Social's inbox 34,972.
   - **Channels:** `RabbitMQEventBus` rents publishing channels from a small pool and declares the exchange once per
     connection. A channel opened, declared and closed per event added three round trips to every write; pooling took
     follow and mark-watched from p50 ~50 ms to ~30 ms at 20 load-test users.
@@ -473,6 +478,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     a move of 0.1+ is named, towards the trait's end.
   - **Called it** is the only part about other users: the share of a show's followers here who followed after the
     caller, shown with 5+ followers (the privacy rule) and when they were ahead of half.
+- **Waiting room** (`WaitingRoomApi`): computed on request from the caller's watches and the catalog copy, with the
+  show documents' `NextPremiere` and `Outlook`. Caught up means every aired regular episode watched; ended shows have
+  nothing to wait for. A dated next episode in the current season is "episode", a dated premiere "season", else the
+  timing forecast, else unknown.
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
@@ -527,6 +536,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     and runtime. "Other" is recorded, not applied. Both services check values, Ratings so the suggester hears why.
   - **Reverting** deletes the override and makes the show due for refresh, which brings the provider's value back.
   - **Synchronous on purpose:** the moderator sees at once if the catalog refused the value or the show is gone.
+- **Episode duels** (`DuelsApi`, `episode_duels`): a user's "which was better?" answers per show, ranked on read by a
+  Bradley-Terry model (MM algorithm), each episode also given one win and one loss against an average episode.
+  - **Why the prior:** without it, an episode that won its only duel has infinite strength and tops the list.
+  - **Pairs:** least-played episode against one of the three closest in strength it hasn't met, at random.
+  - **Watched copy:** duels may only be about watched episodes, so Ratings' `watched_episodes` gained `ShowId` and
+    `RecordedAtUtc`, and Ratings now handles `EpisodeUnwatched` and Tracking's daily snapshot (adds what's missing,
+    fills show ids, removes what's gone unless recorded after `TakenAtUtc`). Before this an unwatch never reached
+    Ratings, so the comments' spoiler gate kept treating the episode as watched.
 - **Ratings' migrations:** Ratings moved off `EnsureCreated` for these tables. Its `InitialCreate` baseline was applied
   to a scratch database and diffed (`pg_dump -s`) against the live one `EnsureCreated` made: identical apart from EF's
   history table.
@@ -792,6 +809,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `theme.js` loads in the head, before the stylesheet, and applies a saved choice from `localStorage` before first
   paint. The phone keeps its choice in MAUI `Preferences`, which the page can't read that early, so `MainLayout`
   also applies it after the first render, and `theme.js` mirrors it into `localStorage` for the next start.
+- **Show page loads together:** after the show itself, its summary, similar shows, follow, progress, rating, mute and
+  lists are fetched in parallel (`Task.WhenAll`) rather than one after another. Over 60 loads each in the browser, time
+  to full render went from a median of 314 ms (p90 809) to 247 ms (p90 342).
+- **Navigation by section** (`NavMenu`, `ToolLink`): the header had grown to 15 links, which scrolled sideways on a
+  phone. It now lists the main sections, and each section's tools are `ToolLink` cards in a `tool-links` grid at the top
+  of its page, each in its own `<Feature>`. Signed out, Blend and Universes stay in the header, since Discover's other
+  tools need sign-in.
+- **Focused headings:** `FocusOnNavigate` focuses each page's `h1` (and some sections focus their `h2`) for screen
+  readers; they get no outline, which had drawn a box round every page title.
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why

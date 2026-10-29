@@ -1,21 +1,26 @@
+@* The main sections only; each section's tools are linked from its page (Up Next: backlog, tonight, waiting room;
+   Discover: blend, universes, nanogenres; Insights: ask, time machine; My shows: lists, stats). Signed out, the public
+   tools are linked here, since their hubs need sign-in. *@
 <nav class="nav" aria-label="Main">
     <NavLink href="" Match="NavLinkMatch.All">Home</NavLink>
-    <NavLink href="up-next">Up Next</NavLink>
-    <NavLink href="calendar">Calendar</NavLink>
-    <NavLink href="search">Search</NavLink>
-    <Feature Flag="@FeatureFlags.Blend"><NavLink href="blend">Blend</NavLink></Feature>
-    <Feature Flag="@FeatureFlags.Universes"><NavLink href="universes">Universes</NavLink></Feature>
     <AuthorizeView>
         <Authorized>
-            <NavLink href="shows">My shows</NavLink>
-            <Feature Flag="@FeatureFlags.BacklogTriage"><NavLink href="backlog">Backlog</NavLink></Feature>
-            <Feature Flag="@FeatureFlags.Social"><NavLink href="feed">Feed</NavLink></Feature>
+            <NavLink href="up-next">Up Next</NavLink>
+            <NavLink href="shows" Match="NavLinkMatch.All">My shows</NavLink>
+            <NavLink href="calendar">Calendar</NavLink>
+            <NavLink href="discover">Discover</NavLink>
             <NavLink href="for-you">For you</NavLink>
             <NavLink href="insights">Insights</NavLink>
-            <NavLink href="discover">Discover</NavLink>
-            <Feature Flag="@FeatureFlags.Ask"><NavLink href="ask">Ask</NavLink></Feature>
-            <NavLink href="lists">Lists</NavLink>
+            <Feature Flag="@FeatureFlags.Social"><NavLink href="feed">Feed</NavLink></Feature>
+            <NavLink href="search">Search</NavLink>
             <NavLink href="inbox">Inbox</NavLink>
         </Authorized>
+        <NotAuthorized>
+            <NavLink href="calendar">Calendar</NavLink>
+            <NavLink href="search">Search</NavLink>
+            <NavLink href="discover">Discover</NavLink>
+            <Feature Flag="@FeatureFlags.Blend"><NavLink href="blend">Blend</NavLink></Feature>
+            <Feature Flag="@FeatureFlags.Universes"><NavLink href="universes">Universes</NavLink></Feature>
+        </NotAuthorized>
     </AuthorizeView>
 </nav>

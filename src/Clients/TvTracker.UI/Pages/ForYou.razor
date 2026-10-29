@@ -8,12 +8,14 @@
 <AuthorizeView>
     <Authorized>
         <p class="muted">Picks based on what you follow, watch and rate. Updated as you go.</p>
-        <Feature Flag="@FeatureFlags.ReunionRadar">
-            <p><a href="reunions"><strong>Reunion radar</strong></a><span class="muted">: where actors from shows you love work together again.</span></p>
-        </Feature>
-        <Feature Flag="@FeatureFlags.TasteTwins">
-            <p><a href="taste-twins"><strong>Taste twins</strong></a><span class="muted">: what people who rate like you loved, that you haven't seen.</span></p>
-        </Feature>
+        <div class="tool-links">
+            <Feature Flag="@FeatureFlags.ReunionRadar">
+                <ToolLink Href="reunions" Title="Reunion radar">Where actors from shows you love work together again.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.TasteTwins">
+                <ToolLink Href="taste-twins" Title="Taste twins">What people who rate like you loved, that you haven't seen.</ToolLink>
+            </Feature>
+        </div>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (picks is null)

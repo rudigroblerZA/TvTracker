@@ -1,0 +1,182 @@
+@page "/shows/{ShowId:guid}/duels"
+@attribute [RequiresFeature(FeatureFlags.EpisodeDuels)]
+@inject CatalogClient Catalog
+@inject RatingsClient Ratings
+@inject UserSession Session
+
+<PageTitle>@(title is null ? "Episode duels" : $"{title}: episode duels") · @Brand.AppName</PageTitle>
+
+<p class="small"><a href="shows/@ShowId">← @(title ?? "Back to the show")</a></p>
+<h1>Which was better?</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (state is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (state.Pair is null)
+        {
+            <p class="muted">Watch at least two episodes of @(title ?? "this show") to start ranking them.</p>
+        }
+        else
+        {
+            <p class="muted">
+                Pick the episode you liked more, from the ones you've watched. Each answer sharpens your own ranking of the show.
+            </p>
+            <div class="duel" aria-live="polite">
+                @foreach (var id in new[] { state.Pair.First, state.Pair.Second })
+                {
+                    var other = id == state.Pair.First ? state.Pair.Second : state.Pair.First;
+                    <button type="button" class="duel-option" disabled="@busy" @key="id" @onclick="() => DecideAsync(id, other)">
+                        @if (episodes.TryGetValue(id, out var episode))
+                        {
+                            <span class="duel-code">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</span>
+                            <strong>@episode.Title</strong>
+                            @if (episode.AirsAtUtc is { } aired)
+                            {
+                                <span class="muted small">@aired.ToString("MMMM yyyy")</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="muted">Loading…</span>
+                        }
+                    </button>
+                }
+            </div>
+            <p class="small">
+                <button type="button" class="btn btn-quiet small" disabled="@busy" @onclick="SkipAsync">Can't decide, show me another pair</button>
+                <span class="muted">@($" · {state.Duels} {(state.Duels == 1 ? "answer" : "answers")} over {state.Watched} watched episodes")</span>
+            </p>
+        }
+
+        @if (state is { Ranking.Count: > 0 })
+        {
+            <section>
+                <h2>Your ranking</h2>
+                <ol class="duel-ranking">
+                    @foreach (var rank in state.Ranking.Take(shown))
+                    {
+                        <li @key="rank.EpisodeId">
+                            @if (episodes.TryGetValue(rank.EpisodeId, out var episode))
+                            {
+                                <a href="episodes/@episode.Id">@Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)</a>
+                                <span>@($" {episode.Title}")</span>
+                            }
+                            else
+                            {
+                                <span class="muted">…</span>
+                            }
+                            <span class="muted small">@($" · {rank.Wins}–{rank.Losses}")</span>
+                        </li>
+                    }
+                </ol>
+                @if (state.Ranking.Count > shown)
+                {
+                    <p><button type="button" class="btn btn-quiet small" @onclick="ShowMoreAsync">@($"Show all {state.Ranking.Count}")</button></p>
+                }
+                <p class="muted small">
+                    Wins and losses in your duels. An episode needs a few answers before its place settles.
+                    <button type="button" class="btn btn-quiet small" disabled="@busy" @onclick="ResetAsync">Start over</button>
+                </p>
+            </section>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to rank the episodes you've watched." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public Guid ShowId { get; set; }
+
+    private const int FirstShown = 10;
+
+    private DuelState? state;
+    private string? title;
+    private string? error;
+    private bool busy;
+    private int shown = FirstShown;
+    private readonly Dictionary<Guid, Episode> episodes = [];
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            title ??= (await Catalog.GetShowAsync(ShowId, Session.Region))?.Title;
+            state = await Ratings.GetDuelsAsync(ShowId);
+            await LoadEpisodesAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task DecideAsync(Guid winner, Guid loser) =>
+        await RunAsync(async () => state = await Ratings.DecideDuelAsync(ShowId, winner, loser));
+
+    // A new pair comes with every read, so skipping is just asking again.
+    private async Task SkipAsync() => await RunAsync(async () => state = await Ratings.GetDuelsAsync(ShowId));
+
+    private async Task ResetAsync() => await RunAsync(async () =>
+    {
+        await Ratings.ResetDuelsAsync(ShowId);
+        state = await Ratings.GetDuelsAsync(ShowId);
+        shown = FirstShown;
+    });
+
+    private async Task ShowMoreAsync()
+    {
+        shown = int.MaxValue;
+        await LoadEpisodesAsync();
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+            await LoadEpisodesAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    /// <summary>The pair's and the shown ranking's episodes, each fetched once (the catalog caches them too).</summary>
+    private async Task LoadEpisodesAsync()
+    {
+        if (state is null)
+        {
+            return;
+        }
+        var wanted = (state.Pair is { } pair ? new[] { pair.First, pair.Second } : [])
+            .Concat(state.Ranking.Take(shown).Select(r => r.EpisodeId))
+            .Where(id => !episodes.ContainsKey(id))
+            .Distinct()
+            .ToList();
+        var loaded = await Task.WhenAll(wanted.Select(id => Catalog.GetEpisodeAsync(id)));
+        foreach (var episode in loaded.OfType<Episode>())
+        {
+            episodes[episode.Id] = episode;
+        }
+    }
+}

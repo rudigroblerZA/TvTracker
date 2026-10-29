@@ -8,15 +8,17 @@
 
 <AuthorizeView>
     <Authorized>
-        <Feature Flag="@FeatureFlags.Ask">
-            <p><a href="ask"><strong>Ask</strong></a><span class="muted">: ask about any show, person or list ("hidden gems in drama", "does Breaking Bad stick the landing?"), answered from these insights.</span></p>
-        </Feature>
-        <Feature Flag="@FeatureFlags.TimeMachine">
-            <p><a href="time-machine"><strong>TV time machine</strong></a><span class="muted">: what premiered, ended and stood out this week in TV history, or the week of any date.</span></p>
-        </Feature>
-        <Feature Flag="@FeatureFlags.HolidayEpisodes">
-            <p><a href="holidays"><strong>Holiday episodes</strong></a><span class="muted">: the Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of your shows, and where each sits against how far you are.</span></p>
-        </Feature>
+        <div class="tool-links">
+            <Feature Flag="@FeatureFlags.Ask">
+                <ToolLink Href="ask" Title="Ask">Ask about any show, person or list, answered from these insights.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.TimeMachine">
+                <ToolLink Href="time-machine" Title="TV time machine">What premiered, ended and stood out this week in TV history.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.HolidayEpisodes">
+                <ToolLink Href="holidays" Title="Holiday episodes">Your shows' Halloween, Christmas and other holiday episodes, and where each sits for you.</ToolLink>
+            </Feature>
+        </div>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (verdicts is { Count: > 0 })
