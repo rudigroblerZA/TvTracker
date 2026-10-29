@@ -751,6 +751,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
 - **Flag:** checked once per run without a user, so it can't target some users only.
 
+## Six degrees
+
+- **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every
+  show in a catalog actor's provider credits (`person_cast_credits`), and the actors between them. Credits are what make
+  it work: within the catalog's own casts, Breaking Bad and Friends don't connect; through North and South and
+  Extrapolations they're three apart. A show outside the catalog is a node with a title and poster but no id, which
+  the page marks and offers a search for (which imports it).
+- **Breadth-first from one side**, over shows, remembering the person that led to each; the catalog is a few
+  thousand people, so a search is milliseconds (6 ms for Game of Thrones to The Office). Capped at six.
+- **Self roles don't link:** "Himself" credits would join every panel show to every other, and reality casts play
+  themselves, so those shows mostly link to nothing (12 of 40 random popular pairs had no chain; each involved one).
+- **Catalog shows first** in each person's credit list, so of two chains the same length the walk tends to find the one
+  through shows the app can open. A tendency, not a guarantee.
+- **The challenge** picks two popular catalog shows with a cast at random, up to 20 tries, until a pair is two or
+  more apart, and returns the distance without the chain; the page fetches the chain only on "Show me".
+
 ## Guess the show
 
 - **No table** (`PuzzleApi` on Catalog.API): the day's show is the pool's lowest SHA-256 of date and show id, skipping

@@ -830,3 +830,15 @@ public record CallRecord(int Scored, double? AverageMiss, double? ModelAverageMi
 
 public record MyCalls(CallRecord Record, IReadOnlyList<SeasonCallInfo> Calls, IReadOnlyList<SeasonCallInfo> Suggestions);
 
+/// <summary>Six degrees: the shortest chain of shared actors from one show to another.</summary>
+/// <param name="OutsideCatalog">Shows along the chain that aren't in the catalog.</param>
+public record DegreesResult(DegreesShow From, DegreesShow To, int Degrees, IReadOnlyList<DegreesLink> Links, int OutsideCatalog);
+
+/// <param name="ShowId">Null for a show known only from an actor's credits.</param>
+public record DegreesShow(Guid? ShowId, string Title, string? PosterUrl, int? Year);
+
+public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesShow From, string? CharacterInFrom, DegreesShow To, string? CharacterInTo);
+
+/// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
+public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
+

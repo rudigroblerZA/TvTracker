@@ -1,0 +1,173 @@
+@page "/degrees"
+@attribute [RequiresFeature(FeatureFlags.SixDegrees)]
+@inject CatalogClient Catalog
+
+<PageTitle>Six degrees · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Six degrees</h1>
+<p class="muted">
+    Pick two shows and find the shortest chain of actors between them: someone from the first show was in a second show
+    with someone from a third, and so on. Or take a challenge and guess the chain before you look.
+</p>
+
+<div class="degrees-pickers">
+    <ShowPicker Label="First show" Selected="a" SelectedChanged="PickA" Exclude="b?.Id" />
+    <ShowPicker Label="Second show" Selected="b" SelectedChanged="PickB" Exclude="a?.Id" />
+</div>
+<p>
+    <button class="btn btn-quiet" type="button" disabled="@loading" @onclick="ChallengeAsync">Challenge me</button>
+    @if (a is not null && b is not null)
+    {
+        <span>@(" ")</span><button class="link small" type="button" @onclick="Swap">Swap</button>
+    }
+</p>
+
+<ErrorNotice Message="@error" />
+
+@if (challenge is { } c && result is null)
+{
+    <section class="panel">
+        <p>
+            <strong>@c.From.Title</strong><span>@(" to ")</span><strong>@c.To.Title</strong><span>@($": they connect in {c.Degrees} {(c.Degrees == 1 ? "step" : "steps")}. Can you name the actors?")</span>
+        </p>
+        <p><button class="btn" type="button" disabled="@loading" @onclick="RevealAsync">@(loading ? "Finding…" : "Show me the chain")</button></p>
+    </section>
+}
+else if (loading)
+{
+    <p class="muted">Finding a chain…</p>
+}
+else if (noChain)
+{
+    <p class="muted">No chain of six or fewer actors joins these two, at least among the main casts TVmaze lists.</p>
+}
+else if (result is { } r)
+{
+    <section class="panel degrees">
+        <h2>@(r.Degrees == 0 ? "That's the same show" : $"{r.Degrees} {(r.Degrees == 1 ? "degree" : "degrees")} apart")</h2>
+        <ol class="degrees-chain">
+            <li class="degrees-show">@Show(r.From)</li>
+            @foreach (var link in r.Links)
+            {
+                <li class="degrees-link" @key="@($"{link.PersonId}-{link.To.Title}")">
+                    <Poster Title="@link.Name" Url="@link.PhotoUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="people/@link.PersonId">@link.Name</a>
+                        <div class="small muted">@Played(link)</div>
+                    </div>
+                </li>
+                <li class="degrees-show">@Show(link.To)</li>
+            }
+        </ol>
+        @if (r.OutsideCatalog > 0)
+        {
+            <p class="muted small">@(r.OutsideCatalog == 1 ? "One show on the way isn't in the catalog yet; search for it to add it." : $"{r.OutsideCatalog} shows on the way aren't in the catalog yet; search for them to add them.")</p>
+        }
+        <p class="muted small">Main casts only, as TVmaze lists them: guest appearances don't count, so some chains are longer than the real world's.</p>
+    </section>
+}
+
+@code {
+    private ShowSummary? a;
+    private ShowSummary? b;
+    private DegreesResult? result;
+    private DegreesChallenge? challenge;
+    private bool noChain;
+    private bool loading;
+    private string? error;
+
+    private Task PickA(ShowSummary? show) { a = show; return FindAsync(); }
+
+    private Task PickB(ShowSummary? show) { b = show; return FindAsync(); }
+
+    private Task Swap() { (a, b) = (b, a); return FindAsync(); }
+
+    private async Task FindAsync()
+    {
+        result = null;
+        noChain = false;
+        challenge = null;
+        if (a is null || b is null)
+        {
+            return;
+        }
+        await LoadAsync(a.Id, b.Id);
+    }
+
+    private async Task LoadAsync(Guid from, Guid to)
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            result = await Catalog.GetDegreesAsync(from, to);
+            noChain = result is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    /// <summary>Two connected shows with the chain's length; the chain is fetched only when revealed.</summary>
+    private async Task ChallengeAsync()
+    {
+        loading = true;
+        error = null;
+        result = null;
+        noChain = false;
+        a = b = null;
+        try
+        {
+            challenge = await Catalog.GetDegreesChallengeAsync();
+            if (challenge is null)
+            {
+                error = "No challenge right now; the catalog is still filling up.";
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RevealAsync()
+    {
+        if (challenge is { From.ShowId: { } from, To.ShowId: { } to })
+        {
+            await LoadAsync(from, to);
+        }
+    }
+
+    private static string Played(DegreesLink link) =>
+        link.CharacterInFrom is { } from && link.CharacterInTo is { } to ? $"{from} in {link.From.Title} · {to} in {link.To.Title}"
+        : $"In {link.From.Title} and {link.To.Title}";
+
+    private static RenderFragment Show(DegreesShow show) => __builder =>
+    {
+        <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+        <div>
+            @if (show.ShowId is { } id)
+            {
+                <a class="strong" href="shows/@id">@show.Title</a>
+            }
+            else
+            {
+                <span class="strong">@show.Title</span><span class="muted small">@(" · not in the catalog · ")</span><a class="small" href="search?q=@Uri.EscapeDataString(show.Title)">search</a>
+            }
+            @if (show.Year is { } year)
+            {
+                <div class="muted small">@year</div>
+            }
+        </div>
+    };
+}
