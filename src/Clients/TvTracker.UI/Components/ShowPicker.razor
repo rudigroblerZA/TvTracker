@@ -21,7 +21,7 @@
         @if (suggestions is { Count: > 0 })
         {
             <ul class="show-picker-suggestions" role="listbox" aria-label="@($"{Label} suggestions")">
-                @foreach (var suggestion in suggestions.Where(s => s.Id != Exclude))
+                @foreach (var suggestion in suggestions.Where(s => s.Id != Exclude && ExcludeAll?.Contains(s.Id) != true))
                 {
                     <li>
                         <button type="button" role="option" @onclick="() => PickAsync(suggestion)">
@@ -49,6 +49,9 @@
 
     /// <summary>A show not to suggest (the one picked in the other picker).</summary>
     [Parameter] public Guid? Exclude { get; set; }
+
+    /// <summary>Shows not to suggest, when several are picked elsewhere (a mixtape's other slots).</summary>
+    [Parameter] public IReadOnlyCollection<Guid>? ExcludeAll { get; set; }
 
     private string? term;
     private List<ShowSummary>? suggestions;

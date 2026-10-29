@@ -130,6 +130,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// <param name="lean">0-100, how much like <paramref name="a"/>.</param>
     public Task<Blend?> GetBlendAsync(Guid a, Guid b, int lean = 50, CancellationToken ct = default) =>
         GetAsync<Blend>(ApiClients.Catalog, $"api/v1/shows/blend?a={a}&b={b}&lean={lean}", ct);
+
+    /// <summary>The shows that fit all of the given three to five shows.</summary>
+    public Task<Mixtape?> GetMixtapeAsync(IReadOnlyCollection<Guid> showIds, CancellationToken ct = default) =>
+        GetAsync<Mixtape>(ApiClients.Catalog, $"api/v1/shows/mixtape?ids={string.Join(',', showIds)}", ct);
 }
 
 public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

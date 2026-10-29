@@ -169,6 +169,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
   - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
   - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
+- **Mixtape** (`MixtapeApi`): Blend for three to five shows, with equal weights. The mix is the normalised mean of the
+  shows' vectors; a candidate's score is its distance to the farthest show.
+  - **Wider candidates:** the 40 nearest the mix plus each show's own 40 nearest (pgvector's HNSW returns at most
+    `ef_search` rows a query); with three or more shows the best common ground isn't always near the average.
+  - **Same kinds only:** a pick's kind (the catalog's kind keyword: scripted, animation, reality, …) must be one of the
+    mixtape's. Without it, Ted Lasso + Succession + Breaking Bad brought in The Amazing Race.
+  - **Distances in memory:** the candidates' vectors are loaded and compared with a dot product (they're L2-normalised),
+    since the number of inputs varies.
 - **Universes** (`Catalog.API/Services/Universes.cs`): shows linked by the same actor playing a same-named
   character, or by a franchise name (`SameFranchise`), grouped into connected components.
   - **Franchise names:** a colon stem ("NCIS: Sydney" ~ "NCIS"), or the same first word plus two or more shared

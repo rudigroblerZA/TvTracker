@@ -19,6 +19,12 @@
     --offline-bg: light-dark(#92400e, #78350f);
     --offline-text: light-dark(#ffffff, #fef3c7);
     --franchise: light-dark(#7c3aed, #a78bfa);
+    /* Mixtape slots: five hues that also differ in lightness, so they read apart without colour vision. */
+    --mix-0: light-dark(#1d4ed8, #93c5fd);
+    --mix-1: light-dark(#c2410c, #fdba74);
+    --mix-2: light-dark(#15803d, #86efac);
+    --mix-3: light-dark(#7c3aed, #c4b5fd);
+    --mix-4: light-dark(#a16207, #fde047);
     --good-fill: light-dark(#15803d, #4ade80);
     --on-good-fill: light-dark(#ffffff, #052e16);
     --radius: 10px;
@@ -738,3 +744,15 @@ h1:focus, h2:focus { outline: none; }
     .calendar-nav { display: grid; grid-template-columns: auto 1fr auto; text-align: center; gap: 8px; }
     .calendar-nav > .muted { grid-column: 1 / -1; text-align: left; }
 }
+
+/* Mixtape */
+
+.mixtape-pickers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.mixtape-slot { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: start; }
+.mixtape-swatch { width: 10px; height: 40px; margin-top: 26px; border-radius: 5px; }
+.mixtape-bar { display: flex; gap: 2px; height: 6px; border-radius: 999px; overflow: hidden; margin: 2px 0 4px; }
+.swatch-0 { background: var(--mix-0); }
+.swatch-1 { background: var(--mix-1); }
+.swatch-2 { background: var(--mix-2); }
+.swatch-3 { background: var(--mix-3); }
+.swatch-4 { background: var(--mix-4); }

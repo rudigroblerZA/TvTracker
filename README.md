@@ -209,6 +209,17 @@ watching and your watchlist.
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
 
+**Mixtape** (`/mixtape`, from Discover and Blend; `mixtape` flag) is Blend for three to five shows: the shows that fit
+all of them, not just one. Breaking Bad + Ozark + Better Call Saul gives The Lincoln Lawyer, Bosch and Criminal Minds;
+Stranger Things + Severance + Black Mirror gives Travelers, Westworld and The Expanse; The Office + Superstore + Abbott
+Elementary gives Seinfeld, The Good Place and Brooklyn Nine-Nine. Each pick shows how close it is to each show (a bar in
+the shows' colours), the one it's closest to, and a genre it takes from one of them; shows you follow say so. The
+address holds the shows, so a mixtape can be shared, and it works signed out.
+- **How:** it averages the shows' search vectors, gathers candidates nearest the average and nearest each show, and
+  ranks them by their distance to the farthest of the shows. Picks must be the same kinds of show as the mixtape's
+  (three scripted shows give scripted picks).
+- **API:** `GET /api/v1/shows/mixtape?ids=a,b,c` on Catalog.API.
+
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
 Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
@@ -382,7 +393,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -416,6 +427,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
+| `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 
@@ -452,7 +464,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
   - My shows: lists.
-  - Discover: Prestige picks, Blend, Universes, nanogenres and network report cards.
+  - Discover: Prestige picks, Blend, Mixtape, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: Ask, the time machine and holiday episodes.
   - Stats: Year in TV.
