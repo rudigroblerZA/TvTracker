@@ -388,8 +388,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 | Flag | Gates |
 | --- | --- |
-| `blend` | `/blend`, the Blend nav link and the "Blend … with another show" link on show pages |
-| `universes` | `/universes` and universe pages, the nav link, and the "Shared universe" section on show pages |
+| `blend` | `/blend`, its Discover card (and nav link when signed out), the "Blend … with another show" link on show pages |
+| `universes` | `/universes` and universe pages, its Discover card (and nav link when signed out), and the "Shared universe" section on show pages |
 | `essential-cut` | `/shows/{id}/essential-cut` and its teaser on show pages |
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `tonight-together` | Tonight for two: the "Watching" choice on `/tonight`, the link on people's pages, and its endpoint |
@@ -406,7 +406,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
-| `ask` | `/ask`, its nav and Insights links, and Assistant.API's endpoints |
+| `ask` | `/ask`, its Insights card, and Assistant.API's endpoints |
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
@@ -445,6 +445,19 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
     flagd, so it needs the two on one disk.
   - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
     Identity.API.
+
+### Navigation
+
+- **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Calendar, Discover, For you,
+  Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
+  - Up Next: backlog, waiting room, Tonight's plan and time off.
+  - My shows: lists.
+  - Discover: Prestige picks, Blend, Universes, nanogenres and network report cards.
+  - For you: reunion radar and taste twins.
+  - Insights: Ask, the time machine and holiday episodes.
+  - Stats: Year in TV.
+- **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
+- **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
 ### White label and theme
 
@@ -623,7 +636,7 @@ How events flow:
       of the same", "It doesn't recover" (0.3+ lower: Dexter after season 4), or "Hard to say" (too few ratings).
     - **Spoiler-free:** the turn ahead is named by its number only.
     - **API:** `GET /api/v1/shows/{id}/comeback` (204 unless you dropped it) on Analytics.API, signed in.
-  - **Backlog triage** (`/backlog`, signed in; in the menu and on Up Next): the shows you follow but haven't started,
+  - **Backlog triage** (`/backlog`, signed in; linked from Up Next): the shows you follow but haven't started,
     ranked by how much they're likely worth your time, plus the ones you dropped.
     - **Worth your time:** TVmaze's rating, ±0.3 for whether its genres are ones you like (from shows you rated 4+ or
       watched 80% of), and how it ends (+0.3 sticks the landing, −0.5 fizzles). Each show lists its reasons.
@@ -737,7 +750,7 @@ How events flow:
       `GET /api/v1/research/{id}/episode-notes`, `PUT|DELETE /api/v1/research/{id}/episode-notes/{episodeId}`
       (`{ "mark": "essential" | "skippable", "reason", "sourceUrl" }`). Anyone else gets 404. Behind the `research`
       flag (and `episode-notes` for the notes).
-  - **Ask** (`/ask`, signed in; linked from the nav and Insights): questions about shows in plain words ("Landman
+  - **Ask** (`/ask`, signed in; linked from Insights): questions about shows in plain words ("Landman
     insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
     things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
     - **Grounded, and shows its work:** the model is told to answer only from what the tools returned. Each answer lists

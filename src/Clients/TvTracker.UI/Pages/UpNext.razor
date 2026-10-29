@@ -8,15 +8,20 @@
 
 <AuthorizeView>
     <Authorized>
-        <Feature Flag="@FeatureFlags.BacklogTriage">
-            <p><a href="backlog"><strong>Your backlog</strong></a><span class="muted">: what to start next from the shows you follow, and what to let go.</span></p>
-        </Feature>
-        <Feature Flag="@FeatureFlags.WaitingRoom">
-            <p><a href="waiting"><strong>Waiting room</strong></a><span class="muted">: shows you're caught up on, and when each is back.</span></p>
-        </Feature>
-        <Feature Flag="@FeatureFlags.TonightPlan">
-            <p><a href="tonight"><strong>Plan tonight</strong></a><span class="muted">: tell it how long you've got and your mood, and it picks the episodes.</span></p>
-        </Feature>
+        <div class="tool-links">
+            <Feature Flag="@FeatureFlags.BacklogTriage">
+                <ToolLink Href="backlog" Title="Your backlog">What to start next from the shows you follow, and what to let go.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.WaitingRoom">
+                <ToolLink Href="waiting" Title="Waiting room">Shows you're caught up on, and when each is back.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.TonightPlan">
+                <ToolLink Href="tonight" Title="Plan tonight">Tell it how long you've got and your mood, and it picks the episodes.</ToolLink>
+            </Feature>
+            <Feature Flag="@FeatureFlags.TimeOff">
+                <ToolLink Href="time-off" Title="Fits your time off">Finished shows you could watch whole in the days you've got.</ToolLink>
+            </Feature>
+        </div>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         <Feature Flag="@FeatureFlags.CrossoverAlerts"><CrossoversAhead /></Feature>
