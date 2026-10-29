@@ -120,21 +120,26 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Search
 
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
-- **Embeddings:** dmr/nomic-embed-text-v1.5 on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
+- **Embeddings:** dmr/qwen3-embedding-0.6b on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
   or all-MiniLM-L6-v2 / bge-small run in-process with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
   - Either way the model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, L2-normalised, 384 dimensions.
   - ONNX models are downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
     cutoff). Built in: all-MiniLM-L6-v2 (mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
-    an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
+    an instruction prefix on search terms, cutoff 0.45), plus dmr/qwen3-embedding-0.6b (the default; an instruction
+    on search terms, truncated from 1024, cutoff 0.46) and dmr/nomic-embed-text-v1.5 on Docker Model Runner
     (the AppHost's default; task prefixes, truncated from 768, cutoff 0.38). With no configuration at all (services run
     outside the AppHost), `EmbeddingOptions.Model` falls back to all-MiniLM-L6-v2, which needs no server. The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
-    595 shows (42 searches): MiniLM ranks best (MRR 0.74; bge-small 0.68, nomic 0.63). The default is nomic on
-    Docker Model Runner anyway, by choice: the model runs out of process and can be swapped for any Docker Hub model.
+    595 shows (42 searches): MiniLM ranked best then (MRR 0.74; bge-small 0.68, nomic 0.63). The default runs on
+    Docker Model Runner by choice: the model runs out of process and can be swapped for any Docker Hub model.
+  - **Qwen3-Embedding 0.6B replaced nomic** as the default: on 41 searches over 846 shows, MRR 0.78 against 0.57 (top-1
+    30 against 18), and unrelated searches stayed at 0.463 or further while expected shows' 90th percentile was 0.455,
+    so the cutoff is 0.46. MiniLM wasn't rerun on that set. It costs ~640 MB, ~130 ms a search and about eight minutes to
+    embed the catalog on 4 CPU cores. The 8B model (README, "Not built yet") needs a GPU to be practical.
   - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
     `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
     - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
@@ -244,7 +249,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start and daily, so lost events heal).
   - **Waits for embeddings:** it runs only once 80% of shows are embedded by the current model, else retries in 15
     minutes. Run on a fresh catalog or just after a model change, it found almost no clusters and wiped them all.
-  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38) + 0.6 ×
+  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38, the model it
+    was tuned with) + 0.6 ×
     genre/type distance. With text alone, Ted Lasso's nearest shows were Scrubs and The Lincoln Lawyer: the
     summaries are only loosely topical.
   - **Clustering:** average-linkage, by the nearest-neighbour chain (O(n²)), cut at 0.25. Groups over 30 shows are
