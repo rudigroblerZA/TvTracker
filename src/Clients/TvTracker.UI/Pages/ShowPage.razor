@@ -335,18 +335,31 @@ else
                 return;
             }
 
-            summary = await Ratings.GetShowSummaryAsync(Id);
-            similar = await Recommendations.GetSimilarAsync(Id, 8);
-
+            // The rest is independent of each other, so it's fetched together rather than one call after another.
+            var summaryTask = Ratings.GetShowSummaryAsync(Id);
+            var similarTask = Recommendations.GetSimilarAsync(Id, 8);
             if (Session.IsSignedIn)
             {
-                follow = await Tracking.GetFollowAsync(Id);
-                progress = await Tracking.GetProgressAsync(Id);
+                var followTask = Tracking.GetFollowAsync(Id);
+                var progressTask = Tracking.GetProgressAsync(Id);
+                var ratingTask = Ratings.GetMyShowRatingAsync(Id);
+                var preferenceTask = Notifications.GetShowPreferenceAsync(Id);
+                var listsTask = Tracking.GetListsAsync();
+                await Task.WhenAll(summaryTask, similarTask, followTask, progressTask, ratingTask, preferenceTask, listsTask);
+
+                follow = followTask.Result;
+                progress = progressTask.Result;
                 watched = progress?.WatchedEpisodeIds.ToHashSet() ?? [];
-                myRating = (await Ratings.GetMyShowRatingAsync(Id))?.Stars;
-                muted = (await Notifications.GetShowPreferenceAsync(Id))?.Muted ?? false;
-                lists = await Tracking.GetListsAsync();
+                myRating = ratingTask.Result?.Stars;
+                muted = preferenceTask.Result?.Muted ?? false;
+                lists = listsTask.Result;
             }
+            else
+            {
+                await Task.WhenAll(summaryTask, similarTask);
+            }
+            summary = summaryTask.Result;
+            similar = similarTask.Result;
 
             // Open the season the user is in, or the latest season.
             openSeason = progress?.NextEpisode?.SeasonNumber ?? show.Seasons.LastOrDefault(s => s.EpisodeCount > 0)?.Number;

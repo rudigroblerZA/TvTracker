@@ -18,6 +18,12 @@ public interface IIntegrationEventOutbox
 
     /// <summary>Publishes any stored events that haven't been published yet (used by the background publisher).</summary>
     Task PublishPendingAsync(TimeSpan olderThan, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes up to <paramref name="batch"/> published outbox rows created before <paramref name="publishedBefore"/>,
+    /// and as many inbox rows processed before <paramref name="processedBefore"/> (used by <see cref="IntegrationEventRetention"/>).
+    /// </summary>
+    Task<(int Outbox, int Inbox)> TrimAsync(DateTime publishedBefore, DateTime processedBefore, int batch, CancellationToken cancellationToken = default);
 }
 
 public sealed class IntegrationEventOutbox<TContext>(
@@ -75,6 +81,23 @@ public sealed class IntegrationEventOutbox<TContext>(
             .ToListAsync(cancellationToken);
 
         await PublishEntriesAsync(entries, cancellationToken);
+    }
+
+    public async Task<(int Outbox, int Inbox)> TrimAsync(DateTime publishedBefore, DateTime processedBefore, int batch,
+        CancellationToken cancellationToken = default)
+    {
+        // Unpublished and failed rows are kept whatever their age: the publisher still owes them.
+        var outbox = await dbContext.IntegrationEventLogs
+            .Where(e => e.State == EventState.Published && e.CreatedAtUtc < publishedBefore)
+            .OrderBy(e => e.CreatedAtUtc)
+            .Take(batch)
+            .ExecuteDeleteAsync(cancellationToken);
+        var inbox = await dbContext.ProcessedIntegrationEvents
+            .Where(e => e.ProcessedAtUtc < processedBefore)
+            .OrderBy(e => e.ProcessedAtUtc)
+            .Take(batch)
+            .ExecuteDeleteAsync(cancellationToken);
+        return (outbox, inbox);
     }
 
     private async Task PublishEntriesAsync(List<IntegrationEventLogEntry> entries, CancellationToken cancellationToken)
