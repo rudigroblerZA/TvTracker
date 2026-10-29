@@ -435,6 +435,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `list-links` | A list's link (`/l/{token}`), its section on the list page, and its endpoints |
 | `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
@@ -471,10 +472,11 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 Free and Plus, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
 
-- **Free:** up to 3 lists, and lists can't be shared on your profile. **Plus:** as many lists as you like (up to the
-  service's cap of 100), and sharing.
-- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit; a list's page turns
-  the Share box off with "Sharing lists is part of Plus"; `/settings/plan` compares the plans and shows yours.
+- **Free:** up to 3 lists. **Plus:** as many lists as you like (up to the service's cap of 100). Both can share lists,
+  on their profile and by link; sharing was Plus-only at first and opened to everyone, since shared lists bring people in.
+- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit, and `/settings/plan`
+  compares the plans and shows yours. Sharing still goes through the plan's `ShareLists`, so a plan can take it away
+  again without new plumbing.
 - **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
   user can still edit, unshare or delete them. Only a new list or a new share is refused.
 - **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches
@@ -485,6 +487,20 @@ Free and Plus, behind the `plans` flag. The plumbing for paid features is in pla
     admins (404 for anyone else).
   - `GET /api/v1/lists/limits` (Tracking) gives what the lists endpoints enforce.
   - Past a limit, Tracking answers 403 with a problem of type `plan-limit` naming the plan that allows it.
+
+### List links
+
+A list's page has **Get a link** (behind the `list-links` flag): anyone with the link (`/l/{token}`) sees the list,
+read-only, without signing in or having an account.
+
+- **What it shows:** the list's name, description and shows (each linking to its show page), not who made it.
+- **Separate from profile sharing:** a private profile or a block doesn't stop a link; sending it is the owner's choice.
+- **Turn off link** stops it working at once; a new link has a new address. Deleting the list or the account ends it too.
+- **Share link** opens the share sheet on a phone and copies the link elsewhere.
+- **The address** is the web app's own on the web; the phone uses `MobileSettings.WebAddress` (this machine in
+  development, so set it to the public address for a release).
+- **API:** `POST` / `DELETE /api/v1/lists/{id}/link` (owner), and `GET /api/v1/linked-lists/{token}` (anyone) on Tracking.
+  The token is 128 random bits, so links can't be guessed.
 
 ### Navigation
 

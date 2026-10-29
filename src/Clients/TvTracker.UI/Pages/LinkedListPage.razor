@@ -1,0 +1,68 @@
+@page "/l/{Token}"
+@attribute [RequiresFeature(FeatureFlags.ListLinks)]
+@inject TrackingClient Tracking
+
+@* A list opened from its link: read-only, for anyone, signed in or not. The owner isn't named. *@
+<PageTitle>@(list?.Name ?? "Shared list") · @Brand.AppName</PageTitle>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (gone)
+{
+    <h1>Shared list</h1>
+    <p class="muted">This link has been turned off, or it isn't a list's link. Ask whoever sent it for a new one.</p>
+}
+else if (list is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <p class="muted small">A list shared with you on @Brand.AppName</p>
+    <h1>@list.Name</h1>
+    @if (!string.IsNullOrEmpty(list.Description))
+    {
+        <p>@list.Description</p>
+    }
+    @if (list.Items.Count == 0)
+    {
+        <p class="muted">No shows on it yet.</p>
+    }
+    else
+    {
+        <p class="muted small">@(list.Items.Count == 1 ? "1 show" : $"{list.Items.Count} shows")</p>
+        <div class="card-grid">
+            @foreach (var item in list.Items)
+            {
+                <ShowCard @key="item.ShowId" ShowId="item.ShowId" Title="@(item.Title ?? "Unknown show")" PosterUrl="@item.PosterUrl" />
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private LinkedList? list;
+    private bool gone;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            list = await Tracking.GetLinkedListAsync(Token);
+            gone = list is null;
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

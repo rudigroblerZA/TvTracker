@@ -14,7 +14,7 @@ public static class Plans
 
     public static readonly IReadOnlyList<string> All = [Free, Plus];
 
-    private static readonly PlanLimits FreeLimits = new(MaxLists: 3, ShareLists: false);
+    private static readonly PlanLimits FreeLimits = new(MaxLists: 3, ShareLists: true);
     private static readonly PlanLimits PlusLimits = new(MaxLists: null, ShareLists: true);
 
     /// <summary>The plan's limits; an unknown plan (or none yet) is free.</summary>
@@ -25,5 +25,8 @@ public static class Plans
 }
 
 /// <param name="MaxLists">How many custom lists the user may have; null for no plan limit (the service's own cap still applies).</param>
-/// <param name="ShareLists">Whether they may share a list on their profile.</param>
+/// <param name="ShareLists">
+/// Whether they may share a list, on their profile or by link. Every plan may now (sharing brings people in); the
+/// limit stays so a plan can take it away again without new plumbing.
+/// </param>
 public record PlanLimits(int? MaxLists, bool ShareLists);

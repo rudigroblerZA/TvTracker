@@ -167,7 +167,16 @@ public record ListSummary(Guid Id, string Name, string? Description, int ItemCou
 public record ListItem(Guid ShowId, string? Title, string? PosterUrl, int Position, DateTime AddedAtUtc);
 
 /// <param name="Shared">Shown on the owner's Social page to the people who can see them.</param>
-public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false);
+/// <param name="LinkToken">The secret in the list's link; null without one.</param>
+public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false,
+    string? LinkToken = null);
+
+/// <summary>A list as its link shows it to anyone: no owner.</summary>
+public record LinkedList(string Name, string? Description, IReadOnlyList<LinkedListItem> Items, DateTime UpdatedAtUtc);
+
+public record LinkedListItem(Guid ShowId, string? Title, string? PosterUrl);
+
+public record ListLink(string Token);
 
 // Ratings
 

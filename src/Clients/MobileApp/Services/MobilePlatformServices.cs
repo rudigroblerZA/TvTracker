@@ -73,6 +73,14 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
         return await notifications.RegisterDeviceAsync(new RegisterDevice(platform, token, null, null)) is not null;
     }
 
+    public string PublicWebAddress => MobileSettings.WebAddress.ToString();
+
+    public async Task<bool> ShareLinkAsync(string title, string url)
+    {
+        await Share.Default.RequestAsync(new ShareTextRequest { Title = title, Uri = url });
+        return true;
+    }
+
     public async Task SaveTextFileAsync(string fileName, string content)
     {
         var path = Path.Combine(FileSystem.CacheDirectory, fileName);
