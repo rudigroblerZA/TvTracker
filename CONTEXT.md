@@ -473,6 +473,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     a move of 0.1+ is named, towards the trait's end.
   - **Called it** is the only part about other users: the share of a show's followers here who followed after the
     caller, shown with 5+ followers (the privacy rule) and when they were ahead of half.
+- **Waiting room** (`WaitingRoomApi`): computed on request from the caller's watches and the catalog copy, with the
+  show documents' `NextPremiere` and `Outlook`. Caught up means every aired regular episode watched; ended shows have
+  nothing to wait for. A dated next episode in the current season is "episode", a dated premiere "season", else the
+  timing forecast, else unknown.
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
@@ -527,6 +531,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     and runtime. "Other" is recorded, not applied. Both services check values, Ratings so the suggester hears why.
   - **Reverting** deletes the override and makes the show due for refresh, which brings the provider's value back.
   - **Synchronous on purpose:** the moderator sees at once if the catalog refused the value or the show is gone.
+- **Episode duels** (`DuelsApi`, `episode_duels`): a user's "which was better?" answers per show, ranked on read by a
+  Bradley-Terry model (MM algorithm), each episode also given one win and one loss against an average episode.
+  - **Why the prior:** without it, an episode that won its only duel has infinite strength and tops the list.
+  - **Pairs:** least-played episode against one of the three closest in strength it hasn't met, at random.
+  - **Watched copy:** duels may only be about watched episodes, so Ratings' `watched_episodes` gained `ShowId` and
+    `RecordedAtUtc`, and Ratings now handles `EpisodeUnwatched` and Tracking's daily snapshot (adds what's missing,
+    fills show ids, removes what's gone unless recorded after `TakenAtUtc`). Before this an unwatch never reached
+    Ratings, so the comments' spoiler gate kept treating the episode as watched.
 - **Ratings' migrations:** Ratings moved off `EnsureCreated` for these tables. Its `InitialCreate` baseline was applied
   to a scratch database and diffed (`pg_dump -s`) against the live one `EnsureCreated` made: identical apart from EF's
   history table.

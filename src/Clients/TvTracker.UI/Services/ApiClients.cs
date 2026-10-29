@@ -216,6 +216,18 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<MyRating?> GetMyEpisodeRatingAsync(Guid episodeId, CancellationToken ct = default) =>
         GetAsync<MyRating>(ApiClients.Ratings, $"api/v1/episodes/{episodeId}/rating", ct);
 
+    /// <summary>The user's episode duels for a show: the next pair and their ranking so far.</summary>
+    public Task<DuelState?> GetDuelsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<DuelState>(ApiClients.Ratings, $"api/v1/shows/{showId}/duels", ct);
+
+    /// <summary>Records which of two watched episodes was better; returns the new state.</summary>
+    public Task<DuelState?> DecideDuelAsync(Guid showId, Guid winnerId, Guid loserId, CancellationToken ct = default) =>
+        SendAsync<DuelState>(ApiClients.Ratings, HttpMethod.Post, $"api/v1/shows/{showId}/duels", new { winnerId, loserId }, ct);
+
+    /// <summary>Forgets every duel for the show.</summary>
+    public Task ResetDuelsAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/shows/{showId}/duels", null, ct);
+
     public Task RateEpisodeAsync(Guid episodeId, Guid showId, int stars, CancellationToken ct = default) =>
         SendAsync(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/rating", new { showId, stars }, ct, queueIfOffline: true);
 
@@ -352,6 +364,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     /// <summary>"Will you finish it?" for one show; null when the user hasn't started it or is caught up.</summary>
     public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
+
+    /// <summary>Running shows the user is caught up on, with when each is back.</summary>
+    public Task<WaitingRoom?> GetWaitingRoomAsync(CancellationToken ct = default) =>
+        GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 
     /// <summary>Network report cards, most shows first, with the whole catalog as the baseline.</summary>
     public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>

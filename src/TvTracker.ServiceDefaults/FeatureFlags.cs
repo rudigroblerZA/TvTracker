@@ -47,6 +47,8 @@ public static class FeatureFlags
     public const string AwardsShelf = "awards-shelf";
     public const string NetworkReports = "network-reports";
     public const string YearInTv = "year-in-tv";
+    public const string EpisodeDuels = "episode-duels";
+    public const string WaitingRoom = "waiting-room";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

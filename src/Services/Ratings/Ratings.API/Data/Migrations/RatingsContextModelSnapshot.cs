@@ -228,6 +228,35 @@ namespace Ratings.API.Data.Migrations
                     b.ToTable("corrections", (string)null);
                 });
 
+            modelBuilder.Entity("Ratings.API.Data.EpisodeDuel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DecidedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("LoserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("WinnerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ShowId");
+
+                    b.ToTable("episode_duels", (string)null);
+                });
+
             modelBuilder.Entity("Ratings.API.Data.EpisodeRating", b =>
                 {
                     b.Property<string>("UserId")
@@ -370,7 +399,15 @@ namespace Ratings.API.Data.Migrations
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ShowId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("UserId", "EpisodeId");
+
+                    b.HasIndex("UserId", "ShowId");
 
                     b.ToTable("watched_episodes", (string)null);
                 });

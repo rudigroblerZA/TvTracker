@@ -54,6 +54,9 @@ else
             <AuthorizeView>
                 <Authorized>
                     <Feature Flag="@FeatureFlags.EssentialCut"><EssentialCutTeaser ShowId="show.Id" /></Feature>
+                    <Feature Flag="@FeatureFlags.EpisodeDuels">
+                        <p class="small"><a href="shows/@show.Id/duels">Rank the episodes you've watched</a><span class="muted"> by picking the better of two</span></p>
+                    </Feature>
                     <Feature Flag="@FeatureFlags.Corrections">
                         <SuggestCorrection ShowId="show.Id" Context="@show.Title"
                                            Current="@(new Dictionary<string, string?> { ["show-summary"] = show.Overview })" />

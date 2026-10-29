@@ -21,6 +21,8 @@ builder.Services.AddHybridCache();
 
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeWatchedIntegrationEvent, EpisodeWatchedHandler>()
+    .AddSubscription<EpisodeUnwatchedIntegrationEvent, EpisodeUnwatchedHandler>()
+    .AddSubscription<TrackingSnapshotIntegrationEvent, TrackingSnapshotHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
 builder.Services.AddIntegrationEventOutbox<RatingsContext>();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -50,6 +52,7 @@ app.MapRatingsApi();
 app.MapCommentsApi();
 app.MapCommunityApi();
 app.MapModerationApi();
+app.MapDuelsApi();
 
 app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, RatingsContext db, CancellationToken ct) =>
 {
@@ -71,7 +74,9 @@ app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, RatingsContext db, 
         flags = await db.Flags.AsNoTracking().Where(f => f.UserId == userId)
             .Select(f => new { f.TargetKind, f.TargetId, f.Reason, f.Note, f.CreatedAtUtc }).ToListAsync(ct),
         corrections = await db.Corrections.AsNoTracking().Where(c => c.UserId == userId)
-            .Select(c => new { c.ShowId, c.EpisodeId, c.Field, c.SuggestedValue, c.Note, c.Status, c.CreatedAtUtc }).ToListAsync(ct)
+            .Select(c => new { c.ShowId, c.EpisodeId, c.Field, c.SuggestedValue, c.Note, c.Status, c.CreatedAtUtc }).ToListAsync(ct),
+        episodeDuels = await db.Duels.AsNoTracking().Where(d => d.UserId == userId)
+            .Select(d => new { d.ShowId, d.WinnerId, d.LoserId, d.DecidedAtUtc }).ToListAsync(ct)
     });
 }).RequireAuthorization();
 

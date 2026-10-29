@@ -168,10 +168,28 @@ public class Reaction
 }
 
 /// <summary>Local copy of watched episodes (from EpisodeWatched), used to decide whether to show comments.</summary>
+/// <summary>An episode the user has watched, from Tracking's events and daily snapshot.</summary>
 public class WatchedEpisodeCopy
 {
     public required string UserId { get; set; }
     public Guid EpisodeId { get; set; }
+
+    /// <summary>Null for rows from before it was kept, until Tracking's next snapshot fills it in.</summary>
+    public Guid? ShowId { get; set; }
+
+    /// <summary>When this copy heard of it, so a snapshot read earlier doesn't remove it.</summary>
+    public DateTime RecordedAtUtc { get; set; }
+}
+
+/// <summary>One "which was better?" answer between two episodes of a show the user watched (episode duels).</summary>
+public class EpisodeDuel
+{
+    public Guid Id { get; set; }
+    public required string UserId { get; set; }
+    public Guid ShowId { get; set; }
+    public Guid WinnerId { get; set; }
+    public Guid LoserId { get; set; }
+    public DateTime DecidedAtUtc { get; set; }
 }
 
 public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContext(options), IIntegrationEventLogDbContext
@@ -181,6 +199,7 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
     public DbSet<WatchedEpisodeCopy> WatchedEpisodes => Set<WatchedEpisodeCopy>();
+    public DbSet<EpisodeDuel> Duels => Set<EpisodeDuel>();
     public DbSet<ContentFlag> Flags => Set<ContentFlag>();
     public DbSet<CommunityInsight> Insights => Set<CommunityInsight>();
     public DbSet<InsightVote> InsightVotes => Set<InsightVote>();
@@ -290,7 +309,17 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
         {
             entity.ToTable("watched_episodes");
             entity.HasKey(w => new { w.UserId, w.EpisodeId });
+            entity.HasIndex(w => new { w.UserId, w.ShowId });
             entity.Property(w => w.UserId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<EpisodeDuel>(entity =>
+        {
+            entity.ToTable("episode_duels");
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Id).ValueGeneratedNever();
+            entity.HasIndex(d => new { d.UserId, d.ShowId });
+            entity.Property(d => d.UserId).HasMaxLength(64);
         });
 
         modelBuilder.UseIntegrationEventLogs();
