@@ -1,0 +1,113 @@
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+@* Call it: predict the next season's rating before it premieres. The model's and everyone's calls show only after yours. *@
+@if (call is not null && (call.SeasonNumber is not null || call.Past.Count > 0))
+{
+    <div class="insight-card call-it">
+        <h3>Call it</h3>
+        @if (call.SeasonNumber is { } season)
+        {
+            @if (call.Mine is { } mine && !editing)
+            {
+                <p>
+                    <span>@($"Your call for season {season}: ")</span><strong>@Format.Rating(mine)</strong>
+                    @if (call.Model is { } model)
+                    {
+                        <span class="muted">@($" · the model says {Format.Rating(model.Rating)} ({Format.Rating(model.Low)} to {Format.Rating(model.High)})")</span>
+                    }
+                    @if (call.Crowd is { } crowd)
+                    {
+                        <span class="muted">@($" · everyone: {Format.Rating(crowd.Rating)} from {crowd.Callers} calls")</span>
+                    }
+                </p>
+                <p class="small">
+                    <span class="muted">@Locks(call.PremieresAtUtc)</span>
+                    <button class="link small" type="button" @onclick="() => editing = true">@(" Change")</button>
+                    <button class="link small" type="button" @onclick="TakeBackAsync">Take back</button>
+                </p>
+            }
+            else
+            {
+                <p>@($"What will season {season} rate on TVmaze? Make your call before it premieres; once it's over, see how close you were, and whether you beat the forecast.")</p>
+                <div class="call-input">
+                    <input type="range" min="5" max="10" step="0.1" value="@draft" @oninput="e => draft = double.Parse(e.Value!.ToString()!, System.Globalization.CultureInfo.InvariantCulture)"
+                           aria-label="@($"Your call for season {season}")" />
+                    <strong class="call-value">@Format.Rating(draft)</strong>
+                    <button class="btn small" type="button" disabled="@saving" @onclick="SaveAsync">@(call.Mine is null ? "Call it" : "Save")</button>
+                    @if (editing)
+                    {
+                        <button class="link small" type="button" @onclick="() => editing = false">Cancel</button>
+                    }
+                </div>
+                <p class="muted small">@Locks(call.PremieresAtUtc)</p>
+            }
+        }
+        @foreach (var past in call.Past)
+        {
+            <p class="small" @key="past.SeasonNumber">@TvTracker.UI.Pages.CallsPage.Outcome(past)</p>
+        }
+        <ErrorNotice Message="@error" />
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowCall? call;
+    private double draft = 8.0;
+    private bool editing;
+    private bool saving;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            call = await Analytics.GetShowCallAsync(ShowId);
+            draft = call?.Mine ?? 8.0;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // Extra: the rest of the insights don't depend on it.
+            call = null;
+        }
+    }
+
+    private string Locks(DateTimeOffset? premieres) =>
+        premieres is { } p ? $"Locks when it premieres on {Session.ToLocal(p):d MMMM yyyy}." : "No premiere date yet; it locks when one airs.";
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        try
+        {
+            call = await Analytics.SetShowCallAsync(ShowId, Math.Round(draft, 1));
+            editing = false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task TakeBackAsync()
+    {
+        error = null;
+        try
+        {
+            await Analytics.DeleteShowCallAsync(ShowId);
+            call = await Analytics.GetShowCallAsync(ShowId);
+            draft = 8.0;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

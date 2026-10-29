@@ -810,3 +810,23 @@ public record PuzzleFeedback(PuzzleShow Guess, int? GuessYear, string Year, bool
 public record PuzzleGenre(string Genre, bool Shared);
 
 public record PuzzleShow(Guid Id, string Title, string? PosterUrl);
+
+/// <summary>Call it on a show: its next season to call, the caller's call, and once called, the model's and the crowd's.</summary>
+/// <param name="SeasonNumber">The season open to a call; null for an ended show.</param>
+/// <param name="Crowd">Everyone's average call; null under 5 callers or before the caller has called.</param>
+public record ShowCall(int? SeasonNumber, DateTimeOffset? PremieresAtUtc, double? Mine, CallRange? Model, CrowdCall? Crowd,
+    IReadOnlyList<SeasonCallInfo> Past);
+
+public record CallRange(double Rating, double Low, double High);
+
+public record CrowdCall(double Rating, int Callers);
+
+/// <param name="State">"open", "airing" or "scored".</param>
+/// <param name="BeatModel">Scored with a model: true when the call was closer, false when the model was; null on a tie.</param>
+public record SeasonCallInfo(Guid ShowId, string Title, string? PosterUrl, int SeasonNumber, double Rating, double? Model, double? Actual,
+    string State, bool? BeatModel, DateTimeOffset? PremieresAtUtc);
+
+public record CallRecord(int Scored, double? AverageMiss, double? ModelAverageMiss, int BeatModel, int ModelWon);
+
+public record MyCalls(CallRecord Record, IReadOnlyList<SeasonCallInfo> Calls, IReadOnlyList<SeasonCallInfo> Suggestions);
+

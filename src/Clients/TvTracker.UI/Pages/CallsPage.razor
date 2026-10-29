@@ -1,0 +1,127 @@
+@page "/calls"
+@attribute [RequiresFeature(FeatureFlags.CallIt)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Call it · @Brand.AppName</PageTitle>
+
+<p><a href="insights">← Insights</a></p>
+<h1>Call it</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Predict what a season will rate on TVmaze before it premieres. Once it's over, see how close you were, and whether
+            you beat @Brand.AppName's forecast model, which you only see after you call.
+        </p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (calls is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else
+        {
+            @if (calls.Record.Scored > 0)
+            {
+                <section class="panel">
+                    <h2>You against the model</h2>
+                    <div class="service-total">
+                        <div><strong>@calls.Record.Scored</strong><span class="muted">@(calls.Record.Scored == 1 ? " call scored" : " calls scored")</span></div>
+                        @if (calls.Record.AverageMiss is { } miss)
+                        {
+                            <div><strong>@($"±{miss:0.00}")</strong><span class="muted">@(" your average miss")</span></div>
+                        }
+                        @if (calls.Record.ModelAverageMiss is { } modelMiss)
+                        {
+                            <div><strong>@($"±{modelMiss:0.00}")</strong><span class="muted">@(" the model's")</span></div>
+                        }
+                        <div><strong>@($"{calls.Record.BeatModel}–{calls.Record.ModelWon}")</strong><span class="muted">@(" calls won against it")</span></div>
+                    </div>
+                </section>
+            }
+
+            @if (calls.Calls.Count > 0)
+            {
+                <section class="panel">
+                    <h2>Your calls</h2>
+                    <ul class="plain-list call-list">
+                        @foreach (var c in calls.Calls)
+                        {
+                            <li class="call-row @(c.BeatModel switch { true => "won", false => "lost", _ => "" })" @key="@($"{c.ShowId}-{c.SeasonNumber}")">
+                                <a class="strong" href="shows/@c.ShowId">@c.Title</a>
+                                <div>@Outcome(c)</div>
+                                @if (c.State == "open")
+                                {
+                                    <span class="muted small">@(c.PremieresAtUtc is { } p ? $" Locks {Session.ToLocal(p):d MMM}." : " No premiere date yet.")</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (calls.Suggestions.Count > 0)
+            {
+                <section class="panel">
+                    <h2>Shows you follow, to call next</h2>
+                    <p class="muted small">Their next season, soonest premiere first. Make your call on the show's page.</p>
+                    <ul class="plain-list">
+                        @foreach (var s in calls.Suggestions)
+                        {
+                            <li @key="s.ShowId">
+                                <a href="shows/@s.ShowId">@s.Title</a>
+                                <span class="muted small">@($" · season {s.SeasonNumber}{(s.PremieresAtUtc is { } p ? $", premieres {Session.ToLocal(p):d MMM yyyy}" : ", no date yet")}")</span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+            else if (calls.Calls.Count == 0)
+            {
+                <p class="muted">Follow a running show, then make your call on its page.</p>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to call your shows' next seasons." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private MyCalls? calls;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            calls = await Analytics.GetMyCallsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>One call in a line: what was called, and once scored, how it came out against the model.</summary>
+    public static string Outcome(SeasonCallInfo c)
+    {
+        var called = $"you called {Format.Rating(c.Rating)}";
+        var model = c.Model is { } m ? $", the model {Format.Rating(m)}" : "";
+        return c.State switch
+        {
+            "scored" when c.Actual is { } actual =>
+                $"Season {c.SeasonNumber} rated {actual:0.00}: {called} (off by {Math.Abs(c.Rating - actual):0.00}){model}. "
+                + c.BeatModel switch { true => "You beat the model.", false => "The model was closer.", _ => c.Model is null ? "" : "A tie with the model." },
+            "airing" => $"Season {c.SeasonNumber} is airing: {called}{model}. Scored when it's over.",
+            _ => $"Season {c.SeasonNumber}: {called}{model}."
+        };
+    }
+}

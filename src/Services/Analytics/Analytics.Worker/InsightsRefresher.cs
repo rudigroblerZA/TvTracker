@@ -2,7 +2,10 @@ using Analytics.Worker.Insights;
 
 namespace Analytics.Worker;
 
-/// <summary>Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour).</summary>
+/// <summary>
+/// Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour), and
+/// scores the season calls whose seasons are over.
+/// </summary>
 public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, ILogger<InsightsRefresher> logger) : BackgroundService
 {
     /// <summary>Gives the event consumers (and a catalog replay) a head start before the first run.</summary>
@@ -33,6 +36,17 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Computing insights failed; will retry at the next interval");
+            }
+
+            // After the documents, whose season verdicts say a season is over; on its own, so one failing doesn't stop the other.
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<SeasonCallScorer>().ScoreAsync(stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Scoring season calls failed; will retry at the next interval");
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));

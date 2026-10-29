@@ -350,6 +350,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     are kept as ratios of (wait + 30 days), since they grow with the wait. It needs two past waits.
   - **When there's no forecast:** none for ended shows. Renewal and timing are only forecast between seasons with
     nothing scheduled or announced; a scheduled season is a fact (`NextPremiere`).
+- **Call it** (`CallItApi`, `season_calls`): a user's prediction of a running show's next season's rating, against the
+  rating forecast.
+  - **Which season:** the one after the latest to air (the first, for a show yet to air), open until its first episode
+    airs. There's no "locked" flag: once it airs, the open season becomes the next one, and the call reads as airing.
+  - **The model's rating is stored with the call** (as it stood when called or changed): the forecast moves as the show
+    airs, and "beat the model" should compare like with like. No forecast for that season, no comparison.
+  - **Anchoring:** the panel shows the model and the crowd only after a call. The Outlook card on the same page shows
+    the forecast anyway; hiding it would take a feature away, so the guard is only the panel's own order.
+  - **Scoring in the worker** (`SeasonCallScorer`, after each insights run): over means the season verdict called it,
+    a later season aired, or the show ended, with 3+ rated episodes; the actual is the season average to 2 decimals,
+    as the verdict computes it. A season that never gets a verdict (daily shows, too few ratings) waits for the next
+    season or the ending.
+  - **Written by two services' processes** in one database: Analytics.API writes calls, Analytics.Worker scores them.
+    Both are Analytics, so the one-database-per-service rule holds. Calls are deleted with the account and in the
+    data export.
+  - **Privacy:** the crowd's average needs 5 callers, and includes the caller's own call.
+  - **Tested** by seeding calls on finished seasons: Ted Lasso's season 4 scored 7.93, the season verdict's figure, and
+    six callers on Silo's season 4 gave a crowd average of 7.7.
 - **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches.
   - **No probability:** per-person history is too thin for an honest one.
   - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),

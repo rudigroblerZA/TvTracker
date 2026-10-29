@@ -73,14 +73,17 @@ public static class ServicesApi
         api.MapPut("/me/services", SetMineAsync).RequireFeature(FeatureFlags.YourServices);
         api.MapGet("/me/services/report", GetReportAsync).RequireFeature(FeatureFlags.YourServices);
 
-        // The only data here the user gave us (everything else is a copy of other services'), for Identity's data export.
+        // The only data here the user gave us (their services and season calls; everything else is a copy of other
+        // services'), for Identity's data export.
         api.MapGet("/me/export", async (ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct) =>
             user.FindFirst("sub")?.Value is not { } userId
                 ? Results.Unauthorized()
                 : Results.Ok(new
                 {
                     services = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId)
-                        .Select(s => new { s.ServiceKey, s.AddedAtUtc }).ToListAsync(ct)
+                        .Select(s => new { s.ServiceKey, s.AddedAtUtc }).ToListAsync(ct),
+                    seasonCalls = await db.SeasonCalls.AsNoTracking().Where(c => c.UserId == userId)
+                        .Select(c => new { c.ShowId, c.SeasonNumber, c.Rating, c.CalledAtUtc, c.Actual }).ToListAsync(ct)
                 }));
     }
 
