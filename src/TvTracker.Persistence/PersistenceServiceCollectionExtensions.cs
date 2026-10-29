@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using TvTracker.Persistence;
 
@@ -13,6 +14,8 @@ public static class PersistenceServiceCollectionExtensions
     {
         services.AddScoped<IIntegrationEventOutbox, IntegrationEventOutbox<TContext>>();
         services.AddHostedService<OutboxPublisher>();
+        services.AddHostedService<IntegrationEventRetention>();
+        services.TryAddSingleton(TimeProvider.System);
         return services;
     }
 

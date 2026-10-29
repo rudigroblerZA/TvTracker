@@ -42,6 +42,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outboxes still deserialize. Don't rename or reorder existing ones.
 - **Publishing:** add the event to `IIntegrationEventOutbox` in the same `SaveChanges` as the change, then
   `PublishAddedAsync`. `OutboxPublisher` retries anything left behind.
+  - **Retention** (`IntegrationEventRetention`, hourly, in batches of 5,000): published outbox rows go after 7 days
+    (kept only to look into what was sent; unpublished and failed rows stay), inbox rows after 30. An inbox row is what
+    makes a redelivery a no-op, so it must outlive any redelivery; Notifications also uses it to alert once by a stable
+    id (crossovers re-sent for up to 14 days, verdicts within 2), both inside 30 days. Before this nothing was deleted:
+    Catalog's outbox reached 10,753 rows and Social's inbox 34,972.
   - **Channels:** `RabbitMQEventBus` rents publishing channels from a small pool and declares the exchange once per
     connection. A channel opened, declared and closed per event added three round trips to every write; pooling took
     follow and mark-watched from p50 ~50 ms to ~30 ms at 20 load-test users.
@@ -804,6 +809,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `theme.js` loads in the head, before the stylesheet, and applies a saved choice from `localStorage` before first
   paint. The phone keeps its choice in MAUI `Preferences`, which the page can't read that early, so `MainLayout`
   also applies it after the first render, and `theme.js` mirrors it into `localStorage` for the next start.
+- **Show page loads together:** after the show itself, its summary, similar shows, follow, progress, rating, mute and
+  lists are fetched in parallel (`Task.WhenAll`) rather than one after another. Over 60 loads each in the browser, time
+  to full render went from a median of 314 ms (p90 809) to 247 ms (p90 342).
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why
