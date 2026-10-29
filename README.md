@@ -428,6 +428,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
@@ -458,6 +459,25 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
     flagd, so it needs the two on one disk.
   - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
     Identity.API.
+
+### Plans
+
+Free and Plus, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
+
+- **Free:** up to 3 lists, and lists can't be shared on your profile. **Plus:** as many lists as you like (up to the
+  service's cap of 100), and sharing.
+- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit; a list's page turns
+  the Share box off with "Sharing lists is part of Plus"; `/settings/plan` compares the plans and shows yours.
+- **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
+  user can still edit, unshare or delete them. Only a new list or a new share is refused.
+- **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches
+  Tracking within seconds.
+- **API:**
+  - `GET /api/v1/me/plan` (Identity) gives the caller's plan and its limits.
+  - `GET /api/v1/admin/plans/users?q=` and `PUT /api/v1/admin/plans/users/{userId}` (`{"plan":"plus"}`) are for
+    admins (404 for anyone else).
+  - `GET /api/v1/lists/limits` (Tracking) gives what the lists endpoints enforce.
+  - Past a limit, Tracking answers 403 with a problem of type `plan-limit` naming the plan that allows it.
 
 ### Navigation
 
@@ -1006,12 +1026,11 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
-(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Notifications.API/Data/Migrations`,
+Catalog, Analytics, Identity, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
 `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
-`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity still uses `EnsureCreated`,
-which creates a missing database but never changes an existing one. Notifications', Recommendations' and Tracking's first
-migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
+`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
+Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
 marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
@@ -1065,7 +1084,6 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 
 ## Before production
 
-- Move the remaining services from `EnsureCreated` to EF Core migrations, as Catalog has (see Database schema).
 - Change the development secrets in `AppHost.cs` and `Realms/tvtracker-realm.json`, and turn on HTTPS for Keycloak.
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
 - Add a dead-letter queue for events that fail twice, and tests.

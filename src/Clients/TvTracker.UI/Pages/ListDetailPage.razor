@@ -35,10 +35,18 @@
                     <p>@list.Description</p>
                 }
                 <Feature Flag="@FeatureFlags.Social">
+                    @* A list shared before the plan limits stays shared, and can still be unshared. *@
                     <label class="checkbox small">
-                        <input type="checkbox" checked="@list.Shared" @onchange="e => ShareAsync(e.Value is true)" />
+                        <input type="checkbox" checked="@list.Shared" disabled="@(!list.Shared && limits?.CanShare == false)"
+                               @onchange="e => ShareAsync(e.Value is true)" />
                         Share on your profile (people who can see you on Feed see this list)
                     </label>
+                    @if (!list.Shared && limits is { } plan && !plan.CanShare)
+                    {
+                        <p class="plan-note small">
+                            <span>@($"Sharing lists is part of {Plans.Name(Plans.Plus)}. ")</span><a href="settings/plan">See plans</a>
+                        </p>
+                    }
                 </Feature>
                 <div class="actions">
                     <button class="btn btn-quiet" @onclick="StartEdit">Rename</button>
@@ -73,6 +81,7 @@
     [Parameter] public Guid Id { get; set; }
 
     private ListDetail? list;
+    private ListLimits? limits;
     private bool notFound;
     private bool editing;
     private string name = "";
@@ -86,7 +95,9 @@
         error = null;
         try
         {
+            var limitsTask = Tracking.GetListLimitsAsync();
             list = await Tracking.GetListAsync(Id);
+            limits = await limitsTask;
             notFound = list is null;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)

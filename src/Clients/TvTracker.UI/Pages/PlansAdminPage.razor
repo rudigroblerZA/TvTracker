@@ -1,0 +1,101 @@
+@page "/settings/plans"
+@attribute [RequiresFeature(FeatureFlags.Plans)]
+@inject IdentityClient Identity
+
+<PageTitle>Plans · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Plans</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Set someone's plan until payments exist. A change reaches the services within seconds, and limits apply to new
+            lists and shares only: what they already have stays.
+        </p>
+        <form class="inline-form" @onsubmit="LoadAsync">
+            <input type="search" @bind="term" placeholder="Name or email" aria-label="Find people" />
+            <button class="btn" type="submit">Find</button>
+        </form>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (users is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(notAdmin ? "Only admins can set plans." : "Loading…")</p>
+            }
+        }
+        else if (users.Count == 0)
+        {
+            <p class="muted">@(string.IsNullOrWhiteSpace(term) ? $"Nobody is on {Plans.Name(Plans.Plus)} yet. Find someone above." : "Nobody matches.")</p>
+        }
+        else
+        {
+            <ul class="plan-users">
+                @foreach (var user in users)
+                {
+                    <li class="panel" @key="user.UserId">
+                        <div>
+                            <div class="strong">@user.DisplayName</div>
+                            <div class="muted small">@user.Email</div>
+                        </div>
+                        <select aria-label="@($"Plan for {user.DisplayName}")" value="@user.Plan" @onchange="e => SetAsync(user, e.Value as string)">
+                            @foreach (var key in Plans.All)
+                            {
+                                <option value="@key">@Plans.Name(key)</option>
+                            }
+                        </select>
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<PlanUser>? users;
+    private string? term;
+    private string? error;
+    private bool notAdmin;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // Admins only: anyone else gets 404, which arrives as null.
+            users = await Identity.SearchPlanUsersAsync(term?.Trim());
+            notAdmin = users is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task SetAsync(PlanUser user, string? plan)
+    {
+        if (plan is null || plan == user.Plan)
+        {
+            return;
+        }
+        error = null;
+        try
+        {
+            if (await Identity.SetPlanAsync(user.UserId, plan) is { } saved)
+            {
+                users = users!.Select(u => u.UserId == saved.UserId ? saved : u).ToList();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

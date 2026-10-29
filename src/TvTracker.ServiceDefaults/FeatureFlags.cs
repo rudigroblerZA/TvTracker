@@ -51,6 +51,7 @@ public static class FeatureFlags
     public const string WaitingRoom = "waiting-room";
     public const string Mixtape = "mixtape";
     public const string WorthIt = "worth-it";
+    public const string Plans = "plans";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

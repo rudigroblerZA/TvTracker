@@ -100,19 +100,6 @@ So the rest of the list reads in proportion:
 - **Done when:** a handler that throws twice and then succeeds still processes the event; one that always throws lands
   in the dead-letter queue, visible on `/ops`; CONTEXT.md's Events section is updated.
 
-### R3. Move Identity to migrations
-
-**P2 · S**
-
-- **Why:**
-  - It still uses `EnsureCreated` (`Identity.API/Program.cs:12`), which never changes an existing database.
-    Notifications moved with the weekly digest.
-- **What:** the baseline pattern other services used. Make `InitialCreate` from the unchanged model, pass
-  `baseline: "InitialCreate"`, diff it against an `EnsureCreated` database with `pg_dump -s`, and add the migration
-  commands to CLAUDE.md.
-- **Done when:** it starts on an existing database and on an empty one, and CONTEXT.md's Persistence section lists it
-  as migrated.
-
 ### R4. Inbox and delivery retention in Notifications
 
 **P3 · S**
@@ -260,6 +247,18 @@ So the rest of the list reads in proportion:
 ## Features
 
 All the features from the review have shipped; new ideas go here.
+
+### F1. Paying for Plus
+
+**P2 · M**
+
+- **Why:** plans are plumbed (Identity owns each user's plan; Tracking enforces Free's 3 lists and no sharing), but
+  only admins can change a plan, on `/settings/plans`.
+- **What:** a payment provider's checkout from `/settings/plan`, and its webhook on Identity.API setting the plan
+  through the same change `PlansApi.SetPlanAsync` makes (event and all), downgrading when a subscription lapses.
+  Prices per region, and a receipt in the data export.
+- **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
+  period's end, and the webhook rejects unsigned calls.
 
 ## Technical debt
 

@@ -111,3 +111,9 @@ public static class TrackingMappings
     public static IOrderedEnumerable<EpisodeCopy> InWatchOrder(this IEnumerable<EpisodeCopy> episodes) =>
         episodes.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber);
 }
+
+/// <param name="Plan">The caller's plan (<see cref="TvTracker.IntegrationEvents.Plans"/>).</param>
+/// <param name="MaxLists">Lists their plan allows; null for no plan limit.</param>
+/// <param name="Lists">Lists they have; can be over <paramref name="MaxLists"/> when made before the limits.</param>
+/// <param name="Enforced">False while the plans flag is off for them: no plan limits apply.</param>
+public record ListLimitsDto(string Plan, int? MaxLists, bool ShareLists, int Lists, bool Enforced);

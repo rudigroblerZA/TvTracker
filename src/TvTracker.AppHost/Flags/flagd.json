@@ -223,6 +223,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
     },
+    "plans": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Plans: Free and Plus. Free accounts get 3 lists and can't share them; off, nobody has a limit. Also the plan page and admins' plans page." }
+    },
     "worth-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

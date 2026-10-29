@@ -76,6 +76,19 @@ public class EpisodeCopy
     public int? RuntimeMinutes { get; set; }
 }
 
+/// <summary>
+/// Copy of a user's plan (<see cref="TvTracker.IntegrationEvents.Plans"/>), from Identity's plan events and daily
+/// profile snapshot, for the lists' limits. No row means free.
+/// </summary>
+public class UserPlanCopy
+{
+    public required string UserId { get; set; }
+    public required string Plan { get; set; }
+
+    /// <summary>When Identity set it; an event older than this is ignored, since events can arrive out of order.</summary>
+    public DateTimeOffset ChangedAtUtc { get; set; }
+}
+
 public class TrackingContext(DbContextOptions<TrackingContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<Follow> Follows => Set<Follow>();
@@ -84,6 +97,7 @@ public class TrackingContext(DbContextOptions<TrackingContext> options) : DbCont
     public DbSet<UserListItem> ListItems => Set<UserListItem>();
     public DbSet<ShowCopy> Shows => Set<ShowCopy>();
     public DbSet<EpisodeCopy> Episodes => Set<EpisodeCopy>();
+    public DbSet<UserPlanCopy> Plans => Set<UserPlanCopy>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -120,6 +134,14 @@ public class TrackingContext(DbContextOptions<TrackingContext> options) : DbCont
         {
             entity.ToTable("list_items");
             entity.HasKey(i => new { i.ListId, i.ShowId });
+        });
+
+        modelBuilder.Entity<UserPlanCopy>(entity =>
+        {
+            entity.ToTable("user_plans");
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.UserId).HasMaxLength(64);
+            entity.Property(p => p.Plan).HasMaxLength(16);
         });
 
         modelBuilder.Entity<ShowCopy>(entity =>

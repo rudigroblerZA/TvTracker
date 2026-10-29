@@ -144,7 +144,7 @@ public static class ProfileApi
         return Results.Text(export.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), "application/json");
     }
 
-    private static async Task<UserProfile> GetOrCreateProfileAsync(
+    internal static async Task<UserProfile> GetOrCreateProfileAsync(
         ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
     {
         var userId = user.GetUserId();
