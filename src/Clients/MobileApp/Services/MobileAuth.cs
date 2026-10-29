@@ -6,11 +6,14 @@ using IdentityModel.OidcClient;
 using IdentityModel.OidcClient.Browser;
 using Microsoft.AspNetCore.Components.Authorization;
 using TvTracker.UI.Services;
+// MAUI's implicit usings bring in Microsoft.Maui.ApplicationModel.IBrowser (the system browser, with OpenAsync),
+// which takes the plain name; the OIDC client needs its own browser interface.
+using OidcBrowser = IdentityModel.OidcClient.Browser.IBrowser;
 
 namespace TvTracker.Mobile.Services;
 
 /// <summary>Opens the sign-in page in the system browser and returns the redirect (tvtracker://callback?...).</summary>
-public sealed class MauiAuthBrowser : IBrowser
+public sealed class MauiAuthBrowser : OidcBrowser
 {
     public async Task<BrowserResult> InvokeAsync(BrowserOptions options, CancellationToken cancellationToken = default)
     {

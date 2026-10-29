@@ -1,3 +1,5 @@
+using TvTracker.Mobile.Services;
+
 namespace TvTracker.Mobile;
 
 public partial class App : Application
