@@ -482,6 +482,13 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 - It talks to the Mobile BFF and Keycloak on `localhost` (`10.0.2.2` from the Android emulator); see `Services/MobileSettings.cs`.
 - Sign-in opens Keycloak in the system browser and returns via `tvtracker://callback`.
 - Deep links: `tvtracker://shows/{id}` opens a show.
+- **Building on Linux** (Android only; iOS and Mac Catalyst need a Mac):
+  ```bash
+  dotnet workload install maui-android
+  USER=$(whoami) dotnet build src/Clients/MobileApp -t:InstallAndroidDependencies -f net10.0-android \
+    -p:AndroidSdkDirectory=$HOME/android-sdk -p:AcceptAndroidSDKLicenses=True
+  dotnet build src/Clients/MobileApp -f net10.0-android -p:AndroidSdkDirectory=$HOME/android-sdk
+  ```
 - Offline: show pages, Up Next, lists and progress are cached in SQLite; follows, watched marks, ratings and list changes made offline are queued and sent when the connection is back.
 
 ## Architecture

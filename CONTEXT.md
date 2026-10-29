@@ -922,5 +922,5 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 - There are no tests and no CI.
 - There's no dead-letter queue.
-- The MAUI app has never been compiled.
+- The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - Development secrets are in `AppHost.cs` and the realm file.

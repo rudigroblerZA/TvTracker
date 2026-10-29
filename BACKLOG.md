@@ -72,9 +72,12 @@ So the rest of the list reads in proportion:
 
 **P2 · M**
 
-- **Why:** the MAUI app has never been compiled (CONTEXT.md, Known gaps), so changes to TvTracker.UI's shared pages
-  may already have broken it.
-- **What:** a CI job on a runner with the MAUI workload that builds `src/Clients/MobileApp` for Android.
+- **Why:** the MAUI app has been compiled once, by hand (CONTEXT.md, Known gaps), so changes to TvTracker.UI's shared
+  pages can break it unnoticed. That first build found three errors (an `IBrowser` clash, a missing `using`, a package
+  downgrade).
+- **What:** a CI job on a Linux runner that builds `src/Clients/MobileApp` for Android (the project targets Android alone
+  on Linux): `dotnet workload install maui-android`, then `-t:InstallAndroidDependencies` with
+  `AcceptAndroidSDKLicenses=True` (it needs `USER` set), then the build with `AndroidSdkDirectory`.
 - **Done when:** it builds in CI, and fixes for whatever was broken are merged.
 
 ## Reliability
