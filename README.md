@@ -209,6 +209,17 @@ watching and your watchlist.
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
 
+**Mixtape** (`/mixtape`, from Discover and Blend; `mixtape` flag) is Blend for three to five shows: the shows that fit
+all of them, not just one. Breaking Bad + Ozark + Better Call Saul gives The Lincoln Lawyer, Bosch and Criminal Minds;
+Stranger Things + Severance + Black Mirror gives Travelers, Westworld and The Expanse; The Office + Superstore + Abbott
+Elementary gives Seinfeld, The Good Place and Brooklyn Nine-Nine. Each pick shows how close it is to each show (a bar in
+the shows' colours), the one it's closest to, and a genre it takes from one of them; shows you follow say so. The
+address holds the shows, so a mixtape can be shared, and it works signed out.
+- **How:** it averages the shows' search vectors, gathers candidates nearest the average and nearest each show, and
+  ranks them by their distance to the farthest of the shows. Picks must be the same kinds of show as the mixtape's
+  (three scripted shows give scripted picks).
+- **API:** `GET /api/v1/shows/mixtape?ids=a,b,c` on Catalog.API.
+
 **Blend** (`/blend`, and "Blend … with another show" on every show page) finds the shows that sit between two others:
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
 Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
@@ -382,7 +393,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -416,6 +427,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
+| `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
+| `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 
@@ -446,13 +460,32 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
   - **API:** `GET /api/v1/admin/flags` and `PUT /api/v1/admin/flags/{key}` (`{ "on": true | false | null }`) on
     Identity.API.
 
+### Plans
+
+Free and Plus, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
+
+- **Free:** up to 3 lists, and lists can't be shared on your profile. **Plus:** as many lists as you like (up to the
+  service's cap of 100), and sharing.
+- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit; a list's page turns
+  the Share box off with "Sharing lists is part of Plus"; `/settings/plan` compares the plans and shows yours.
+- **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
+  user can still edit, unshare or delete them. Only a new list or a new share is refused.
+- **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches
+  Tracking within seconds.
+- **API:**
+  - `GET /api/v1/me/plan` (Identity) gives the caller's plan and its limits.
+  - `GET /api/v1/admin/plans/users?q=` and `PUT /api/v1/admin/plans/users/{userId}` (`{"plan":"plus"}`) are for
+    admins (404 for anyone else).
+  - `GET /api/v1/lists/limits` (Tracking) gives what the lists endpoints enforce.
+  - Past a limit, Tracking answers 403 with a problem of type `plan-limit` naming the plan that allows it.
+
 ### Navigation
 
 - **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Calendar, Discover, For you,
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
   - My shows: lists.
-  - Discover: Prestige picks, Blend, Universes, nanogenres and network report cards.
+  - Discover: Prestige picks, Blend, Mixtape, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: Ask, the time machine and holiday episodes.
   - Stats: Year in TV.
@@ -571,6 +604,7 @@ How events flow:
     - great endings: well-rated (7.5+) ended shows that stick the landing, most popular first;
     - worth the wait: well-rated shows (7.5+) with a slow start that rate at least 0.4 higher from the episode where
       they get good, most popular first (Person of Interest, Dark, Slow Horses, Severance).
+    - worth your time: shows whose worth-it score says worth it (75+), best first.
   - **Show page — prolific creators and producers:** who made the show, featuring the most prolific person.
     - **Prolific** means credited behind the camera on 10 or more shows on TVmaze. Dick Wolf has 57 and Chuck Lorre 19.
     - **What it shows:** their totals, best-known shows, and their other shows in the catalog.
@@ -852,6 +886,19 @@ How events flow:
       needs three. Ties read as ties ("ties for its best"). A show whose final season has too few rated episodes to
       check gets no verdict: 232 of 289 ended shows get one.
     - **Great endings:** a Discover list of well-rated (7.5+) ended shows that stick the landing, most popular first.
+  - **Is it worth it?** (show pages, signed in; `worth-it` flag): a 0-100 score for whether the hours pay off, with
+    every part behind it, and the first of the page's highlights.
+    - **How:** TVmaze's rating, moved by what the other insights found:
+      - a slow start: −0.15, or −0.3 when it gets good 10 h or more in; good from the first episode +0.1;
+      - a decline: −0.6 × the share of the running time from the season it sets in;
+      - the ending: sticks or great finale +0.3, weaker last season −0.1, finale lets down −0.3, fizzles −0.5;
+      - the spread of episode ratings: a rollercoaster −0.15, steady +0.1.
+    - **Score:** 6.0 on that scale is 0 and 9.0 is 100, so a typical show scores 50. The verdicts are worth it (75+),
+      mostly worth it (50+), mixed (30+) and hard to recommend.
+    - **Examples:** Breaking Bad 100, Better Call Saul 97, The Wire 88, Game of Thrones 66, Dexter 56, Severance 52,
+      How I Met Your Mother 22. A running show's ending isn't in it yet, and the panel says so.
+    - **Who gets one:** shows with a TVmaze rating and 5 or more rated episodes (595 of 846).
+    - **Worth your time:** a Discover list of the shows rated worth it, best scores first, most popular among equals.
   - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
     - **This week in TV history** (the default): what premiered and what ended this week in past years, and the
       best-rated episode of each year that week. Home shows four of the best-known milestones ("Once Upon a Time
@@ -979,12 +1026,11 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
-(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Notifications.API/Data/Migrations`,
+Catalog, Analytics, Identity, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
 `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
-`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity still uses `EnsureCreated`,
-which creates a missing database but never changes an existing one. Notifications', Recommendations' and Tracking's first
-migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
+`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
+Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
 marked as having it and upgraded in place.
 
 After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
@@ -1038,7 +1084,6 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 
 ## Before production
 
-- Move the remaining services from `EnsureCreated` to EF Core migrations, as Catalog has (see Database schema).
 - Change the development secrets in `AppHost.cs` and `Realms/tvtracker-realm.json`, and turn on HTTPS for Keycloak.
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
 - Add a dead-letter queue for events that fail twice, and tests.

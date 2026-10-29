@@ -6,8 +6,9 @@ using TvTracker.Persistence;
 namespace Identity.API.Services;
 
 /// <summary>
-/// Sends every user's display name as a <see cref="UserProfileSnapshotIntegrationEvent"/> shortly after start and then
-/// daily. Social, which started after most users registered, learns their names from it; a lost profile event heals.
+/// Sends every user's display name and plan as a <see cref="UserProfileSnapshotIntegrationEvent"/> shortly after start
+/// and then daily. Social, which started after most users registered, learns their names from it; Tracking their plans;
+/// a lost profile or plan event heals.
 /// </summary>
 public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimeProvider time, ILogger<ProfileSnapshotPublisher> logger)
     : BackgroundService
@@ -51,7 +52,7 @@ public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimePr
                 .Where(p => after == null || string.Compare(p.UserId, after) > 0)
                 .OrderBy(p => p.UserId)
                 .Take(ProfilesPerBatch)
-                .Select(p => new { p.UserId, p.DisplayName })
+                .Select(p => new { p.UserId, p.DisplayName, p.Plan, p.PlanChangedAtUtc })
                 .ToListAsync(ct);
             if (batch.Count == 0)
             {
@@ -60,7 +61,8 @@ public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimePr
 
             foreach (var profile in batch)
             {
-                outbox.Add(new UserProfileSnapshotIntegrationEvent(profile.UserId, profile.DisplayName));
+                outbox.Add(new UserProfileSnapshotIntegrationEvent(profile.UserId, profile.DisplayName, profile.Plan,
+                    profile.PlanChangedAtUtc is { } changed ? new DateTimeOffset(changed, TimeSpan.Zero) : null));
             }
             await db.SaveChangesAsync(ct);
             await outbox.PublishAddedAsync(ct);

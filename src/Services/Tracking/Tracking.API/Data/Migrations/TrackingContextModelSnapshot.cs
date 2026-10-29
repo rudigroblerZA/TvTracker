@@ -167,6 +167,25 @@ namespace Tracking.API.Data.Migrations
                     b.ToTable("list_items", (string)null);
                 });
 
+            modelBuilder.Entity("Tracking.API.Data.UserPlanCopy", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_plans", (string)null);
+                });
+
             modelBuilder.Entity("Tracking.API.Data.WatchedEpisode", b =>
                 {
                     b.Property<string>("UserId")

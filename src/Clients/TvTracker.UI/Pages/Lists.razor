@@ -9,8 +9,18 @@
     <Authorized>
         <form class="inline-form" @onsubmit="CreateAsync">
             <input @bind="newName" placeholder="New list name, e.g. Weekend binge" maxlength="100" aria-label="List name" />
-            <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newName))">Create</button>
+            <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newName) || limits?.AtLimit == true)">Create</button>
         </form>
+        @if (limits is { Enforced: true, MaxLists: { } max } plan)
+        {
+            <p class="plan-note small">
+                @* Lists made before the limits are kept, so a free user can be over it. *@
+                <span>@(plan.Lists > max
+                    ? $"{plan.Lists} lists, from before {Plans.Name(plan.Plan)}'s limit of {max}. "
+                    : $"{plan.Lists} of {max} lists on {Plans.Name(plan.Plan)}. ")</span>
+                <a href="settings/plan">@(plan.AtLimit ? $"{Plans.Name(Plans.Plus)} has as many as you like" : $"More with {Plans.Name(Plans.Plus)}")</a>
+            </p>
+        }
 
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
@@ -46,6 +56,7 @@
 
 @code {
     private List<ListSummary>? lists;
+    private ListLimits? limits;
     private string? newName;
     private string? error;
 
@@ -56,7 +67,9 @@
         error = null;
         try
         {
+            var limitsTask = Tracking.GetListLimitsAsync();
             lists = await Tracking.GetListsAsync() ?? [];
+            limits = await limitsTask;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

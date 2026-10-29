@@ -88,6 +88,7 @@ const string AppAdminPassword = "admin";
 
 var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithReference(identityDb).WaitFor(identityDb)
+    .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithEnvironment("Identity__AdminClientSecret", IdentityAdminClientSecret)

@@ -22,6 +22,12 @@ public class UserProfile
 
     public string Language { get; set; } = "en";
 
+    /// <summary>One of <see cref="TvTracker.IntegrationEvents.Plans"/>; everyone starts free.</summary>
+    public string Plan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
+
+    /// <summary>When <see cref="Plan"/> was last set; null while it never has.</summary>
+    public DateTime? PlanChangedAtUtc { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
@@ -48,6 +54,7 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(p => p.TimeZone).HasMaxLength(64);
             entity.Property(p => p.Region).HasMaxLength(2);
             entity.Property(p => p.Language).HasMaxLength(10);
+            entity.Property(p => p.Plan).HasMaxLength(16).HasDefaultValue(TvTracker.IntegrationEvents.Plans.Free);
         });
 
         modelBuilder.UseIntegrationEventLogs();

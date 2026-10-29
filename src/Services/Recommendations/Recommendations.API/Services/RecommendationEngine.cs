@@ -270,9 +270,6 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     private const double DnaFloor = 0.65;
     private const double DnaCeiling = 0.95;
 
-    private static readonly HashSet<string> Kinds =
-        ["scripted", "animation", "reality", "documentary", "talk show", "variety", "game show", "news", "sports", "award show", "panel show"];
-
     private static ShowMatch Match(ShowFeatures a, ShowFeatures b, Extras extras)
     {
         var nanogenresA = extras.Nanogenres.GetValueOrDefault(a.ShowId) ?? [];
@@ -294,7 +291,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         {
             affinity *= 0.4;
         }
-        if (!a.Keywords.Where(k => !Kinds.Contains(k)).Intersect(b.Keywords.Where(k => !Kinds.Contains(k))).Any())
+        if (!a.Keywords.Where(k => !ShowKinds.All.Contains(k)).Intersect(b.Keywords.Where(k => !ShowKinds.All.Contains(k))).Any())
         {
             affinity *= 0.8;
         }
@@ -326,7 +323,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     private static string Article(string name) => "aeiouAEIOU".Contains(name[0]) ? "an" : "a";
 
 
-    private static string? KindOf(ShowFeatures show) => show.Keywords.FirstOrDefault(Kinds.Contains);
+    private static string? KindOf(ShowFeatures show) => ShowKinds.Of(show.Keywords);
 
     private async Task<Extras> ExtrasAsync(IEnumerable<Guid> showIds, CancellationToken ct)
     {

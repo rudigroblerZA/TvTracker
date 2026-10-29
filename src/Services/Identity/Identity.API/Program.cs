@@ -7,9 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
+builder.AddFeatureFlags();
 
 builder.AddNpgsqlDbContext<IdentityContext>("identitydb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
-builder.Services.AddDatabaseInitializer<IdentityContext>();
+builder.Services.AddDatabaseInitializer<IdentityContext>(baseline: "InitialCreate");
 
 builder.AddRabbitMQEventBus("eventbus");
 builder.Services.AddIntegrationEventOutbox<IdentityContext>();
@@ -43,5 +44,6 @@ app.UseAuthorization();
 app.MapGet("/api/v1/status", () => new { Service = "identity-api", Status = "ok" });
 app.MapProfileApi();
 app.MapFlagsApi();
+app.MapPlansApi();
 
 app.Run();

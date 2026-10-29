@@ -191,6 +191,13 @@
             </section>
         </Feature>
 
+        <Feature Flag="@FeatureFlags.Plans">
+            <section class="panel">
+                <h2>Plan</h2>
+                <p><a href="settings/plan">Your plan</a><span class="muted small"> · what Free and @Plans.Name(Plans.Plus) include</span></p>
+            </section>
+        </Feature>
+
         @if (isAdmin || isModerator)
         {
             <section class="panel">
@@ -205,6 +212,9 @@
                 @if (isAdmin)
                 {
                     <p><a href="settings/flags">Feature flags</a><span class="muted small"> · turn features on or off for everyone</span></p>
+                    <Feature Flag="@FeatureFlags.Plans">
+                        <p><a href="settings/plans">Plans</a><span class="muted small"> · set people's plans</span></p>
+                    </Feature>
                 }
             </section>
         }

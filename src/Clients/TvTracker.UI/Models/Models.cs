@@ -247,7 +247,18 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
     EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
-    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null);
+    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null, WorthIt? WorthIt = null);
+
+/// <summary>Is it worth the time? Analytics' 0-100 score, from the provider's rating and the factors that move it.</summary>
+/// <param name="Verdict">"worth-it", "mostly", "mixed" or "hard-to-recommend".</param>
+/// <param name="Value">The rating plus every factor's points, on the rating's scale.</param>
+/// <param name="StillRunning">The ending isn't in the score yet.</param>
+public record WorthIt(int Score, string Verdict, double Rating, double Value, IReadOnlyList<WorthItFactor> Factors, int RuntimeMinutes,
+    bool StillRunning);
+
+/// <param name="Key">"start", "decline", "ending" or "consistency".</param>
+/// <param name="Points">What it adds to the rating; negative takes away.</param>
+public record WorthItFactor(string Key, double Points, string Text);
 
 /// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
 /// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>
@@ -706,3 +717,28 @@ public record WaitingRoom(IReadOnlyList<WaitingShow> Shows);
 /// <param name="Kind">episode, season, forecast or unknown.</param>
 public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? Network, string Kind, DateTimeOffset? BackAtUtc,
     int? SeasonNumber, DateOnly? Likely, DateOnly? Earliest, DateOnly? Latest, bool Overdue, double? Renewal, DateTimeOffset? LastAiredUtc);
+
+/// <summary>A mixtape: three to five shows, and the shows that fit all of them.</summary>
+public record Mixtape(IReadOnlyList<ShowSummary> Shows, bool Indexed, IReadOnlyList<string> SharedGenres, IReadOnlyList<MixtapeMatch> Matches,
+    bool Loose);
+
+/// <param name="Links">How it relates to each of the mixtape's shows, in the same order.</param>
+public record MixtapeMatch(ShowSummary Show, int Fit, IReadOnlyList<MixtapeLink> Links);
+
+public record MixtapeLink(Guid ShowId, int Closeness, IReadOnlyList<string> SharedGenres);
+
+/// <summary>What the caller's plan allows for lists, as Tracking enforces it.</summary>
+/// <param name="MaxLists">Lists the plan allows; null for no plan limit.</param>
+/// <param name="Lists">Lists they have; can be over MaxLists when made before the limits.</param>
+/// <param name="Enforced">False while the plans flag is off: no limits.</param>
+public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists, bool Enforced)
+{
+    public bool AtLimit => Enforced && MaxLists is { } max && Lists >= max;
+    public bool CanShare => !Enforced || ShareLists;
+}
+
+/// <summary>The caller's plan, from Identity.</summary>
+public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc);
+
+/// <summary>A user on the admins' plans page.</summary>
+public record PlanUser(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);

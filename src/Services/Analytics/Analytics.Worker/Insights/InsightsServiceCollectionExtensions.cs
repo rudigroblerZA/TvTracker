@@ -27,6 +27,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowInsight, GetsGoodInsight>();
         services.AddSingleton<IShowInsight, LandingInsight>();
         services.AddSingleton<IShowInsight, SeasonVerdictInsight>();
+        services.AddSingleton<IShowInsight, WorthItInsight>();
 
         // Tag rules, in the order tags are shown.
         services.AddSingleton<IShowTagRule, DropsAtOnceRule>();

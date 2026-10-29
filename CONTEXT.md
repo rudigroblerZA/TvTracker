@@ -169,6 +169,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - It asks for 40 candidates, because pgvector's HNSW scan returns at most `ef_search` (40 by default) rows.
   - Shows titled like either input are excluded (the classic Doctor Who, blended from the new one).
   - `Loose` compares the best score with the model's `MaxDistance`, so it holds when the model changes.
+- **Mixtape** (`MixtapeApi`): Blend for three to five shows, with equal weights. The mix is the normalised mean of the
+  shows' vectors; a candidate's score is its distance to the farthest show.
+  - **Wider candidates:** the 40 nearest the mix plus each show's own 40 nearest (pgvector's HNSW returns at most
+    `ef_search` rows a query), fetched in one query (UNION ALL); with three or more shows the best common ground isn't
+    always near the average. Rate-limited like search, since one call is up to six vector scans.
+  - **Same kinds only:** a pick's kind (the catalog's kind keyword: scripted, animation, reality, …) must be one of the
+    mixtape's. The kinds are `ShowKinds` in IntegrationEvents, shared with Recommendations and nanogenres. Without it, Ted Lasso + Succession + Breaking Bad brought in The Amazing Race.
+  - **Distances in memory:** the candidates' vectors are loaded and compared with a dot product (they're L2-normalised),
+    since the number of inputs varies.
 - **Universes** (`Catalog.API/Services/Universes.cs`): shows linked by the same actor playing a same-named
   character, or by a franchise name (`SameFranchise`), grouped into connected components.
   - **Franchise names:** a colon stem ("NCIS: Sydney" ~ "NCIS"), or the same first word plus two or more shared
@@ -411,6 +420,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Ties:** the finale's and the final season's places are stored as counts (rated higher, lower), not a share or a
     rank alone, so a tie reads as one ("ties for its best") rather than "higher than any other episode".
   - **Spoiler-free:** no titles, in the panel or the Great endings list.
+- **Is it worth it?** (`WorthItInsight`, the document's `WorthIt`): the provider's rating moved by the other stages'
+  findings (slow start, decline, ending, consistency), then 0-100 between fixed anchors (`WorthItScale`).
+  - **On the rating's scale first,** like `ShowValue`, so each part reads as rating points and the panel can list them
+    all; the ending's points are `ShowValue`'s, so the backlog, time off and the score agree.
+  - **Decline by share of the running time:** a show that fades in its last season loses little; How I Met Your
+    Mother, weaker for 58% of its hours, loses 0.35.
+  - **Fixed anchors (6.0 → 0, 9.0 → 100):** a percentile would move a show's score whenever the catalog grows. 595
+    shows scored when it was added: median 50, 13 at 100, 13% worth it, 40% mostly, 28% mixed, 18% hard to recommend.
+  - **Not in it:** our users' viewing (load-test data, and completion depends on length more than worth), and total
+    hours, which are shown beside the score rather than counted against it: a long show isn't worse, just longer.
+  - **Needs** a provider rating and 5+ rated episodes.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
   - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a
@@ -740,6 +760,29 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
   previous plan, and the browser showed the old poster until the new one loaded.
 
+## Plans
+
+- **Identity owns the plan** (`UserProfile.Plan`, `Plans` in IntegrationEvents): who pays is about the account, and
+  Identity already orchestrates account-wide things (deletion, export). A change goes out as
+  `UserPlanChangedIntegrationEvent` through the outbox, and every plan rides the daily `UserProfileSnapshot` (optional
+  trailing `Plan` and `PlanChangedAtUtc`), so a lost change heals.
+- **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
+  every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
+  since events can arrive out of order; no row means free.
+  - **Tested:** demo's copy deleted, then restored by the snapshot two minutes after start, with Identity's time.
+- **Not a token claim:** a Keycloak role would need a token refresh before a change applied, and would put billing in
+  the identity provider. A copy applies in seconds.
+- **Shared definition:** `Plans.Limits` is linked into the UI, so the plan page, the lists page and Tracking state the
+  same limits.
+- **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
+  already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
+  people's work.
+- **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
+- **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
+- **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
+  applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
+  Identity now reads flags, so the AppHost gives it flagd.
+
 ## Feature flags
 
 - **OpenFeature, served by flagd:** flags are in `TvTracker.AppHost/Flags/flagd.json`, mounted into the flagd
@@ -794,7 +837,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   marked seasons only, labels every fifth).
 - **Spoiler shield:** `SpoilerShield` (scoped) reads a device preference through `IPlatformServices` (localStorage
   on the web, MAUI `Preferences` on the phone). `<Spoiler Hidden=…>` swaps hidden content for a "Title hidden" button.
-  Per device by design, and it needed no column in Identity, which still uses `EnsureCreated`.
+  Per device by design, so it needs no column in Identity.
 - **White label:** the app's name is `Branding:AppName`, set once in the AppHost and passed as `Branding__AppName`.
   - **Two `Branding` types:** services use ServiceDefaults' (`TvTracker.Branding`, registered by
     `AddServiceDefaults`); the UI has its own (`TvTracker.UI.Services.Branding`), since the phone doesn't reference
@@ -825,12 +868,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
-  migrations, applied at startup by their API. Identity still uses `EnsureCreated`.
+- **Migrations:** Catalog, Analytics, Identity, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
+  migrations, applied at startup by their API. Identity moved last, for plans.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+  - **Checked:** Identity's, Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
   idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).

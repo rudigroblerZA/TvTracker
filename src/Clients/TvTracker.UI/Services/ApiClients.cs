@@ -44,6 +44,17 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<FeatureFlagSetting?> SetFeatureFlagAsync(string key, bool? on, CancellationToken ct = default) =>
         SendAsync<FeatureFlagSetting>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/flags/{Uri.EscapeDataString(key)}", new { On = on }, ct);
 
+    /// <summary>The caller's plan; null while the plans flag is off.</summary>
+    public Task<UserPlan?> GetMyPlanAsync(CancellationToken ct = default) =>
+        GetAsync<UserPlan>(ApiClients.Identity, "api/v1/me/plan", ct);
+
+    /// <summary>Users by name or email, for admins (Plus users with no term); null for anyone else.</summary>
+    public Task<List<PlanUser>?> SearchPlanUsersAsync(string? term, CancellationToken ct = default) =>
+        GetAsync<List<PlanUser>>(ApiClients.Identity, $"api/v1/admin/plans/users?q={Uri.EscapeDataString(term ?? "")}", ct);
+
+    public Task<PlanUser?> SetPlanAsync(string userId, string plan, CancellationToken ct = default) =>
+        SendAsync<PlanUser>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/plans/users/{Uri.EscapeDataString(userId)}", new { plan }, ct);
+
     public async Task<string> ExportAsync(CancellationToken ct = default)
     {
         var json = await GetAsync<System.Text.Json.JsonElement>(ApiClients.Identity, "api/v1/account/export", ct);
@@ -130,6 +141,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// <param name="lean">0-100, how much like <paramref name="a"/>.</param>
     public Task<Blend?> GetBlendAsync(Guid a, Guid b, int lean = 50, CancellationToken ct = default) =>
         GetAsync<Blend>(ApiClients.Catalog, $"api/v1/shows/blend?a={a}&b={b}&lean={lean}", ct);
+
+    /// <summary>The shows that fit all of the given three to five shows.</summary>
+    public Task<Mixtape?> GetMixtapeAsync(IReadOnlyCollection<Guid> showIds, CancellationToken ct = default) =>
+        GetAsync<Mixtape>(ApiClients.Catalog, $"api/v1/shows/mixtape?ids={string.Join(',', showIds)}", ct);
 }
 
 public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
@@ -181,6 +196,10 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
 
     public Task<ListDetail?> GetListAsync(Guid id, CancellationToken ct = default) =>
         GetAsync<ListDetail>(ApiClients.Tracking, $"api/v1/lists/{id}", ct, cacheForOffline: true);
+
+    /// <summary>The caller's plan limits for lists, and how many they have.</summary>
+    public Task<ListLimits?> GetListLimitsAsync(CancellationToken ct = default) =>
+        GetAsync<ListLimits>(ApiClients.Tracking, "api/v1/lists/limits", ct);
 
     public Task<ListSummary?> CreateListAsync(string name, string? description, CancellationToken ct = default) =>
         SendAsync<ListSummary>(ApiClients.Tracking, HttpMethod.Post, "api/v1/lists", new { name, description }, ct);

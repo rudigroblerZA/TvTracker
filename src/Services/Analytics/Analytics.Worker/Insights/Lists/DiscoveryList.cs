@@ -35,7 +35,7 @@ public sealed class DiscoveryList : IListInsight
     private sealed record Candidate(
         ShowCopy Show, int AiredEpisodes, bool WellRated, Consistency? Consistency, int Followers,
         List<(EpisodeCopy Finale, double Score)> Finales, IReadOnlyList<ShowTag> Tags, double? OurRating, int RuntimeMinutes,
-        GetsGoodTurn? Turn, Landing? Landing)
+        GetsGoodTurn? Turn, Landing? Landing, WorthIt? WorthIt)
     {
         public bool Has(string tag) => Tags.Any(t => t.Key == tag);
     }
@@ -57,7 +57,7 @@ public sealed class DiscoveryList : IListInsight
                 : [];
             candidates.Add(new Candidate(show.Show, show.Aired.Count, show.WellRated, insights.Patterns?.Consistency,
                 show.Sources.FollowersByShow[show.ShowId].Count(), finales, insights.Tags ?? [], insights.Rating.Ours,
-                insights.Run.RuntimeMinutes, insights.GetsGood?.Turn, insights.Landing));
+                insights.Run.RuntimeMinutes, insights.GetsGood?.Turn, insights.Landing, insights.WorthIt));
         }
 
         /// <summary>Each fully aired season's last episode, when it's rated and the season has enough rated episodes.</summary>
@@ -149,6 +149,13 @@ public sealed class DiscoveryList : IListInsight
                     .OrderByDescending(c => c.Show.Popularity)
                     .ThenByDescending(c => c.Landing!.FinaleRating)
                     .Select(c => Row(c.Show, c.Landing!.FinaleRating)));
+
+                // Value: the score. Scores cap at 100, so popularity orders the best.
+                Add(DiscoveryLists.WorthYourTime, genre, inGenre
+                    .Where(c => c.WorthIt is { Verdict: WorthItVerdicts.WorthIt })
+                    .OrderByDescending(c => c.WorthIt!.Score)
+                    .ThenByDescending(c => c.Show.Popularity)
+                    .Select(c => Row(c.Show, c.WorthIt!.Score)));
             }
 
             return rows;
