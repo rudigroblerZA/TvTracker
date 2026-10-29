@@ -426,6 +426,19 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
     /// <summary>Running shows the user is caught up on, with when each is back.</summary>
+    public Task<ShowCall?> GetShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowCall>(ApiClients.Analytics, $"api/v1/shows/{showId}/call", ct);
+
+    public Task<ShowCall?> SetShowCallAsync(Guid showId, double rating, CancellationToken ct = default) =>
+        SendAsync<ShowCall>(ApiClients.Analytics, HttpMethod.Put, $"api/v1/shows/{showId}/call", new { rating }, ct);
+
+    public Task DeleteShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Analytics, HttpMethod.Delete, $"api/v1/shows/{showId}/call", null, ct);
+
+    /// <summary>The user's season calls, their record against the model, and followed shows to call next.</summary>
+    public Task<MyCalls?> GetMyCallsAsync(CancellationToken ct = default) =>
+        GetAsync<MyCalls>(ApiClients.Analytics, "api/v1/me/calls", ct);
+
     public Task<WaitingRoom?> GetWaitingRoomAsync(CancellationToken ct = default) =>
         GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 

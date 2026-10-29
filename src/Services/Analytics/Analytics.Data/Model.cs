@@ -180,6 +180,31 @@ public class UserService
     public DateTime AddedAtUtc { get; set; }
 }
 
+/// <summary>
+/// "Call it": a user's prediction of a season's average episode rating, made before it premieres. Written by
+/// Analytics.API (the user's call, with the forecast model's as it stood then), scored by Analytics.Worker once the
+/// season is over.
+/// </summary>
+public class SeasonCall
+{
+    public required string UserId { get; set; }
+    public Guid ShowId { get; set; }
+    public int SeasonNumber { get; set; }
+
+    /// <summary>The user's call, 1-10 in tenths.</summary>
+    public double Rating { get; set; }
+
+    /// <summary>The forecast model's rating for the season when the call was made or last changed; null without one.</summary>
+    public double? ModelRating { get; set; }
+
+    public DateTime CalledAtUtc { get; set; }
+
+    /// <summary>The season's average episode rating on the provider, once it's over.</summary>
+    public double? Actual { get; set; }
+
+    public DateTime? ScoredAtUtc { get; set; }
+}
+
 // Computed every hour by Analytics.Worker; Analytics.API only reads these.
 
 /// <summary>One show's insights as a JSON <see cref="ShowInsights"/> document.</summary>

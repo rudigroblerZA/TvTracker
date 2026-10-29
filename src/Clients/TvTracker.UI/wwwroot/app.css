@@ -817,3 +817,11 @@ h1:focus, h2:focus { outline: none; }
 .puzzle-chip.hit { color: var(--good); border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
 .puzzle-chip.near { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 
+/* Call it */
+.call-input { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.call-input input[type=range] { flex: 1 1 180px; min-width: 0; }
+.call-value { font-size: 1.3rem; min-width: 2.5em; text-align: center; }
+.call-list li { padding: 8px 0 8px 10px; border-left: 3px solid var(--border); margin-bottom: 6px; }
+.call-row.won { border-left-color: var(--good); }
+.call-row.lost { border-left-color: var(--warn); }
+
