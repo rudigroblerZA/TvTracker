@@ -806,6 +806,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
 - **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
 - **Analytics keeps a copy too** (`user_plans`, from the same events), for Your services.
+- **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
+  applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
+  Identity now reads flags, so the AppHost gives it flagd.
 
 ## Your services
 
@@ -822,9 +825,6 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Cost per hour** = the month's price over the hours watched on it in the last 30 days, bulk marks left out. Over $2
   an hour (a rental) is pricey; nothing watched and none of the user's followed shows airing on it in the next 30 days
   means it could be paused.
-- **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
-  applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
-  Identity now reads flags, so the AppHost gives it flagd.
 
 ## Feature flags
 
