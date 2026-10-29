@@ -137,12 +137,22 @@
         error = null;
         try
         {
+            // All three at once; the report answers 403 when the plan doesn't allow it, which only matters then.
             var directoryTask = Analytics.GetServiceDirectoryAsync();
+            var reportTask = Analytics.GetServicesReportAsync();
             mine = await Analytics.GetMyServicesAsync();
             directory = await directoryTask;
             picked = mine?.Services.ToHashSet() ?? [];
             changed = false;
-            report = mine is { Allowed: true } ? await Analytics.GetServicesReportAsync() : null;
+            if (mine is { Allowed: true })
+            {
+                report = await reportTask;
+            }
+            else
+            {
+                report = null;
+                _ = reportTask.ContinueWith(t => t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
@@ -195,7 +205,9 @@
         "value" => use.CostPerHour is { } perHour ? $"Good value: {Format.Usd(perHour)} an hour" : "In use",
         "pricey" => $"Pricey: {Format.Usd(use.CostPerHour!.Value)} an hour",
         "quiet" => "Nothing watched lately, but your shows are coming",
-        _ => "Could pause: nothing watched, nothing coming"
+        "pause" => "Could pause: nothing watched, nothing coming",
+        "free" => "Free, so nothing to weigh",
+        _ => "No known price, so no cost per hour"
     };
 
     private static string Facts(ServiceUse use) =>

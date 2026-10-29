@@ -32,7 +32,9 @@ public record FamilyInviteLinkDto(string Token);
 /// <see cref="Plans.FamilyMembers"/> people by link; each member's effective plan is "family", with Plus's limits,
 /// for as long as the owner pays for it (<see cref="PlanState"/>). Behind the <c>family-plan</c> flag.
 /// <list type="bullet">
-/// <item>A person is in one family at most, and an owner of a family with members can't join another.</item>
+/// <item>A person is in one family at most, and an owner of a family with members can't join another. A member can't
+/// invite: joining turns off the joiner's own invite link, and a member asking for one is refused.</item>
+/// <item>Joins lock the family's row (<c>FOR UPDATE</c>), so two people joining at once can't both take the last seat.</item>
 /// <item>Leaving, being removed, or the owner stopping the plan or deleting their account takes the family plan away
 /// at once; anything they made on it stays, as with any downgrade.</item>
 /// <item>The invite link is 128 random bits, like a list's link; turning invites off clears it.</item>
@@ -65,6 +67,11 @@ public static class FamilyApi
         {
             return TypedResults.Problem($"Inviting people is part of the {Plans.Name(Plans.Family)} plan.", statusCode: StatusCodes.Status403Forbidden,
                 title: "Not on your plan", type: "plan-limit");
+        }
+        if (await db.FamilyMembers.AnyAsync(m => m.UserId == userId, ct))
+        {
+            return TypedResults.Problem("You're in someone else's family. Leave it first to invite people to your own.",
+                statusCode: StatusCodes.Status409Conflict, title: "Can't invite");
         }
 
         var family = await db.Families.FindAsync([userId], ct);
@@ -144,33 +151,54 @@ public static class FamilyApi
         // Make sure the joiner has a profile, so their effective plan can be kept.
         await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, ct);
 
-        if (await db.FamilyMembers.FindAsync([userId], ct) is { } existing)
+        // In a transaction holding the family's row, so the seat count can't change between the check and the insert.
+        var refusal = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            return existing.OwnerUserId == ownerId
-                ? TypedResults.Ok(await FamilyOfAsync(db, userId, ct))
-                : Conflict("You're already in another family. Leave it first, from your plan page.");
-        }
-        if (ownerId == userId)
-        {
-            return Conflict("This is your own family's invite link. Send it to the people you want to invite.");
-        }
-        if (found.Owner.Plan != Plans.Family)
-        {
-            return Conflict($"{found.Owner.DisplayName} isn't on the {Plans.Name(Plans.Family)} plan any more.");
-        }
-        if (await db.FamilyMembers.AnyAsync(m => m.OwnerUserId == userId, ct))
-        {
-            return Conflict("You run a family of your own, so you can't join another.");
-        }
-        if (await db.FamilyMembers.CountAsync(m => m.OwnerUserId == ownerId, ct) >= Plans.FamilyMembers)
-        {
-            return Conflict($"This family is full: it has {Plans.FamilyMembers} members.");
-        }
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM families WHERE \"OwnerUserId\" = {ownerId} FOR UPDATE", ct);
 
-        var now = time.GetUtcNow();
-        db.FamilyMembers.Add(new FamilyMember { UserId = userId, OwnerUserId = ownerId, JoinedAtUtc = now.UtcDateTime });
-        await PlanState.RecomputeAsync(db, outbox, now, [userId], ct);
-        await db.SaveChangesAsync(ct);
+            if (await db.FamilyMembers.FindAsync([userId], ct) is { } existing)
+            {
+                return existing.OwnerUserId == ownerId ? null : "You're already in another family. Leave it first, from your plan page.";
+            }
+            if (ownerId == userId)
+            {
+                return "This is your own family's invite link. Send it to the people you want to invite.";
+            }
+            if (await db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == ownerId, ct) is not { Plan: Plans.Family } owner)
+            {
+                return $"{found.Owner.DisplayName} isn't on the {Plans.Name(Plans.Family)} plan any more.";
+            }
+            if (await db.FamilyMembers.AnyAsync(m => m.UserId == ownerId, ct))
+            {
+                return $"{owner.DisplayName} is in another family now, so this invite doesn't work.";
+            }
+            if (await db.FamilyMembers.AnyAsync(m => m.OwnerUserId == userId, ct))
+            {
+                return "You run a family of your own, so you can't join another.";
+            }
+            if (await db.FamilyMembers.CountAsync(m => m.OwnerUserId == ownerId, ct) >= Plans.FamilyMembers)
+            {
+                return $"This family is full: it has {Plans.FamilyMembers} members.";
+            }
+
+            var now = time.GetUtcNow();
+            db.FamilyMembers.Add(new FamilyMember { UserId = userId, OwnerUserId = ownerId, JoinedAtUtc = now.UtcDateTime });
+            // A member doesn't invite: their own (empty) family's link stops working.
+            if (await db.Families.FindAsync([userId], ct) is { InviteToken: not null } own)
+            {
+                own.InviteToken = null;
+            }
+            await PlanState.RecomputeAsync(db, outbox, now, [userId], ct);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return (string?)null;
+        });
+        if (refusal is not null)
+        {
+            return Conflict(refusal);
+        }
         await outbox.PublishAddedAsync(ct);
         return TypedResults.Ok(await FamilyOfAsync(db, userId, ct));
     }

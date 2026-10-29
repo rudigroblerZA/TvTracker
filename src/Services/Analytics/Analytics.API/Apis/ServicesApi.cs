@@ -3,6 +3,7 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using OpenFeature;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 
@@ -14,14 +15,16 @@ public record ServiceDto(string Key, string Name, decimal? MonthlyUsd, string? N
 
 public record ServiceDirectoryDto(string PricesAsOf, string PricesSource, IReadOnlyList<ServiceDto> Services);
 
-/// <param name="Allowed">Whether the caller's plan lets them keep services (<see cref="PlanLimits.TrackServices"/>).</param>
+/// <param name="Allowed">Whether the caller's plan lets them keep services (<see cref="PlanLimits.TrackServices"/>); always
+/// while the <c>plans</c> flag is off for them.</param>
 public record MyServicesDto(string Plan, bool Allowed, IReadOnlyList<string> Services);
 
-public record SetMyServicesRequest(IReadOnlyList<string> Services);
+public record SetMyServicesRequest(IReadOnlyList<string>? Services);
 
 /// <param name="Minutes">Watched in the last <see cref="ServicesApi.WindowDays"/> days, bulk marks left out.</param>
 /// <param name="CostPerHour">The month's price over those hours; null when the price is unknown or free, or nothing was watched.</param>
-/// <param name="Verdict">"value", "pricey", "quiet" (nothing watched, but followed shows are coming) or "pause".</param>
+/// <param name="Verdict">"value", "pricey", "quiet" (nothing watched, but followed shows are coming), "pause", or "free" /
+/// "unpriced" for a service with no price to weigh.</param>
 /// <param name="Watched">The shows watched on it in the window, most minutes first.</param>
 /// <param name="Coming">Followed shows with episodes airing on it in the next <see cref="ServicesApi.WindowDays"/> days.</param>
 public record ServiceUseDto(string Key, string Name, decimal? MonthlyUsd, int Minutes, decimal? CostPerHour, string Verdict,
@@ -47,7 +50,9 @@ public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownP
 /// <item><b>Prices</b> are estimates: US list prices of the cheapest plan, checked by hand (<see cref="NetworkServices.PricesAsOf"/>).</item>
 /// <item><b>The report</b> looks at the last 30 days of watching and the next 30 days of the user's followed shows.
 /// Bulk marks (8+ of a show's episodes at one moment, as Year in TV) say when episodes were marked, not watched, so they're
-/// left out. A service with nothing watched and nothing coming is one to pause; over $2 an hour (a rental's price) is pricey.</item>
+/// left out. A service with nothing watched and nothing coming is one to pause; over $2 an hour (a rental's price) is pricey.
+/// A free or unpriced service gets neither: there's no cost to weigh.</item>
+/// <item><b>The limit</b> applies only while the <c>plans</c> flag is on for the caller, as Tracking's list limits.</item>
 /// </list>
 /// </summary>
 public static class ServicesApi
@@ -58,6 +63,8 @@ public static class ServicesApi
     private const int MaxShowsListed = 5;
 
     private static readonly TimeSpan LogoCacheTime = TimeSpan.FromDays(7);
+    // A fetch that missed some logos (the favicon service down or slow) is kept only this long, so a blip isn't a week of initials.
+    private static readonly TimeSpan PartialLogoCacheTime = TimeSpan.FromMinutes(15);
 
     public static void MapServicesApi(this RouteGroupBuilder api)
     {
@@ -79,8 +86,17 @@ public static class ServicesApi
 
     private static async Task<Ok<ServiceDirectoryDto>> GetDirectoryAsync(HybridCache cache, IHttpClientFactory http, CancellationToken ct)
     {
-        var logos = await cache.GetOrCreateAsync("service-logos", async token => await FetchLogosAsync(http, token),
-            new HybridCacheEntryOptions { Expiration = LogoCacheTime, LocalCacheExpiration = LogoCacheTime }, cancellationToken: ct);
+        var fetched = false;
+        var logos = await cache.GetOrCreateAsync("service-logos", async token =>
+        {
+            fetched = true;
+            return await FetchLogosAsync(http, token);
+        }, new HybridCacheEntryOptions { Expiration = LogoCacheTime, LocalCacheExpiration = LogoCacheTime }, cancellationToken: ct);
+        if (fetched && logos.Count < NetworkServices.All.Count)
+        {
+            await cache.SetAsync("service-logos", logos,
+                new HybridCacheEntryOptions { Expiration = PartialLogoCacheTime, LocalCacheExpiration = PartialLogoCacheTime }, cancellationToken: ct);
+        }
         var services = NetworkServices.All
             .Select(s => new ServiceDto(s.Key, s.Name, s.MonthlyUsd, s.Note, logos.GetValueOrDefault(s.Key), NetworkServices.NetworksOf(s.Key).ToList()))
             .ToList();
@@ -115,29 +131,33 @@ public static class ServicesApi
     }
 
     private static async Task<Results<Ok<MyServicesDto>, UnauthorizedHttpResult>> GetMineAsync(
-        ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, CancellationToken ct)
     {
         if (user.FindFirst("sub")?.Value is not { } userId)
         {
             return TypedResults.Unauthorized();
         }
-        var plan = await PlanOfAsync(db, userId, ct);
+        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
         var services = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId).Select(s => s.ServiceKey).ToListAsync(ct);
-        return TypedResults.Ok(new MyServicesDto(plan, Plans.Limits(plan).TrackServices, services));
+        return TypedResults.Ok(new MyServicesDto(plan, allowed, services));
     }
 
     /// <summary>Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.</summary>
     private static async Task<Results<Ok<MyServicesDto>, UnauthorizedHttpResult, ValidationProblem, ProblemHttpResult>> SetMineAsync(
-        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
         if (user.FindFirst("sub")?.Value is not { } userId)
         {
             return TypedResults.Unauthorized();
         }
-        var plan = await PlanOfAsync(db, userId, ct);
-        if (!Plans.Limits(plan).TrackServices)
+        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
+        if (!allowed)
         {
             return PlanLimit(plan);
+        }
+        if (request.Services is null)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["services"] = ["Services is required (an empty list for none)."] });
         }
         var keys = request.Services.Distinct().ToList();
         if (keys.FirstOrDefault(k => NetworkServices.Get(k) is null) is { } unknown)
@@ -155,14 +175,14 @@ public static class ServicesApi
     }
 
     private static async Task<Results<Ok<ServicesReportDto>, UnauthorizedHttpResult, ProblemHttpResult>> GetReportAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
         if (user.FindFirst("sub")?.Value is not { } userId)
         {
             return TypedResults.Unauthorized();
         }
-        var plan = await PlanOfAsync(db, userId, ct);
-        if (!Plans.Limits(plan).TrackServices)
+        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
+        if (!allowed)
         {
             return PlanLimit(plan);
         }
@@ -208,9 +228,13 @@ public static class ServicesApi
                 .OrderBy(s => s.NextAirsAtUtc).ToList();
             var minutes = watchedHere.Sum(s => s.Minutes);
             decimal? perHour = service.MonthlyUsd is > 0 && minutes > 0 ? Math.Round(service.MonthlyUsd.Value / (minutes / 60m), 2) : null;
-            var verdict = minutes == 0
-                ? comingHere.Count > 0 ? "quiet" : "pause"
-                : perHour > PriceyPerHour ? "pricey" : "value";
+            var verdict = service.MonthlyUsd switch
+            {
+                null => "unpriced",
+                0 => "free",
+                _ when minutes == 0 => comingHere.Count > 0 ? "quiet" : "pause",
+                _ => perHour > PriceyPerHour ? "pricey" : "value"
+            };
             return new ServiceUseDto(service.Key, service.Name, service.MonthlyUsd, minutes, perHour, verdict,
                 watchedHere.Take(MaxShowsListed).ToList(), comingHere.Take(MaxShowsListed).ToList());
         }
@@ -232,8 +256,14 @@ public static class ServicesApi
             NetworkServices.PricesAsOf));
     }
 
-    private static async Task<string> PlanOfAsync(AnalyticsContext db, string userId, CancellationToken ct) =>
-        await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
+    /// <summary>The caller's plan from Analytics' copy, and whether it allows services: always while <c>plans</c> is off (fail open).</summary>
+    private static async Task<(string Plan, bool Allowed)> PlanOfAsync(ClaimsPrincipal user, string userId, AnalyticsContext db,
+        IFeatureClient flags, CancellationToken ct)
+    {
+        var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
+        var limited = await flags.GetBooleanValueAsync(FeatureFlags.Plans, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct);
+        return (plan, !limited || Plans.Limits(plan).TrackServices);
+    }
 
     /// <summary>403 typed <c>plan-limit</c>, as Tracking answers, so clients offer the upgrade.</summary>
     private static ProblemHttpResult PlanLimit(string plan) =>
