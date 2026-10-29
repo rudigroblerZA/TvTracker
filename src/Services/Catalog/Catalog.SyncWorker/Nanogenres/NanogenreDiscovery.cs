@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Nanogenres;
 
@@ -46,8 +47,6 @@ public static partial class NanogenreDiscovery
     /// <summary>The model the cut was tuned with has MaxDistance 0.38; distances from other models are scaled to it.</summary>
     private const double ReferenceMaxDistance = 0.38;
 
-    private static readonly string[] Kinds = ["scripted", "animation", "reality", "documentary", "game show", "talk show", "variety"];
-
     /// <summary>The provider's specific genres, as they read before a base: "sports comedy", "spy thriller".</summary>
     private static readonly Dictionary<string, string> Modifiers = new()
     {
@@ -61,7 +60,7 @@ public static partial class NanogenreDiscovery
     /// <param name="modelMaxDistance">The embedding model's semantic-search cutoff, a measure of how it spreads distances.</param>
     public static List<DiscoveredNanogenre> Discover(IReadOnlyList<NanogenreShow> shows, double modelMaxDistance)
     {
-        var kinds = shows.Select(s => s.Keywords.FirstOrDefault(k => Kinds.Contains(k))).ToArray();
+        var kinds = shows.Select(s => ShowKinds.Of(s.Keywords)).ToArray();
         var features = GenreFeatures(shows, kinds);
         var scale = ReferenceMaxDistance / modelMaxDistance;
         var embedded = Enumerable.Range(0, shows.Count).Where(i => shows[i].Embedding is not null).ToList();

@@ -1,3 +1,4 @@
+using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -5,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 using TvTracker;
+using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Apis;
 
@@ -31,9 +33,9 @@ public record MixtapeLinkDto(Guid ShowId, int Closeness, IReadOnlyList<string> S
 /// vectors (the ones semantic search uses) are averaged, and candidates are ranked by their distance to the farthest
 /// of the mixtape's shows, so a show close to just one of them ranks low however close it is.
 /// <list type="bullet">
-/// <item><b>Candidates:</b> the shows nearest the mix, plus each show's own nearest. pgvector's HNSW scan returns at most
-/// <c>ef_search</c> (40) rows a query, and with three or more shows the best common ground isn't always among the
-/// 40 nearest the average.</item>
+/// <item><b>Candidates:</b> the shows nearest the mix, plus each show's own nearest, in one query (a UNION ALL of
+/// nearest-neighbour scans). pgvector's HNSW scan returns at most <c>ef_search</c> (40) rows a query, and with three or
+/// more shows the best common ground isn't always among the 40 nearest the average.</item>
 /// <item><b>Excluded:</b> the mixtape's shows, and shows titled like any of them (a remake, the classic Doctor Who).</item>
 /// <item><b>Same kinds only:</b> a pick's kind (scripted, animation, reality, …, from the catalog's keywords) must be one of
 /// the mixtape's. Ted Lasso + Succession + Breaking Bad brought in The Amazing Race, close enough in summary words.
@@ -48,12 +50,8 @@ public static class MixtapeApi
 
     private const int CandidatesPerQuery = 40;
 
-    /// <summary>The kinds of show the provider tags, as the catalog keeps them in its keywords (Recommendations uses the same).</summary>
-    private static readonly HashSet<string> Kinds =
-        ["scripted", "animation", "reality", "documentary", "talk show", "variety", "game show", "news", "sports", "award show", "panel show"];
-
     public static void MapMixtapeApi(this RouteGroupBuilder api) =>
-        api.MapGet("/shows/mixtape", GetMixtapeAsync).RequireFeature(FeatureFlags.Mixtape);
+        api.MapGet("/shows/mixtape", GetMixtapeAsync).RequireRateLimiting(SearchRateLimiting.Policy).RequireFeature(FeatureFlags.Mixtape);
 
     /// <param name="ids">The shows, comma-separated: <see cref="MinShows"/> to <see cref="MaxShows"/> different ones.</param>
     private static async Task<Results<Ok<MixtapeDto>, NotFound, ValidationProblem>> GetMixtapeAsync(
@@ -93,7 +91,7 @@ public static class MixtapeApi
             return TypedResults.Ok(new MixtapeDto(summaries, false, sharedGenres, []));
         }
 
-        var kinds = inputs.Select(KindOf).OfType<string>().ToHashSet();
+        var kinds = inputs.Select(s => ShowKinds.Of(s.Keywords)).OfType<string>().ToHashSet();
         var inputVectors = showIds.Select(id => vectors[id]).ToList();
         var mix = Normalize(Enumerable.Range(0, inputVectors[0].Length)
             .Select(i => inputVectors.Sum(v => v[i]) / inputVectors.Count)
@@ -105,21 +103,16 @@ public static class MixtapeApi
             .Where(e => e.Model == model.Id && !showIds.Contains(e.ShowId))
             .Where(e => db.Shows.Any(s => s.Id == e.ShowId && !titles.Contains(s.Title)));
 
-        var candidateIds = new HashSet<Guid>();
-        foreach (var query in inputVectors.Prepend(mix))
-        {
-            var vector = new Vector(query);
-            candidateIds.UnionWith(await eligible
-                .OrderBy(e => e.Embedding.CosineDistance(vector))
-                .Take(CandidatesPerQuery)
-                .Select(e => e.ShowId)
-                .ToListAsync(ct));
-        }
+        var nearest = inputVectors.Prepend(mix)
+            .Select(query => new Vector(query))
+            .Select(vector => eligible.OrderBy(e => e.Embedding.CosineDistance(vector)).Take(CandidatesPerQuery).Select(e => e.ShowId))
+            .Aggregate((all, next) => all.Concat(next));
+        var candidateIds = (await nearest.ToListAsync(ct)).ToHashSet();
 
         // A show of another kind than the mixtape's is left out; one with no kind tag stays.
         var candidateKinds = await db.Shows.AsNoTracking().Where(s => candidateIds.Contains(s.Id))
             .Select(s => new { s.Id, s.Keywords })
-            .ToDictionaryAsync(s => s.Id, s => s.Keywords.FirstOrDefault(Kinds.Contains), ct);
+            .ToDictionaryAsync(s => s.Id, s => ShowKinds.Of(s.Keywords), ct);
         candidateIds.RemoveWhere(id => kinds.Count > 0 && candidateKinds.GetValueOrDefault(id) is { } kind && !kinds.Contains(kind));
 
         // Vectors are L2-normalised, so cosine distance is 1 − the dot product.
@@ -158,8 +151,6 @@ public static class MixtapeApi
                 .ToList(),
             Loose: ranked.Count == 0 || ranked[0].Score > model.MaxDistance));
     }
-
-    private static string? KindOf(Show show) => show.Keywords.FirstOrDefault(Kinds.Contains);
 
     private static int Percent(double distance) => (int)Math.Round(100 * Math.Clamp(1 - distance, 0, 1));
 
