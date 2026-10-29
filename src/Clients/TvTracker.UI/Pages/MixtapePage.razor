@@ -16,14 +16,25 @@
         var slot = i;
         <div class="mixtape-slot" @key="slot">
             <span class="mixtape-swatch swatch-@slot" aria-hidden="true"></span>
-            <ShowPicker Label="@($"Show {slot + 1}")" Selected="@(slot < picked.Count ? picked[slot] : null)"
-                        SelectedChanged="show => PickAsync(slot, show)" ExcludeAll="@picked.Select(s => s.Id).ToList()" />
+            @if (slot <= picked.Count)
+            {
+                <ShowPicker Label="@($"Show {slot + 1}")" Selected="@(slot < picked.Count ? picked[slot] : null)"
+                            SelectedChanged="show => Pick(slot, show)" ExcludeAll="excluded" />
+            }
+            else
+            {
+                @* Slots fill in order, so a show keeps the colour of the slot it was picked in. *@
+                <div class="show-picker">
+                    <span class="show-picker-label muted small">Show @(slot + 1)</span>
+                    <input type="search" placeholder="Pick show @(slot) first" aria-label="@($"Show {slot + 1}")" disabled />
+                </div>
+            }
         </div>
     }
 </div>
 @if (slots < MaxShows && picked.Count == slots)
 {
-    <p><button type="button" class="btn btn-quiet small" @onclick="() => slots++">+ Add another show</button></p>
+    <p><button type="button" class="btn btn-quiet small" @onclick="AddSlot">+ Add another show</button></p>
 }
 
 @if (picked.Count == 0)
@@ -37,15 +48,20 @@
     </div>
 }
 
-<ErrorNotice Message="@error" OnRetry="LoadAsync" />
-
-@if (picked.Count >= MinShows)
+@if (missing > 0)
 {
-    @if (loading)
-    {
-        <p class="muted">Mixing…</p>
-    }
-    else if (mixtape is { Indexed: false })
+    <p class="notice">@(missing == 1 ? "One show" : $"{missing} shows") in this mixtape @(missing == 1 ? "isn't" : "aren't") in the catalog any more. Pick @(missing == 1 ? "another" : "others") to mix.</p>
+}
+
+<ErrorNotice Message="@error" OnRetry="RetryAsync" />
+
+@if (loading)
+{
+    <p class="muted">Mixing…</p>
+}
+else if (picked.Count >= MinShows)
+{
+    @if (mixtape is { Indexed: false })
     {
         <p class="notice">One of these shows was just added and is still being indexed. Try again in a minute.</p>
     }
@@ -96,14 +112,22 @@
         ["Stranger Things", "Severance", "Black Mirror"]
     ];
 
-    private readonly List<ShowSummary> picked = [];
+    private List<ShowSummary> picked = [];
+    private List<Guid> excluded = [];
     private readonly Dictionary<Guid, ShowSummary> known = [];
     private HashSet<Guid> followed = [];
     private int slots = MinShows;
+    private bool extraSlot;
+    private int missing;
     private Mixtape? mixtape;
     private bool loading;
     private string? error;
+    private Func<Task>? retry;
     private string? loadedFor;
+
+    // Each load gets a number; a load that finishes after a newer one started leaves the page alone, so a slow
+    // response for the previous picks can't replace the current ones.
+    private int loadNumber;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -114,44 +138,76 @@
         }
     }
 
+    private Task RetryAsync() => (retry ?? LoadAsync)();
+
     private async Task LoadAsync()
     {
+        var number = ++loadNumber;
         error = null;
+        retry = null;
+        var ids = (Ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .Take(MaxShows)
+            .ToList();
+        loading = ids.Count >= MinShows;
         try
         {
-            var ids = (Ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty)
-                .Where(id => id != Guid.Empty)
-                .Distinct()
-                .Take(MaxShows)
-                .ToList();
-            picked.Clear();
-            foreach (var id in ids)
+            Mixtape? result = null;
+            List<ShowSummary> shows;
+            HashSet<Guid> follows = [];
+            if (ids.Count >= MinShows)
             {
-                if (await ShowAsync(id) is { } show)
-                {
-                    picked.Add(show);
-                }
-            }
-            slots = Math.Max(slots, Math.Min(MaxShows, Math.Max(MinShows, picked.Count)));
-
-            mixtape = null;
-            if (picked.Count >= MinShows)
-            {
-                loading = true;
                 await Session.EnsureLoadedAsync();
                 var followsTask = Session.IsSignedIn ? Tracking.GetFollowsAsync() : Task.FromResult<List<Follow>?>(null);
-                mixtape = await Catalog.GetMixtapeAsync(picked.Select(s => s.Id).ToList());
-                followed = (await followsTask)?.Select(f => f.ShowId).ToHashSet() ?? [];
+                result = await Catalog.GetMixtapeAsync(ids);
+                follows = (await followsTask)?.Select(f => f.ShowId).ToHashSet() ?? [];
             }
+            if (result is not null)
+            {
+                // The mixtape carries its shows, so a shared link needs no lookups of its own.
+                shows = [.. result.Shows];
+            }
+            else
+            {
+                // Fewer than three, or one of them is gone (the mixtape answers 404): look up the ones that are left.
+                var found = await Task.WhenAll(ids.Select(ShowAsync));
+                shows = found.OfType<ShowSummary>().ToList();
+            }
+            if (number != loadNumber)
+            {
+                return;
+            }
+
+            foreach (var show in shows)
+            {
+                known[show.Id] = show;
+            }
+            picked = shows;
+            excluded = shows.Select(s => s.Id).ToList();
+            missing = ids.Count - shows.Count;
+            mixtape = result;
+            if (result is null && shows.Count >= MinShows && missing == 0)
+            {
+                error = "Couldn't mix these shows right now.";
+            }
+            followed = follows;
+            slots = Math.Min(MaxShows, Math.Max(MinShows, picked.Count + (extraSlot ? 1 : 0)));
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            error = ErrorNotice.Describe(ex);
+            if (number == loadNumber)
+            {
+                error = ErrorNotice.Describe(ex);
+            }
         }
         finally
         {
-            loading = false;
+            if (number == loadNumber)
+            {
+                loading = false;
+            }
         }
     }
 
@@ -165,13 +221,18 @@
         {
             return null;
         }
-        show = new ShowSummary(detail.Id, detail.Title, detail.PosterUrl, detail.FirstAirDate?.Year, detail.Status, detail.Network, detail.Genres);
-        known[id] = show;
-        return show;
+        return new ShowSummary(detail.Id, detail.Title, detail.PosterUrl, detail.FirstAirDate?.Year, detail.Status, detail.Network, detail.Genres);
     }
 
-    // Picking a show replaces its slot; clearing a slot removes it and the rest move up.
-    private void PickAsync(int slot, ShowSummary? show)
+    private void AddSlot()
+    {
+        extraSlot = true;
+        slots++;
+    }
+
+    // Picking a show replaces its slot, or fills the next empty one (only that one can be picked in); clearing a slot
+    // removes it and the rest move up, colours with them.
+    private void Pick(int slot, ShowSummary? show)
     {
         var shows = picked.ToList();
         if (show is null)
@@ -191,6 +252,7 @@
             else
             {
                 shows.Add(show);
+                extraSlot = false;
             }
         }
         Go(shows);
@@ -198,6 +260,8 @@
 
     private async Task TryExampleAsync(string[] titles)
     {
+        error = null;
+        retry = null;
         try
         {
             var shows = new List<ShowSummary>();
@@ -216,6 +280,7 @@
         catch (HttpRequestException ex)
         {
             error = ErrorNotice.Describe(ex);
+            retry = () => TryExampleAsync(titles);
         }
     }
 
