@@ -825,3 +825,12 @@ h1:focus, h2:focus { outline: none; }
 .call-row.won { border-left-color: var(--good); }
 .call-row.lost { border-left-color: var(--warn); }
 
+/* Six degrees */
+.degrees-pickers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; margin-bottom: 12px; }
+@media (max-width: 600px) { .degrees-pickers { grid-template-columns: 1fr; } }
+.degrees-chain { list-style: none; padding: 0; margin: 8px 0; }
+.degrees-chain li { display: flex; align-items: center; gap: 12px; }
+.degrees-show { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.degrees-link { padding: 6px 10px 6px 28px; position: relative; }
+.degrees-link::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; border-left: 2px dashed var(--border); }
+

@@ -216,6 +216,18 @@ watching and your watchlist.
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
 
+**Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
+shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
+Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
+two shows the catalog doesn't have yet (each is marked, with a search to add it). "Challenge me" picks two popular shows
+that connect, says how many steps, and keeps the chain hidden until you ask. It works signed out.
+- **Main casts only:** TVmaze lists a show's regulars, not guest roles, so chains run longer than the real world's, and
+  reality, game and talk shows (whose casts play themselves) link to nothing. Of 40 random pairs of popular shows, 27
+  connected (2 in one step, 8 in two, 17 in three, 1 in four); the 12 that didn't involved a reality or game show, or an
+  anime whose cast has no other catalog credits.
+- **API:** `GET /api/v1/degrees?from={id}&to={id}` (Catalog.API, public): the chain, 204 when none within six, 404
+  for an unknown show. `GET /api/v1/degrees/challenge`: two shows and their distance.
+
 **Guess the show** (`/puzzle`, from Discover; `show-puzzle` flag) is a daily puzzle: one popular show, the same for
 everyone, found in six guesses. Each guess is compared with the answer: when it premiered (earlier or later, amber within
 3 years), its network (amber for the same streaming service), the genres they share, scripted or animated, seasons (amber
@@ -411,7 +423,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -533,7 +545,7 @@ read-only, without signing in or having an account.
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
   - My shows: lists.
-  - Discover: Prestige picks, Blend, Mixtape, Guess the show, Universes, nanogenres and network report cards.
+  - Discover: Prestige picks, Blend, Mixtape, Guess the show, Six degrees, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: Ask, the time machine and holiday episodes.
   - Stats: Year in TV.

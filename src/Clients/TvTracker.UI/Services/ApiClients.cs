@@ -108,6 +108,13 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
+    public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>
+        GetAsync<DegreesResult>(ApiClients.Catalog, $"api/v1/degrees?from={from}&to={to}", ct);
+
+    public Task<DegreesChallenge?> GetDegreesChallengeAsync(CancellationToken ct = default) =>
+        GetAsync<DegreesChallenge>(ApiClients.Catalog, "api/v1/degrees/challenge", ct);
+
     /// <summary>Guess the show for a day (the device's date); null while the flag is off or there's no puzzle that day.</summary>
     public Task<Puzzle?> GetPuzzleAsync(DateOnly date, CancellationToken ct = default) =>
         GetAsync<Puzzle>(ApiClients.Catalog, $"api/v1/puzzles/{date:yyyy-MM-dd}", ct);

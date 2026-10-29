@@ -59,6 +59,7 @@ builder.Services.AddSearchRateLimiting(builder.Configuration);
 builder.Services.AddLocalEmbeddings(builder.Configuration, ShowEmbedding.Dimensions);
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddSingleton<Universes>();
+builder.Services.AddSingleton<DegreesGraph>();
 builder.Services.AddSingleton<Crossovers>();
 
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
