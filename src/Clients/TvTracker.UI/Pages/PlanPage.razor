@@ -30,7 +30,7 @@
                         <h2>@Plans.Name(key)</h2>
                         <ul class="plan-features">
                             <li>@(limits.MaxLists is { } max ? $"Up to {max} lists" : "As many lists as you like")</li>
-                            <li>@(limits.ShareLists ? "Share lists on your profile" : "Lists are just for you")</li>
+                            <li>@(limits.ShareLists ? "Share lists on your profile or by link" : "Lists are just for you")</li>
                             <li>Everything else in @Brand.AppName</li>
                         </ul>
                         @if (key == plan.Plan)

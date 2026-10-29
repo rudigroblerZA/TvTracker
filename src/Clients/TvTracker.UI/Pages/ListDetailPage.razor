@@ -1,6 +1,7 @@
 @page "/lists/{Id:guid}"
 @inject TrackingClient Tracking
 @inject NavigationManager Navigation
+@inject IPlatformServices Platform
 
 <PageTitle>@(list?.Name ?? "List") · @Brand.AppName</PageTitle>
 
@@ -47,6 +48,22 @@
                             <span>@($"Sharing lists is part of {Plans.Name(Plans.Plus)}. ")</span><a href="settings/plan">See plans</a>
                         </p>
                     }
+                </Feature>
+                <Feature Flag="@FeatureFlags.ListLinks">
+                    <div class="list-link small">
+                        @if (list.LinkToken is { } token)
+                        {
+                            <span class="muted">@("Anyone with the link can see this list: ")</span>
+                            <input class="list-link-url" readonly value="@LinkFor(token)" aria-label="The list's link" />
+                            <button class="btn btn-quiet small" type="button" @onclick="() => ShareLinkAsync(token)">@(copied ? "Copied" : "Share link")</button>
+                            <button class="link small" type="button" @onclick="TurnOffLinkAsync">Turn off link</button>
+                        }
+                        else if (limits?.CanShare != false)
+                        {
+                            <button class="btn btn-quiet small" type="button" @onclick="CreateLinkAsync">Get a link</button>
+                            <span class="muted">@(" Anyone you send it to can see the list, without signing in.")</span>
+                        }
+                    </div>
                 </Feature>
                 <div class="actions">
                     <button class="btn btn-quiet" @onclick="StartEdit">Rename</button>
@@ -125,6 +142,25 @@
         await Tracking.UpdateListAsync(Id, list!.Name, list.Description, shared);
         await LoadAsync();
     });
+
+    private bool copied;
+
+    private string LinkFor(string token) => $"{Platform.PublicWebAddress}l/{token}";
+
+    private Task CreateLinkAsync() => RunAsync(async () =>
+    {
+        await Tracking.CreateListLinkAsync(Id);
+        await LoadAsync();
+    });
+
+    private Task TurnOffLinkAsync() => RunAsync(async () =>
+    {
+        await Tracking.DeleteListLinkAsync(Id);
+        copied = false;
+        await LoadAsync();
+    });
+
+    private async Task ShareLinkAsync(string token) => copied = await Platform.ShareLinkAsync(list!.Name, LinkFor(token));
 
     private Task DeleteAsync() => RunAsync(async () =>
     {

@@ -1,4 +1,6 @@
+using System.Buffers.Text;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using OpenFeature;
@@ -18,6 +20,12 @@ namespace Tracking.API.Apis;
 /// before the limits are kept, shared ones stay shared, and a free user may still edit, unshare or delete them: only
 /// a new list or a new share is refused. The plan comes from Tracking's copy (<see cref="UserPlanCopy"/>).
 /// </para>
+/// <para>
+/// Links (behind the <c>list-links</c> flag): a list's owner can make a link anyone can open, signed in or not, which
+/// shows the list read-only without the owner's name. It's separate from sharing on the profile, so Social's privacy
+/// rules (private profiles, blocks) don't apply: handing out a link is the owner's choice. A link is a share, so it
+/// follows the plan's <see cref="PlanLimits.ShareLists"/>; an existing link keeps working after a downgrade.
+/// </para>
 /// </summary>
 public static class ListsApi
 {
@@ -36,6 +44,11 @@ public static class ListsApi
         api.MapDelete("/{id:guid}", DeleteListAsync);
         api.MapPost("/{id:guid}/items", AddItemAsync);
         api.MapDelete("/{id:guid}/items/{showId:guid}", RemoveItemAsync);
+        api.MapPost("/{id:guid}/link", CreateLinkAsync).RequireFeature(FeatureFlags.ListLinks);
+        api.MapDelete("/{id:guid}/link", DeleteLinkAsync).RequireFeature(FeatureFlags.ListLinks);
+
+        // What a link opens: anonymous, so it works for anyone the owner sends it to.
+        app.MapGet("/api/v1/linked-lists/{token}", GetLinkedListAsync).AllowAnonymous().RequireFeature(FeatureFlags.ListLinks);
 
         return api;
     }
@@ -117,7 +130,7 @@ public static class ListsApi
             })
             .ToList();
 
-        return TypedResults.Ok(new ListDetailDto(list.Id, list.Name, list.Description, items, list.UpdatedAtUtc, list.Shared));
+        return TypedResults.Ok(new ListDetailDto(list.Id, list.Name, list.Description, items, list.UpdatedAtUtc, list.Shared, list.LinkToken));
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem, ProblemHttpResult>> UpdateListAsync(
@@ -264,6 +277,59 @@ public static class ListsApi
             errors["description"] = ["Description must be at most 1000 characters."];
         }
         return errors.Count == 0 ? null : errors;
+    }
+
+    /// <summary>Gives the list a link, or returns the one it has.</summary>
+    private static async Task<Results<Ok<ListLinkDto>, NotFound, ProblemHttpResult>> CreateLinkAsync(
+        Guid id, ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
+    {
+        var list = await FindOwnedAsync(id, user, db, ct);
+        if (list is null)
+        {
+            return TypedResults.NotFound();
+        }
+        if (list.LinkToken is null)
+        {
+            if (await PlanAsync(user, db, flags, ct) is (var plan, { ShareLists: false }))
+            {
+                return PlanLimit($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
+            }
+            list.LinkToken = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
+            await db.SaveChangesAsync(ct);
+        }
+        return TypedResults.Ok(new ListLinkDto(list.LinkToken));
+    }
+
+    /// <summary>Turns the link off: it stops working at once, and a new one gets a different address.</summary>
+    private static async Task<Results<NoContent, NotFound>> DeleteLinkAsync(Guid id, ClaimsPrincipal user, TrackingContext db, CancellationToken ct)
+    {
+        var list = await FindOwnedAsync(id, user, db, ct);
+        if (list is null)
+        {
+            return TypedResults.NotFound();
+        }
+        list.LinkToken = null;
+        await db.SaveChangesAsync(ct);
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<LinkedListDto>, NotFound>> GetLinkedListAsync(string token, TrackingContext db, CancellationToken ct)
+    {
+        var list = token.Length is > 0 and <= 32
+            ? await db.Lists.AsNoTracking().Include(l => l.Items).SingleOrDefaultAsync(l => l.LinkToken == token, ct)
+            : null;
+        if (list is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var showIds = list.Items.Select(i => i.ShowId).ToList();
+        var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
+        var items = list.Items
+            .OrderBy(i => i.Position)
+            .Select(i => new LinkedListItemDto(i.ShowId, shows.GetValueOrDefault(i.ShowId)?.Title, shows.GetValueOrDefault(i.ShowId)?.PosterUrl))
+            .ToList();
+        return TypedResults.Ok(new LinkedListDto(list.Name, list.Description, items, list.UpdatedAtUtc));
     }
 
     /// <summary>

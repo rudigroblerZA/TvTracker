@@ -223,6 +223,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
     },
+    "list-links": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "List links: a list's owner makes a link anyone can open, signed in or not, showing the list read-only." }
+    },
     "plans": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

@@ -13,6 +13,15 @@ window.tvtracker = {
         } catch { }
     },
 
+    // A touch device's share sheet when it has one, else the clipboard. False when neither worked or the sheet was
+    // dismissed.
+    shareLink: async (title, url) => {
+        if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+            try { await navigator.share({ title, url }); return true; } catch { return false; }
+        }
+        try { await navigator.clipboard.writeText(url); return true; } catch { return false; }
+    },
+
     downloadText: (fileName, text) => {
         const blob = new Blob([text], { type: "application/json" });
         const link = document.createElement("a");
