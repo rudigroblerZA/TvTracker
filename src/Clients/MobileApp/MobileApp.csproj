@@ -11,7 +11,10 @@
   <PropertyGroup>
     <!-- Directory.Build.props sets a single TargetFramework; clear it so this project can multi-target. -->
     <TargetFramework></TargetFramework>
-    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <!-- iOS and Mac Catalyst build only on a Mac (their workload doesn't exist for Linux), so a Linux build, such as CI,
+         targets Android alone. -->
+    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('linux'))">net10.0-android</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
@@ -46,8 +49,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.13" />
     <PackageReference Include="IdentityModel.OidcClient" Version="6.0.0" />
     <!-- Feature flags: OpenFeature over OFREP, through the BFF's /features route (the services use flagd's own provider). -->
     <PackageReference Include="OpenFeature.Hosting" Version="2.14.1" />
