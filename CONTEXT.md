@@ -781,6 +781,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Identity already orchestrates account-wide things (deletion, export). A change goes out as
   `UserPlanChangedIntegrationEvent` through the outbox, and every plan rides the daily `UserProfileSnapshot` (optional
   trailing `Plan` and `PlanChangedAtUtc`), so a lost change heals.
+- **Effective plans** (`UserProfile.EffectivePlan`, `PlanState`): other services are only ever sent the plan a user
+  gets, never what they pay for, so a family member's copy says "family" (Plus's limits) and enforcement needs no idea
+  of families. `PlanState.RecomputeAsync` runs in the same save as anything that can move it (a plan set, a join, a
+  leave, a removal, an owner's deletion) and adds an event for each person whose plan moved; it reads memberships and
+  owners' plans as they'll be after the save, so one save carries the change and its events.
+- **Families** (`families`, `family_members`): one per owner, a person in at most one, an owner with members can't join
+  another, 5 members (`Plans.FamilyMembers`). The invite link is 128 random bits, like a list's; members see the owner's
+  name and each other's names only. A family ends with its owner's plan or account; members fall back to what they pay for.
 - **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
   every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
   since events can arrive out of order; no row means free.
@@ -797,6 +805,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   people's work.
 - **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
 - **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
+- **Analytics keeps a copy too** (`user_plans`, from the same events), for Your services.
+
+## Your services
+
+- **A hand-kept directory** (`NetworkServices` in IntegrationEvents, linked into the UI): each catalog network's
+  streaming home, its site and the cheapest US plan's price, with the date it was checked. TVmaze gives a network's name
+  and nothing else. US broadcast networks map to the service their shows stream on, and are marked free over the air.
+  A price that couldn't be confirmed is left null rather than guessed.
+- **Logos inline:** Analytics.API fetches each service's icon through Google's favicon service once a week (HybridCache)
+  and sends them as `data:` URIs, so browsers and the phone never ask a third party (or need a route to Analytics) for an
+  image. Only the directory's domains are fetched.
+- **In Analytics:** the report needs watches, follows, upcoming episodes and each show's network, which only Analytics
+  has together. The services a user picks (`user_services`) are written by Analytics.API, the one table there a user
+  writes; they're deleted with the account and included in the data export (Analytics now has `/me/export`).
+- **Cost per hour** = the month's price over the hours watched on it in the last 30 days, bulk marks left out. Over $2
+  an hour (a rental) is pricey; nothing watched and none of the user's followed shows airing on it in the next 30 days
+  means it could be paused.
 - **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
   applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
   Identity now reads flags, so the AppHost gives it flagd.

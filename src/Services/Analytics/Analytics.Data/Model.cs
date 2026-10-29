@@ -156,6 +156,30 @@ public class UserFollow
     public DateTime FollowedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Copy of a user's effective plan (<see cref="TvTracker.IntegrationEvents.Plans"/>), from Identity's plan events and
+/// daily profile snapshot, kept by Analytics.Worker; no row means free.
+/// </summary>
+public class UserPlanCopy
+{
+    public required string UserId { get; set; }
+    public required string Plan { get; set; }
+
+    /// <summary>When Identity set it; an older event is ignored, since events can arrive out of order.</summary>
+    public DateTimeOffset ChangedAtUtc { get; set; }
+}
+
+/// <summary>
+/// A streaming service the user says they pay for (<see cref="TvTracker.IntegrationEvents.NetworkServices"/> key).
+/// The user's own setting, written by Analytics.API, where the report on it is computed.
+/// </summary>
+public class UserService
+{
+    public required string UserId { get; set; }
+    public required string ServiceKey { get; set; }
+    public DateTime AddedAtUtc { get; set; }
+}
+
 // Computed every hour by Analytics.Worker; Analytics.API only reads these.
 
 /// <summary>One show's insights as a JSON <see cref="ShowInsights"/> document.</summary>

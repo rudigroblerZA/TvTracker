@@ -13,6 +13,11 @@
             catalog's shows and TVmaze's ratings. Each figure is set against the whole catalog.
         </p>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        <Feature Flag="@FeatureFlags.YourServices">
+            <div class="tool-links">
+                <ToolLink Href="services" Title="Your services">Pick the streaming services you pay for and see what each costs per hour you watch.</ToolLink>
+            </div>
+        </Feature>
 
         @if (cards is null)
         {
@@ -37,8 +42,20 @@
             <div class="network-cards">
                 @foreach (var n in Sorted())
                 {
-                    <article class="network-card" @key="n.Network">
-                        <h2>@n.Network</h2>
+                    var service = directory?.ForNetwork(n.Network);
+                    <article class="network-card @(service is not null && mine.Contains(service.Key) ? "owned" : "")" @key="n.Network">
+                        <div class="network-head">
+                            <ServiceLogo Service="service" Name="@n.Network" />
+                            <h2>@n.Network</h2>
+                            @if (service is not null && mine.Contains(service.Key))
+                            {
+                                <span class="tag owned-tag">You have it</span>
+                            }
+                        </div>
+                        @if (service is not null)
+                        {
+                            <p class="small network-price">@ServiceLine(n.Network, service)</p>
+                        }
                         <p class="muted small">@($"{n.Shows} shows · {n.Ended} ended{(n.AverageRating is { } r ? $" · rated {Format.Rating(r)} on average" : "")}")</p>
                         <dl class="report">
                             @if (n.Endings is { } e)
@@ -78,6 +95,13 @@
                     </article>
                 }
             </div>
+            @if (directory is not null)
+            {
+                <p class="muted small">
+                    Prices are estimates: the cheapest US plan a month (with ads where there are any), checked @directory.PricesAsOf
+                    (<a href="@directory.PricesSource" target="_blank" rel="noopener">source</a>). Check the service before you sign up.
+                </p>
+            }
         }
     </Authorized>
     <NotAuthorized>
@@ -90,6 +114,8 @@
         [("shows", "Most shows"), ("endings", "Best endings"), ("renewals", "Most renewals"), ("wait", "Shortest waits"), ("rating", "Best rated")];
 
     private NetworkReportCards? cards;
+    private ServiceDirectory? directory;
+    private HashSet<string> mine = [];
     private string? error;
     private string sort = "shows";
 
@@ -100,12 +126,42 @@
         error = null;
         try
         {
+            var directoryTask = LoadDirectoryAsync();
             cards = await Analytics.GetNetworkReportsAsync();
+            await directoryTask;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
         }
+    }
+
+    // Logos, prices and the user's own services are extras: the cards stand without them.
+    private async Task LoadDirectoryAsync()
+    {
+        try
+        {
+            var mineTask = Analytics.GetMyServicesAsync();
+            directory = await Analytics.GetServiceDirectoryAsync();
+            mine = (await mineTask)?.Services.ToHashSet() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+        }
+    }
+
+    /// <summary>"On Paramount+ · from $8.99 a month", and for US broadcast networks that they're free over the air.</summary>
+    private static string ServiceLine(string network, ServiceInfo service)
+    {
+        var on = string.Equals(service.Name, network, StringComparison.OrdinalIgnoreCase) ? "" : $"On {service.Name} · ";
+        var price = service.MonthlyUsd switch
+        {
+            null => service.Note ?? "Price unknown",
+            0 => service.Note ?? "Free",
+            { } usd => $"from {Format.Usd(usd)} a month"
+        };
+        var air = NetworkServices.FreeOverTheAir.Contains(network) && service.MonthlyUsd > 0 ? " · free over the air in the US" : "";
+        return on + price + air;
     }
 
     // Networks without the figure sort last.

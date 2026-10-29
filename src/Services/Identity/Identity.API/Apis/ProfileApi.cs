@@ -29,7 +29,7 @@ public record UpdateProfileRequest(
 public static class ProfileApi
 {
     /// <summary>Services that hold per-user data and expose GET api/v1/me/export.</summary>
-    private static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social"];
+    private static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social", "analytics"];
 
     public static RouteGroupBuilder MapProfileApi(this IEndpointRouteBuilder app)
     {
@@ -81,9 +81,11 @@ public static class ProfileApi
 
     /// <summary>
     /// Deletes the Keycloak user and the profile, then publishes UserDeleted so every service purges the user's data.
+    /// An owner's family ends with them (its members go back to their own plans); a member just leaves theirs.
     /// </summary>
     private static async Task<NoContent> DeleteAccountAsync(
-        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak, CancellationToken ct)
+        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak, TimeProvider time,
+        CancellationToken ct)
     {
         var userId = user.GetUserId();
 
@@ -94,6 +96,12 @@ public static class ProfileApi
         {
             db.Profiles.Remove(profile);
         }
+
+        db.FamilyMembers.RemoveRange(await db.FamilyMembers.Where(m => m.UserId == userId).ToListAsync(ct));
+        var members = await db.FamilyMembers.Where(m => m.OwnerUserId == userId).ToListAsync(ct);
+        db.FamilyMembers.RemoveRange(members);
+        db.Families.RemoveRange(await db.Families.Where(f => f.OwnerUserId == userId).ToListAsync(ct));
+        await PlanState.RecomputeAsync(db, outbox, time.GetUtcNow(), members.Select(m => m.UserId).ToList(), ct);
 
         outbox.Add(new UserDeletedIntegrationEvent(userId));
 

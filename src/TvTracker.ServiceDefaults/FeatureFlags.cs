@@ -53,6 +53,8 @@ public static class FeatureFlags
     public const string WorthIt = "worth-it";
     public const string Plans = "plans";
     public const string ListLinks = "list-links";
+    public const string YourServices = "your-services";
+    public const string FamilyPlan = "family-plan";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

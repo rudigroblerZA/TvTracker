@@ -781,3 +781,21 @@ h1:focus, h2:focus { outline: none; }
 /* A list's link, under its title */
 .list-link { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 12px; }
 .list-link-url { flex: 1 1 260px; min-width: 0; font-size: 0.85rem; }
+
+/* Service logos and prices on network report cards, and the your-services page */
+.network-head { display: flex; align-items: center; gap: 8px; }
+.network-head h2 { margin: 0; flex: 1; min-width: 0; }
+.service-logo { width: 24px; height: 24px; border-radius: 6px; flex: none; object-fit: contain; background: light-dark(#ffffff, #f5f5f4); }
+.service-logo.initials { display: inline-grid; place-items: center; font-size: 0.65rem; font-weight: 700; color: var(--muted); background: var(--border); }
+.network-price { margin: 4px 0 6px; color: var(--muted); }
+.network-card.owned { border-color: var(--good); }
+.owned-tag { color: var(--good); border-color: currentColor; }
+.service-picks { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); margin: 12px 0; }
+.service-pick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.service-pick.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.service-pick input { margin: 0; }
+.service-pick span { display: grid; min-width: 0; }
+.service-uses { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.service-use { border-left: 4px solid var(--tone); }
+.service-total { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; margin: 8px 0 16px; }
+.service-total strong { font-size: 1.6rem; }

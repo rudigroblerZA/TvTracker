@@ -21,7 +21,7 @@ builder.Services.AddHostedService<ProfileSnapshotPublisher>();
 builder.Services.AddHostedService<AdminAccountSeeder>();
 
 // Used by the data export to collect each service's data for the user.
-foreach (var source in new[] { "tracking", "ratings", "recommendations", "notifications", "social" })
+foreach (var source in new[] { "tracking", "ratings", "recommendations", "notifications", "social", "analytics" })
 {
     builder.Services.AddHttpClient(source, client => client.BaseAddress = new Uri($"https+http://{source}-api/"));
 }
@@ -45,5 +45,6 @@ app.MapGet("/api/v1/status", () => new { Service = "identity-api", Status = "ok"
 app.MapProfileApi();
 app.MapFlagsApi();
 app.MapPlansApi();
+app.MapFamilyApi();
 
 app.Run();
