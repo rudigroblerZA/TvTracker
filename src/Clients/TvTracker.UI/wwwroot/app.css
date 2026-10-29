@@ -777,3 +777,7 @@ h1:focus, h2:focus { outline: none; }
 .plan-features { padding-left: 18px; margin: 0 0 10px; display: grid; gap: 4px; }
 .plan-users { list-style: none; padding: 0; display: grid; gap: 8px; }
 .plan-users li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* A list's link, under its title */
+.list-link { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 12px; }
+.list-link-url { flex: 1 1 260px; min-width: 0; font-size: 0.85rem; }

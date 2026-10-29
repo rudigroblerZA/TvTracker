@@ -36,6 +36,15 @@ public interface IPlatformServices
 
     /// <summary>Keeps a setting on this device or browser; null removes it.</summary>
     Task SetPreferenceAsync(string key, string? value);
+
+    /// <summary>
+    /// The web app's address, ending in "/", for links people open elsewhere (a list's link): the browser's own on the
+    /// web, the configured one on the phone.
+    /// </summary>
+    string PublicWebAddress { get; }
+
+    /// <summary>Shares a link: the share sheet on a phone, else copies it. True when it was shared or copied.</summary>
+    Task<bool> ShareLinkAsync(string title, string url);
 }
 
 /// <summary>Offline support. The web app uses <see cref="OnlineOnly"/>; the mobile app stores responses and queues changes in SQLite.</summary>

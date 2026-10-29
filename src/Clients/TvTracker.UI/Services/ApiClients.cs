@@ -208,6 +208,17 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task UpdateListAsync(Guid id, string name, string? description, bool? shared = null, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Put, $"api/v1/lists/{id}", new { name, description, shared }, ct, queueIfOffline: true);
 
+    /// <summary>Gives a list a link anyone can open, or returns the one it has.</summary>
+    public Task<ListLink?> CreateListLinkAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ListLink>(ApiClients.Tracking, HttpMethod.Post, $"api/v1/lists/{id}/link", null, ct);
+
+    public Task DeleteListLinkAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{id}/link", null, ct);
+
+    /// <summary>The list a link opens; null when the link was turned off or never existed. Needs no sign-in.</summary>
+    public Task<LinkedList?> GetLinkedListAsync(string token, CancellationToken ct = default) =>
+        GetAsync<LinkedList>(ApiClients.Tracking, $"api/v1/linked-lists/{Uri.EscapeDataString(token)}", ct);
+
     public Task DeleteListAsync(Guid id, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{id}", null, ct, queueIfOffline: true);
 

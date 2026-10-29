@@ -35,9 +35,14 @@ public sealed class WebAuthActions(NavigationManager navigation) : IAuthActions
 }
 
 /// <summary>Browser features through wwwroot/js/tvtracker.js.</summary>
-public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notifications, Branding brand) : IPlatformServices
+public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notifications, Branding brand, NavigationManager navigation)
+    : IPlatformServices
 {
     public bool SupportsPush => true;
+
+    public string PublicWebAddress => navigation.BaseUri;
+
+    public async Task<bool> ShareLinkAsync(string title, string url) => await js.InvokeAsync<bool>("tvtracker.shareLink", title, url);
 
     public async Task<string?> GetDeviceTimeZoneAsync() => await js.InvokeAsync<string?>("tvtracker.timeZone");
 

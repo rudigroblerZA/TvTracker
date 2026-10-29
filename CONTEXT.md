@@ -672,6 +672,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outbox on every change, and `ListUnsharedIntegrationEvent` when it's unshared or deleted. Social keeps a copy and
   serves it under the profile rule. Updates carry `UpdatedAtUtc`, and an older one is ignored, since events can arrive
   out of order. Tracking's snapshot carries shared lists too (an optional trailing parameter), so a lost event heals.
+- **List links** (Tracking, `UserList.LinkToken`, `list-links` flag): a list's owner can make a link anyone opens,
+  signed in or not (`GET /api/v1/linked-lists/{token}`, anonymous).
+  - **In Tracking, not Social:** the link shows the list as Tracking has it, with no owner, so it needs neither Social's
+    copy nor its `Visibility`. A private profile or a block doesn't stop a link, by design: sending it is the owner's
+    choice, like sharing a document by link.
+  - **The token is the access:** 128 random bits (22 characters, base64url), unique, so links can't be enumerated and no
+    rate limit is needed for that. Turning the link off clears it; a new link gets a new token, so old copies stop working.
+  - **Address:** the UI builds `/l/{token}` on `IPlatformServices.PublicWebAddress`: the browser's base on the web, the
+    configured web address on the phone, since the app's own address means nothing to whoever receives the link.
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
 
@@ -780,6 +789,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   the identity provider. A copy applies in seconds.
 - **Shared definition:** `Plans.Limits` is linked into the UI, so the plan page, the lists page and Tracking state the
   same limits.
+- **Sharing is free now:** Free started with no sharing, then sharing (profile and links) opened to every plan, since
+  shared lists bring people in. `PlanLimits.ShareLists` stays, and Tracking still checks it, so a plan can lose sharing
+  again by changing one value.
 - **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
   already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
   people's work.

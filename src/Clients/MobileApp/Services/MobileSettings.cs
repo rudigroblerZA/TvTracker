@@ -15,6 +15,12 @@ public static class MobileSettings
     /// <summary>Mobile BFF ("http" launch profile, port 5110).</summary>
     public static Uri BffAddress => new($"http://{Host}:5110/");
 
+    /// <summary>
+    /// The web app ("http" launch profile, port 5120), for links others open, such as a list's link. In development it's
+    /// this machine's, so a link only opens on it; set it to the public address for a release.
+    /// </summary>
+    public static Uri WebAddress => new($"http://{Host}:5120/");
+
     /// <summary>Keycloak realm (fixed host port 8080 in the AppHost).</summary>
     public static string Authority => $"http://{Host}:8080/realms/tvtracker";
 

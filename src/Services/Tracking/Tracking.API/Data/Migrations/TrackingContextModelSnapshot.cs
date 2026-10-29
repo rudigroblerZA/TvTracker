@@ -125,6 +125,10 @@ namespace Tracking.API.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("LinkToken")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -142,6 +146,10 @@ namespace Tracking.API.Data.Migrations
                         .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LinkToken")
+                        .IsUnique()
+                        .HasFilter("\"LinkToken\" IS NOT NULL");
 
                     b.HasIndex("UserId");
 

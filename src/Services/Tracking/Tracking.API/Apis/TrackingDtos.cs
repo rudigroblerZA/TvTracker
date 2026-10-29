@@ -98,7 +98,16 @@ public record ListSummaryDto(Guid Id, string Name, string? Description, int Item
 
 public record ListItemDto(Guid ShowId, string? Title, string? PosterUrl, int Position, DateTime AddedAtUtc);
 
-public record ListDetailDto(Guid Id, string Name, string? Description, IReadOnlyList<ListItemDto> Items, DateTime UpdatedAtUtc, bool Shared = false);
+/// <param name="LinkToken">The list's link secret, for its owner; null without a link.</param>
+public record ListDetailDto(Guid Id, string Name, string? Description, IReadOnlyList<ListItemDto> Items, DateTime UpdatedAtUtc, bool Shared = false,
+    string? LinkToken = null);
+
+/// <summary>A list as its link shows it: no owner, no ids beyond the shows'.</summary>
+public record LinkedListDto(string Name, string? Description, IReadOnlyList<LinkedListItemDto> Items, DateTime UpdatedAtUtc);
+
+public record LinkedListItemDto(Guid ShowId, string? Title, string? PosterUrl);
+
+public record ListLinkDto(string Token);
 
 public static class TrackingMappings
 {
