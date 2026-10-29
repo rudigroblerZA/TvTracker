@@ -733,6 +733,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
 - **Flag:** checked once per run without a user, so it can't target some users only.
 
+## Guess the show
+
+- **No table** (`PuzzleApi` on Catalog.API): the day's show is the pool's lowest SHA-256 of date and show id, skipping
+  the first choices of the 30 days before, so any process works it out alone and a show doesn't come back within a month.
+  Once chosen, a day's answer is cached for two days (HybridCache, so Redis shares it), and a pool change mid-day doesn't
+  move it.
+- **The pool:** popularity 99+, rated 7.5+, English, scripted or animated, a premiere date and two credited characters:
+  ~230 shows. Popularity 95 and 7.0 gave 437, and a sample of 30 included Tehran and Maigret, which few would name.
+- **Stateless, on trust:** the client says which attempt a guess is and gets the answer after the sixth, so the answer
+  can be had by asking; it's a game. Guesses and the record live on the device (`IPlatformServices` preferences, like the
+  spoiler shield), so it needs no account and no column anywhere.
+- **Clues don't give it away:** a name sharing a word of four letters or more with the title is skipped, and the lead's
+  character is left off when it does (Grey's Anatomy's lead is "Ellen Pompeo", not "as Meredith Grey"). The lead is the
+  first-billed safe name; the character clue is someone else's.
+- **Close** means within 3 years, one season, or another network on the same streaming service (`NetworkServices`).
+- **The shared grid** marks a miss amber when three or more of the seven comparisons matched or were close.
+
 ## Holiday episodes
 
 - **Found, not curated** (`HolidayApi` on Catalog.API): a Postgres regex per holiday over episode titles and summaries,

@@ -791,3 +791,22 @@ public record ServiceUse(string Key, string Name, decimal? MonthlyUsd, int Minut
 
 public record ServiceShow(Guid ShowId, string Title, int Minutes, int Episodes, DateTimeOffset? NextAirsAtUtc);
 
+/// <summary>Guess the show: today's puzzle, without its answer.</summary>
+public record Puzzle(int Number, DateOnly Date, int MaxGuesses, IReadOnlyList<PuzzleClue> Clues);
+
+/// <param name="AfterWrong">How many wrong guesses unlock it.</param>
+public record PuzzleClue(string Key, int AfterWrong, string Text);
+
+/// <param name="Answer">Set once the puzzle is over.</param>
+public record PuzzleGuess(bool Correct, PuzzleFeedback Feedback, IReadOnlyList<PuzzleClue> Clues, PuzzleShow? Answer);
+
+/// <param name="Year">"same", "later" or "earlier": when the answer premiered, against the guess.</param>
+/// <param name="Network">"same", "service" (same streaming service) or "different".</param>
+/// <param name="Seasons">"same", "more" or "fewer": the answer's seasons, against the guess.</param>
+public record PuzzleFeedback(PuzzleShow Guess, int? GuessYear, string Year, bool YearClose, string? GuessNetwork, string Network,
+    IReadOnlyList<PuzzleGenre> Genres, string? GuessKind, bool SameKind, int GuessSeasons, string Seasons, bool SeasonsClose,
+    string GuessStatus, bool SameStatus, IReadOnlyList<string> SharedCast);
+
+public record PuzzleGenre(string Genre, bool Shared);
+
+public record PuzzleShow(Guid Id, string Title, string? PosterUrl);
