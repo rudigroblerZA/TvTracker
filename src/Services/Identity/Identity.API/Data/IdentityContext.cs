@@ -22,20 +22,50 @@ public class UserProfile
 
     public string Language { get; set; } = "en";
 
-    /// <summary>One of <see cref="TvTracker.IntegrationEvents.Plans"/>; everyone starts free.</summary>
+    /// <summary>The plan this user pays for (<see cref="TvTracker.IntegrationEvents.Plans"/>); everyone starts free.</summary>
     public string Plan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
 
     /// <summary>When <see cref="Plan"/> was last set; null while it never has.</summary>
     public DateTime? PlanChangedAtUtc { get; set; }
+
+    /// <summary>
+    /// The plan they get: their own, or "family" while they're in an active family; what other services are sent
+    /// (<see cref="Services.PlanState"/>).
+    /// </summary>
+    public string EffectivePlan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
+
+    /// <summary>When <see cref="EffectivePlan"/> last changed; null while it never has.</summary>
+    public DateTime? EffectivePlanChangedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 }
 
+/// <summary>A family plan's group, one per owner. Members get the family plan while the owner pays for it.</summary>
+public class Family
+{
+    public required string OwnerUserId { get; set; }
+
+    /// <summary>The secret in the invite link (<c>/family/join/{token}</c>); null while invites are off.</summary>
+    public string? InviteToken { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+}
+
+/// <summary>Someone in a family; a person is in at most one.</summary>
+public class FamilyMember
+{
+    public required string UserId { get; set; }
+    public required string OwnerUserId { get; set; }
+    public DateTime JoinedAtUtc { get; set; }
+}
+
 public class IdentityContext(DbContextOptions<IdentityContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<UserProfile> Profiles => Set<UserProfile>();
+    public DbSet<Family> Families => Set<Family>();
+    public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
 
@@ -55,6 +85,25 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(p => p.Region).HasMaxLength(2);
             entity.Property(p => p.Language).HasMaxLength(10);
             entity.Property(p => p.Plan).HasMaxLength(16).HasDefaultValue(TvTracker.IntegrationEvents.Plans.Free);
+            entity.Property(p => p.EffectivePlan).HasMaxLength(16).HasDefaultValue(TvTracker.IntegrationEvents.Plans.Free);
+        });
+
+        modelBuilder.Entity<Family>(entity =>
+        {
+            entity.ToTable("families");
+            entity.HasKey(f => f.OwnerUserId);
+            entity.Property(f => f.OwnerUserId).HasMaxLength(64);
+            entity.Property(f => f.InviteToken).HasMaxLength(32);
+            entity.HasIndex(f => f.InviteToken).IsUnique().HasFilter("\"InviteToken\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<FamilyMember>(entity =>
+        {
+            entity.ToTable("family_members");
+            entity.HasKey(m => m.UserId);
+            entity.Property(m => m.UserId).HasMaxLength(64);
+            entity.Property(m => m.OwnerUserId).HasMaxLength(64);
+            entity.HasIndex(m => m.OwnerUserId);
         });
 
         modelBuilder.UseIntegrationEventLogs();

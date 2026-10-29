@@ -747,7 +747,47 @@ public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists,
 }
 
 /// <summary>The caller's plan, from Identity.</summary>
-public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc);
+/// <param name="Plan">The plan they get: their own, or the family plan they're in.</param>
+/// <param name="Purchased">The plan they pay for themselves.</param>
+public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc, string Purchased = "free",
+    bool TrackServices = false);
+
+/// <param name="Role">"owner", "member" or "none".</param>
+/// <param name="Active">Whether the owner pays for the family plan now.</param>
+/// <param name="InviteToken">The invite link's secret, for the owner; null while invites are off.</param>
+public record FamilyInfo(string Role, bool Active, string? OwnerName, IReadOnlyList<FamilyMemberInfo> Members, int Seats, string? InviteToken);
+
+/// <param name="UserId">Given to the owner only, to remove them.</param>
+public record FamilyMemberInfo(string? UserId, string DisplayName, DateTime JoinedAtUtc);
+
+public record FamilyInvite(string OwnerName, int SeatsLeft, bool Active);
+
+public record FamilyInviteLink(string Token);
 
 /// <summary>A user on the admins' plans page.</summary>
 public record PlanUser(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);
+
+/// <summary>The streaming services behind the networks, with logos and estimated prices.</summary>
+public record ServiceDirectory(string PricesAsOf, string PricesSource, IReadOnlyList<ServiceInfo> Services)
+{
+    public ServiceInfo? ForNetwork(string network) =>
+        Services.FirstOrDefault(s => s.Networks.Contains(network, StringComparer.OrdinalIgnoreCase));
+}
+
+/// <param name="MonthlyUsd">Cheapest US plan a month; 0 free; null unknown.</param>
+/// <param name="Logo">The icon as a data: URI; null when it couldn't be fetched.</param>
+public record ServiceInfo(string Key, string Name, decimal? MonthlyUsd, string? Note, string? Logo, IReadOnlyList<string> Networks);
+
+/// <param name="Allowed">Whether the user's plan lets them keep services.</param>
+public record MyServices(string Plan, bool Allowed, IReadOnlyList<string> Services);
+
+/// <summary>What the user's services cost per hour they watch, over the last and next WindowDays.</summary>
+public record ServicesReport(int WindowDays, decimal MonthlyUsd, int UnknownPrices, int Minutes, IReadOnlyList<ServiceUse> Services,
+    IReadOnlyList<ServiceUse> Missing, string PricesAsOf);
+
+/// <param name="Verdict">"value", "pricey", "quiet" or "pause".</param>
+public record ServiceUse(string Key, string Name, decimal? MonthlyUsd, int Minutes, decimal? CostPerHour, string Verdict,
+    IReadOnlyList<ServiceShow> Watched, IReadOnlyList<ServiceShow> Coming);
+
+public record ServiceShow(Guid ShowId, string Title, int Minutes, int Episodes, DateTimeOffset? NextAirsAtUtc);
+
