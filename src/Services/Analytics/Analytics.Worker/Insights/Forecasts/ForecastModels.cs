@@ -14,7 +14,9 @@ public sealed class ForecastModels
     public required RenewalCohorts Renewal { get; init; }
     public required PremiereForecaster Premiere { get; init; }
 
-    /// <summary>One line for the log: how each model did in its backtest.</summary>
+    /// <summary>
+    /// One line for the log: how each model did in its backtest.
+    /// </summary>
     public string Summary => $"rating {Rating.Summary}; renewal {Renewal.Summary}; premiere {Premiere.Summary}";
 
     public static ForecastModels Train(InsightSources sources)
@@ -31,10 +33,14 @@ public sealed class ForecastModels
         };
     }
 
-    /// <summary>A show that has ended gets no forecasts.</summary>
+    /// <summary>
+    /// A show that has ended gets no forecasts.
+    /// </summary>
     public static bool Running(ShowCopy show) => show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled);
 
-    /// <summary>The value below which a share <paramref name="q"/> of the sorted values fall.</summary>
+    /// <summary>
+    /// The value below which a share <paramref name="q"/> of the sorted values fall.
+    /// </summary>
     internal static double Quantile(IReadOnlyList<double> sorted, double q) => sorted[(int)Math.Clamp(q * (sorted.Count - 1), 0, sorted.Count - 1)];
 }
 
@@ -198,7 +204,9 @@ public sealed class RenewalCohorts
         return new RenewalCohorts(groups, total, total == 0 ? 0 : (double)renewed / total);
     }
 
-    /// <summary>For a running show whose latest season has fully aired and nothing later is scheduled or announced.</summary>
+    /// <summary>
+    /// For a running show whose latest season has fully aired and nothing later is scheduled or announced.
+    /// </summary>
     public RenewalOutlook? Forecast(List<SeasonRecord> seasons, int seasonsSoFar)
     {
         var latest = seasons[^1];
@@ -212,7 +220,9 @@ public sealed class RenewalCohorts
         return null;
     }
 
-    /// <summary>The groups a season belongs to, most specific first, each with how to describe it.</summary>
+    /// <summary>
+    /// The groups a season belongs to, most specific first, each with how to describe it.
+    /// </summary>
     private static IEnumerable<(string Key, string Basis)> Keys(SeasonRecord season, int seasonsSoFar, int? era)
     {
         if (season.Rating is not { } rating)
@@ -307,7 +317,9 @@ public sealed class PremiereForecaster
             DateOnly.FromDateTime(now.UtcDateTime) > latest, Cases);
     }
 
-    /// <summary>Days from each season's last episode to the next one's first.</summary>
+    /// <summary>
+    /// Days from each season's last episode to the next one's first.
+    /// </summary>
     private static List<double> Waits(List<SeasonRecord> seasons) => seasons
         .Zip(seasons.Skip(1))
         .Where(p => p.First.LastAired is not null && p.Second.First is not null)

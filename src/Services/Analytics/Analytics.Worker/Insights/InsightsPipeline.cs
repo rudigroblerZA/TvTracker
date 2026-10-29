@@ -102,7 +102,9 @@ public sealed class InsightsPipeline(
         return sources.Shows.Count;
     }
 
-    /// <summary>The document the stages start from: the show, its overall rating, and nothing else yet.</summary>
+    /// <summary>
+    /// The document the stages start from: the show, its overall rating, and nothing else yet.
+    /// </summary>
     private static ShowInsights Blank(ShowInsightContext show) =>
         new(show.ShowId, show.Show.Title, show.Sources.ComputedAtUtc, show.Rating, [], null, null, null, [], NoRun, null, []);
 

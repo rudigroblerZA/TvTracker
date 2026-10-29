@@ -2,13 +2,19 @@ using Analytics.Worker.Insights;
 
 namespace Analytics.Worker;
 
-/// <summary>Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour).</summary>
+/// <summary>
+/// Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour).
+/// </summary>
 public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, ILogger<InsightsRefresher> logger) : BackgroundService
 {
-    /// <summary>Gives the event consumers (and a catalog replay) a head start before the first run.</summary>
+    /// <summary>
+    /// Gives the event consumers (and a catalog replay) a head start before the first run.
+    /// </summary>
     private static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(1);
 
-    /// <summary>How often every show's tags and DNA are sent, not just the changed ones (and on the first run after starting).</summary>
+    /// <summary>
+    /// How often every show's tags and DNA are sent, not just the changed ones (and on the first run after starting).
+    /// </summary>
     private static readonly TimeSpan FullSyncInterval = TimeSpan.FromDays(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

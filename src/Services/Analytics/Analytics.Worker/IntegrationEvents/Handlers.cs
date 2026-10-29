@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Analytics.Worker.IntegrationEvents;
 
-/// <summary>Keeps Analytics' copy of shows, episodes, announced seasons and cast current from the catalog.</summary>
+/// <summary>
+/// Keeps Analytics' copy of shows, episodes, announced seasons and cast current from the catalog.
+/// </summary>
 public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,

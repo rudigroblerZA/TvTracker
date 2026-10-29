@@ -2,7 +2,9 @@ using Catalog.SyncWorker.Providers;
 
 namespace Catalog.SyncWorker;
 
-/// <summary>What to import: exactly one of titles (each imports the provider's best match), provider ids, or the top N.</summary>
+/// <summary>
+/// What to import: exactly one of titles (each imports the provider's best match), provider ids, or the top N.
+/// </summary>
 public record BulkImportRequest(IReadOnlyList<string>? Titles = null, IReadOnlyList<string>? Ids = null, int? Top = null);
 
 /// <param name="State">"running", "completed", "cancelled" or "failed".</param>
@@ -53,7 +55,9 @@ public sealed class BulkImportRunner(
         }
     }
 
-    /// <summary>Starts a job, or returns the running one's status (and false) when one is already running.</summary>
+    /// <summary>
+    /// Starts a job, or returns the running one's status (and false) when one is already running.
+    /// </summary>
     public (bool Started, BulkImportStatus Status) TryStart(BulkImportRequest request)
     {
         lock (_lock)
@@ -70,7 +74,9 @@ public sealed class BulkImportRunner(
         }
     }
 
-    /// <summary>Asks the job to stop after the show it's importing. False when it isn't running (or isn't the current job).</summary>
+    /// <summary>
+    /// Asks the job to stop after the show it's importing. False when it isn't running (or isn't the current job).
+    /// </summary>
     public bool TryCancel(Guid id)
     {
         lock (_lock)

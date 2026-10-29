@@ -1,19 +1,29 @@
 namespace Catalog.Embeddings;
 
-/// <summary>How a model's per-token vectors become one vector for the text.</summary>
+/// <summary>
+/// How a model's per-token vectors become one vector for the text.
+/// </summary>
 public enum EmbeddingPooling
 {
-    /// <summary>The average of the token vectors (sentence-transformers models such as MiniLM).</summary>
+    /// <summary>
+    /// The average of the token vectors (sentence-transformers models such as MiniLM).
+    /// </summary>
     Mean,
 
-    /// <summary>The vector of the first ([CLS]) token (BGE and Arctic models).</summary>
+    /// <summary>
+    /// The vector of the first ([CLS]) token (BGE and Arctic models).
+    /// </summary>
     Cls
 }
 
-/// <summary>Where a model runs.</summary>
+/// <summary>
+/// Where a model runs.
+/// </summary>
 public enum EmbeddingSource
 {
-    /// <summary>In-process with ONNX Runtime; the files are downloaded from <see cref="EmbeddingModel.BaseUrl"/>.</summary>
+    /// <summary>
+    /// In-process with ONNX Runtime; the files are downloaded from <see cref="EmbeddingModel.BaseUrl"/>.
+    /// </summary>
     Onnx,
 
     /// <summary>
@@ -31,7 +41,9 @@ public enum EmbeddingSource
 /// </summary>
 public sealed class EmbeddingModel
 {
-    /// <summary>Stored with each vector, so changing the model re-embeds the catalog. Set from the configuration key.</summary>
+    /// <summary>
+    /// Stored with each vector, so changing the model re-embeds the catalog. Set from the configuration key.
+    /// </summary>
     public string Id { get; set; } = "";
 
     public EmbeddingSource Source { get; set; } = EmbeddingSource.Server;
@@ -77,13 +89,19 @@ public sealed class EmbeddingModel
     /// </summary>
     public int MaxTokens { get; set; } = 256;
 
-    /// <summary>For ONNX models; a server pools by itself.</summary>
+    /// <summary>
+    /// For ONNX models; a server pools by itself.
+    /// </summary>
     public EmbeddingPooling Pooling { get; set; } = EmbeddingPooling.Mean;
 
-    /// <summary>Put in front of search terms (some models are trained to tell queries from documents this way).</summary>
+    /// <summary>
+    /// Put in front of search terms (some models are trained to tell queries from documents this way).
+    /// </summary>
     public string QueryPrefix { get; set; } = "";
 
-    /// <summary>Put in front of the show text that's embedded.</summary>
+    /// <summary>
+    /// Put in front of the show text that's embedded.
+    /// </summary>
     public string DocumentPrefix { get; set; } = "";
 
     /// <summary>
@@ -101,10 +119,14 @@ public static class EmbeddingModels
     public const string BgeSmall = "bge-small-en-v1.5";
     public const string DockerNomic = "dmr/nomic-embed-text-v1.5";
 
-    /// <summary>Docker Model Runner's OpenAI-compatible API, as seen from the host.</summary>
+    /// <summary>
+    /// Docker Model Runner's OpenAI-compatible API, as seen from the host.
+    /// </summary>
     public const string DockerModelRunnerEndpoint = "http://localhost:12434/engines/v1/";
 
-    /// <summary>The models that work without configuring files; <see cref="EmbeddingOptions.Model"/> picks one.</summary>
+    /// <summary>
+    /// The models that work without configuring files; <see cref="EmbeddingOptions.Model"/> picks one.
+    /// </summary>
     public static IReadOnlyDictionary<string, EmbeddingModel> BuiltIn { get; } = new Dictionary<string, EmbeddingModel>
     {
         // ~90 MB; the default. Related shows land around 0.3-0.64 ("cooking competition" → The Great British Bake Off at 0.62),

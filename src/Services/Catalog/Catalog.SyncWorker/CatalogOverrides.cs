@@ -11,7 +11,9 @@ namespace Catalog.SyncWorker;
 /// </summary>
 public static class CatalogOverrides
 {
-    /// <summary>Checks a value for a field; returns the error, or null when it's fine.</summary>
+    /// <summary>
+    /// Checks a value for a field; returns the error, or null when it's fine.
+    /// </summary>
     public static string? Validate(string field, string value) => field switch
     {
         _ when !CatalogOverrideFields.All.Contains(field) => $"Unknown field \"{field}\".",
@@ -26,7 +28,9 @@ public static class CatalogOverrides
         _ => null
     };
 
-    /// <summary>The provider's show with the overrides applied; episodes are matched through their catalog ids.</summary>
+    /// <summary>
+    /// The provider's show with the overrides applied; episodes are matched through their catalog ids.
+    /// </summary>
     public static ProviderShow Apply(ProviderShow show, IReadOnlyList<CatalogOverride> overrides, IReadOnlyDictionary<Guid, string> episodeExternalIds)
     {
         if (overrides.Count == 0)
@@ -70,7 +74,9 @@ public static class CatalogOverrides
         };
     }
 
-    /// <summary>Applies one override to the stored show or episode; true when it changed anything.</summary>
+    /// <summary>
+    /// Applies one override to the stored show or episode; true when it changed anything.
+    /// </summary>
     public static bool ApplyTo(Show show, CatalogOverride o)
     {
         if (o.EpisodeId is null)
@@ -115,7 +121,9 @@ public static class CatalogOverrides
         }
     }
 
-    /// <summary>The corrected date at the provider's time of day (UTC midnight when it has none).</summary>
+    /// <summary>
+    /// The corrected date at the provider's time of day (UTC midnight when it has none).
+    /// </summary>
     private static DateTimeOffset AirsOn(string date, DateTimeOffset? provider) =>
         new(DateOnly.ParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToDateTime(TimeOnly.FromTimeSpan(provider?.UtcDateTime.TimeOfDay ?? TimeSpan.Zero)), TimeSpan.Zero);
 }
