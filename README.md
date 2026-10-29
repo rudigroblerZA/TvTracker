@@ -67,13 +67,14 @@ The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`. 
 | --- | --- | --- |
 | `all-MiniLM-L6-v2` | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
 | `bge-small-en-v1.5` | In-process (ONNX), ~130 MB download | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
-| `dmr/nomic-embed-text-v1.5` (default) | Docker Model Runner, ~270 MB model | ~10× slower per search (~30 ms) and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
+| `dmr/qwen3-embedding-0.6b` (default) | Docker Model Runner, ~640 MB model | Ranked best of the server models on the test searches (top-1 30/41, top-3 34/41, against nomic's 18 and 27); ~130 ms a search on a CPU; matches below 0.46 |
+| `dmr/nomic-embed-text-v1.5` | Docker Model Runner, ~270 MB model | The previous default; matches below 0.38 |
 
 **Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API. It runs the
 default model, so semantic search needs nothing installed beyond Docker.
 - **Container:** the AppHost runs `docker/model-runner` as the `model-runner` container, on CPU. Models are kept
   in the `tvtracker-model-runner` volume.
-- **First start:** the sync worker pulls the model from Docker Hub (~270 MB). Until it's ready, search matches
+- **First start:** the sync worker pulls the model from Docker Hub (~640 MB). Until it's ready, search matches
   titles only, then the catalog is embedded within a few minutes. If the pull fails, for example because Docker Hub
   rate-limits it, it retries every minute.
 - **Your own Model Runner:** set `ModelRunner:Url` in the AppHost's configuration (e.g. `http://localhost:12434`)
@@ -83,8 +84,8 @@ default model, so semantic search needs nothing installed beyond Docker.
   - The sync worker pulls the model there too, if it's missing.
 - **Endpoint:** the AppHost sets `Embeddings:Endpoint` for every server model to its Model Runner. A model's own
   `Embeddings:Models:{id}:Endpoint` takes precedence; without either, it's `http://localhost:12434/engines/v1/`.
-- **In-process instead:** set `Embeddings:Model` to `all-MiniLM-L6-v2`, which also ranked best on the test
-  searches. The AppHost then doesn't start Model Runner at all.
+- **In-process instead:** set `Embeddings:Model` to `all-MiniLM-L6-v2`, which ranked best on the earlier test
+  searches and needs no server. The AppHost then doesn't start Model Runner at all.
 - **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
 - **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
   embeds once it's back. Each service logs one warning per outage.
@@ -100,12 +101,18 @@ default model, so semantic search needs nothing installed beyond Docker.
     in-process embedding model, since there's no Model Runner then.
 - **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
   `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
-  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as nomic and EmbeddingGemma):
+  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as Qwen3-Embedding, nomic and EmbeddingGemma):
     its longer vectors are cut to the column's 384 dimensions.
   - A model that makes 384 dimensions natively needs no truncation. A longer one without `Truncate` is refused,
     since cutting other models loses most of their meaning.
 
-On 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
+**Qwen3-Embedding 0.6B** became the default after 41 test searches over the 846-show catalog ("chemistry teacher
+becomes a drug dealer" → Breaking Bad, "vets in the yorkshire dales" → All Creatures Great and Small): it put the
+expected show first for 30 and in the top 3 for 34 (MRR 0.78), against nomic's 18, 27 and 0.57. It finds what nomic
+missed (Stranger Things, The Sopranos' therapist, The Expanse) and keeps unrelated searches ("knitting patterns for
+beginners") at 0.46 or further, where nomic let them within its cutoff. MiniLM and bge-small weren't run on this set.
+
+An earlier comparison, on 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
 first for 27 and in the top 3 for 35; bge-small did so for 24 and 31, and found slightly more of the expected shows in
 the top 10 (84% against 82%). Each model wins different searches: bge-small finds Dark for "time travel mystery in a
 small german town" (10th against 64th) and The Mandalorian for "bounty hunter protects a child in a galaxy far away"
