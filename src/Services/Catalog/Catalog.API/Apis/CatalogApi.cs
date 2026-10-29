@@ -25,6 +25,7 @@ public static class CatalogApi
         api.MapGet("/shows/batch", GetShowsByIdsAsync);
         api.MapGet("/shows/suggest", SuggestShowsAsync);
         api.MapBlendApi();
+        api.MapMixtapeApi();
         api.MapUniverseApi();
         api.MapMoodApi();
         api.MapHolidayApi();

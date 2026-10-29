@@ -217,6 +217,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Waiting room: shows you're caught up on, with when they're back (scheduled or forecast)." }
     },
+    "mixtape": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
+    },
     "year-in-tv": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

@@ -1,0 +1,245 @@
+@page "/mixtape"
+@attribute [RequiresFeature(FeatureFlags.Mixtape)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(picked.Count >= MinShows ? string.Join(" + ", picked.Select(s => s.Title)) : "Mixtape") · @Brand.AppName</PageTitle>
+
+<h1>Mixtape</h1>
+<p class="muted">Pick three shows you love and get the shows that fit all of them, not just one.</p>
+
+<div class="mixtape-pickers">
+    @for (var i = 0; i < slots; i++)
+    {
+        var slot = i;
+        <div class="mixtape-slot" @key="slot">
+            <span class="mixtape-swatch swatch-@slot" aria-hidden="true"></span>
+            <ShowPicker Label="@($"Show {slot + 1}")" Selected="@(slot < picked.Count ? picked[slot] : null)"
+                        SelectedChanged="show => PickAsync(slot, show)" ExcludeAll="@picked.Select(s => s.Id).ToList()" />
+        </div>
+    }
+</div>
+@if (slots < MaxShows && picked.Count == slots)
+{
+    <p><button type="button" class="btn btn-quiet small" @onclick="() => slots++">+ Add another show</button></p>
+}
+
+@if (picked.Count == 0)
+{
+    <div class="blend-examples">
+        <span class="muted small">Try</span>
+        @foreach (var example in Examples)
+        {
+            <button class="btn btn-quiet small" type="button" @onclick="() => TryExampleAsync(example)">@string.Join(" + ", example)</button>
+        }
+    </div>
+}
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (picked.Count >= MinShows)
+{
+    @if (loading)
+    {
+        <p class="muted">Mixing…</p>
+    }
+    else if (mixtape is { Indexed: false })
+    {
+        <p class="notice">One of these shows was just added and is still being indexed. Try again in a minute.</p>
+    }
+    else if (mixtape is not null)
+    {
+        @if (mixtape.SharedGenres.Count > 0)
+        {
+            <p class="small"><span class="muted">What they have in common: </span>@string.Join(", ", mixtape.SharedGenres)</p>
+        }
+        @if (mixtape.Loose)
+        {
+            <p class="notice">These shows don't have much in common, so these are the closest common ground rather than close matches.</p>
+        }
+
+        <div class="card-grid">
+            @foreach (var match in mixtape.Matches)
+            {
+                <ShowCard @key="match.Show.Id" ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl"
+                          Subtitle="@(string.Join(" · ", new[] { match.Show.Year?.ToString(), match.Show.Network }.Where(s => !string.IsNullOrEmpty(s))))">
+                    <div class="mixtape-bar" title="@Mix(match)">
+                        @for (var i = 0; i < match.Links.Count; i++)
+                        {
+                            <span class="swatch-@i" style="flex-grow:@(Math.Max(1, match.Links[i].Closeness))"></span>
+                        }
+                    </div>
+                    <div class="muted small">@Reason(match)</div>
+                    @if (followed.Contains(match.Show.Id))
+                    {
+                        <div class="muted small">On your list</div>
+                    }
+                </ShowCard>
+            }
+        </div>
+    }
+}
+
+@code {
+    // The address is the state, so a mixtape can be shared: ?ids=a,b,c.
+    [SupplyParameterFromQuery(Name = "ids")] public string? Ids { get; set; }
+
+    private const int MinShows = 3;
+    private const int MaxShows = 5;
+
+    private static readonly string[][] Examples =
+    [
+        ["The Office", "Superstore", "Abbott Elementary"],
+        ["Breaking Bad", "Ozark", "Better Call Saul"],
+        ["Stranger Things", "Severance", "Black Mirror"]
+    ];
+
+    private readonly List<ShowSummary> picked = [];
+    private readonly Dictionary<Guid, ShowSummary> known = [];
+    private HashSet<Guid> followed = [];
+    private int slots = MinShows;
+    private Mixtape? mixtape;
+    private bool loading;
+    private string? error;
+    private string? loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if ((Ids ?? "") != loadedFor)
+        {
+            loadedFor = Ids ?? "";
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            var ids = (Ids ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .Take(MaxShows)
+                .ToList();
+            picked.Clear();
+            foreach (var id in ids)
+            {
+                if (await ShowAsync(id) is { } show)
+                {
+                    picked.Add(show);
+                }
+            }
+            slots = Math.Max(slots, Math.Min(MaxShows, Math.Max(MinShows, picked.Count)));
+
+            mixtape = null;
+            if (picked.Count >= MinShows)
+            {
+                loading = true;
+                await Session.EnsureLoadedAsync();
+                var followsTask = Session.IsSignedIn ? Tracking.GetFollowsAsync() : Task.FromResult<List<Follow>?>(null);
+                mixtape = await Catalog.GetMixtapeAsync(picked.Select(s => s.Id).ToList());
+                followed = (await followsTask)?.Select(f => f.ShowId).ToHashSet() ?? [];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task<ShowSummary?> ShowAsync(Guid id)
+    {
+        if (known.TryGetValue(id, out var show))
+        {
+            return show;
+        }
+        if (await Catalog.GetShowAsync(id) is not { } detail)
+        {
+            return null;
+        }
+        show = new ShowSummary(detail.Id, detail.Title, detail.PosterUrl, detail.FirstAirDate?.Year, detail.Status, detail.Network, detail.Genres);
+        known[id] = show;
+        return show;
+    }
+
+    // Picking a show replaces its slot; clearing a slot removes it and the rest move up.
+    private void PickAsync(int slot, ShowSummary? show)
+    {
+        var shows = picked.ToList();
+        if (show is null)
+        {
+            if (slot < shows.Count)
+            {
+                shows.RemoveAt(slot);
+            }
+        }
+        else
+        {
+            known[show.Id] = show;
+            if (slot < shows.Count)
+            {
+                shows[slot] = show;
+            }
+            else
+            {
+                shows.Add(show);
+            }
+        }
+        Go(shows);
+    }
+
+    private async Task TryExampleAsync(string[] titles)
+    {
+        try
+        {
+            var shows = new List<ShowSummary>();
+            foreach (var title in titles)
+            {
+                if ((await Catalog.SuggestAsync(title))?.FirstOrDefault(s => s.Title == title) is not { } show)
+                {
+                    error = $"{title} isn't in the catalog yet. Search for it to add it.";
+                    return;
+                }
+                shows.Add(show);
+                known[show.Id] = show;
+            }
+            Go(shows);
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Go(IEnumerable<ShowSummary> shows) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("ids", string.Join(',', shows.Select(s => s.Id)) is { Length: > 0 } ids ? ids : null));
+
+    private string TitleOf(Guid id) => known.TryGetValue(id, out var show) ? show.Title : "";
+
+    private string Mix(MixtapeMatch match) =>
+        string.Join(" · ", match.Links.Select(l => $"{TitleOf(l.ShowId)} {l.Closeness}%"));
+
+    /// <summary>
+    /// "Closest to The Wire · Legal like Better Call Saul": the show it's nearest, and a genre it takes from one of them
+    /// beyond what they all have in common (already said above the results).
+    /// </summary>
+    private string Reason(MixtapeMatch match)
+    {
+        var closest = match.Links.MaxBy(l => l.Closeness)!;
+        var common = mixtape?.SharedGenres ?? [];
+        var extra = match.Links
+            .Select(l => (l.ShowId, Genre: l.SharedGenres.FirstOrDefault(g => !common.Contains(g))))
+            .Where(x => x.Genre is not null)
+            .Take(2)
+            .Select(x => $"{x.Genre} like {TitleOf(x.ShowId)}");
+        return string.Join(" · ", extra.Prepend($"Closest to {TitleOf(closest.ShowId)}"));
+    }
+}

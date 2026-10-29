@@ -706,3 +706,12 @@ public record WaitingRoom(IReadOnlyList<WaitingShow> Shows);
 /// <param name="Kind">episode, season, forecast or unknown.</param>
 public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? Network, string Kind, DateTimeOffset? BackAtUtc,
     int? SeasonNumber, DateOnly? Likely, DateOnly? Earliest, DateOnly? Latest, bool Overdue, double? Renewal, DateTimeOffset? LastAiredUtc);
+
+/// <summary>A mixtape: three to five shows, and the shows that fit all of them.</summary>
+public record Mixtape(IReadOnlyList<ShowSummary> Shows, bool Indexed, IReadOnlyList<string> SharedGenres, IReadOnlyList<MixtapeMatch> Matches,
+    bool Loose);
+
+/// <param name="Links">How it relates to each of the mixtape's shows, in the same order.</param>
+public record MixtapeMatch(ShowSummary Show, int Fit, IReadOnlyList<MixtapeLink> Links);
+
+public record MixtapeLink(Guid ShowId, int Closeness, IReadOnlyList<string> SharedGenres);
