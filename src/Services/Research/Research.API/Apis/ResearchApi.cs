@@ -1,10 +1,10 @@
-using System.Security.Claims;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Research.API.Data;
 using Research.API.Services;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using TvTracker;
 
 namespace Research.API.Apis;

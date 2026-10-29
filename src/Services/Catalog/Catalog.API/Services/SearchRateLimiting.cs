@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace Catalog.API.Services;
 

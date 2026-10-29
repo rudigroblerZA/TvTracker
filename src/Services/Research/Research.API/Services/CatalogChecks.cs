@@ -1,8 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+using Research.API.Data;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using Research.API.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Research.API.Services;
@@ -154,8 +154,14 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             }
             void Differs(string field, string? catalogValue, string wikidataValue) => checks.Add(new CatalogCheck
             {
-                ShowId = show.Id, Field = field, ShowTitle = show.Title, CatalogValue = catalogValue, WikidataValue = wikidataValue,
-                WikidataUrl = w.Item, Rank = rank, CheckedAtUtc = now
+                ShowId = show.Id,
+                Field = field,
+                ShowTitle = show.Title,
+                CatalogValue = catalogValue,
+                WikidataValue = wikidataValue,
+                WikidataUrl = w.Item,
+                Rank = rank,
+                CheckedAtUtc = now
             });
 
             if (w.Networks.Count > 0 && !w.Networks.Any(n => SameNetwork(n, show.Network)))
@@ -183,8 +189,13 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             .Select(x => (x.Show, Won: awards[x.Show.ExternalId]))
             .Select(x => new ShowAward
             {
-                ShowId = x.Show.Id, ShowTitle = x.Show.Title, PosterUrl = x.Show.PosterUrl, Wins = x.Won.Wins,
-                Summary = WikimediaSource.Awards(x.Won.Labels), WikidataUrl = x.Won.Item, CheckedAtUtc = now
+                ShowId = x.Show.Id,
+                ShowTitle = x.Show.Title,
+                PosterUrl = x.Show.PosterUrl,
+                Wins = x.Won.Wins,
+                Summary = WikimediaSource.Awards(x.Won.Labels),
+                WikidataUrl = x.Won.Item,
+                CheckedAtUtc = now
             })
             .ToList();
 

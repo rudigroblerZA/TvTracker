@@ -1,6 +1,6 @@
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using TvTracker.EventBus;
 
 namespace Analytics.Worker.Insights;

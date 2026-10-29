@@ -1,9 +1,9 @@
-using System.Security.Cryptography;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.Tokenizers;
+using System.Security.Cryptography;
 
 namespace Catalog.Embeddings;
 

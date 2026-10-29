@@ -1,4 +1,3 @@
-using TvTracker;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 

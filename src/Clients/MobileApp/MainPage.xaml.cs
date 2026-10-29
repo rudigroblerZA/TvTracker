@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.DependencyInjection;
 using TvTracker.Mobile.Services;
 
 namespace TvTracker.Mobile;

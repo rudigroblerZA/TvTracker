@@ -1,7 +1,7 @@
-using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Ratings.API.Data;
+using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace Ratings.API.Services;
 

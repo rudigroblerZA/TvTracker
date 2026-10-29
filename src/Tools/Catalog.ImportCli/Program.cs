@@ -1,5 +1,5 @@
-using System.CommandLine;
 using Catalog.ImportCli;
+using System.CommandLine;
 
 // tvtracker-import: bulk imports shows into the catalog. The sync worker does the work (one job at a time, under
 // TVmaze's rate limit, about two shows a second); this tool starts the job and shows its progress.

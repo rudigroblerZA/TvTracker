@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Analytics.Data;
+using System.Text.Json;
 using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker.Insights;

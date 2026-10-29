@@ -2,8 +2,8 @@ using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using TvTracker.IntegrationEvents;
 using TvTracker;
+using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Apis;
 

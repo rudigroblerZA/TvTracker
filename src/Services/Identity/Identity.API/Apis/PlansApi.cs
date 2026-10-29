@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using Identity.API.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

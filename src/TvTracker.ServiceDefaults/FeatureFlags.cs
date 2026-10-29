@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using OpenFeature.Model;
+using System.Security.Claims;
 
 namespace TvTracker;
 

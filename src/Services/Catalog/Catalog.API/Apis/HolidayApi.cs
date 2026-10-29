@@ -1,8 +1,8 @@
-using System.Text.RegularExpressions;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using System.Text.RegularExpressions;
 using TvTracker;
 
 namespace Catalog.API.Apis;
@@ -139,7 +139,14 @@ public static class HolidayApi
                 || e.Overview != null && Regex.IsMatch(e.Overview, pattern, RegexOptions.IgnoreCase))
             .Select(e => new
             {
-                e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes, e.ExternalRating,
+                e.Id,
+                e.ShowId,
+                e.SeasonNumber,
+                e.EpisodeNumber,
+                e.Title,
+                e.AirsAtUtc,
+                e.RuntimeMinutes,
+                e.ExternalRating,
                 InTitle = Regex.IsMatch(e.Title, pattern, RegexOptions.IgnoreCase)
             })
             .ToListAsync(ct);
@@ -149,7 +156,12 @@ public static class HolidayApi
             .Where(s => showIds.Contains(s.Id))
             .Select(s => new
             {
-                s.Id, s.Title, s.PosterUrl, s.Popularity, s.Genres, s.Keywords,
+                s.Id,
+                s.Title,
+                s.PosterUrl,
+                s.Popularity,
+                s.Genres,
+                s.Keywords,
                 Named = Regex.IsMatch(s.Title, pattern, RegexOptions.IgnoreCase)
             })
             .ToDictionaryAsync(s => s.Id, ct);

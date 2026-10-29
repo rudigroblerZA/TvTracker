@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using Research.API.Data;
+using System.Threading.Channels;
 
 namespace Research.API.Services;
 

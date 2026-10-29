@@ -1,7 +1,7 @@
+using Analytics.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Analytics.Data;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 

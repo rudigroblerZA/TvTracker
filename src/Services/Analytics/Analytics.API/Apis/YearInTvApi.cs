@@ -1,9 +1,9 @@
-using System.Globalization;
-using System.Security.Claims;
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Security.Claims;
+using System.Text.Json;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 
@@ -96,7 +96,14 @@ public static class YearInTvApi
             .Where(w => w.UserId == userId)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new
             {
-                w.ShowId, w.EpisodeId, w.WatchedAtUtc, e.RuntimeMinutes, e.SeasonNumber, e.EpisodeNumber, e.Title, e.ExternalRating
+                w.ShowId,
+                w.EpisodeId,
+                w.WatchedAtUtc,
+                e.RuntimeMinutes,
+                e.SeasonNumber,
+                e.EpisodeNumber,
+                e.Title,
+                e.ExternalRating
             })
             .ToListAsync(ct);
 

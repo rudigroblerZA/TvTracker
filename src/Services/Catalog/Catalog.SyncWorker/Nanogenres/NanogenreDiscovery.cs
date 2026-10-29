@@ -50,11 +50,28 @@ public static partial class NanogenreDiscovery
     /// <summary>The provider's specific genres, as they read before a base: "sports comedy", "spy thriller".</summary>
     private static readonly Dictionary<string, string> Modifiers = new()
     {
-        ["Legal"] = "legal", ["Medical"] = "medical", ["Crime"] = "crime", ["Science-Fiction"] = "sci-fi", ["Fantasy"] = "fantasy",
-        ["Supernatural"] = "supernatural", ["Family"] = "family", ["Romance"] = "romantic", ["Sports"] = "sports",
-        ["Espionage"] = "spy", ["War"] = "war", ["Western"] = "western", ["History"] = "historical", ["Music"] = "music",
-        ["Mystery"] = "mystery", ["Action"] = "action", ["Adventure"] = "adventure", ["Food"] = "cooking",
-        ["DIY"] = "home-renovation", ["Travel"] = "travel", ["Nature"] = "nature", ["Children"] = "kids'"
+        ["Legal"] = "legal",
+        ["Medical"] = "medical",
+        ["Crime"] = "crime",
+        ["Science-Fiction"] = "sci-fi",
+        ["Fantasy"] = "fantasy",
+        ["Supernatural"] = "supernatural",
+        ["Family"] = "family",
+        ["Romance"] = "romantic",
+        ["Sports"] = "sports",
+        ["Espionage"] = "spy",
+        ["War"] = "war",
+        ["Western"] = "western",
+        ["History"] = "historical",
+        ["Music"] = "music",
+        ["Mystery"] = "mystery",
+        ["Action"] = "action",
+        ["Adventure"] = "adventure",
+        ["Food"] = "cooking",
+        ["DIY"] = "home-renovation",
+        ["Travel"] = "travel",
+        ["Nature"] = "nature",
+        ["Children"] = "kids'"
     };
 
     /// <param name="modelMaxDistance">The embedding model's semantic-search cutoff, a measure of how it spreads distances.</param>

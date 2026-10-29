@@ -1,7 +1,7 @@
-using System.Diagnostics;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using System.Diagnostics;
 
 namespace Mcp.Gateway;
 

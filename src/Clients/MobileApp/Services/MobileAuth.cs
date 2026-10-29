@@ -1,10 +1,10 @@
-using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
 using IdentityModel.Client;
 using IdentityModel.OidcClient;
 using IdentityModel.OidcClient.Browser;
 using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using TvTracker.UI.Services;
 // MAUI's implicit usings bring in Microsoft.Maui.ApplicationModel.IBrowser (the system browser, with OpenAsync),
 // which takes the plain name; the OIDC client needs its own browser interface.

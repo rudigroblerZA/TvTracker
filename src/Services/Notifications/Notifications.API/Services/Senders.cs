@@ -1,10 +1,10 @@
-using System.Net;
-using System.Text.Json;
 using Azure;
 using Azure.Communication.Email;
 using Microsoft.Azure.NotificationHubs;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
+using System.Net;
+using System.Text.Json;
 using WebPush;
 
 namespace Notifications.API.Services;

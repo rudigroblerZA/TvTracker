@@ -1,10 +1,10 @@
-using System.Security.Claims;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Identity.API.Data;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

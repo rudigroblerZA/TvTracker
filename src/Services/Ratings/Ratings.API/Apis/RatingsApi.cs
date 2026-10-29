@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Ratings.API.Data;
+using System.Security.Claims;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

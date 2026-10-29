@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Components.Authorization;
 using OpenFeature;
+using System.Collections.Concurrent;
 
 namespace TvTracker.UI.Services;
 

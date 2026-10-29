@@ -1,8 +1,8 @@
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using System.Text.Json;
 using TvTracker;
 
 namespace Analytics.API.Apis;

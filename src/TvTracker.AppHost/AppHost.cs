@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using Aspire.Hosting.Utils;
 
 var builder = DistributedApplication.CreateBuilder(args);
 

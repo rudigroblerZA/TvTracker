@@ -1,8 +1,8 @@
+using Research.API.Data;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
-using Research.API.Data;
 
 namespace Research.API.Services;
 

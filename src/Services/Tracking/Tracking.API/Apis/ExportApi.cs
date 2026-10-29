@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Tracking.API.Data;
 
 namespace Tracking.API.Apis;

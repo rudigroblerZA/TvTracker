@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Catalog.Data;
 using Microsoft.Extensions.Caching.Hybrid;
 

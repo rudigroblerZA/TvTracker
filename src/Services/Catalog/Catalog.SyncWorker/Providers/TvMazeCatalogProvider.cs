@@ -1,10 +1,9 @@
+using Catalog.Data;
+using Microsoft.Extensions.Options;
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.RateLimiting;
-using Catalog.Data;
-using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Providers;

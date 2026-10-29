@@ -1,6 +1,6 @@
-using System.Globalization;
 using Catalog.Data;
 using Catalog.SyncWorker.Providers;
+using System.Globalization;
 
 namespace Catalog.SyncWorker;
 

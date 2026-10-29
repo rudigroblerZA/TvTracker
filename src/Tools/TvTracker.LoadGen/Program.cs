@@ -68,7 +68,8 @@ run.SetAction(async (parse, ct) =>
     {
         MaxConnectionsPerServer = Math.Max(16, options.Users * 4),
         PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-    }) { Timeout = TimeSpan.FromSeconds(30) };
+    })
+    { Timeout = TimeSpan.FromSeconds(30) };
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
     var stats = new Stats();
     var pool = new ShowPool();

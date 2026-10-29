@@ -1,8 +1,7 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Tracking.API.Data;
-using TvTracker.IntegrationEvents;
 using TvTracker;
 
 namespace Tracking.API.Apis;

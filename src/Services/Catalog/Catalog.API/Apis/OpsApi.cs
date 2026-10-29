@@ -1,10 +1,10 @@
-using System.Reflection;
-using System.Text.Json;
 using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using OpenFeature;
+using System.Reflection;
+using System.Text.Json;
 using TvTracker;
 
 namespace Catalog.API.Apis;

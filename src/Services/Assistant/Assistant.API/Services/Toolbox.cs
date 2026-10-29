@@ -1,8 +1,8 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Assistant.API.Services;
 

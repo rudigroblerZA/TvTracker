@@ -1,10 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Pgvector;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Catalog.SyncWorker;
 

@@ -1,7 +1,7 @@
+using Microsoft.Extensions.Caching.Distributed;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace WebApp.Services;
 

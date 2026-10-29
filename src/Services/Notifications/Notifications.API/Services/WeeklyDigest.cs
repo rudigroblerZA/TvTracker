@@ -1,12 +1,11 @@
-using System.Globalization;
-using System.Net;
-using System.Net.Http.Json;
-using System.Text;
 using Azure;
 using Azure.Communication.Email;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using OpenFeature;
+using System.Globalization;
+using System.Net;
+using System.Text;
 using TvTracker;
 
 namespace Notifications.API.Services;

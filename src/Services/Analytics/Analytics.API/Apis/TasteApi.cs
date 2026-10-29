@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Analytics.API.Apis;
 

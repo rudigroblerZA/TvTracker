@@ -145,8 +145,12 @@ public sealed class ActivityEventHandlers(SocialContext db) :
             {
                 db.Activities.Add(new Activity
                 {
-                    Id = Guid.CreateVersion7(), UserId = e.UserId, Kind = ActivityKinds.Watched, ShowId = e.ShowId,
-                    EpisodeIds = e.EpisodeIds.Distinct().ToList(), OccurredAtUtc = at
+                    Id = Guid.CreateVersion7(),
+                    UserId = e.UserId,
+                    Kind = ActivityKinds.Watched,
+                    ShowId = e.ShowId,
+                    EpisodeIds = e.EpisodeIds.Distinct().ToList(),
+                    OccurredAtUtc = at
                 });
                 return;
             }
@@ -242,7 +246,10 @@ public sealed class UserStateHandlers(SocialContext db) :
             var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct);
             db.Watches.AddRange(ids.Except(existing).Select(id => new UserWatch
             {
-                UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
+                UserId = e.UserId,
+                EpisodeId = id,
+                ShowId = e.ShowId,
+                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
             }));
         }, ct);
 
@@ -281,7 +288,10 @@ public sealed class UserStateHandlers(SocialContext db) :
             var snapshot = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
             db.Watches.AddRange(snapshot.Values.Where(w => !watched.Contains(w.EpisodeId)).Select(w => new UserWatch
             {
-                UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime
+                UserId = e.UserId,
+                EpisodeId = w.EpisodeId,
+                ShowId = w.ShowId,
+                WatchedAtUtc = w.WatchedAtUtc.UtcDateTime
             }));
             db.Watches.RemoveRange(watches.Where(w => !snapshot.ContainsKey(w.EpisodeId) && w.WatchedAtUtc < takenAt));
 
@@ -378,7 +388,12 @@ public sealed class SharedListHandlers(SocialContext db) :
         {
             db.SharedLists.Add(new SharedList
             {
-                ListId = listId, UserId = userId, Name = name, Description = description, ShowIds = showIds.ToList(), UpdatedAtUtc = updatedAt.UtcDateTime
+                ListId = listId,
+                UserId = userId,
+                Name = name,
+                Description = description,
+                ShowIds = showIds.ToList(),
+                UpdatedAtUtc = updatedAt.UtcDateTime
             });
             return;
         }

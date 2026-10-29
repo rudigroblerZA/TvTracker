@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Analytics.Data;
+using System.Text.Json;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 
