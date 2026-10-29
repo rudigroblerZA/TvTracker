@@ -276,12 +276,16 @@ foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExt
     }
 }
 
-// Docker Model Runner serves the default embedding model (dmr/nomic-embed-text-v1.5). The AppHost runs it as a
+// Docker Model Runner serves the default embedding model (dmr/qwen3-embedding-0.6b). The AppHost runs it as a
 // container (CPU; the model is kept in a volume), unless ModelRunner:Url points at one already running, such as
 // Docker Desktop's (http://localhost:12434, which can use the GPU). The sync worker pulls the model on first start;
 // until it's ready, search matches titles only. Not started for an in-process model: the built-in server models
 // are the dmr/ ones, and a custom one says Source: Server.
 var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
+// The model's name on Model Runner, for Open WebUI's document search: a configured model's own, else the built-in one's.
+var servedEmbeddingModel = builder.Configuration[$"Embeddings:Models:{embeddingModelId}:ServedModel"] is { Length: > 0 } configuredServed
+    ? configuredServed
+    : embeddingModelId == "dmr/nomic-embed-text-v1.5" ? "ai/nomic-embed-text-v1.5" : "ai/qwen3-embedding:0.6b";
 // The chat model Open WebUI chats with, Research drafts insights with and the assistant answers with; pulled with the
 // dashboard's command. The default is the smallest that calls tools reliably (qwen3 0.6B, ~400 MB, fine on a CPU).
 var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/qwen3:0.6B-Q4_K_M";
@@ -362,7 +366,7 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
         .WithEnvironment("RAG_EMBEDDING_ENGINE", "openai")
         .WithEnvironment("RAG_OPENAI_API_BASE_URL", modelRunnerApi)
         .WithEnvironment("RAG_OPENAI_API_KEY", "model-runner")
-        .WithEnvironment("RAG_EMBEDDING_MODEL", "ai/nomic-embed-text-v1.5")
+        .WithEnvironment("RAG_EMBEDDING_MODEL", servedEmbeddingModel)
         .WithEnvironment("ENABLE_EVALUATION_ARENA_MODELS", "False")
         .WithEnvironment("ANONYMIZED_TELEMETRY", "False")
         // The app's MCP tools ("landman insights"), through the gateway, on for every chat's tool list. The AppHost owns
