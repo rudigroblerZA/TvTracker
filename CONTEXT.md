@@ -812,6 +812,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Show page loads together:** after the show itself, its summary, similar shows, follow, progress, rating, mute and
   lists are fetched in parallel (`Task.WhenAll`) rather than one after another. Over 60 loads each in the browser, time
   to full render went from a median of 314 ms (p90 809) to 247 ms (p90 342).
+- **Navigation by section** (`NavMenu`, `ToolLink`): the header had grown to 15 links, which scrolled sideways on a
+  phone. It now lists the main sections, and each section's tools are `ToolLink` cards in a `tool-links` grid at the top
+  of its page, each in its own `<Feature>`. Signed out, Blend and Universes stay in the header, since Discover's other
+  tools need sign-in.
+- **Focused headings:** `FocusOnNavigate` focuses each page's `h1` (and some sections focus their `h2`) for screen
+  readers; they get no outline, which had drawn a box round every page title.
 - **Blazor whitespace:** Blazor drops text nodes that are only whitespace. Put a space between inline elements inside a
   span or an expression, not bare between tags.
 - **Mobile:** goes through Mobile.Bff and keeps an SQLite offline store and a queue for offline changes, which is why

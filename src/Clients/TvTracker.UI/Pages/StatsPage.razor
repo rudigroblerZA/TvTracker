@@ -8,9 +8,11 @@
 
 <AuthorizeView>
     <Authorized>
-        <Feature Flag="@FeatureFlags.YearInTv">
-            <p><a href="year"><strong>Your year in TV</strong></a><span class="muted">: your top shows, rhythm, highlights and how your taste moved.</span></p>
-        </Feature>
+        <div class="tool-links">
+            <Feature Flag="@FeatureFlags.YearInTv">
+                <ToolLink Href="year" Title="Your year in TV">Your top shows, rhythm, highlights and how your taste moved.</ToolLink>
+            </Feature>
+        </div>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (stats is null)

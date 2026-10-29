@@ -1,0 +1,12 @@
+@* A card linking to a tool from a hub page (Up Next, Discover, For you, ...). Put them in a <div class="tool-links">,
+   each in its own <Feature> when the tool has a flag; a hidden one leaves no gap. *@
+<a class="tool-link" href="@Href">
+    <strong>@Title</strong>
+    <span class="muted small">@ChildContent</span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
