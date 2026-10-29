@@ -193,6 +193,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     - **Why not same night:** same-night airing flagged 534 of One Chicago's 798 episodes, since the shows air back
       to back weekly.
     - **Progress:** the UI reads the user's progress from Tracking, one `/progress/{showId}` call per show.
+  - **Crossover alerts** (`Crossovers`, `CrossoverAlerts` in Catalog.API): the watch order's detection, shared, over
+    each universe's episodes from a week back to 37 days ahead; events with a part still to come and starting within
+    30 days are cached for half an hour.
+    - **Straight to the bus:** Catalog.API is the read side and keeps no outbox, so the hourly job publishes
+      `CrossoverScheduledIntegrationEvent` directly, for each crossover starting within 14 days, and again every hour
+      while it's ahead. A lost event heals on the next send; Notifications keys on `CrossoverId` (universe, name,
+      year), as it does on a season verdict's id, so followers hear once.
+    - **One item per person:** Notifications fans out per show with that one identity, so someone following Fire and
+      Med gets one item. The text says "in 6 days" rather than a date: one text goes to every time zone, and a US
+      evening is the next day in UTC.
+    - **Catch-up count:** aired episodes not yet watched, only for shows the user has started; for an unstarted show
+      "298 to catch up" isn't about the crossover.
+    - **Tested** by retitling two upcoming One Chicago episodes as a crossover: 56 followers got one item each, and a
+      second send after a restart added none.
   - **Link kinds:** "continuation" needs more than half of the later show's characters from earlier shows to come
     from that link, so a team-up (The Defenders) reads as a crossover.
   - **Caching:** the whole map is rebuilt from the database at most every 30 minutes (HybridCache).
@@ -431,6 +445,34 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Why the provider's credits:** within the catalog alone (587 shows), only 73 shows had any reunion, and none of
     the demo user's favourites did. Across TVmaze, NCIS finds Chicago Hope (three of its cast) and The Wire finds Oz,
     Treme and Bosch.
+- **Taste twins** (`TasteTwinsApi`): computed on request from the ratings copy.
+  - **Agreement, not correlation:** 1 − mean |stars difference| / 4 over 3+ shared shows, shrunk by n / (n + 3).
+    Pearson on 3-10 shared ratings swings wildly, and most ratings sit at 3-5 stars, where a correlation says little.
+  - **The privacy rule:** 5+ twins or nothing (not even the count), and 5+ twins behind each pick and shared favourite,
+    since "loved by n" and their average stars are figures about them. Twins aren't named or listed.
+  - **In SQL:** agreement is a join on the caller's ratings grouped by user, so only candidates come back, not every
+    rating of every show the caller rated.
+  - **Picks:** Σ agreement × (stars − 3) over twins who rated it 4+, so 5 stars counts twice 4; shows the caller rated,
+    follows or watched are left out.
+  - **Dev data:** the load-test users' ratings are random 3-5 stars, so twins there are mechanical, not meaningful.
+- **Network report cards** (`NetworkReportList`, table `network_reports`): per network with 5+ catalog shows, from the
+  provider's data and the shows' documents, so the privacy rule doesn't apply. A `*` row is the whole catalog, the
+  baseline each figure is compared with.
+  - **Network on the copy:** `ShowCopy.Network` came with this; catalog events carry it as an optional trailing
+    `Network` plus `NetworkKnown` (an older event's null means "not sent", not "no network"), and the replay is
+    requested while any show lacks it.
+  - **Renewals:** a season counts once its fate is known (every season of an ended show; a running show's seasons that
+    a later one follows). The catalog is survivor-heavy, so the baseline is ~93%, and networks differ by a few points.
+  - **Not "over after one season":** TVmaze has no "cancelled", so every ended one-season show is tagged a limited
+    series; leaving those out left none, and keeping them would call every miniseries a cancellation.
+  - **Endings** are the shows' `Landing` verdicts; sticks includes "great finale".
+- **Year in TV** (`YearInTvApi`): computed on request from the caller's own watches and follows, in their time zone.
+  - **Bulk marks left out:** a mark of 8+ of a show's episodes at one moment says when they were marked, not watched
+    (seeding a back catalog read as a record year). The count left out is returned and shown.
+  - **Taste shift:** DNA traits averaged over the year's shows, weighted by minutes watched, against the year before's;
+    a move of 0.1+ is named, towards the trait's end.
+  - **Called it** is the only part about other users: the share of a show's followers here who followed after the
+    caller, shown with 5+ followers (the privacy rule) and when they were ahead of half.
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.
@@ -517,6 +559,31 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   treated as failed. It reads only the included sources, 1,500 characters each, and cites them as [n].
 - **Numbering:** sources are numbered by kind (Wikidata, Wikipedia, TMDB, pages) then time, and a version stores
   them as numbered, so its citations keep pointing at the right source.
+- **Research queue** (`ResearchQueueApi`, `CatalogChecks`): popular shows with no saved research, and popular shows
+  where Wikidata disagrees with the catalog.
+  - **Order:** TVmaze's popularity tops out, so the provider's rating breaks ties (the alphabet did at first).
+  - **Checked in bulk, by TVmaze id:** one SPARQL query per 100 shows (`VALUES` over P8600), so 300 shows are three
+    queries a day. Per-show gathers would be 300 queries, and Wikidata limits the sandbox's shared address hard: it
+    answered 429 with Retry-After 1,000 s after a handful of queries. The job waits as asked (up to 30 minutes), and a
+    failed run is retried in an hour. The table is replaced in a transaction run through the execution strategy, since
+    Npgsql's retrying strategy refuses a transaction begun by hand.
+  - **Loose matches:** a network matches when one name contains the other (a show that moved lists both) or by
+    initials ("American Broadcasting Company" is ABC), with "television" read as "TV"; a premiere within a day (time
+    zones), at Wikidata's precision (a month-only date is stored as the 1st, so it's compared by month); episodes within
+    2 or 10% and only for ended shows (Wikidata lags running ones, and counts specials and double episodes its own way).
+    The first run, without initials or precision, listed 66 differences in 300 shows; with them, 44, mostly a show's
+    streaming home against its first broadcaster (BBC iPlayer and BBC One), which a moderator judges.
+  - **Replaced each run:** the table is the latest check, so a fix (saved research overrides the catalog) clears its row
+    the next day; nothing to dismiss by hand.
+  - **Catalog facts by API:** Catalog.API's `/shows/facts` gives the popular shows' network, premiere date and aired
+    episodes as the catalog holds them, overrides applied.
+- **Awards shelf** (`AwardsApi`, `show_awards`): the daily check's second query per batch counts award statements
+  (P166, one per win) and their labels for the popular shows. A moderator's saved awards fact replaces Wikidata's
+  wording on the show page; ranking uses Wikidata's count either way. Wikidata's counts are uneven (The Sopranos 57,
+  Game of Thrones 13), which a moderator can correct by researching the show.
+  - **Counting:** `COUNT(DISTINCT ?win)` with the English label optional, so a win whose award has no English label
+    still counts (it just isn't named), and labels don't multiply wins.
+  - **Isolated:** an awards query failure keeps the stored `show_awards` and still saves the day's `catalog_checks`.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
@@ -596,9 +663,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     every season of the last six weeks.
   - **History:** it was briefly sent on every run for a week (then two days), because the pipeline saved documents
     before their events, so a run that failed in between lost the verdict for good. The pipeline now saves them together.
-- **Notifications:** under the "new seasons" preference; a preference of its own would need a column, and
-  Notifications still uses `EnsureCreated`. The flag is checked once per event, without a user, so it can't target
+- **Notifications:** under the "new seasons" preference. Notifications has migrations now (since the weekly digest),
+  so a preference of its own is a column away (BACKLOG D2). The flag is checked once per event, without a user, so it can't target
   some followers only.
+
+## Weekly digest
+
+- **In Notifications** (`WeeklyDigest`, `DigestWorker`): one email a week instead of an email per alert. With it on, the
+  fan-out adds no email deliveries; push and web push carry on.
+- **What it reads:** Notifications' own copies (followers, mutes, the user's inbox since the last digest) and
+  Catalog.API's public schedule for the coming week. Up Next and friends' finishes aren't in it: they live in Tracking
+  and Social, which need the user's token (service-to-service auth is BACKLOG S2).
+- **When:** every 15 minutes the worker sends to users whose day it is, from their hour, in their time zone, and whose
+  last digest is six or more days old; six, not seven, so a run a few minutes late doesn't skip a week. An empty week
+  sends nothing but counts as sent.
+- **Migrations:** the digest's settings needed columns, so Notifications moved off `EnsureCreated` (baseline
+  `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
+- **Flag:** checked once per run without a user, so it can't target some users only.
 
 ## Holiday episodes
 
@@ -718,13 +799,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations, applied at startup by
-  their API.
-  The other services still use `EnsureCreated`.
+- **Migrations:** Catalog, Analytics, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
+  migrations, applied at startup by their API. Identity still uses `EnsureCreated`.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+  - **Checked:** Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
   idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).
@@ -817,5 +897,4 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - There are no tests and no CI.
 - There's no dead-letter queue.
 - The MAUI app has never been compiled.
-- The weekly digest email isn't built yet.
 - Development secrets are in `AppHost.cs` and the realm file.

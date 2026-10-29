@@ -16,6 +16,8 @@
         </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
+        <Feature Flag="@FeatureFlags.CrossoverAlerts"><CrossoversAhead /></Feature>
+
         @if (catchUps is { Count: > 0 })
         {
             <Feature Flag="@FeatureFlags.CatchUp">

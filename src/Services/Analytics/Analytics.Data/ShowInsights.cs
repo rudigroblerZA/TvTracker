@@ -431,3 +431,48 @@ public record KindredCreator(Guid PersonId, string Name, double Similarity, IRea
 
 /// <param name="PersonId">The catalog's id for the co-star, for linking to their page.</param>
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
+
+/// <summary>
+/// A network's (or streaming service's) report card, from the provider's data on its catalog shows: how they're rated,
+/// how its ended shows end, how often a season is followed by another, and how long the waits between seasons are.
+/// </summary>
+/// <param name="Network">The network's name, or <see cref="NetworkReports.Catalog"/> for every show (the baseline).</param>
+/// <param name="Shows">Its catalog shows.</param>
+/// <param name="Ended">Of those, ended.</param>
+/// <param name="AverageRating">The provider's average rating of its rated shows.</param>
+/// <param name="Endings">How its ended shows land; null with fewer than <see cref="NetworkReports.MinJudged"/> judged.</param>
+/// <param name="Renewals">How often its seasons come back; null with fewer than <see cref="NetworkReports.MinJudged"/> decided.</param>
+/// <param name="MedianWaitDays">The median days from a season's last episode to the next's first; null with fewer than
+/// <see cref="NetworkReports.MinJudged"/> waits.</param>
+/// <param name="DropsAtOnce">The share of its shows whose latest season dropped at once (streaming-style).</param>
+/// <param name="Best">Its best rated shows.</param>
+/// <param name="GreatEndings">Its shows that stick the landing (or end on a great finale), best finale first.</param>
+public record NetworkReport(string Network, DateTime ComputedAtUtc, int Shows, int Ended, double? AverageRating,
+    NetworkEndings? Endings, NetworkRenewals? Renewals, int? MedianWaitDays, int Waits, double DropsAtOnce,
+    IReadOnlyList<NetworkShow> Best, IReadOnlyList<NetworkShow> GreatEndings);
+
+/// <param name="Judged">Ended shows with a landing verdict (see <see cref="Landing"/>).</param>
+/// <param name="Sticks">Sticks the landing, or ends on a great finale.</param>
+/// <param name="AsItRan">Ends as it ran.</param>
+/// <param name="Weaker">A weaker last season, or a finale that lets it down.</param>
+/// <param name="Fizzles">Fizzles out.</param>
+public record NetworkEndings(int Judged, int Sticks, int AsItRan, int Weaker, int Fizzles);
+
+/// <param name="Decided">Seasons whose fate is known: every season but a running show's latest.</param>
+/// <param name="Renewed">Of those, followed by another season.</param>
+public record NetworkRenewals(int Decided, int Renewed);
+
+/// <param name="Rating">The provider's rating: the show's, or the finale's in great endings.</param>
+public record NetworkShow(Guid ShowId, string Title, string? PosterUrl, double? Rating);
+
+public static class NetworkReports
+{
+    /// <summary>The baseline row's name: every show in the catalog.</summary>
+    public const string Catalog = "*";
+
+    /// <summary>A network needs this many catalog shows for a report card.</summary>
+    public const int MinShows = 5;
+
+    /// <summary>A share (endings, renewals) or the median wait needs this many shows, seasons or waits behind it.</summary>
+    public const int MinJudged = 3;
+}

@@ -1,0 +1,197 @@
+@page "/year"
+@attribute [RequiresFeature(FeatureFlags.YearInTv)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Year in TV · @Brand.AppName</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (recap is null)
+        {
+            <h1>Your year in TV</h1>
+            @if (error is null)
+            {
+                <p class="muted">Adding up your year…</p>
+            }
+        }
+        else
+        {
+            <h1>@($"Your {recap.Year} in TV")</h1>
+            @if (recap.Years.Count > 1)
+            {
+                <nav class="chips" aria-label="Years">
+                    @foreach (var y in recap.Years)
+                    {
+                        <a class="chip @(y == recap.Year ? "active" : "")" href="@($"year?year={y}")" aria-current="@(y == recap.Year ? "page" : null)">@y</a>
+                    }
+                </nav>
+            }
+
+            @if (recap.Episodes == 0)
+            {
+                <p class="muted">Nothing watched in @recap.Year yet. Mark episodes as you watch and your year fills in here.</p>
+            }
+            else
+            {
+                <div class="stat-tiles">
+                    <div class="stat"><div class="stat-value">@Format.Hours(recap.Minutes)</div><div class="muted">watched</div></div>
+                    <div class="stat"><div class="stat-value">@recap.Episodes</div><div class="muted">episodes</div></div>
+                    <div class="stat"><div class="stat-value">@recap.Shows</div><div class="muted">@($"shows, {recap.NewShows} new to you")</div></div>
+                    <div class="stat"><div class="stat-value">@recap.DaysWatched</div><div class="muted">@($"days with TV · longest run {recap.LongestStreak} {(recap.LongestStreak == 1 ? "day" : "days")}")</div></div>
+                </div>
+                @if (recap.Bulk > 0)
+                {
+                    <p class="muted small">@($"{recap.Bulk} episodes marked many at once aren't counted, since when you watched them isn't known.")</p>
+                }
+
+                <section>
+                    <h2>Most watched</h2>
+                    <ol class="discovery">
+                        @foreach (var show in recap.TopShows)
+                        {
+                            <li @key="show.ShowId">
+                                <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
+                                <div>
+                                    <a href="shows/@show.ShowId"><strong>@show.Title</strong></a>
+                                    <div class="muted small">@($"{show.Episodes} {(show.Episodes == 1 ? "episode" : "episodes")} · {Format.Duration(show.Minutes)}")</div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                </section>
+
+                <section>
+                    <h2>Your rhythm</h2>
+                    <ul class="plain-list">
+                        @if (recap.BusiestMonth is { } month)
+                        {
+                            <li>@($"Busiest month: {month.Name}, {Format.Duration(month.Minutes)} over {month.Episodes} episodes")</li>
+                        }
+                        @if (recap.BusiestDay is { } day)
+                        {
+                            <li>@($"Biggest day: {day.Date:d MMMM}, {day.Episodes} {(day.Episodes == 1 ? "episode" : "episodes")} ({Format.Duration(day.Minutes)})")</li>
+                        }
+                        @if (recap.TopNetwork is { } network)
+                        {
+                            <li>@($"Most of it on {network.Name}: {Format.Percent(network.Share)} of your time")</li>
+                        }
+                    </ul>
+                    @if (recap.Genres.Count > 0)
+                    {
+                        <ul class="bars" aria-label="Time by genre">
+                            @foreach (var genre in recap.Genres)
+                            {
+                                <li>
+                                    <span class="small">@genre.Name</span>
+                                    <span><span class="bar" style="width:@(Math.Max(4, genre.Share * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture))%"></span></span>
+                                    <span class="muted small">@Format.Percent(genre.Share)</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                @if (recap.Shift.Count > 0)
+                {
+                    <section>
+                        <h2>@($"How your taste moved since {recap.Year - 1}")</h2>
+                        <ul class="plain-list">
+                            @foreach (var shift in recap.Shift)
+                            {
+                                <li><strong>@($"More \"{shift.Toward.ToLowerInvariant()}\"")</strong><span class="muted">@($" · {shift.Name}")</span></li>
+                            }
+                        </ul>
+                        <p class="muted small">From the DNA of the shows you watched, weighted by time spent.</p>
+                    </section>
+                }
+
+                @if (recap.BestEpisode is { } best || recap.CalledIt is not null)
+                {
+                    <section>
+                        <h2>Highlights</h2>
+                        <ul class="plain-list">
+                            @if (recap.BestEpisode is { } episode)
+                            {
+                                <li>
+                                    <span class="muted">Best rated episode you watched: </span>
+                                    <a href="shows/@episode.ShowId">@episode.ShowTitle</a>
+                                    <span>@($" {Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber)} \"{episode.Title}\"")</span>
+                                    <span class="muted">@($" · rated {Format.Rating(episode.Rating)}")</span>
+                                </li>
+                            }
+                            @if (recap.CalledIt is { } called)
+                            {
+                                <li>
+                                    <span class="muted">You called it: </span>
+                                    <a href="shows/@called.ShowId">@called.Title</a>
+                                    <span class="muted">@($" · followed {called.FollowedAtUtc:d MMMM}, before {Format.Percent(called.Ahead)} of its {called.Followers} followers here")</span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @ShowList("Finished", recap.Finished, "Ended shows you saw the last of.")
+                @ShowList("Caught up", recap.CaughtUp, "Still running, and you're up to date.")
+                @ShowList("Left behind", recap.LeftBehind, "Episodes left, and nothing watched for a month or more.")
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see your year in TV." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // The year is in the address, so a recap can be bookmarked.
+    [SupplyParameterFromQuery(Name = "year")] public int? Year { get; set; }
+
+    private YearInTv? recap;
+    private string? error;
+    private int? loadedFor = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Year != loadedFor)
+        {
+            loadedFor = Year;
+            await LoadAsync();
+        }
+    }
+
+    private RenderFragment ShowList(string heading, IReadOnlyList<YearShow> shows, string note) => __builder =>
+    {
+        if (shows.Count == 0)
+        {
+            return;
+        }
+        <section>
+            <h2>@heading</h2>
+            <p class="muted small">@note</p>
+            <div class="chips">
+                @foreach (var show in shows)
+                {
+                    <a class="chip" href="shows/@show.ShowId">@show.Title</a>
+                }
+            </div>
+        </section>
+    };
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        recap = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            recap = await Analytics.GetYearInTvAsync(Year, Session.Profile?.TimeZone);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}

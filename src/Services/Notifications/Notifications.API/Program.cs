@@ -12,13 +12,14 @@ builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
 
 builder.AddNpgsqlDbContext<NotificationsContext>("notificationsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
-builder.Services.AddDatabaseInitializer<NotificationsContext>();
+builder.Services.AddDatabaseInitializer<NotificationsContext>(baseline: "InitialCreate");
 
 builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodeAiredIntegrationEvent, CatalogNotificationHandlers>()
     .AddSubscription<SeasonAnnouncedIntegrationEvent, CatalogNotificationHandlers>()
     .AddSubscription<ShowStatusChangedIntegrationEvent, CatalogNotificationHandlers>()
     .AddSubscription<SeasonVerdictIntegrationEvent, AnalyticsNotificationHandlers>()
+    .AddSubscription<CrossoverScheduledIntegrationEvent, CrossoverNotificationHandler>()
     .AddSubscription<ShowFollowedIntegrationEvent, UserEventHandlers>()
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserEventHandlers>()
     .AddSubscription<UserRegisteredIntegrationEvent, UserEventHandlers>()
@@ -36,6 +37,11 @@ builder.Services.AddScoped<IChannelSender>(sp => sp.GetRequiredService<Notificat
 builder.Services.AddScoped<IChannelSender, WebPushSender>();
 builder.Services.AddScoped<IChannelSender, EmailSender>();
 builder.Services.AddHostedService<DeliveryWorker>();
+
+// The weekly digest reads the coming week from Catalog.API's schedule.
+builder.Services.AddHttpClient<CatalogSchedule>(http => http.BaseAddress = new Uri("https+http://catalog-api/"));
+builder.Services.AddScoped<WeeklyDigest>();
+builder.Services.AddHostedService<DigestWorker>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

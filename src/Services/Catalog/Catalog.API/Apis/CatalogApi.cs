@@ -29,6 +29,8 @@ public static class CatalogApi
         api.MapMoodApi();
         api.MapHolidayApi();
         api.MapCharacterApi();
+        api.MapCrossoverApi();
+        api.MapShowFactsApi();
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);

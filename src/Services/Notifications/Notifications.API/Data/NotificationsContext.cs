@@ -27,6 +27,21 @@ public class NotificationPreferences
     /// <summary>IANA timezone id, from the user's profile.</summary>
     public string TimeZone { get; set; } = "UTC";
 
+    /// <summary>
+    /// One email a week (<see cref="Services.WeeklyDigest"/>) instead of an email per alert; push alerts carry on.
+    /// Needs an email address, and is off until the user turns it on.
+    /// </summary>
+    public bool WeeklyDigest { get; set; }
+
+    /// <summary>The day the digest goes out, in the user's time zone.</summary>
+    public DayOfWeek DigestDay { get; set; } = DayOfWeek.Sunday;
+
+    /// <summary>The hour (0-23) it goes out from, in the user's time zone.</summary>
+    public int DigestHour { get; set; } = 9;
+
+    /// <summary>When the last digest was sent; one a week at most.</summary>
+    public DateTime? LastDigestAtUtc { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; }
 }
 
@@ -73,7 +88,8 @@ public enum NotificationKind
     NewEpisode,
     NewSeason,
     StatusChange,
-    SeasonVerdict
+    SeasonVerdict,
+    Crossover
 }
 
 public class InboxItem

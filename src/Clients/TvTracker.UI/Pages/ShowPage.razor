@@ -61,6 +61,8 @@ else
                 </Authorized>
             </AuthorizeView>
 
+            <Feature Flag="@FeatureFlags.AwardsShelf"><AwardsLine ShowId="show.Id" /></Feature>
+
             @if (WatchNow is { } now)
             {
                 <Feature Flag="@FeatureFlags.WatchNow">

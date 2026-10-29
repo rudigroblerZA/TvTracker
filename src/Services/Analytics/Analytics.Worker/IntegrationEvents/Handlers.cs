@@ -17,10 +17,10 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
     IIntegrationEventHandler<SeasonAnnouncedIntegrationEvent>
 {
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
-        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, ct));
+        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, e.NetworkKnown ? e.Network : null, e.NetworkKnown, ct));
 
     public Task HandleAsync(ShowUpdatedIntegrationEvent e, CancellationToken ct) =>
-        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, ct));
+        HandleOnceAsync(e, ct, () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Popularity, e.ExternalRating, e.Cast, e.Creatives, e.NetworkKnown ? e.Network : null, e.NetworkKnown, ct));
 
     public Task HandleAsync(PeopleCareersUpdatedIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, async () =>
@@ -132,7 +132,8 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
 
     private async Task UpsertShowAsync(
         Guid showId, string title, string? posterUrl, ShowStatus status, IReadOnlyList<string> genres, double popularity,
-        double? externalRating, IReadOnlyList<CastCredit>? cast, IReadOnlyList<CreativeCredit>? creatives, CancellationToken ct)
+        double? externalRating, IReadOnlyList<CastCredit>? cast, IReadOnlyList<CreativeCredit>? creatives, string? network, bool networkKnown,
+        CancellationToken ct)
     {
         var show = await db.Shows.FindAsync([showId], ct);
         if (show is null)
@@ -148,6 +149,13 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
         show.Popularity = popularity;
         show.ExternalRating = externalRating;
         show.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+
+        // Events from before the network was added don't carry it; keep what we have.
+        if (networkKnown)
+        {
+            show.Network = network;
+            show.NetworkKnown = true;
+        }
 
         // Likewise for creatives: null in older events.
         if (creatives is not null)

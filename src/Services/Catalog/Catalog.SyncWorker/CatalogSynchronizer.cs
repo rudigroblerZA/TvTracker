@@ -765,7 +765,7 @@ public sealed class CatalogSynchronizer(
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
             s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList(),
-            CreativeCredits(s));
+            CreativeCredits(s), s.Network, NetworkKnown: true);
     }
 
     /// <summary>The show's creatives for events (empty, not null, when it has none or they're still to be backfilled).</summary>
@@ -793,7 +793,7 @@ public sealed class CatalogSynchronizer(
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
         return new(s.Id, s.Title, s.PosterUrl, s.Status, s.Genres, s.Keywords, cast.Select(c => c.Person.Name).ToList(), s.SimilarShowIds, s.Popularity,
             s.ExternalRating, cast.Select(c => new CastCredit(c.Person.Name, c.Character, c.CharacterExternalIds, c.PersonId)).ToList(),
-            CreativeCredits(s));
+            CreativeCredits(s), s.Network, NetworkKnown: true);
     }
 
     private static EpisodesScheduledIntegrationEvent EpisodesScheduled(Show s, IEnumerable<Episode> episodes) =>

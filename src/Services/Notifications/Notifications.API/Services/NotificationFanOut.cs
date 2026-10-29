@@ -85,7 +85,8 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
                 {
                     AddDelivery(item, DeliveryChannel.WebPush, sendAt);
                 }
-                if (pref.EmailEnabled && !string.IsNullOrWhiteSpace(pref.Email))
+                // With the weekly digest on, email comes once a week instead (WeeklyDigest); push carries on.
+                if (pref.EmailEnabled && !pref.WeeklyDigest && !string.IsNullOrWhiteSpace(pref.Email))
                 {
                     AddDelivery(item, DeliveryChannel.Email, sendAt);
                 }
@@ -114,6 +115,7 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
         NotificationKind.NewEpisode => pref.NewEpisodes,
         NotificationKind.NewSeason => pref.NewSeasons,
         NotificationKind.SeasonVerdict => pref.NewSeasons,
+        NotificationKind.Crossover => pref.NewEpisodes,
         NotificationKind.StatusChange => pref.StatusChanges,
         _ => false
     };

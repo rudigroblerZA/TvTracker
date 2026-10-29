@@ -348,6 +348,8 @@ On show pages, written by moderators at `/research`.
   through every refresh. Breaking Bad's network reads "AMC (United States)" until a later version drops it.
 - **Also for questions:** the MCP tools answer from the saved research, so "what awards did Breaking Bad win?" comes
   from checked facts.
+- **What to research next:** the Research page lists the most popular shows nobody has researched, and popular shows
+  where Wikidata disagrees with the catalog about the network, the premiere date or an ended show's episode count.
 
 ### 30. Ask the app
 
@@ -381,7 +383,49 @@ From a show page's cast: "Karen Page · 4 shows".
 - **Your place in each:** how far you are in each show, and one button to add the rest to your watchlist. Shows not
   yet in the catalog link to search, which imports them.
 
-### 33. Smaller touches
+### 33. Crossover alerts
+
+On Up Next and in your inbox.
+
+- **Don't miss the crossover:** two weeks before a crossover across a franchise you follow ("Reckoning" across Chicago
+  Fire, Med and P.D.), you hear about it, once.
+- **What to watch first:** Up Next lists each part and how far behind you are in each show ("2 to catch up"), and links
+  to the franchise's watch order.
+
+### 34. Taste twins
+
+On For you.
+
+- **People who rate like you:** anonymous twins whose ratings track yours, the shows you agree on, and what they loved
+  that you haven't seen ("Loved by 13 of your twins").
+- **Private by design:** no names, nothing with fewer than 5 twins, and every pick backed by at least 5 of them.
+
+### 35. Awards shelf and Prestige picks
+
+On show pages and Discover.
+
+- **What it won:** "🏆 57 awards: Primetime Emmy Award × 23, TCA Award × 11, …" on The Sopranos' page, from Wikidata, or a
+  moderator's checked list from saved research.
+- **Prestige picks:** the most-awarded popular shows you haven't started.
+
+### 36. Network report cards
+
+On Discover.
+
+- **Which networks end shows well:** for each network and streamer, the share of its ended shows that stick the
+  landing, how often seasons come back, the typical wait between seasons, and its best shows, all against the whole
+  catalog. Netflix makes you wait over a year between seasons; CBS and NBC about four months.
+
+### 37. Year in TV
+
+On Stats.
+
+- **Your year, any year:** hours and episodes, your longest run of days, busiest month and biggest day, most watched
+  shows, genres and network, what you finished and left behind, and the best episode you watched.
+- **How your taste moved:** the DNA of this year's viewing against last year's.
+- **Called it:** the well-rated show you followed before most people here did.
+
+### 38. Smaller touches
 
 - **Premieres:** returning seasons come with the catch-up time (episodes and hours to watch first), and how many of
   our users followed the show recently.

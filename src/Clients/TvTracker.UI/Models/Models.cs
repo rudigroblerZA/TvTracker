@@ -11,7 +11,7 @@ public enum EpisodeLabel { None, SeriesPremiere, SeasonPremiere, SeasonFinale }
 
 public enum WatchProviderType { Stream, Free, Rent, Buy }
 
-public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict }
+public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict, Crossover }
 
 public enum DevicePlatform { Android, iOS, Web }
 
@@ -57,6 +57,12 @@ public record TonightEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber
 public record MoodResponse(bool Available, IReadOnlyList<MoodFit> Fits);
 
 public record MoodFit(Guid ShowId, double Fit, double Distance);
+
+/// <summary>A crossover event across a universe's shows (see Catalog.API's CrossoverApi); parts in air order.</summary>
+public record Crossover(Guid Id, string Name, Guid UniverseId, string UniverseName, DateTimeOffset StartsAtUtc, IReadOnlyList<CrossoverPart> Parts);
+
+public record CrossoverPart(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
+    string Title, DateTimeOffset AirsAtUtc);
 
 /// <summary>A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).</summary>
 public record WatchOrder(Guid Id, string Name, IReadOnlyList<ShowSummary> Shows, IReadOnlyList<WatchOrderEpisode> Episodes, int Undated);
@@ -189,10 +195,19 @@ public record DnaTwin(Guid ShowId, string Title, string? PosterUrl, double Simil
 // Notifications
 
 public record NotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
-    bool EmailEnabled, string? Email, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd, string TimeZone);
+    bool EmailEnabled, string? Email, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd, string TimeZone,
+    bool WeeklyDigest = false, DayOfWeek DigestDay = DayOfWeek.Sunday, int DigestHour = 9);
 
 public record UpdateNotificationPreferences(bool NewEpisodes, bool NewSeasons, bool StatusChanges, bool PushEnabled, bool WebPushEnabled,
-    bool EmailEnabled, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd);
+    bool EmailEnabled, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd,
+    bool? WeeklyDigest = null, DayOfWeek? DigestDay = null, int? DigestHour = null);
+
+/// <summary>The weekly digest as it would go out now (Notifications.API).</summary>
+public record DigestPreview(string Subject, IReadOnlyList<DigestSection> Sections);
+
+public record DigestSection(string Heading, IReadOnlyList<DigestLine> Lines);
+
+public record DigestLine(string Text, string? Link);
 
 public record ShowNotificationPreference(Guid ShowId, bool Muted);
 
@@ -377,6 +392,18 @@ public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Epis
     bool Noted = false);
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
+
+/// <summary>Taste twins (Analytics.API): anonymous people whose ratings track the user's, and what they loved.</summary>
+public record TasteTwins(int RatedShows, int Twins, double? Agreement, string? Reason, IReadOnlyList<TwinShow> AgreeOn, IReadOnlyList<TwinPick> Picks);
+
+public record TwinShow(Guid ShowId, string Title, string? PosterUrl);
+
+/// <param name="Loved">How many twins rated it 4 or 5 stars.</param>
+public record TwinPick(Guid ShowId, string Title, string? PosterUrl, int Loved, double Stars, double? Rating);
+
+/// <param name="Wins">Award wins on Wikidata; null when only saved research has them.</param>
+/// <param name="Checked">From saved research, checked by a moderator.</param>
+public record AwardedShow(Guid ShowId, string Title, string? PosterUrl, int? Wins, string Summary, bool Checked, string? SourceUrl);
 
 public record ReunionRadar(int LovedShows, int ActorsPending, IReadOnlyList<Reunion> Reunions);
 
@@ -581,6 +608,18 @@ public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtU
 public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Mark, string Reason, string SourceUrl,
     DateTime NotedAtUtc, string NotedBy);
 
+/// <summary>What to research next (Research.API's queue).</summary>
+public record ResearchQueue(IReadOnlyList<QueuedShow> Unresearched, IReadOnlyList<DisagreeingShow> Disagreements, DateTime? CheckedAtUtc);
+
+/// <param name="Rank">Its place among the catalog's most popular.</param>
+/// <param name="Started">Gathered or drafted, not saved.</param>
+public record QueuedShow(Guid ShowId, string Title, string? PosterUrl, int Rank, string? Network, int? Year, bool Started);
+
+public record DisagreeingShow(Guid ShowId, string Title, int Rank, bool Researched, string WikidataUrl, IReadOnlyList<Disagreement> Fields);
+
+/// <param name="Field">"network", "premiered" or "episodes".</param>
+public record Disagreement(string Field, string? Catalog, string Wikidata);
+
 public record ResearchSourceItem(Guid Id, int? Number, string Kind, string Url, string Title, string Excerpt, bool Included, DateTime RetrievedAtUtc);
 
 /// <param name="Origin">"saved", "catalog" or "source".</param>
@@ -619,3 +658,36 @@ public record AssistantShow(Guid Id, string Title);
 /// <param name="Status">"queued", "thinking", "answered" or "failed".</param>
 public record AssistantAsk(Guid Id, string Question, Guid? PreviousId, string Status, int Ahead, List<AssistantStep> Steps, string? Answer,
     List<AssistantShow> Shows, string? Problem, DateTime AskedAtUtc, double? Seconds);
+
+/// <summary>Network report cards: every network with enough catalog shows, and the whole catalog to compare with.</summary>
+public record NetworkReportCards(NetworkReport? Baseline, IReadOnlyList<NetworkReport> Networks);
+
+public record NetworkReport(string Network, int Shows, int Ended, double? AverageRating, NetworkEndings? Endings,
+    NetworkRenewals? Renewals, int? MedianWaitDays, int Waits, double DropsAtOnce, IReadOnlyList<NetworkShow> Best,
+    IReadOnlyList<NetworkShow> GreatEndings);
+
+public record NetworkEndings(int Judged, int Sticks, int AsItRan, int Weaker, int Fizzles);
+
+public record NetworkRenewals(int Decided, int Renewed);
+
+public record NetworkShow(Guid ShowId, string Title, string? PosterUrl, double? Rating);
+
+/// <summary>A year of the user's viewing (Year in TV).</summary>
+public record YearInTv(int Year, IReadOnlyList<int> Years, int Episodes, int Minutes, int Shows, int NewShows, int Bulk,
+    int DaysWatched, int LongestStreak, YearDay? BusiestDay, YearMonth? BusiestMonth, IReadOnlyList<YearShow> TopShows,
+    IReadOnlyList<YearShare> Genres, YearShare? TopNetwork, IReadOnlyList<YearShow> Finished, IReadOnlyList<YearShow> CaughtUp,
+    IReadOnlyList<YearShow> LeftBehind, YearEpisode? BestEpisode, IReadOnlyList<YearShift> Shift, YearCalledIt? CalledIt);
+
+public record YearShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes);
+
+public record YearDay(DateOnly Date, int Episodes, int Minutes);
+
+public record YearMonth(int Month, string Name, int Episodes, int Minutes);
+
+public record YearShare(string Name, int Minutes, double Share);
+
+public record YearEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, int SeasonNumber, int EpisodeNumber, string Title, double Rating);
+
+public record YearShift(string Key, string Name, double From, double To, string Toward);
+
+public record YearCalledIt(Guid ShowId, string Title, string? PosterUrl, DateTime FollowedAtUtc, double Ahead, int Followers, double? Rating);

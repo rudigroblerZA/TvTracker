@@ -116,6 +116,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<CharacterTrail?> GetCharacterTrailAsync(Guid personId, Guid showId, CancellationToken ct = default) =>
         GetAsync<CharacterTrail>(ApiClients.Catalog, $"api/v1/people/{personId}/characters/{showId}", ct, cacheForOffline: true);
 
+    /// <summary>Crossover events in the next 30 days involving any of the shows (the user's follows).</summary>
+    public Task<List<Crossover>?> GetCrossoversAsync(IReadOnlyList<Guid> showIds, CancellationToken ct = default) =>
+        SendAsync<List<Crossover>>(ApiClients.Catalog, HttpMethod.Post, "api/v1/crossovers", new { showIds }, ct);
+
     public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
 
@@ -349,6 +353,23 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<FinishOutlook?> GetFinishOutlookAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
+    /// <summary>Network report cards, most shows first, with the whole catalog as the baseline.</summary>
+    public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>
+        GetAsync<NetworkReportCards>(ApiClients.Analytics, "api/v1/insights/networks", ct, cacheForOffline: true);
+
+    /// <summary>The user's year in TV; the latest year with viewing when <paramref name="year"/> is null.</summary>
+    public Task<YearInTv?> GetYearInTvAsync(int? year, string? timeZone, CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (year is { } y) query.Add($"year={y}");
+        if (!string.IsNullOrEmpty(timeZone)) query.Add($"tz={Uri.EscapeDataString(timeZone)}");
+        return GetAsync<YearInTv>(ApiClients.Analytics, "api/v1/me/year" + (query.Count > 0 ? "?" + string.Join('&', query) : ""), ct);
+    }
+
+    /// <summary>The user's taste twins and what they loved; nothing shown with fewer than five twins.</summary>
+    public Task<TasteTwins?> GetTasteTwinsAsync(CancellationToken ct = default) =>
+        GetAsync<TasteTwins>(ApiClients.Analytics, "api/v1/me/taste-twins", ct, cacheForOffline: true);
+
     /// <summary>Shows where actors from the user's favourites work together again (the reunion radar).</summary>
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
         GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
@@ -398,6 +419,10 @@ public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvid
 {
     public Task<NotificationPreferences?> GetPreferencesAsync(CancellationToken ct = default) =>
         GetAsync<NotificationPreferences>(ApiClients.Notifications, "api/v1/preferences", ct);
+
+    /// <summary>This week's digest as it would go out now.</summary>
+    public Task<DigestPreview?> GetDigestPreviewAsync(CancellationToken ct = default) =>
+        GetAsync<DigestPreview>(ApiClients.Notifications, "api/v1/digest/preview", ct);
 
     public Task<NotificationPreferences?> UpdatePreferencesAsync(UpdateNotificationPreferences update, CancellationToken ct = default) =>
         SendAsync<NotificationPreferences>(ApiClients.Notifications, HttpMethod.Put, "api/v1/preferences", update, ct);
@@ -499,6 +524,14 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
 
 public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
+    /// <summary>What the show has won; null when nothing is known.</summary>
+    public Task<AwardedShow?> GetAwardsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<AwardedShow>(ApiClients.Research, $"api/v1/shows/{showId}/awards", ct, cacheForOffline: true);
+
+    /// <summary>The most-awarded popular shows, most wins first.</summary>
+    public Task<List<AwardedShow>?> GetMostAwardedAsync(int limit = 60, CancellationToken ct = default) =>
+        GetAsync<List<AwardedShow>>(ApiClients.Research, $"api/v1/awards?limit={limit}", ct, cacheForOffline: true);
+
     /// <summary>The show's saved research, its trusted record; null when none is saved. Public.</summary>
     public Task<SavedResearch?> GetSavedAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SavedResearch>(ApiClients.Research, $"api/v1/shows/{showId}/research", ct, cacheForOffline: true);
@@ -510,6 +543,10 @@ public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t,
     /// <summary>Shows with research, most recently worked on first; null unless the user is a moderator.</summary>
     public Task<List<ResearchedShow>?> GetResearchedAsync(CancellationToken ct = default) =>
         GetAsync<List<ResearchedShow>>(ApiClients.Research, "api/v1/research", ct);
+
+    /// <summary>What to research next; null unless the user is a moderator.</summary>
+    public Task<ResearchQueue?> GetQueueAsync(CancellationToken ct = default) =>
+        GetAsync<ResearchQueue>(ApiClients.Research, "api/v1/research/queue", ct);
 
     public Task<ResearchWorkspace?> GatherAsync(Guid showId, CancellationToken ct = default) =>
         SendAsync<ResearchWorkspace>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/gather", null, ct);
