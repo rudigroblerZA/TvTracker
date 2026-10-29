@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Analytics.Data;
+using TvTracker;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,15 +44,21 @@ public static class TasteApi
     private const int MinComparedRatings = 3;
     private const int MinRatedPerGenre = 2;
 
-    public static async Task<Results<Ok<TasteDto>, UnauthorizedHttpResult>> GetTasteAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
-    {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+    /// <summary>A show rated this far (stars × 2 against 0-10) from the provider is listed as kinder or harsher.</summary>
+    private const double ListedDifference = 1;
+    private const int MaxListedShows = 3;
+    private const int MaxGenres = 8;
+    private const int MaxRecentlyDropped = 5;
 
+    public static void MapTasteApi(this RouteGroupBuilder api) => api.MapGet("/me/taste", GetTasteAsync);
+
+    /// <param name="tz">The caller's time zone (IANA id, from their profile), for the months; UTC when missing or unknown.</param>
+    private static async Task<Ok<TasteDto>> GetTasteAsync(
+        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, string? tz = null, CancellationToken ct = default)
+    {
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
+        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
 
         var showRatings = await db.ShowRatings.AsNoTracking()
             .Where(r => r.UserId == userId)
@@ -84,8 +91,8 @@ public static class TasteApi
                 differences.Count,
                 average,
                 Math.Abs(average) < InLineMargin ? "in line" : average > 0 ? "kinder" : "harsher",
-                byDifference.Where(d => d.Difference >= 1).OrderByDescending(d => d.Difference).Take(3).Select(d => d.Dto).ToList(),
-                byDifference.Where(d => d.Difference <= -1).OrderBy(d => d.Difference).Take(3).Select(d => d.Dto).ToList());
+                byDifference.Where(d => d.Difference >= ListedDifference).OrderByDescending(d => d.Difference).Take(MaxListedShows).Select(d => d.Dto).ToList(),
+                byDifference.Where(d => d.Difference <= -ListedDifference).OrderBy(d => d.Difference).Take(MaxListedShows).Select(d => d.Dto).ToList());
         }
 
         var genres = showRatings
@@ -96,13 +103,16 @@ public static class TasteApi
                 g.Any(x => x.ExternalRating is not null) ? Math.Round(g.Where(x => x.ExternalRating is not null).Average(x => x.ExternalRating!.Value), 2) : null))
             .OrderByDescending(g => g.AverageStars)
             .ThenByDescending(g => g.Rated)
-            .Take(8)
+            .Take(MaxGenres)
             .ToList();
 
-        var firstMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-11);
+        // Months in the caller's calendar: a 9 pm watch on 31 January in New York is January there, February in UTC.
+        var local = TimeZoneInfo.ConvertTime(now, zone);
+        var firstMonth = new DateTime(local.Year, local.Month, 1).AddMonths(-11);
         var byMonth = watches
-            .Where(w => w.WatchedAtUtc >= firstMonth)
-            .GroupBy(w => (w.WatchedAtUtc.Year, w.WatchedAtUtc.Month))
+            .Select(w => (Local: TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(w.WatchedAtUtc, DateTimeKind.Utc), zone), w.RuntimeMinutes))
+            .Where(w => w.Local >= firstMonth)
+            .GroupBy(w => (w.Local.Year, w.Local.Month))
             .ToDictionary(g => g.Key, g => (Episodes: g.Count(), Minutes: g.Sum(w => w.RuntimeMinutes ?? 0)));
         var months = Enumerable.Range(0, 12)
             .Select(i => firstMonth.AddMonths(i))
@@ -111,26 +121,26 @@ public static class TasteApi
                 : new MonthWatchDto(m.Year, m.Month, 0, 0))
             .ToList();
 
-        return TypedResults.Ok(new TasteDto(bias, genres, months, await ProgressAsync(db, watches.Select(w => (w.ShowId, w.WatchedAtUtc)).ToList(), now, ct)));
+        return TypedResults.Ok(new TasteDto(bias, genres, months, await ProgressAsync(db, userId, watches.Select(w => (w.ShowId, w.WatchedAtUtc)).ToList(), now, ct)));
     }
 
-    /// <summary>Finished, still watching or dropped, for every show the user has watched an episode of.</summary>
+    /// <summary>
+    /// Finished, still watching or dropped, for every show the user has watched an episode of; regular episodes only
+    /// (the viewer's aggregate), so a Christmas special never keeps a show from being finished.
+    /// </summary>
     private static async Task<ProgressDto> ProgressAsync(
-        AnalyticsContext db, List<(Guid ShowId, DateTime WatchedAtUtc)> watches, DateTimeOffset now, CancellationToken ct)
+        AnalyticsContext db, string userId, List<(Guid ShowId, DateTime WatchedAtUtc)> watches, DateTimeOffset now, CancellationToken ct)
     {
         var showIds = watches.Select(w => w.ShowId).Distinct().ToList();
-        var aired = await db.Episodes.AsNoTracking()
-            .Where(e => showIds.Contains(e.ShowId) && e.AirsAtUtc <= now)
-            .GroupBy(e => e.ShowId)
-            .Select(g => new { ShowId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.ShowId, g => g.Count, ct);
+        var progress = await Viewer.ProgressAsync(db, userId, now, showIds, ct);
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
 
         var cutoff = now.UtcDateTime.AddDays(-InsightRules.StoppedAfterDays);
         var perShow = watches
             .GroupBy(w => w.ShowId)
             .Where(g => shows.ContainsKey(g.Key))
-            .Select(g => (Show: shows[g.Key], Watched: g.Count(), Aired: aired.GetValueOrDefault(g.Key), Last: g.Max(w => w.WatchedAtUtc)))
+            .Select(g => (Show: shows[g.Key], Watched: progress.GetValueOrDefault(g.Key)?.Watched ?? 0, Aired: progress.GetValueOrDefault(g.Key)?.Aired ?? 0,
+                Last: g.Max(w => w.WatchedAtUtc)))
             .ToList();
 
         var finished = perShow.Where(s => s.Aired > 0 && s.Watched >= s.Aired).ToList();
@@ -141,7 +151,7 @@ public static class TasteApi
             finished.Count,
             unfinished.Count - dropped.Count,
             dropped.Count,
-            dropped.Take(5)
+            dropped.Take(MaxRecentlyDropped)
                 .Select(s => new ProgressShowDto(s.Show.ShowId, s.Show.Title, s.Show.PosterUrl, s.Watched, s.Aired, s.Last))
                 .ToList());
     }

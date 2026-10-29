@@ -6,7 +6,8 @@ namespace Analytics.Worker;
 /// Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour), and
 /// scores the season calls whose seasons are over.
 /// </summary>
-public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, ILogger<InsightsRefresher> logger) : BackgroundService
+public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, TimeProvider time, ILogger<InsightsRefresher> logger)
+    : BackgroundService
 {
     /// <summary>Gives the event consumers (and a catalog replay) a head start before the first run.</summary>
     private static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(1);
@@ -20,17 +21,17 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
         await Task.Delay(configuration.GetValue("Analytics:StartupDelay", StartupDelay), stoppingToken);
 
         using var timer = new PeriodicTimer(interval);
-        var lastFullSync = DateTime.MinValue;
+        var lastFullSync = DateTimeOffset.MinValue;
         do
         {
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var publishAll = DateTime.UtcNow - lastFullSync >= FullSyncInterval;
+                var publishAll = time.GetUtcNow() - lastFullSync >= FullSyncInterval;
                 await scope.ServiceProvider.GetRequiredService<InsightsPipeline>().RunAsync(stoppingToken, publishAll);
                 if (publishAll)
                 {
-                    lastFullSync = DateTime.UtcNow;
+                    lastFullSync = time.GetUtcNow();
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

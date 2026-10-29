@@ -136,7 +136,12 @@ public sealed class InsightSources
     public static string PersonKey(CastCopy credit) => credit.PersonId?.ToString() ?? $"name:{credit.PersonName}";
 }
 
-/// <summary>A regular season, summarised for the forecasts.</summary>
+/// <summary>
+/// A regular season, summarised for the forecasts. A second season summary beside <see cref="SeasonSummary"/>: the
+/// forecast models train on every show's seasons before the batches run, so these come from one SQL query over the
+/// whole catalog rather than from each show's loaded episodes. The rating rule is the same (null under
+/// <see cref="SeasonSummary.MinRatedEpisodes"/> rated episodes, where the other has <see cref="SeasonSummary.RatingCounts"/>).
+/// </summary>
 /// <param name="LastAired">The latest aired episode's air time; null before any aired.</param>
 /// <param name="Rating">The provider's average for its aired episodes; null with fewer than <see cref="SeasonSummary.MinRatedEpisodes"/> rated.</param>
 public record SeasonRecord(Guid ShowId, int Number, int Episodes, int Aired, DateTimeOffset? First, DateTimeOffset? LastAired, double? Rating)

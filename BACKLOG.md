@@ -315,3 +315,24 @@ All the features from the review have shipped; new ideas go here.
   
   A dashboard per service from the existing OpenTelemetry data.
 - **Done when:** each alert fires in a test of its failure.
+
+## From the analytics review (October 2026)
+
+Done: shared readings in Analytics.Data (`CopyRules`, `InsightDocuments`), the API's `Viewer`/`ShowLoad` helpers,
+transactional handlers, diffed lists, `RecordedAtUtc` on watches, the `cast_credits` index. Left for later:
+
+- **R1. Key constants into IntegrationEvents.** `LandingVerdicts`, `WorthItVerdicts`, the `ShowTags` keys and
+  `DiscoveryLists` live in Analytics.Data, which only Analytics references, so the UI (`Models.cs`, `LandingPanel`,
+  `WorthItPanel`, `ShowTagOptions`, `Discover.razor`), Mcp.Server and LoadGen retype them as literals. Move the keys
+  (not the thresholds) next to `SeasonVerdicts` and `DnaTraits`, and delete the literals.
+- **R2. Reunion radar precomputed.** `ReunionsApi` loads every cast row of every loved show and every provider credit
+  of their actors per request (uncached; ~10-20k rows for 100 loved shows). An hourly "actors together again" table in
+  the worker would leave only the love weights per request.
+- **R3. `ShowInsights.cs` in document order**, split into the show document, the person documents, the network
+  report and `InsightRules`; and `DateTimeOffset` for the user-activity columns (a CLR-type-only migration), so the
+  comparisons stop converting.
+- **R4. Shows stubbed from `EpisodesScheduled`** (a title and nothing else, until a replay) get full documents and
+  forecasts; a "known from a catalog event" flag the pipeline skips would hide them until then.
+- **R5. Season verdict list over a generated column** (`finale_aired_at` from the document, indexed) once the catalog
+  is thousands of shows; today the 5-minute cache covers the scan.
+

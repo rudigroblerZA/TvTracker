@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.IntegrationEvents;
@@ -16,6 +15,8 @@ public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILo
 {
     private const int MinRatedEpisodes = 3;
 
+    private sealed record VerdictRow(Guid ShowId, int? Season);
+
     public async Task ScoreAsync(CancellationToken ct)
     {
         var open = await db.SeasonCalls.AsNoTracking().Where(c => c.ScoredAtUtc == null)
@@ -27,22 +28,24 @@ public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILo
 
         var now = time.GetUtcNow();
         var showIds = open.Select(o => o.ShowId).Distinct().ToList();
-        var ended = await db.Shows.AsNoTracking()
+        var ended = (await db.Shows.AsNoTracking()
             .Where(s => showIds.Contains(s.ShowId) && (s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled))
-            .Select(s => s.ShowId).ToListAsync(ct);
+            .Select(s => s.ShowId).ToListAsync(ct)).ToHashSet();
         var episodes = (await db.Episodes.AsNoTracking()
                 .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
                 .Select(e => new { e.ShowId, e.SeasonNumber, e.ExternalRating })
                 .ToListAsync(ct))
             .ToLookup(e => e.ShowId);
-        var verdicts = (await db.ShowInsights.AsNoTracking().Where(d => showIds.Contains(d.ShowId))
-                .Select(d => new { d.ShowId, d.Document }).ToListAsync(ct))
-            .ToDictionary(d => d.ShowId, d => JsonSerializer.Deserialize<ShowInsights>(d.Document, JsonSerializerOptions.Web)?.SeasonVerdict?.Number);
+        // Only the verdict's season number, by jsonb path, rather than every open show's whole document.
+        var verdicts = (await db.Database
+                .SqlQuery<VerdictRow>($"SELECT \"ShowId\", (\"Document\"->'seasonVerdict'->>'number')::int AS \"Season\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
+                .ToListAsync(ct))
+            .ToDictionary(v => v.ShowId, v => v.Season);
 
         var scored = 0;
         foreach (var season in open)
         {
-            var aired = episodes[season.ShowId].ToList();
+            var aired = episodes[season.ShowId];
             var over = verdicts.GetValueOrDefault(season.ShowId) == season.SeasonNumber
                 || aired.Any(e => e.SeasonNumber > season.SeasonNumber)
                 || ended.Contains(season.ShowId);

@@ -483,8 +483,8 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
         GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
 
-    public Task<Taste?> GetTasteAsync(CancellationToken ct = default) =>
-        GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste", ct, cacheForOffline: true);
+    public Task<Taste?> GetTasteAsync(string? timeZone = null, CancellationToken ct = default) =>
+        GetAsync<Taste>(ApiClients.Analytics, "api/v1/me/taste" + (string.IsNullOrEmpty(timeZone) ? "" : $"?tz={Uri.EscapeDataString(timeZone)}"), ct, cacheForOffline: true);
 
     /// <summary>"Previously on…" for one show, cut to <paramref name="minutes"/>; null when the user hasn't watched it, or has seen it all and nothing more is coming.</summary>
     public Task<Refresher?> GetRefresherAsync(Guid showId, int minutes = 120, CancellationToken ct = default) =>

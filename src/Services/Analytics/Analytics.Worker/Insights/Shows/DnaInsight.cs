@@ -66,7 +66,7 @@ public sealed class DnaInsight : IShowInsight
             Add(DnaTraits.RunLength, Log(minutes / 60.0, RunHours), () => $"{Hours(minutes)} in all");
         }
 
-        var (drops, fullSeasons) = Drops(show, aired);
+        var (drops, fullSeasons) = Drops(show);
         if (fullSeasons > 0)
         {
             Add(DnaTraits.Release, (double)drops / fullSeasons, () => drops == 0
@@ -129,19 +129,13 @@ public sealed class DnaInsight : IShowInsight
     }
 
     /// <summary>
-    /// Fully aired regular seasons of at least three episodes, and how many of them came out on one
-    /// day or in a few batches (the same rule as the "drops all at once" tag).
+    /// Fully aired regular seasons of at least three episodes, and how many of them came out on one day or in a few
+    /// batches, by the "drops all at once" tag's own rule (<see cref="DropsAtOnceRule.IsDrop"/>).
     /// </summary>
-    private static (int Drops, int Seasons) Drops(ShowInsightContext show, List<EpisodeCopy> aired)
+    private static (int Drops, int Seasons) Drops(ShowInsightContext show)
     {
-        var full = show.SeasonStats.Where(s => s.Number > 0 && s.AiredCount >= 3 && s.AiredCount == s.EpisodeCount).ToList();
-        var drops = full.Count(s =>
-        {
-            var days = aired.Where(e => e.SeasonNumber == s.Number && e.AirsAtUtc is not null)
-                .Select(e => e.AirsAtUtc!.Value.UtcDateTime.Date).Distinct().Count();
-            return days == 1 || days <= ShowTags.MaxDropDays && s.AiredCount >= 2 * days;
-        });
-        return (drops, full.Count);
+        var full = show.RegularSeasonStats.Where(DropsAtOnceRule.IsFull).ToList();
+        return (full.Count(s => DropsAtOnceRule.IsDrop(s, show.ReleaseDays(s.Number))), full.Count);
     }
 
     /// <summary>Median days from one season's last episode to the next one's first; null with fewer than two aired seasons.</summary>

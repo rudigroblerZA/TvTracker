@@ -1,6 +1,7 @@
 @page "/stats"
 @inject TrackingClient Tracking
 @inject AnalyticsClient Analytics
+@inject UserSession Session
 
 <PageTitle>Stats · @Brand.AppName</PageTitle>
 
@@ -212,7 +213,7 @@
 
         try
         {
-            taste = await Analytics.GetTasteAsync();
+            taste = await Analytics.GetTasteAsync(Session.Profile?.TimeZone);
             finishing = await Analytics.GetFinishOutlooksAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)

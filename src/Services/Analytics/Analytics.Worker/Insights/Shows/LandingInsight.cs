@@ -29,7 +29,7 @@ public sealed class LandingInsight : IShowInsight
 
     private static Landing? LandingFor(ShowInsightContext show)
     {
-        if (show.Show.Status != ShowStatus.Ended)
+        if (!show.Show.HasEnded())
         {
             return null;
         }

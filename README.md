@@ -1070,7 +1070,8 @@ How events flow:
     - **Your record:** "You finished 2 of the 3 other shows you got this far into", from 3 comparable shows.
     - **Drop-off:** the episode many of our viewers stop at, when it's still ahead of you (from 5 viewers).
     - **API:** `GET /api/v1/me/finish-outlook` and `GET /api/v1/shows/{id}/finish-outlook` on Analytics.API.
-  - **Stats page — your taste:** computed on request from your own data only.
+  - **Stats page — your taste:** computed on request from your own data only. Months follow your profile's time zone,
+    and "finished" counts regular episodes (a special never keeps a show from being finished).
     - How your ratings compare with TVmaze's (stars doubled to its 0-10).
     - The genres you rate highest.
     - Time watched over the last 12 months.

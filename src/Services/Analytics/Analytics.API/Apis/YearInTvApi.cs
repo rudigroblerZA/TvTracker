@@ -11,7 +11,7 @@ namespace Analytics.API.Apis;
 
 /// <param name="Year">The year shown.</param>
 /// <param name="Years">Years with viewing, latest first, for switching.</param>
-/// <param name="Bulk">Episodes left out because they were marked many at once (see <see cref="YearInTvApi.BulkMark"/>).</param>
+/// <param name="Bulk">Episodes left out because they were marked many at once (see <see cref="CopyRules.BulkMark"/>).</param>
 /// <param name="DaysWatched">Days with at least one episode.</param>
 /// <param name="LongestStreak">Most days in a row with an episode.</param>
 /// <param name="Finished">Ended shows whose last episode they watched this year.</param>
@@ -61,9 +61,6 @@ public record YearCalledItDto(Guid ShowId, string Title, string? PosterUrl, Date
 /// </summary>
 public static class YearInTvApi
 {
-    /// <summary>A mark of this many of one show's episodes at the same moment is a bulk mark.</summary>
-    public const int BulkMark = 8;
-
     /// <summary>A trait is named in the shift when the minutes-weighted average moved at least this much.</summary>
     public const double MinShift = 0.1;
 
@@ -80,14 +77,10 @@ public static class YearInTvApi
 
     /// <param name="year">The year to recap; the latest with viewing when missing.</param>
     /// <param name="tz">The caller's time zone (IANA id, from their profile); UTC when missing or unknown.</param>
-    private static async Task<Results<Ok<YearInTvDto>, UnauthorizedHttpResult>> GetYearAsync(
+    private static async Task<Ok<YearInTvDto>> GetYearAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int? year = null, string? tz = null, CancellationToken ct = default)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
         var now = time.GetUtcNow();
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
@@ -100,7 +93,7 @@ public static class YearInTvApi
             })
             .ToListAsync(ct);
 
-        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= BulkMark).SelectMany(g => g).ToHashSet();
+        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).SelectMany(g => g).ToHashSet();
         var watches = rows.Where(r => !bulk.Contains(r))
             .Select(r => new Watch(r.ShowId, r.EpisodeId, r.WatchedAtUtc,
                 DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone)),
@@ -125,7 +118,8 @@ public static class YearInTvApi
         var firstWatch = watches.GroupBy(w => w.ShowId).ToDictionary(g => g.Key, g => g.Min(w => w.Day));
         var days = inYear.GroupBy(w => w.Day).Select(g => new YearDayDto(g.Key, g.Count(), g.Sum(w => w.Minutes))).ToList();
 
-        var (finished, caughtUp, leftBehind) = await ProgressAsync(db, userId, byShow.Select(g => g.Key).ToList(), shows, inYear,
+        var (finished, caughtUp, leftBehind) = await ProgressAsync(db, rows.Select(r => (r.ShowId, r.EpisodeId, r.WatchedAtUtc)).ToList(),
+            byShow.Select(g => g.Key).ToList(), shows, inYear,
             shown == today.Year ? now.UtcDateTime : new DateTime(shown, 12, 31, 23, 59, 59, DateTimeKind.Utc), now, ct);
 
         var genres = byShow
@@ -194,19 +188,16 @@ public static class YearInTvApi
     /// <see cref="InsightRules.StoppedAfterDays"/> days by <paramref name="asOf"/>); each most watched first.
     /// </summary>
     private static async Task<(List<Guid> Finished, List<Guid> CaughtUp, List<Guid> LeftBehind)> ProgressAsync(
-        AnalyticsContext db, string userId, List<Guid> ids, Dictionary<Guid, ShowCopy> shows, List<Watch> inYear, DateTime asOf,
-        DateTimeOffset now, CancellationToken ct)
+        AnalyticsContext db, List<(Guid ShowId, Guid EpisodeId, DateTime WatchedAtUtc)> allWatches, List<Guid> ids, Dictionary<Guid, ShowCopy> shows,
+        List<Watch> inYear, DateTime asOf, DateTimeOffset now, CancellationToken ct)
     {
-        var aired = (await db.Episodes.AsNoTracking()
-                .Where(e => ids.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
+        var aired = (await db.Episodes.AsNoTracking().AiredRegular(now)
+                .Where(e => ids.Contains(e.ShowId))
                 .Select(e => new { e.ShowId, e.EpisodeId, e.AirsAtUtc })
                 .ToListAsync(ct))
             .ToLookup(e => e.ShowId);
-        var watched = (await db.Watches.AsNoTracking()
-                .Where(w => w.UserId == userId && ids.Contains(w.ShowId))
-                .Select(w => new { w.ShowId, w.EpisodeId, w.WatchedAtUtc })
-                .ToListAsync(ct))
-            .ToLookup(w => w.ShowId);
+        // Every watch, bulk marks included (a bulk-marked show is finished all the same), from the rows already loaded.
+        var watched = allWatches.Where(w => ids.Contains(w.ShowId)).ToLookup(w => w.ShowId);
         var minutes = inYear.GroupBy(w => w.ShowId).ToDictionary(g => g.Key, g => g.Sum(w => w.Minutes));
         var yearEpisodes = inYear.Select(w => w.EpisodeId).ToHashSet();
 
@@ -271,9 +262,9 @@ public static class YearInTvApi
     private static Dictionary<string, double> TraitsOf(string document)
     {
         using var json = JsonDocument.Parse(document);
-        return json.RootElement.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object
-               && dna.TryGetProperty("traits", out var traits) && traits.ValueKind == JsonValueKind.Array
-            ? traits.EnumerateArray().ToDictionary(t => t.GetProperty("key").GetString()!, t => t.GetProperty("value").GetDouble())
+        return json.RootElement.TryGetProperty(InsightDocuments.Paths.Dna, out var dna) && dna.ValueKind == JsonValueKind.Object
+               && dna.TryGetProperty(InsightDocuments.Paths.Traits, out var traits) && traits.ValueKind == JsonValueKind.Array
+            ? traits.EnumerateArray().ToDictionary(t => t.GetProperty(InsightDocuments.Paths.Key).GetString()!, t => t.GetProperty(InsightDocuments.Paths.Value).GetDouble())
             : [];
     }
 

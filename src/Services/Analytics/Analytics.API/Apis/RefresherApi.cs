@@ -67,32 +67,28 @@ public static class RefresherApi
     }
 
     /// <summary>204 when the user hasn't watched the show, or has seen all of it and nothing more is coming.</summary>
-    private static async Task<Results<Ok<RefresherDto>, NoContent, UnauthorizedHttpResult, ValidationProblem>> GetOneAsync(
+    private static async Task<Results<Ok<RefresherDto>, NoContent, ValidationProblem>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int minutes = DefaultBudget, CancellationToken ct = default)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
         if (minutes is < MinBudget or > MaxBudget)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["minutes"] = [$"Use {MinBudget} to {MaxBudget} minutes."] });
         }
 
-        return await BuildAsync(db, userId, showId, minutes, time.GetUtcNow(), ct) is { } refresher
-            ? TypedResults.Ok(refresher)
-            : TypedResults.NoContent();
+        var now = time.GetUtcNow();
+        var load = await ShowLoads.LoadAsync(db, user.GetUserId(), showId, now, withInsights: false, ct);
+        if (load is null)
+        {
+            return TypedResults.NoContent();
+        }
+        var returns = await NextPremieres.FindAsync(db, [showId], load.Episodes.ToLookup(e => e.ShowId), now, premieresOnly: false, ct);
+        return Build(load, returns.GetValueOrDefault(showId), minutes, now) is { } refresher ? TypedResults.Ok(refresher) : TypedResults.NoContent();
     }
 
     /// <summary>Followed shows due a refresher: the ones coming back soonest first, then the most recently paused.</summary>
-    private static async Task<Results<Ok<List<RefresherDto>>, UnauthorizedHttpResult>> GetAllAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Ok<List<RefresherDto>>> GetAllAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
         var cutoff = now.UtcDateTime.AddDays(-GapDays);
         var followed = db.Follows.Where(f => f.UserId == userId).Select(f => f.ShowId);
@@ -105,14 +101,14 @@ public static class RefresherApi
             .Take(MaxShows)
             .ToListAsync(ct);
 
-        var due = new List<RefresherDto>();
-        foreach (var show in paused)
-        {
-            if (await BuildAsync(db, userId, show.ShowId, DefaultBudget, now, ct) is { Due: true } refresher)
-            {
-                due.Add(refresher);
-            }
-        }
+        var ids = paused.Select(p => p.ShowId).ToList();
+        var loads = await ShowLoads.LoadAsync(db, userId, ids, now, withInsights: false, ct);
+        var returns = await NextPremieres.FindAsync(db, ids, loads.Values.SelectMany(l => l.Episodes).ToLookup(e => e.ShowId), now, premieresOnly: false, ct);
+        var due = ids.Select(id => loads.GetValueOrDefault(id)).OfType<ShowLoad>()
+            .Select(load => Build(load, returns.GetValueOrDefault(load.Show.ShowId), DefaultBudget, now))
+            .OfType<RefresherDto>()
+            .Where(r => r.Due)
+            .ToList();
 
         return TypedResults.Ok(due
             .OrderBy(r => r.Returns is null)
@@ -121,74 +117,52 @@ public static class RefresherApi
             .ToList());
     }
 
-    private static async Task<RefresherDto?> BuildAsync(AnalyticsContext db, string userId, Guid showId, int budget, DateTimeOffset now, CancellationToken ct)
+    private static RefresherDto? Build(ShowLoad load, NextPremiere? next, int budget, DateTimeOffset now)
     {
-        var watches = await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).ToListAsync(ct);
-        var show = watches.Count == 0 ? null : await db.Shows.AsNoTracking().SingleOrDefaultAsync(s => s.ShowId == showId, ct);
-        if (show is null)
+        var watches = load.Watches;
+        if (watches.Count == 0)
         {
             return null;
         }
 
-        var episodes = await db.Episodes.AsNoTracking()
-            .Where(e => e.ShowId == showId && e.SeasonNumber > 0)
-            .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-            .ToListAsync(ct);
-        var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
-        var watched = watches.Select(w => w.EpisodeId).ToHashSet();
-        var furthestIndex = aired.FindLastIndex(e => watched.Contains(e.EpisodeId));
+        var show = load.Show;
+        var aired = load.Aired;
+        var watched = load.Watched;
+        var (furthestIndex, ahead) = Viewer.Split(aired, watched);
         if (furthestIndex < 0)
         {
             return null;
         }
 
-        var announced = await db.AnnouncedSeasons.AsNoTracking()
-            .Where(s => s.ShowId == showId && s.PremieresAtUtc > now)
-            .OrderBy(s => s.PremieresAtUtc)
-            .FirstOrDefaultAsync(ct);
-        var nextNew = episodes.Where(e => e.AirsAtUtc > now).MinBy(e => e.AirsAtUtc);
-        var returns = (nextNew, announced) switch
-        {
-            ({ } e, { } s) when s.PremieresAtUtc < e.AirsAtUtc => new RefresherReturnDto(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
-            ({ } e, _) => new RefresherReturnDto(e.SeasonNumber, e.AirsAtUtc!.Value, e.EpisodeNumber == 1),
-            (null, { } s) => new RefresherReturnDto(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
-            _ => null
-        };
-
-        var ahead = aired.Skip(furthestIndex + 1).ToList();
+        var returns = next is null ? null : new RefresherReturnDto(next.SeasonNumber, next.PremieresAtUtc, next.NewSeason);
         if (ahead.Count == 0 && returns is null)
         {
             return null;
         }
 
-        var stars = await db.EpisodeRatings.AsNoTracking()
-            .Where(r => r.UserId == userId && r.ShowId == showId)
-            .ToDictionaryAsync(r => r.EpisodeId, r => r.Stars, ct);
-
+        var stars = load.Stars;
         // Missing runtimes count as the show's typical one, as in the essential cut.
-        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
-        var typical = runtimes.Count > 0 ? runtimes[runtimes.Count / 2] : 0;
-        int Minutes(EpisodeCopy e) => e.RuntimeMinutes is > 0 ? e.RuntimeMinutes.Value : typical;
+        var minutes = load.Minutes;
         double? Rating(EpisodeCopy e) => stars.TryGetValue(e.EpisodeId, out var s) ? s * 2.0 : e.ExternalRating;
-        RefresherEpisodeDto Dto(EpisodeCopy e, string why) => new(e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.Title, Minutes(e),
+        RefresherEpisodeDto Dto(EpisodeCopy e, string why) => new(e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.Title, minutes(e),
             Rating(e), stars.TryGetValue(e.EpisodeId, out var s) ? s : null, why);
 
         var seen = aired.Take(furthestIndex + 1).Where(e => watched.Contains(e.EpisodeId)).ToList();
         var furthest = aired[furthestIndex];
-        var plan = Plan(seen, furthest, aired, budget, Minutes, Rating);
+        var plan = Plan(seen, furthest, aired, budget, minutes, Rating);
         var lastWatched = watches.Max(w => w.WatchedAtUtc);
         var daysSince = (int)(now.UtcDateTime - lastWatched).TotalDays;
 
         return new RefresherDto(
-            showId, show.Title, show.PosterUrl,
+            show.ShowId, show.Title, show.PosterUrl,
             daysSince >= GapDays,
             lastWatched, daysSince,
             Dto(furthest, "left-off"),
-            new RefresherAheadDto(ahead.Count, ahead.Sum(Minutes), ahead.FirstOrDefault()?.EpisodeId, ahead.FirstOrDefault()?.SeasonNumber,
+            new RefresherAheadDto(ahead.Count, ahead.Sum(minutes), ahead.FirstOrDefault()?.EpisodeId, ahead.FirstOrDefault()?.SeasonNumber,
                 ahead.FirstOrDefault()?.EpisodeNumber),
             returns,
             budget,
-            plan.Sum(p => Minutes(p.Episode)),
+            plan.Sum(p => minutes(p.Episode)),
             plan.Select(p => Dto(p.Episode, p.Why)).ToList());
     }
 
@@ -220,7 +194,7 @@ public static class RefresherApi
         candidates.AddRange(focusBest.Skip(TopBest).Select(e => (e, "season-best")));
         candidates.AddRange(previousBest.Skip(TopBest).Select(e => (e, "last-season-best")));
 
-        var limit = budget + Math.Max(5, budget / 12);
+        var limit = budget + Viewer.Overrun(budget);
         var picked = new Dictionary<Guid, (EpisodeCopy Episode, string Why)>();
         var total = 0;
         foreach (var (episode, why) in candidates)

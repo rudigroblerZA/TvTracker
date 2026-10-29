@@ -311,6 +311,46 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     document, list row and tag event came out byte-identical.
 - **Privacy rule:** a figure derived from our users needs at least 5 users or ratings behind it (`MinUsersToShow`,
   `MinRatingsToShow`). The exception is "your taste" (`TasteApi`), which uses only the caller's own data.
+- **Shared readings** (`Analytics.Data`, from a review of the three projects): the rules every insight and endpoint
+  must read the same way live in one place, after each had been written out in a dozen places with drift.
+  - **`CopyRules`:** `AiredRegular(now)` (aired, season 0 left out, as Tracking counts), `HasEnded()` (Ended or
+    Cancelled: TVmaze never says Cancelled, the mock provider does, and half the code checked only Ended), `BulkMark`
+    and `BulkMarks(...)` (8+ of a show's episodes at one moment). The worker's `ShowInsightContext` has `RegularAired`
+    and `RegularSeasonStats`; a show's run, its tags (bingeable, limited series, long-running, quick episodes) and
+    completion now leave specials out, as the API and Tracking always did.
+  - **`InsightDocuments`:** the documents' JSON contract: one `JsonSerializerOptions` for writing and reading, typed
+    `Read`, and `Paths` (jsonb keys derived with `nameof`), used by every reader that selects a part of a document by
+    path (tags, the verdict list, the scorer, the publications). A renamed record parameter now breaks the build, not
+    the SQL silently.
+  - **In the API, `Viewer`** (`Apis/Viewer.cs`): `ProgressAsync`, one SQL aggregate per show of aired regular
+    episodes left-joined to the caller's watches (aired, watched, latest watched, minutes left, last aired and
+    watched), shared by Will you finish it?, the waiting room, Known faces and Your taste. Before it, the per-show
+    "will you finish it?" loaded every aired episode of every show the viewer had ever watched on each show-page
+    visit. Also `Split` (the furthest episode watched and what's ahead), `TurnAhead`, `Overrun`, `ShowDocuments`
+    (typed document reads), `NextPremieres` (a scheduled episode 1 or an announced season, whichever is sooner, shared
+    by the catch-up planner, Previously on… and Call it) and `ShowLoad`/`ShowLoads`: everything a show-level endpoint
+    needs for one viewer (show, regular episodes, watches, stars, the cut's ratings, notes, document), loaded for a
+    set of shows in eight queries. The comeback, refresher and catch-up lists (and the backlog's long shows) build
+    from it in memory instead of five or six queries per show.
+  - **Checked** by snapshotting every endpoint for the demo user before and after (123 requests): byte-identical,
+    apart from a premiere that aired between the two snapshots. Warm, every endpoint answers in under 40 ms.
+- **Handlers run in one transaction** (`HandleOnceAsync` in the worker's `IntegrationEvents/HandlerExtensions.cs`):
+  the inbox check, the handler's changes, `MarkProcessed` and the save, through the execution strategy with the change
+  tracker cleared per attempt. Before, `UpsertShowAsync` ran `ExecuteDelete` on a show's cast at once and re-added it
+  in the save, so a transient failure at the save (and RabbitMQ's one retry) could leave the show with no cast until
+  its next update; the user-deletion handler ran seven deletes with no inbox row and no transaction. Inbox names are
+  unchanged (they key the processed rows).
+- **Lists are diffed, not replaced** (`ListBuilder<TRow>.ReplaceAsync`): rows compared with the stored ones by
+  primary key (EF's metadata), changed rows updated, new added, missing deleted; "computed at" stamps are left out of
+  the comparison, and a jsonb document is compared as JSON with its keys sorted, since Postgres gives jsonb back in
+  its own key order and spacing (the first attempt compared text, and every document looked changed). Replacing
+  ~15,000 rows an hour left a table's worth of dead tuples per run; a run with nothing new now writes no row at all
+  (`pg_stat_user_tables` after a restart: 0 inserts, updates and deletes across the six list tables).
+- **Watches record when they arrived** (`UserEpisodeWatch.RecordedAtUtc`, migration `WatchRecordedAtAndCastIndex`,
+  backfilled from the watch time): the snapshot repair compares that with when the snapshot was taken. The watch
+  time is what the user says (the phone's offline queue backdates it), so a mark synced after a snapshot was taken
+  but before it arrived used to be deleted until the next day's snapshot. The same migration moves `cast_credits`'
+  index from `PersonName` (never filtered) to `PersonId` (what Known faces looks up).
 - **Show tags** (keys in `ShowTags`): `drops-at-once` (or "drops in parts"), `bingeable`, `weekend-binge`,
   `fan-favorite`, `limited-series`, `quick-episodes`, `long-running`, `prolific-creator` / prolific producer.
   - Tags are computed hourly and sent to the catalog as `ShowTagsChangedIntegrationEvent`, one per batch of 100 shows.
@@ -368,7 +408,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Privacy:** the crowd's average needs 5 callers, and includes the caller's own call.
   - **Tested** by seeding calls on finished seasons: Ted Lasso's season 4 scored 7.93, the season verdict's figure, and
     six callers on Silo's season 4 gave a crowd average of 7.7.
-- **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches.
+- **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches, through the viewer
+  aggregate (`Viewer.ProgressAsync`): the record compares progress across every show from one query, and only the
+  shows described load their episodes.
   - **No probability:** per-person history is too thin for an honest one.
   - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
     the user's record from as far in, and the show's drop-off point when it's ahead of them.
@@ -409,6 +451,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Fits your time off** (`TimeOffApi`): ended, unstarted shows within the budget plus Tonight's overrun. The mix is
   the best pair or triple of the top 30 by Σ minutes × (value − 6.5), shown only when it fills 60%+ and more than the
   best single show.
+  - **The shelf is cached** (an hour, HybridCache): every ended show with its running time, ending and slow start is
+    the same for everyone; per request only the caller's started shows and liked genres are read. It used to load and
+    deserialize several hundred documents on every visit.
 - **Prolific:** credited behind the camera on 10 or more TVmaze shows (`ProlificMinShows`). Dick Wolf and Chuck Lorre
   are the reference cases.
 - **Discovery lists:** hidden gems (rated 7.5+, outside the catalog's most popular 40%, few followers), most consistent,

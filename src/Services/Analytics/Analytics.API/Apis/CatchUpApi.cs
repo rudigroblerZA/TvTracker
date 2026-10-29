@@ -66,46 +66,42 @@ public static class CatchUpApi
     }
 
     /// <summary>204 when no new season is due within <see cref="HorizonDays"/> days, or the user is already caught up.</summary>
-    private static async Task<Results<Ok<CatchUpDto>, NoContent, UnauthorizedHttpResult>> GetOneAsync(
+    private static async Task<Results<Ok<CatchUpDto>, NoContent>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, bool cut = false, CancellationToken ct = default)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
         var pace = await PaceAsync(db, userId, now, ct);
-        return await BuildAsync(db, userId, showId, pace, cut, now, ct) is { } plan ? TypedResults.Ok(plan) : TypedResults.NoContent();
+        var load = await ShowLoads.LoadAsync(db, userId, showId, now, withInsights: false, ct);
+        if (load is null)
+        {
+            return TypedResults.NoContent();
+        }
+        var premieres = await NextPremieres.FindAsync(db, [showId], load.Episodes.ToLookup(e => e.ShowId), now, premieresOnly: true, ct);
+        return Build(load, premieres.GetValueOrDefault(showId), pace, cut, now) is { } plan ? TypedResults.Ok(plan) : TypedResults.NoContent();
     }
 
     /// <summary>Every followed show with a season coming and something to catch up on, soonest premiere first.</summary>
-    private static async Task<Results<Ok<List<CatchUpDto>>, UnauthorizedHttpResult>> GetAllAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Ok<List<CatchUpDto>>> GetAllAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
         var horizon = now.AddDays(HorizonDays);
         var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
-        var coming = await db.Episodes.AsNoTracking()
-            .Where(e => followed.Contains(e.ShowId) && e.EpisodeNumber == 1 && e.SeasonNumber > 0 && e.AirsAtUtc > now && e.AirsAtUtc <= horizon)
-            .Select(e => e.ShowId)
-            .Union(db.AnnouncedSeasons.Where(s => followed.Contains(s.ShowId) && s.PremieresAtUtc > now && s.PremieresAtUtc <= horizon).Select(s => s.ShowId))
-            .ToListAsync(ct);
+        var coming = (await db.Episodes.AsNoTracking()
+                .Where(e => followed.Contains(e.ShowId) && e.EpisodeNumber == 1 && e.SeasonNumber > 0 && e.AirsAtUtc > now && e.AirsAtUtc <= horizon)
+                .Select(e => e.ShowId)
+                .Union(db.AnnouncedSeasons.Where(s => followed.Contains(s.ShowId) && s.PremieresAtUtc > now && s.PremieresAtUtc <= horizon).Select(s => s.ShowId))
+                .ToListAsync(ct))
+            .Distinct().ToList();
 
         var pace = await PaceAsync(db, userId, now, ct);
-        var plans = new List<CatchUpDto>();
-        foreach (var showId in coming.Distinct())
-        {
-            if (await BuildAsync(db, userId, showId, pace, false, now, ct) is { } plan)
-            {
-                plans.Add(plan);
-            }
-        }
+        var loads = await ShowLoads.LoadAsync(db, userId, coming, now, withInsights: false, ct);
+        var premieres = await NextPremieres.FindAsync(db, coming, loads.Values.SelectMany(l => l.Episodes).ToLookup(e => e.ShowId), now, premieresOnly: true, ct);
+        var plans = coming.Select(id => loads.GetValueOrDefault(id)).OfType<ShowLoad>()
+            .Select(load => Build(load, premieres.GetValueOrDefault(load.Show.ShowId), pace, false, now))
+            .OfType<CatchUpDto>()
+            .ToList();
 
         return TypedResults.Ok(plans.OrderBy(p => p.Premiere.PremieresAtUtc).ToList());
     }
@@ -126,39 +122,27 @@ public static class CatchUpApi
         return days.Sum(m => Math.Min(m, MaxMinutesPerDay)) / PaceWeeks;
     }
 
-    private static async Task<CatchUpDto?> BuildAsync(AnalyticsContext db, string userId, Guid showId, int pace, bool preferCut,
-        DateTimeOffset now, CancellationToken ct)
+    private static CatchUpDto? Build(ShowLoad load, NextPremiere? next, int pace, bool preferCut, DateTimeOffset now)
     {
-        var show = await db.Shows.AsNoTracking().SingleOrDefaultAsync(s => s.ShowId == showId, ct);
-        if (show is null)
+        if (next is null || next.PremieresAtUtc > now.AddDays(HorizonDays))
         {
             return null;
         }
+        var premiere = new CatchUpPremiereDto(next.SeasonNumber, next.PremieresAtUtc);
 
-        var episodes = await db.Episodes.AsNoTracking()
-            .Where(e => e.ShowId == showId && e.SeasonNumber > 0)
-            .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-            .ToListAsync(ct);
-        var premiere = await PremiereAsync(db, showId, episodes, now, ct);
-        if (premiere is null || premiere.PremieresAtUtc > now.AddDays(HorizonDays))
-        {
-            return null;
-        }
-
-        var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
-        var watched = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
-        var furthest = aired.FindLastIndex(e => watched.Contains(e.EpisodeId));
-        var ahead = aired.Skip(furthest + 1).ToList();
+        var show = load.Show;
+        var aired = load.Aired;
+        var (_, ahead) = Viewer.Split(aired, load.Watched);
         if (ahead.Count == 0)
         {
             return null;
         }
 
-        var minutes = EssentialCutApi.MinutesOf(aired);
-        var rating = await EssentialCutApi.RatingsAsync(db, showId, ct);
-        var notes = await EssentialCutApi.NotesAsync(db, showId, ct);
+        var minutes = load.Minutes;
+        var rating = load.Rating;
+        var notes = load.Notes;
         var decisions = EssentialCutApi.Unavailable(aired, rating, notes) is null
-            ? EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now, notes)
+            ? EssentialCutApi.Decide(show, load.Episodes, aired, rating, EssentialCutApi.Lean, now, notes)
             : null;
         var kept = decisions is null ? null : ahead.Where(e => decisions[e.EpisodeId].Keep).ToList();
 
@@ -171,24 +155,6 @@ public static class CatchUpApi
 
         return new CatchUpDto(show.ShowId, show.Title, show.PosterUrl, premiere, daysLeft, full, cut, pace, path,
             Weeks(path == "cut" ? kept! : ahead, minutes, daysLeft, now));
-    }
-
-    /// <summary>The next season premiere: a scheduled first episode, or an announced season, whichever is sooner.</summary>
-    private static async Task<CatchUpPremiereDto?> PremiereAsync(AnalyticsContext db, Guid showId, List<EpisodeCopy> episodes,
-        DateTimeOffset now, CancellationToken ct)
-    {
-        var scheduled = episodes.Where(e => e.EpisodeNumber == 1 && e.AirsAtUtc > now).MinBy(e => e.AirsAtUtc);
-        var announced = await db.AnnouncedSeasons.AsNoTracking()
-            .Where(s => s.ShowId == showId && s.PremieresAtUtc > now)
-            .OrderBy(s => s.PremieresAtUtc)
-            .FirstOrDefaultAsync(ct);
-        return (scheduled, announced) switch
-        {
-            ({ } e, { } s) when s.PremieresAtUtc < e.AirsAtUtc => new CatchUpPremiereDto(s.SeasonNumber, s.PremieresAtUtc!.Value),
-            ({ } e, _) => new CatchUpPremiereDto(e.SeasonNumber, e.AirsAtUtc!.Value),
-            (null, { } s) => new CatchUpPremiereDto(s.SeasonNumber, s.PremieresAtUtc!.Value),
-            _ => null
-        };
     }
 
     private static CatchUpPathDto PathOf(List<EpisodeCopy> path, Func<EpisodeCopy, int> minutes, int daysLeft, int pace, DateTimeOffset premiere)

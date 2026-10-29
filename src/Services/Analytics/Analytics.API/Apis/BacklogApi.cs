@@ -50,14 +50,10 @@ public static class BacklogApi
     public static void MapBacklogApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/backlog", GetAsync).RequireFeature(FeatureFlags.BacklogTriage);
 
-    private static async Task<Results<Ok<BacklogDto>, UnauthorizedHttpResult>> GetAsync(
+    private static async Task<Ok<BacklogDto>> GetAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
-
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
         var started = db.Watches.Where(w => w.UserId == userId).Select(w => w.ShowId);
         var notStarted = await db.Follows.AsNoTracking()
@@ -69,19 +65,24 @@ public static class BacklogApi
         var insights = await ShowValue.InsightsAsync(db, runs.Keys.ToList(), ct);
         var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
 
-        var items = new List<BacklogShowDto>();
-        foreach (var show in shows.Where(s => runs[s.ShowId].Episodes > 0))
-        {
-            var (episodes, minutes) = runs[show.ShowId];
-            var assessment = ShowValue.Assess(show, insights.GetValueOrDefault(show.ShowId), liked);
-            var verdict = assessment.Value < LetGoBelow ? "let-it-go"
-                : assessment.Landing is LandingVerdicts.Fizzles or LandingVerdicts.FinaleLetsDown && assessment.Value < EndsBadlyBelow ? "ends-badly"
-                : minutes >= LongMinutes ? "long"
-                : "worth-it";
-            int? cutMinutes = verdict == "long" ? await CutMinutesAsync(db, show, now, ct) : null;
-            items.Add(new BacklogShowDto(show.ShowId, show.Title, show.PosterUrl, episodes, minutes, cutMinutes, assessment.Value, verdict,
-                assessment.Reasons));
-        }
+        var assessed = shows.Where(s => runs[s.ShowId].Episodes > 0)
+            .Select(show =>
+            {
+                var assessment = ShowValue.Assess(show, insights.GetValueOrDefault(show.ShowId), liked);
+                var verdict = assessment.Value < LetGoBelow ? "let-it-go"
+                    : assessment.Landing is LandingVerdicts.Fizzles or LandingVerdicts.FinaleLetsDown && assessment.Value < EndsBadlyBelow ? "ends-badly"
+                    : runs[show.ShowId].Minutes >= LongMinutes ? "long"
+                    : "worth-it";
+                return (Show: show, Assessment: assessment, Verdict: verdict);
+            })
+            .ToList();
+        // The lean cut's running time for the long shows, from one load of their episodes, ratings and notes.
+        var cuts = await ShowLoads.LoadAsync(db, userId, assessed.Where(a => a.Verdict == "long").Select(a => a.Show.ShowId).ToList(), now,
+            withInsights: false, ct);
+        var items = assessed
+            .Select(a => new BacklogShowDto(a.Show.ShowId, a.Show.Title, a.Show.PosterUrl, runs[a.Show.ShowId].Episodes, runs[a.Show.ShowId].Minutes,
+                cuts.TryGetValue(a.Show.ShowId, out var load) ? CutMinutes(load, now) : null, a.Assessment.Value, a.Verdict, a.Assessment.Reasons))
+            .ToList();
 
         // The best few that aren't long go first.
         var next = items.Where(i => i.Verdict == "worth-it").OrderByDescending(i => i.Value).Take(StartNext).Select(i => i.ShowId).ToHashSet();
@@ -104,23 +105,16 @@ public static class BacklogApi
     private static readonly string[] Order = ["start-next", "worth-it", "long", "ends-badly", "let-it-go"];
 
     /// <summary>The "lean" essential cut's running time; null when the show can't be cut or it saves nothing.</summary>
-    private static async Task<int?> CutMinutesAsync(AnalyticsContext db, ShowCopy show, DateTimeOffset now, CancellationToken ct)
+    private static int? CutMinutes(ShowLoad load, DateTimeOffset now)
     {
-        var episodes = await db.Episodes.AsNoTracking()
-            .Where(e => e.ShowId == show.ShowId && e.SeasonNumber > 0)
-            .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
-            .ToListAsync(ct);
-        var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
-        var rating = await EssentialCutApi.RatingsAsync(db, show.ShowId, ct);
-        var notes = await EssentialCutApi.NotesAsync(db, show.ShowId, ct);
-        if (EssentialCutApi.Unavailable(aired, rating, notes) is not null)
+        var aired = load.Aired;
+        if (EssentialCutApi.Unavailable(aired, load.Rating, load.Notes) is not null)
         {
             return null;
         }
 
-        var decisions = EssentialCutApi.Decide(show, episodes, aired, rating, EssentialCutApi.Lean, now, notes);
-        var minutes = EssentialCutApi.MinutesOf(aired);
-        var kept = aired.Where(e => decisions[e.EpisodeId].Keep).Sum(minutes);
-        return kept < aired.Sum(minutes) ? kept : null;
+        var decisions = EssentialCutApi.Decide(load.Show, load.Episodes, aired, load.Rating, EssentialCutApi.Lean, now, load.Notes);
+        var kept = aired.Where(e => decisions[e.EpisodeId].Keep).Sum(load.Minutes);
+        return kept < aired.Sum(load.Minutes) ? kept : null;
     }
 }

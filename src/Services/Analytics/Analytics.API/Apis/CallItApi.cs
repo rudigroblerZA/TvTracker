@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -64,13 +63,10 @@ public static class CallItApi
         api.MapGet("/me/calls", GetMineAsync).RequireFeature(FeatureFlags.CallIt);
     }
 
-    private static async Task<Results<Ok<ShowCallDto>, NotFound, UnauthorizedHttpResult>> GetShowAsync(
+    private static async Task<Results<Ok<ShowCallDto>, NotFound>> GetShowAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         if (await db.Shows.AsNoTracking().FirstOrDefaultAsync(s => s.ShowId == showId, ct) is not { } show)
         {
             return TypedResults.NotFound();
@@ -89,9 +85,7 @@ public static class CallItApi
         if (mine is not null)
         {
             model = await ModelAsync(db, showId, mine.SeasonNumber, ct);
-            var everyone = await db.SeasonCalls.AsNoTracking().Where(c => c.ShowId == showId && c.SeasonNumber == mine.SeasonNumber)
-                .GroupBy(_ => 1).Select(g => new { Count = g.Count(), Average = g.Average(c => c.Rating) }).FirstOrDefaultAsync(ct);
-            crowd = everyone is { Count: >= InsightRules.MinUsersToShow } ? new CrowdCallDto(Math.Round(everyone.Average, 1), everyone.Count) : null;
+            crowd = await CrowdAsync(db, showId, mine.SeasonNumber, ct);
         }
 
         var premieres = await PremieresAsync(db, [showId], now, ct);
@@ -100,13 +94,10 @@ public static class CallItApi
         return TypedResults.Ok(new ShowCallDto(open?.Number, open?.PremieresAtUtc, mine?.Rating, model, crowd, past));
     }
 
-    private static async Task<Results<Ok<ShowCallDto>, NotFound, UnauthorizedHttpResult, ValidationProblem>> SetAsync(
+    private static async Task<Results<Ok<ShowCallDto>, NotFound, ValidationProblem>> SetAsync(
         Guid showId, SetCallRequest request, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         if (request.Rating is < 1 or > 10 || double.IsNaN(request.Rating))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["rating"] = ["A call is a rating from 1 to 10."] });
@@ -129,33 +120,30 @@ public static class CallItApi
         call.ModelRating = model?.Rating;
         call.CalledAtUtc = now.UtcDateTime;
         await db.SaveChangesAsync(ct);
-        return (await GetShowAsync(showId, user, db, time, ct)).Result switch
-        {
-            Ok<ShowCallDto> ok => ok,
-            _ => TypedResults.NotFound()
-        };
+
+        // The panel after a call, from what's already here: the crowd is the one thing left to ask for.
+        var crowd = await CrowdAsync(db, showId, open.Number, ct);
+        var premieres = await PremieresAsync(db, [showId], now, ct);
+        var past = (await db.SeasonCalls.AsNoTracking().Where(c => c.UserId == userId && c.ShowId == showId && c.SeasonNumber != open.Number).ToListAsync(ct))
+            .OrderByDescending(c => c.SeasonNumber)
+            .Select(c => ToDto(c, show, premieres.GetValueOrDefault((showId, c.SeasonNumber)), now)).ToList();
+        return TypedResults.Ok(new ShowCallDto(open.Number, open.PremieresAtUtc, call.Rating, model, crowd, past));
     }
 
     /// <summary>Takes back a call on the open season; one on a season that has premiered stays.</summary>
-    private static async Task<Results<NoContent, UnauthorizedHttpResult>> DeleteAsync(
+    private static async Task<NoContent> DeleteAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var open = await OpenSeasonAsync(db, showId, time.GetUtcNow(), ct);
         await db.SeasonCalls.Where(c => c.UserId == userId && c.ShowId == showId && c.SeasonNumber == open.Number).ExecuteDeleteAsync(ct);
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<Ok<MyCallsDto>, UnauthorizedHttpResult>> GetMineAsync(
+    private static async Task<Ok<MyCallsDto>> GetMineAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (user.FindFirst("sub")?.Value is not { } userId)
-        {
-            return TypedResults.Unauthorized();
-        }
+        var userId = user.GetUserId();
         var now = time.GetUtcNow();
         var calls = await db.SeasonCalls.AsNoTracking().Where(c => c.UserId == userId).ToListAsync(ct);
         var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
@@ -198,7 +186,15 @@ public static class CallItApi
         return TypedResults.Ok(new MyCallsDto(record, dtos, suggestions));
     }
 
-    private static bool Running(ShowCopy show) => show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled);
+    private static bool Running(ShowCopy show) => !show.HasEnded();
+
+    /// <summary>Everyone's average call on the season, with the privacy rule (5+ callers, the caller's own included).</summary>
+    private static async Task<CrowdCallDto?> CrowdAsync(AnalyticsContext db, Guid showId, int season, CancellationToken ct)
+    {
+        var everyone = await db.SeasonCalls.AsNoTracking().Where(c => c.ShowId == showId && c.SeasonNumber == season)
+            .GroupBy(_ => 1).Select(g => new { Count = g.Count(), Average = g.Average(c => c.Rating) }).FirstOrDefaultAsync(ct);
+        return everyone is { Count: >= InsightRules.MinUsersToShow } ? new CrowdCallDto(Math.Round(everyone.Average, 1), everyone.Count) : null;
+    }
 
     /// <summary>The season after the latest to air (the first, for a show yet to air), and its first dated episode.</summary>
     private static async Task<(int Number, DateTimeOffset? PremieresAtUtc)> OpenSeasonAsync(AnalyticsContext db, Guid showId, DateTimeOffset now,
@@ -223,9 +219,7 @@ public static class CallItApi
     /// <summary>The show document's rating forecast, when it's for this season.</summary>
     private static async Task<CallRangeDto?> ModelAsync(AnalyticsContext db, Guid showId, int season, CancellationToken ct)
     {
-        var json = await db.ShowInsights.AsNoTracking().Where(d => d.ShowId == showId).Select(d => d.Document).FirstOrDefaultAsync(ct);
-        return json is not null && JsonSerializer.Deserialize<ShowInsights>(json, JsonSerializerOptions.Web)?.Outlook?.NextSeasonRating is { } f
-            && f.SeasonNumber == season
+        return (await ShowDocuments.LoadAsync(db, showId, ct))?.Outlook?.NextSeasonRating is { } f && f.SeasonNumber == season
             ? new CallRangeDto(f.Rating, f.Low, f.High)
             : null;
     }

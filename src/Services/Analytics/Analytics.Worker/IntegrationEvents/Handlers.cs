@@ -167,7 +167,8 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
             show.CreativesKnown = true;
         }
 
-        // Events published before the cast was added carry none; keep what we have rather than clearing it.
+        // Events published before the cast was added carry none; keep what we have rather than clearing it. The delete
+        // runs at once, but inside HandleOnceAsync's transaction, so a failed save rolls it back with the inserts.
         if (cast is not null)
         {
             await db.Cast.Where(c => c.ShowId == showId).ExecuteDeleteAsync(ct);
@@ -185,18 +186,8 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
         }
     }
 
-    private async Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply)
-    {
-        var handler = $"{nameof(CatalogEventHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
-
-        await apply();
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
-    }
+    private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<CatalogEventHandlers>(e), apply, ct);
 }
 
 /// <summary>Keeps each user's latest rating of shows and episodes. Only aggregates ever leave this service.</summary>
@@ -252,18 +243,8 @@ public sealed class RatingEventHandlers(AnalyticsContext db) :
             }
         });
 
-    private async Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply)
-    {
-        var handler = $"{nameof(RatingEventHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
-
-        await apply();
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
-    }
+    private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<RatingEventHandlers>(e), apply, ct);
 }
 
 /// <summary>Keeps each user's watched episodes and follows. Only aggregates ever leave this service.</summary>
@@ -287,7 +268,8 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
                 UserId = e.UserId,
                 EpisodeId = id,
                 ShowId = e.ShowId,
-                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
+                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime,
+                RecordedAtUtc = e.CreatedAt.UtcDateTime
             }));
         });
 
@@ -318,18 +300,8 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
             }
         });
 
-    private async Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply)
-    {
-        var handler = $"{nameof(TrackingEventHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
-
-        await apply();
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
-    }
+    private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<TrackingEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -342,22 +314,24 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
     IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>,
     IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
 {
-    public async Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
-    {
-        const string handler = $"{nameof(SnapshotHandlers)}.{nameof(TrackingSnapshotIntegrationEvent)}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
+    public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<SnapshotHandlers>(e), () => RepairActivityAsync(e, ct), ct);
 
+    private async Task RepairActivityAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
+    {
         var takenAt = e.TakenAtUtc.UtcDateTime;
         var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
         var watched = watches.Select(w => w.EpisodeId).ToHashSet();
         var snapshotWatches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
         var addWatches = snapshotWatches.Values.Where(w => !watched.Contains(w.EpisodeId))
-            .Select(w => new UserEpisodeWatch { UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime })
+            .Select(w => new UserEpisodeWatch
+            {
+                UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime, RecordedAtUtc = takenAt
+            })
             .ToList();
-        var removeWatches = watches.Where(w => !snapshotWatches.ContainsKey(w.EpisodeId) && w.WatchedAtUtc < takenAt).ToList();
+        // By when the mark reached us, not the watch time the user gave: the phone's offline queue backdates those, and
+        // a mark synced after the snapshot was taken is newer than it whatever its watch time.
+        var removeWatches = watches.Where(w => !snapshotWatches.ContainsKey(w.EpisodeId) && w.RecordedAtUtc < takenAt).ToList();
         db.Watches.AddRange(addWatches);
         db.Watches.RemoveRange(removeWatches);
 
@@ -377,19 +351,13 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
                 "Repaired {UserId}'s activity from Tracking's snapshot: watches +{AddedWatches} -{RemovedWatches}, follows +{AddedFollows} -{RemovedFollows}",
                 e.UserId, addWatches.Count, removeWatches.Count, addFollows.Count, removeFollows.Count);
         }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
     }
 
-    public async Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct)
-    {
-        const string handler = $"{nameof(SnapshotHandlers)}.{nameof(RatingsSnapshotIntegrationEvent)}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
+    public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<SnapshotHandlers>(e), () => RepairRatingsAsync(e, ct), ct);
 
+    private async Task RepairRatingsAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct)
+    {
         var changes = 0;
         var shows = await db.ShowRatings.Where(r => r.UserId == e.UserId).ToDictionaryAsync(r => r.ShowId, ct);
         foreach (var rating in e.Shows.DistinctBy(r => r.ShowId))
@@ -429,9 +397,6 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
         {
             logger.LogInformation("Repaired {UserId}'s ratings from Ratings' snapshot: {Changes} changed", e.UserId, changes);
         }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
     }
 }
 
@@ -442,14 +407,12 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
 /// </summary>
 public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEventHandler<EpisodeNotesChangedIntegrationEvent>
 {
-    public async Task HandleAsync(EpisodeNotesChangedIntegrationEvent e, CancellationToken ct)
-    {
-        const string handler = nameof(EpisodeNotesHandler);
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
+    // The inbox name predates the class.event convention; it keys processed rows, so it stays.
+    public Task HandleAsync(EpisodeNotesChangedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(EpisodeNotesHandler), () => ReplaceNotesAsync(e, ct), ct);
 
+    private async Task ReplaceNotesAsync(EpisodeNotesChangedIntegrationEvent e, CancellationToken ct)
+    {
         var existing = await db.EpisodeNotes.Where(n => e.ShowId == null || n.ShowId == e.ShowId).ToListAsync(ct);
         var newer = existing.Where(n => n.TakenAtUtc > e.TakenAtUtc).Select(n => n.ShowId).ToHashSet();
         var incoming = e.Notes.Where(n => !newer.Contains(n.ShowId) && (e.ShowId == null || n.ShowId == e.ShowId))
@@ -467,16 +430,19 @@ public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEvent
         {
             EpisodeId = n.EpisodeId, ShowId = n.ShowId, Mark = n.Mark, Reason = n.Reason, SourceUrl = n.SourceUrl, TakenAtUtc = e.TakenAtUtc
         }));
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
     }
 }
 
-/// <summary>Deletes everything a deleted user left here; the next hourly run drops them from every aggregate.</summary>
+/// <summary>
+/// Deletes everything a deleted user left here, in one transaction (account deletion is a promise, and a message is
+/// retried only once); the next hourly run drops them from every aggregate.
+/// </summary>
 public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
-    public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
+    public Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<UserDeletedHandler>(e), () => DeleteAsync(e, ct), ct);
+
+    private async Task DeleteAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
         await db.ShowRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
@@ -502,14 +468,11 @@ public sealed class PlanHandlers(AnalyticsContext db)
     public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
         e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
 
-    private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
-    {
-        var handler = $"{nameof(PlanHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
+    private Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct) =>
+        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<PlanHandlers>(e), () => KeepAsync(userId, plan, changedAt, ct), ct);
 
+    private async Task KeepAsync(string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
+    {
         var copy = await db.Plans.FindAsync([userId], ct);
         if (copy is null)
         {
@@ -524,8 +487,5 @@ public sealed class PlanHandlers(AnalyticsContext db)
             copy.Plan = plan;
             copy.ChangedAtUtc = changedAt;
         }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
     }
 }
