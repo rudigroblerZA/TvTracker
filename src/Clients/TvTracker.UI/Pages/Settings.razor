@@ -194,7 +194,10 @@
         <Feature Flag="@FeatureFlags.Plans">
             <section class="panel">
                 <h2>Plan</h2>
-                <p><a href="settings/plan">Your plan</a><span class="muted small"> · what Free and @Plans.Name(Plans.Plus) include</span></p>
+                <p><a href="settings/plan">Your plan</a><span class="muted small"> · what each plan includes</span></p>
+                <Feature Flag="@FeatureFlags.FamilyPlan">
+                    <p><a href="settings/family">Your family</a><span class="muted small"> · share one plan with up to @Plans.FamilyMembers people</span></p>
+                </Feature>
             </section>
         </Feature>
 

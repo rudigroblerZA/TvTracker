@@ -42,6 +42,12 @@ public class UserList
     /// <summary>Shared lists are sent to Social, which shows them to the people who can see the owner.</summary>
     public bool Shared { get; set; }
 
+    /// <summary>
+    /// The secret in the list's link (<c>/l/{token}</c>), which anyone can open, signed in or not; null while it has no
+    /// link. 128 random bits, so links can't be guessed; turning the link off clears it, and a new link gets a new one.
+    /// </summary>
+    public string? LinkToken { get; set; }
+
     public List<UserListItem> Items { get; set; } = [];
 }
 
@@ -127,6 +133,8 @@ public class TrackingContext(DbContextOptions<TrackingContext> options) : DbCont
             entity.Property(l => l.UserId).HasMaxLength(64);
             entity.Property(l => l.Name).HasMaxLength(100);
             entity.Property(l => l.Description).HasMaxLength(1000);
+            entity.Property(l => l.LinkToken).HasMaxLength(32);
+            entity.HasIndex(l => l.LinkToken).IsUnique().HasFilter("\"LinkToken\" IS NOT NULL");
             entity.HasMany(l => l.Items).WithOne().HasForeignKey(i => i.ListId).OnDelete(DeleteBehavior.Cascade);
         });
 

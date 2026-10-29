@@ -67,13 +67,14 @@ The model is a setting: `Embeddings:Model` in the AppHost's `appsettings.json`. 
 | --- | --- | --- |
 | `all-MiniLM-L6-v2` | In-process (ONNX), ~90 MB download | Fast; matches below a cosine distance of 0.65 |
 | `bge-small-en-v1.5` | In-process (ONNX), ~130 MB download | About twice as slow; separates related from unrelated shows more clearly, and finds some that MiniLM misses ("time travel mystery in a small german town" → Dark); matches below 0.45 |
-| `dmr/nomic-embed-text-v1.5` (default) | Docker Model Runner, ~270 MB model | ~10× slower per search (~30 ms) and ranked below both on the test searches (top-1 22/42, top-3 30/42); matches below 0.38 |
+| `dmr/qwen3-embedding-0.6b` (default) | Docker Model Runner, ~640 MB model | Ranked best of the server models on the test searches (top-1 30/41, top-3 34/41, against nomic's 18 and 27); ~130 ms a search on a CPU; matches below 0.46 |
+| `dmr/nomic-embed-text-v1.5` | Docker Model Runner, ~270 MB model | The previous default; matches below 0.38 |
 
 **Docker Model Runner** serves models from Docker Hub's `ai/` namespace over an OpenAI-compatible API. It runs the
 default model, so semantic search needs nothing installed beyond Docker.
 - **Container:** the AppHost runs `docker/model-runner` as the `model-runner` container, on CPU. Models are kept
   in the `tvtracker-model-runner` volume.
-- **First start:** the sync worker pulls the model from Docker Hub (~270 MB). Until it's ready, search matches
+- **First start:** the sync worker pulls the model from Docker Hub (~640 MB). Until it's ready, search matches
   titles only, then the catalog is embedded within a few minutes. If the pull fails, for example because Docker Hub
   rate-limits it, it retries every minute.
 - **Your own Model Runner:** set `ModelRunner:Url` in the AppHost's configuration (e.g. `http://localhost:12434`)
@@ -83,8 +84,8 @@ default model, so semantic search needs nothing installed beyond Docker.
   - The sync worker pulls the model there too, if it's missing.
 - **Endpoint:** the AppHost sets `Embeddings:Endpoint` for every server model to its Model Runner. A model's own
   `Embeddings:Models:{id}:Endpoint` takes precedence; without either, it's `http://localhost:12434/engines/v1/`.
-- **In-process instead:** set `Embeddings:Model` to `all-MiniLM-L6-v2`, which also ranked best on the test
-  searches. The AppHost then doesn't start Model Runner at all.
+- **In-process instead:** set `Embeddings:Model` to `all-MiniLM-L6-v2`, which ranked best on the earlier test
+  searches and needs no server. The AppHost then doesn't start Model Runner at all.
 - **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
 - **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
   embeds once it's back. Each service logs one warning per outage.
@@ -100,12 +101,18 @@ default model, so semantic search needs nothing installed beyond Docker.
     in-process embedding model, since there's no Model Runner then.
 - **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
   `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
-  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as nomic and EmbeddingGemma):
+  - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as Qwen3-Embedding, nomic and EmbeddingGemma):
     its longer vectors are cut to the column's 384 dimensions.
   - A model that makes 384 dimensions natively needs no truncation. A longer one without `Truncate` is refused,
     since cutting other models loses most of their meaning.
 
-On 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
+**Qwen3-Embedding 0.6B** became the default after 41 test searches over the 846-show catalog ("chemistry teacher
+becomes a drug dealer" → Breaking Bad, "vets in the yorkshire dales" → All Creatures Great and Small): it put the
+expected show first for 30 and in the top 3 for 34 (MRR 0.78), against nomic's 18, 27 and 0.57. It finds what nomic
+missed (Stranger Things, The Sopranos' therapist, The Expanse) and keeps unrelated searches ("knitting patterns for
+beginners") at 0.46 or further, where nomic let them within its cutoff. MiniLM and bge-small weren't run on this set.
+
+An earlier comparison, on 42 test searches over a 595-show catalog (TVmaze's top 500 plus the hourly imports), MiniLM put the expected show
 first for 27 and in the top 3 for 35; bge-small did so for 24 and 31, and found slightly more of the expected shows in
 the top 10 (84% against 82%). Each model wins different searches: bge-small finds Dark for "time travel mystery in a
 small german town" (10th against 64th) and The Mandalorian for "bounty hunter protects a child in a galaxy far away"
@@ -208,6 +215,17 @@ watching and your watchlist.
 - **API:** `GET /api/v1/tonight/queue` (Tracking.API, signed in) gives the queue, with runtimes and the show's
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
+
+**Guess the show** (`/puzzle`, from Discover; `show-puzzle` flag) is a daily puzzle: one popular show, the same for
+everyone, found in six guesses. Each guess is compared with the answer: when it premiered (earlier or later, amber within
+3 years), its network (amber for the same streaming service), the genres they share, scripted or animated, seasons (amber
+within one), running or ended, and actors in both casts. Each wrong guess adds a clue: the decade, the network, one of its
+characters, then its lead. A finished puzzle gives a spoiler-free square per guess to share, and your record (played,
+solved, days in a row) is kept on the device. It works signed out.
+- **API:** `GET /api/v1/puzzles/{date}` (Catalog.API) gives the day's number and first clue; `POST
+  /api/v1/puzzles/{date}/guesses` (`{ showId, attempt }`) compares a guess, returns the clues unlocked, and the answer
+  once it's solved or the sixth guess is in. Yesterday, today and tomorrow by UTC are playable, so every time zone has
+  its own today.
 
 **Mixtape** (`/mixtape`, from Discover and Blend; `mixtape` flag) is Blend for three to five shows: the shows that fit
 all of them, not just one. Breaking Bad + Ozark + Better Call Saul gives The Lincoln Lawyer, Bosch and Criminal Minds;
@@ -393,7 +411,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -428,6 +446,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `your-services` | Logos and prices on network report cards, `/services`, and its endpoints |
+| `family-plan` | The Family plan's invites and members: `/settings/family`, `/family/join/{token}`, and their endpoints |
+| `list-links` | A list's link (`/l/{token}`), its section on the list page, and its endpoints |
 | `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
@@ -462,12 +483,25 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 ### Plans
 
-Free and Plus, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
+Free, Plus and Family, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
 
-- **Free:** up to 3 lists, and lists can't be shared on your profile. **Plus:** as many lists as you like (up to the
-  service's cap of 100), and sharing.
-- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit; a list's page turns
-  the Share box off with "Sharing lists is part of Plus"; `/settings/plan` compares the plans and shows yours.
+- **Free:** up to 3 lists. **Plus:** as many lists as you like (up to the service's cap of 100), and Your services.
+  Every plan can share lists, on its profile and by link; sharing was Plus-only at first and opened to everyone, since
+  shared lists bring people in.
+- **Family** (`family-plan` flag): Plus for the owner and up to 5 people they invite, on one subscription.
+  - **Inviting:** `/settings/family` gives the owner an invite link (`/family/join/{token}`), which they can share or
+    turn off. Whoever opens it signs in (or signs up) and joins while there's room.
+  - **Members** get Plus's benefits while the owner pays for Family, with their own lists, ratings and watches; the
+    owner sees only their names. A person is in one family at most; an owner with members can't join another.
+  - **Leaving:** a member can leave, the owner can remove them, and a family ends when its owner stops paying for it or
+    deletes their account. Anything made on the plan stays, as with any downgrade.
+  - **API** (Identity): `GET /api/v1/me/family`, `POST`/`DELETE /api/v1/me/family/invite`,
+    `DELETE /api/v1/me/family/members/{userId}`, `DELETE /api/v1/me/family/membership`,
+    `GET /api/v1/family/invites/{token}` and `POST /api/v1/family/join` (`{"token":…}`; 409 with the reason when the
+    family is full, ended, or you're in another).
+- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit, and `/settings/plan`
+  compares the plans and shows yours. Sharing still goes through the plan's `ShareLists`, so a plan can take it away
+  again without new plumbing.
 - **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
   user can still edit, unshare or delete them. Only a new list or a new share is refused.
 - **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches
@@ -479,13 +513,27 @@ Free and Plus, behind the `plans` flag. The plumbing for paid features is in pla
   - `GET /api/v1/lists/limits` (Tracking) gives what the lists endpoints enforce.
   - Past a limit, Tracking answers 403 with a problem of type `plan-limit` naming the plan that allows it.
 
+### List links
+
+A list's page has **Get a link** (behind the `list-links` flag): anyone with the link (`/l/{token}`) sees the list,
+read-only, without signing in or having an account.
+
+- **What it shows:** the list's name, description and shows (each linking to its show page), not who made it.
+- **Separate from profile sharing:** a private profile or a block doesn't stop a link; sending it is the owner's choice.
+- **Turn off link** stops it working at once; a new link has a new address. Deleting the list or the account ends it too.
+- **Share link** opens the share sheet on a phone and copies the link elsewhere.
+- **The address** is the web app's own on the web; the phone uses `MobileSettings.WebAddress` (this machine in
+  development, so set it to the public address for a release).
+- **API:** `POST` / `DELETE /api/v1/lists/{id}/link` (owner), and `GET /api/v1/linked-lists/{token}` (anyone) on Tracking.
+  The token is 128 random bits, so links can't be guessed.
+
 ### Navigation
 
 - **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Calendar, Discover, For you,
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
   - My shows: lists.
-  - Discover: Prestige picks, Blend, Mixtape, Universes, nanogenres and network report cards.
+  - Discover: Prestige picks, Blend, Mixtape, Guess the show, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: Ask, the time machine and holiday episodes.
   - Stats: Year in TV.
@@ -839,7 +887,23 @@ How events flow:
     shows and great endings. Each figure is set against the whole catalog (green when clearly better, red when clearly
     worse), and the cards sort by any of them.
     - **From the provider's data,** recomputed hourly, so nothing about our users is in it.
+    - **Logos and prices** (`your-services` flag): each card shows the logo of the service the network's shows are on
+      and its estimated price ("On Paramount+ · from $8.99 a month · free over the air in the US"), and "You have it"
+      for services you've picked. Prices are the cheapest US plan, checked by hand (October 2026, from
+      [Stream-Wiser](https://stream-wiser.com/prices)); MGM+ and discovery+ are shown without one, since it couldn't
+      be confirmed. Directory: `NetworkServices` in IntegrationEvents.
     - **API:** `GET /api/v1/insights/networks` on Analytics.API, signed in (`baseline` is the whole catalog).
+  - **Your services** (`/services`, from the report cards; Plus and Family; `your-services` flag): pick the streaming
+    services you pay for.
+    - **The report:** your monthly total, and per service the hours you watched on it in the last 30 days, its cost per
+      hour, the shows behind them, and the shows you follow with episodes on it in the next 30 days.
+    - **Verdicts:** good value (up to $2 an hour, a rental's price), pricey (more), quiet (nothing watched, but your
+      shows are coming) and could pause (nothing watched, nothing coming). Free and unpriced services are listed without a
+      verdict on cost.
+    - **Not on your services:** services you haven't picked that have your followed shows coming.
+    - **Bulk marks** (8+ of a show's episodes at once) aren't counted as watching, as in Year in TV.
+    - **API** (Analytics.API): `GET /api/v1/networks/services` (directory, prices and logos), `GET`/`PUT
+      /api/v1/me/services`, `GET /api/v1/me/services/report`. Free gets 403 `plan-limit` on saving and the report.
   - **Year in TV** (`/year`, linked from Stats; `year-in-tv` flag): your year of viewing, any year you watched in.
     - **What's in it:** hours, episodes, shows (and how many were new to you), days with TV and your longest run of
       days, your busiest month and biggest day, most watched shows, time by genre, the network you watched most,
@@ -976,6 +1040,17 @@ How events flow:
     - **Backtested every run:** each model replays the catalog's history (what it would have said after every past
       season) and keeps the misses as its range. On the development catalog, ratings are off by 0.33 on average
       (1,440 seasons) and start dates by 22 days at the median (2,291 waits).
+  - **Call it** (`/calls`, linked from Insights, and a card on show pages; `call-it` flag): predict what a running show's
+    next season will rate on TVmaze, before it premieres, and see whether you beat the forecast above.
+    - **Making a call:** a slider from 5 to 10 on the show page; change or take it back until the season's first episode
+      airs, when it locks.
+    - **No peeking:** the card shows the model's forecast and everyone's average call (from 5 callers) only after
+      you've called. The forecast also sits in "What's next" on the same page; the card doesn't hide that.
+    - **Scored** once the season is over (the season verdict calls it, a later season airs, or the show ends): the
+      season's average episode rating, how far off you were, and whether you or the model came closer.
+    - **Your record** (`/calls`): calls scored, your average miss against the model's, calls won against it, and your
+      followed shows' next seasons to call, soonest premiere first.
+    - **API:** `GET`/`PUT`/`DELETE /api/v1/shows/{id}/call` and `GET /api/v1/me/calls` on Analytics.API (signed in).
   - **Will you finish it?** (show pages, and "Will you finish them?" on Stats): for shows you're part-way through,
     from your own watches. It shows facts, not a probability: there isn't enough history per person for an honest one.
     - **Pace:** your pace over the last four weeks, and when it gets you to the end of what's aired.

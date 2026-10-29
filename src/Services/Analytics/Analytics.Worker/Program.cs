@@ -31,13 +31,16 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<TrackingSnapshotIntegrationEvent, SnapshotHandlers>()
     .AddSubscription<RatingsSnapshotIntegrationEvent, SnapshotHandlers>()
     .AddSubscription<EpisodeNotesChangedIntegrationEvent, EpisodeNotesHandler>()
-    .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
+    .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>()
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>();
 
 // Publishes show tags for the catalog's search filter.
 builder.Services.AddIntegrationEventOutbox<AnalyticsContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInsights();
+builder.Services.AddScoped<SeasonCallScorer>();
 builder.Services.AddHostedService<InsightsRefresher>();
 
 // Backfill on first start; the sync worker's internal replay endpoint.

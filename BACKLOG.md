@@ -248,15 +248,15 @@ So the rest of the list reads in proportion:
 
 All the features from the review have shipped; new ideas go here.
 
-### F1. Paying for Plus
+### F1. Paying for Plus and Family
 
 **P2 · M**
 
 - **Why:** plans are plumbed (Identity owns each user's plan; Tracking enforces Free's 3 lists and no sharing), but
   only admins can change a plan, on `/settings/plans`.
 - **What:** a payment provider's checkout from `/settings/plan`, and its webhook on Identity.API setting the plan
-  through the same change `PlansApi.SetPlanAsync` makes (event and all), downgrading when a subscription lapses.
-  Prices per region, and a receipt in the data export.
+  through the same change `PlansApi.SetPlanAsync` makes (`PlanState` recomputes the family's members too), downgrading
+  when a subscription lapses. Prices per region, and a receipt in the data export.
 - **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
   period's end, and the webhook rejects unsigned calls.
 

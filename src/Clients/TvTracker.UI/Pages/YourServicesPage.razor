@@ -1,0 +1,225 @@
+@page "/services"
+@attribute [RequiresFeature(FeatureFlags.YourServices)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Your services · @Brand.AppName</PageTitle>
+
+<p><a href="networks">← Network report cards</a></p>
+<h1>Your services</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Pick the streaming services you pay for. Each one's cost per hour comes from what you watched on it in the last
+            30 days, and what's coming from the shows you follow says whether it's worth keeping.
+        </p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (mine is null || directory is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (!mine.Allowed)
+        {
+            <p class="plan-note">
+                <span>@($"Keeping your services is part of {Plans.Name(Plans.Plus)} and {Plans.Name(Plans.Family)}. ")</span>
+                <a href="settings/plan">See plans</a>
+            </p>
+        }
+        else
+        {
+            @if (report is { } r)
+            {
+                <section class="panel">
+                    <div class="service-total">
+                        <div><strong>@Format.Usd(r.MonthlyUsd)</strong><span class="muted">@(" a month")</span></div>
+                        <div><strong>@Format.Hours(r.Minutes)</strong><span class="muted">@($" watched in {r.WindowDays} days")</span></div>
+                        @if (r.MonthlyUsd > 0 && r.Minutes > 0)
+                        {
+                            <div><strong>@Format.Usd(Math.Round(r.MonthlyUsd / (r.Minutes / 60m), 2))</strong><span class="muted">@(" an hour, all together")</span></div>
+                        }
+                    </div>
+                    @if (r.UnknownPrices > 0)
+                    {
+                        <p class="muted small">@(r.UnknownPrices == 1 ? "One of your services has no known price, so it isn't in the total." : $"{r.UnknownPrices} of your services have no known price, so they aren't in the total.")</p>
+                    }
+                    @if (r.Services.Count == 0)
+                    {
+                        <p class="muted">Pick your services below to see what each one costs you.</p>
+                    }
+                    <div class="service-uses">
+                        @foreach (var use in r.Services)
+                        {
+                            <article class="insight-card service-use tone-@Tone(use.Verdict)" @key="use.Key">
+                                <div class="network-head">
+                                    <ServiceLogo Service="@directory.Services.FirstOrDefault(s => s.Key == use.Key)" Name="@use.Name" />
+                                    <h3>@use.Name</h3>
+                                </div>
+                                <p class="strong">@Verdict(use)</p>
+                                <p class="small muted">@Facts(use)</p>
+                                @if (use.Watched.Count > 0)
+                                {
+                                    <p class="small"><span class="muted">Watched: </span>@Shows(use.Watched, s => Format.Hours(s.Minutes))</p>
+                                }
+                                @if (use.Coming.Count > 0)
+                                {
+                                    <p class="small"><span class="muted">Coming: </span>@Shows(use.Coming, s => s.NextAirsAtUtc is { } next ? $"from {Session.ToLocal(next):d MMM}" : "")</p>
+                                }
+                            </article>
+                        }
+                    </div>
+                </section>
+
+                @if (r.Missing.Count > 0)
+                {
+                    <section class="panel">
+                        <h2>Not on your services</h2>
+                        <p class="muted small">Shows you follow, with episodes in the next @r.WindowDays days, on services you haven't picked.</p>
+                        <ul class="plain-list">
+                            @foreach (var use in r.Missing)
+                            {
+                                <li @key="use.Key">
+                                    <strong>@use.Name</strong>
+                                    <span class="muted small">@(use.MonthlyUsd is > 0 ? $" · from {Format.Usd(use.MonthlyUsd.Value)} a month · " : " · ")</span>
+                                    @Shows(use.Coming, s => s.NextAirsAtUtc is { } next ? $"from {Session.ToLocal(next):d MMM}" : "")
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+            }
+
+            <section class="panel">
+                <h2>What you pay for</h2>
+                <div class="service-picks">
+                    @foreach (var service in directory.Services)
+                    {
+                        var on = picked.Contains(service.Key);
+                        <label class="service-pick @(on ? "on" : "")" @key="service.Key">
+                            <input type="checkbox" checked="@on" @onchange="e => Toggle(service.Key, e.Value is true)" />
+                            <ServiceLogo Service="service" Name="@service.Name" />
+                            <span>
+                                <span class="strong">@service.Name</span>
+                                <span class="muted small">@(service.MonthlyUsd switch { null => service.Note ?? "Price unknown", 0 => service.Note ?? "Free", { } usd => $"from {Format.Usd(usd)} a month" })</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+                <p>
+                    <button class="btn" type="button" disabled="@(!changed || saving)" @onclick="SaveAsync">@(saving ? "Saving…" : "Save")</button>
+                    <span class="muted small">@($" Prices: the cheapest US plan a month, checked {directory.PricesAsOf}.")</span>
+                </p>
+            </section>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see what your streaming services cost you." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private ServiceDirectory? directory;
+    private MyServices? mine;
+    private ServicesReport? report;
+    private HashSet<string> picked = [];
+    private bool changed;
+    private bool saving;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // All three at once; the report answers 403 when the plan doesn't allow it, which only matters then.
+            var directoryTask = Analytics.GetServiceDirectoryAsync();
+            var reportTask = Analytics.GetServicesReportAsync();
+            mine = await Analytics.GetMyServicesAsync();
+            directory = await directoryTask;
+            picked = mine?.Services.ToHashSet() ?? [];
+            changed = false;
+            if (mine is { Allowed: true })
+            {
+                report = await reportTask;
+            }
+            else
+            {
+                report = null;
+                _ = reportTask.ContinueWith(t => t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Toggle(string key, bool on)
+    {
+        if (on)
+        {
+            picked.Add(key);
+        }
+        else
+        {
+            picked.Remove(key);
+        }
+        changed = !picked.SetEquals(mine?.Services ?? []);
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+        try
+        {
+            await Analytics.SetMyServicesAsync(picked);
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private static string Tone(string verdict) => verdict switch
+    {
+        "value" => "good",
+        "pricey" => "warn",
+        "pause" => "bad",
+        _ => "info"
+    };
+
+    private static string Verdict(ServiceUse use) => use.Verdict switch
+    {
+        "value" => use.CostPerHour is { } perHour ? $"Good value: {Format.Usd(perHour)} an hour" : "In use",
+        "pricey" => $"Pricey: {Format.Usd(use.CostPerHour!.Value)} an hour",
+        "quiet" => "Nothing watched lately, but your shows are coming",
+        "pause" => "Could pause: nothing watched, nothing coming",
+        "free" => "Free, so nothing to weigh",
+        _ => "No known price, so no cost per hour"
+    };
+
+    private static string Facts(ServiceUse use) =>
+        $"{(use.MonthlyUsd is { } usd ? usd == 0 ? "Free" : $"{Format.Usd(usd)} a month" : "Price unknown")} · {Format.Hours(use.Minutes)} watched";
+
+    private RenderFragment Shows(IReadOnlyList<ServiceShow> shows, Func<ServiceShow, string> detail) => __builder =>
+    {
+        for (var i = 0; i < shows.Count; i++)
+        {
+            var show = shows[i];
+            <a href="shows/@show.ShowId">@show.Title</a>
+            <span class="muted">@($"{(detail(show) is { Length: > 0 } d ? $" ({d})" : "")}{(i < shows.Count - 1 ? ", " : "")}")</span>
+        }
+    };
+}

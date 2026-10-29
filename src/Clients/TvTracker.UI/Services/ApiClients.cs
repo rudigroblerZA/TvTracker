@@ -44,6 +44,29 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<FeatureFlagSetting?> SetFeatureFlagAsync(string key, bool? on, CancellationToken ct = default) =>
         SendAsync<FeatureFlagSetting>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/flags/{Uri.EscapeDataString(key)}", new { On = on }, ct);
 
+    /// <summary>The caller's family; null while the family-plan flag is off.</summary>
+    public Task<FamilyInfo?> GetFamilyAsync(CancellationToken ct = default) =>
+        GetAsync<FamilyInfo>(ApiClients.Identity, "api/v1/me/family", ct);
+
+    public Task<FamilyInviteLink?> CreateFamilyInviteAsync(CancellationToken ct = default) =>
+        SendAsync<FamilyInviteLink>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/family/invite", null, ct);
+
+    public Task DeleteFamilyInviteAsync(CancellationToken ct = default) =>
+        SendAsync(ApiClients.Identity, HttpMethod.Delete, "api/v1/me/family/invite", null, ct);
+
+    public Task RemoveFamilyMemberAsync(string userId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Identity, HttpMethod.Delete, $"api/v1/me/family/members/{Uri.EscapeDataString(userId)}", null, ct);
+
+    public Task LeaveFamilyAsync(CancellationToken ct = default) =>
+        SendAsync(ApiClients.Identity, HttpMethod.Delete, "api/v1/me/family/membership", null, ct);
+
+    /// <summary>Who an invite link is from; null when it's turned off or wrong.</summary>
+    public Task<FamilyInvite?> GetFamilyInviteAsync(string token, CancellationToken ct = default) =>
+        GetAsync<FamilyInvite>(ApiClients.Identity, $"api/v1/family/invites/{Uri.EscapeDataString(token)}", ct);
+
+    public Task<FamilyInfo?> JoinFamilyAsync(string token, CancellationToken ct = default) =>
+        SendAsync<FamilyInfo>(ApiClients.Identity, HttpMethod.Post, "api/v1/family/join", new { token }, ct);
+
     /// <summary>The caller's plan; null while the plans flag is off.</summary>
     public Task<UserPlan?> GetMyPlanAsync(CancellationToken ct = default) =>
         GetAsync<UserPlan>(ApiClients.Identity, "api/v1/me/plan", ct);
@@ -85,6 +108,13 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    /// <summary>Guess the show for a day (the device's date); null while the flag is off or there's no puzzle that day.</summary>
+    public Task<Puzzle?> GetPuzzleAsync(DateOnly date, CancellationToken ct = default) =>
+        GetAsync<Puzzle>(ApiClients.Catalog, $"api/v1/puzzles/{date:yyyy-MM-dd}", ct);
+
+    public Task<PuzzleGuess?> GuessPuzzleAsync(DateOnly date, Guid showId, int attempt, CancellationToken ct = default) =>
+        SendAsync<PuzzleGuess>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/puzzles/{date:yyyy-MM-dd}/guesses", new { showId, attempt }, ct);
+
     public Task<List<HolidaySummary>?> GetHolidaysAsync(CancellationToken ct = default) =>
         GetAsync<List<HolidaySummary>>(ApiClients.Catalog, "api/v1/holidays", ct);
 
@@ -207,6 +237,17 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
     /// <param name="shared">Share it on Social; null leaves it as it is.</param>
     public Task UpdateListAsync(Guid id, string name, string? description, bool? shared = null, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Put, $"api/v1/lists/{id}", new { name, description, shared }, ct, queueIfOffline: true);
+
+    /// <summary>Gives a list a link anyone can open, or returns the one it has.</summary>
+    public Task<ListLink?> CreateListLinkAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ListLink>(ApiClients.Tracking, HttpMethod.Post, $"api/v1/lists/{id}/link", null, ct);
+
+    public Task DeleteListLinkAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{id}/link", null, ct);
+
+    /// <summary>The list a link opens; null when the link was turned off or never existed. Needs no sign-in.</summary>
+    public Task<LinkedList?> GetLinkedListAsync(string token, CancellationToken ct = default) =>
+        GetAsync<LinkedList>(ApiClients.Tracking, $"api/v1/linked-lists/{Uri.EscapeDataString(token)}", ct);
 
     public Task DeleteListAsync(Guid id, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/lists/{id}", null, ct, queueIfOffline: true);
@@ -385,12 +426,38 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
     /// <summary>Running shows the user is caught up on, with when each is back.</summary>
+    public Task<ShowCall?> GetShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowCall>(ApiClients.Analytics, $"api/v1/shows/{showId}/call", ct);
+
+    public Task<ShowCall?> SetShowCallAsync(Guid showId, double rating, CancellationToken ct = default) =>
+        SendAsync<ShowCall>(ApiClients.Analytics, HttpMethod.Put, $"api/v1/shows/{showId}/call", new { rating }, ct);
+
+    public Task DeleteShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Analytics, HttpMethod.Delete, $"api/v1/shows/{showId}/call", null, ct);
+
+    /// <summary>The user's season calls, their record against the model, and followed shows to call next.</summary>
+    public Task<MyCalls?> GetMyCallsAsync(CancellationToken ct = default) =>
+        GetAsync<MyCalls>(ApiClients.Analytics, "api/v1/me/calls", ct);
+
     public Task<WaitingRoom?> GetWaitingRoomAsync(CancellationToken ct = default) =>
         GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 
     /// <summary>Network report cards, most shows first, with the whole catalog as the baseline.</summary>
     public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>
         GetAsync<NetworkReportCards>(ApiClients.Analytics, "api/v1/insights/networks", ct, cacheForOffline: true);
+
+    /// <summary>The services behind the networks, logos and prices; null while the your-services flag is off.</summary>
+    public Task<ServiceDirectory?> GetServiceDirectoryAsync(CancellationToken ct = default) =>
+        GetAsync<ServiceDirectory>(ApiClients.Analytics, "api/v1/networks/services", ct, cacheForOffline: true);
+
+    public Task<MyServices?> GetMyServicesAsync(CancellationToken ct = default) =>
+        GetAsync<MyServices>(ApiClients.Analytics, "api/v1/me/services", ct);
+
+    public Task<MyServices?> SetMyServicesAsync(IReadOnlyCollection<string> services, CancellationToken ct = default) =>
+        SendAsync<MyServices>(ApiClients.Analytics, HttpMethod.Put, "api/v1/me/services", new { services }, ct);
+
+    public Task<ServicesReport?> GetServicesReportAsync(CancellationToken ct = default) =>
+        GetAsync<ServicesReport>(ApiClients.Analytics, "api/v1/me/services/report", ct);
 
     /// <summary>The user's year in TV; the latest year with viewing when <paramref name="year"/> is null.</summary>
     public Task<YearInTv?> GetYearInTvAsync(int? year, string? timeZone, CancellationToken ct = default)

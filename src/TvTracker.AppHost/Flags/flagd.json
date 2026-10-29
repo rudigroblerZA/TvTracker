@@ -151,6 +151,18 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "call-it": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Call it: predict a season's rating before it premieres, and see whether you beat the forecast model." }
+    },
+    "show-puzzle": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Guess the show: a daily puzzle, one popular show found in six guesses with clues." }
+    },
     "season-verdict": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
@@ -222,6 +234,24 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
+    },
+    "your-services": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Your services (Plus and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards." }
+    },
+    "family-plan": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Family plan: the owner invites up to 5 people by link, and each gets Plus's benefits from the one subscription." }
+    },
+    "list-links": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "List links: a list's owner makes a link anyone can open, signed in or not, showing the list read-only." }
     },
     "plans": {
       "state": "ENABLED",

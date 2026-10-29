@@ -118,6 +118,7 @@ public static class EmbeddingModels
     public const string MiniLm = "all-MiniLM-L6-v2";
     public const string BgeSmall = "bge-small-en-v1.5";
     public const string DockerNomic = "dmr/nomic-embed-text-v1.5";
+    public const string DockerQwen3 = "dmr/qwen3-embedding-0.6b";
 
     /// <summary>
     /// Docker Model Runner's OpenAI-compatible API, as seen from the host.
@@ -176,6 +177,25 @@ public static class EmbeddingModels
             QueryPrefix = "search_query: ",
             DocumentPrefix = "search_document: ",
             MaxDistance = 0.38
+        },
+        // The default. Served by Docker Model Runner (docker model pull ai/qwen3-embedding:0.6b; Q8, ~640 MB). 1024
+        // dimensions, trained to be shortened (MRL), so it's cut to the column's 384. Instruction-aware: search terms
+        // take an "Instruct: …\nQuery:" line, show text none. On 41 test searches over 846 shows it put the expected
+        // show first for 30 and in the top 3 for 34 (MRR 0.78; nomic 18, 27 and 0.57), at ~130 ms a search on a CPU.
+        // Expected shows land around 0.40 (90th percentile 0.455), unrelated searches ("knitting patterns for
+        // beginners") from 0.463. A batch of 32 shows takes ~25 s on 4 cores, so the first embedding of the catalog
+        // takes about eight minutes.
+        [DockerQwen3] = new()
+        {
+            Id = DockerQwen3,
+            Source = EmbeddingSource.Server,
+            ServedModel = "ai/qwen3-embedding:0.6b",
+            Pull = true,
+            Dimensions = 384,
+            Truncate = true,
+            MaxTokens = 512,
+            QueryPrefix = "Instruct: Given a description of a TV show, find TV shows that match it\nQuery:",
+            MaxDistance = 0.46
         }
     };
 }

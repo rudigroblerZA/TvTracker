@@ -22,6 +22,49 @@ namespace Identity.API.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Identity.API.Data.Family", b =>
+                {
+                    b.Property<string>("OwnerUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InviteToken")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("OwnerUserId");
+
+                    b.HasIndex("InviteToken")
+                        .IsUnique()
+                        .HasFilter("\"InviteToken\" IS NOT NULL");
+
+                    b.ToTable("families", (string)null);
+                });
+
+            modelBuilder.Entity("Identity.API.Data.FamilyMember", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("JoinedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("family_members", (string)null);
+                });
+
             modelBuilder.Entity("Identity.API.Data.UserProfile", b =>
                 {
                     b.Property<string>("UserId")
@@ -39,6 +82,16 @@ namespace Identity.API.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("EffectivePlan")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("free");
+
+                    b.Property<DateTime?>("EffectivePlanChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)

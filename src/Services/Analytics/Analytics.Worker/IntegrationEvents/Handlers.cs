@@ -489,5 +489,50 @@ public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventH
         await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Watches.Where(w => w.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Follows.Where(f => f.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.Plans.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.UserServices.Where(s => s.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.SeasonCalls.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
+    }
+}
+
+/// <summary>
+/// Keeps <see cref="UserPlanCopy"/> from Identity's plan changes and daily profile snapshot (which heals a lost change),
+/// for the plan's limits on Analytics.API's endpoints. The newest by Identity's change time wins.
+/// </summary>
+public sealed class PlanHandlers(AnalyticsContext db)
+    : IIntegrationEventHandler<UserPlanChangedIntegrationEvent>, IIntegrationEventHandler<UserProfileSnapshotIntegrationEvent>
+{
+    public Task HandleAsync(UserPlanChangedIntegrationEvent e, CancellationToken ct) =>
+        ApplyAsync(e, e.UserId, e.Plan, e.ChangedAtUtc, ct);
+
+    // A snapshot from before plans existed carries none; a plan never changed is free since sign-up, as old as can be.
+    public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
+        e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
+
+    private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
+    {
+        var handler = $"{nameof(PlanHandlers)}.{e.GetType().Name}";
+        if (await db.HasProcessedAsync(e, handler, ct))
+        {
+            return;
+        }
+
+        var copy = await db.Plans.FindAsync([userId], ct);
+        if (copy is null)
+        {
+            // Free with no change is what no row already means.
+            if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+            {
+                db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+            }
+        }
+        else if (changedAt >= copy.ChangedAtUtc)
+        {
+            copy.Plan = plan;
+            copy.ChangedAtUtc = changedAt;
+        }
+
+        db.MarkProcessed(e, handler);
+        await db.SaveChangesAsync(ct);
     }
 }

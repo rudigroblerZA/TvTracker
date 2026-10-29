@@ -35,6 +35,8 @@ public static class FeatureFlags
     public const string Corrections = "corrections";
     public const string KnownFaces = "known-faces";
     public const string HolidayEpisodes = "holiday-episodes";
+    public const string ShowPuzzle = "show-puzzle";
+    public const string CallIt = "call-it";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
@@ -52,6 +54,9 @@ public static class FeatureFlags
     public const string Mixtape = "mixtape";
     public const string WorthIt = "worth-it";
     public const string Plans = "plans";
+    public const string ListLinks = "list-links";
+    public const string YourServices = "your-services";
+    public const string FamilyPlan = "family-plan";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

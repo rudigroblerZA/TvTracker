@@ -1,0 +1,16 @@
+@* A streaming service's logo (its site icon, sent inline by Analytics), or the network's initials when there's none. *@
+@if (Service?.Logo is { } logo)
+{
+    <img class="service-logo" src="@logo" alt="" width="24" height="24" loading="lazy" />
+}
+else
+{
+    <span class="service-logo initials" aria-hidden="true">@Initials</span>
+}
+
+@code {
+    [Parameter] public ServiceInfo? Service { get; set; }
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+
+    private string Initials => new(Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])).ToArray());
+}

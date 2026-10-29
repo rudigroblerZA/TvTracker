@@ -777,3 +777,51 @@ h1:focus, h2:focus { outline: none; }
 .plan-features { padding-left: 18px; margin: 0 0 10px; display: grid; gap: 4px; }
 .plan-users { list-style: none; padding: 0; display: grid; gap: 8px; }
 .plan-users li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* A list's link, under its title */
+.list-link { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 12px; }
+.list-link-url { flex: 1 1 260px; min-width: 0; font-size: 0.85rem; }
+
+/* Service logos and prices on network report cards, and the your-services page */
+.network-head { display: flex; align-items: center; gap: 8px; }
+.network-head h2 { margin: 0; flex: 1; min-width: 0; }
+.service-logo { width: 24px; height: 24px; border-radius: 6px; flex: none; object-fit: contain; background: light-dark(#ffffff, #f5f5f4); }
+.service-logo.initials { display: inline-grid; place-items: center; font-size: 0.65rem; font-weight: 700; color: var(--muted); background: var(--border); }
+.network-price { margin: 4px 0 6px; color: var(--muted); }
+.network-card.owned { border-color: var(--good); }
+.owned-tag { color: var(--good); border-color: currentColor; }
+.service-picks { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); margin: 12px 0; }
+.service-pick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.service-pick.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.service-pick input { margin: 0; }
+.service-pick span { display: grid; min-width: 0; }
+.service-uses { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.service-use { border-left: 4px solid var(--tone); }
+.service-total { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; margin: 8px 0 16px; }
+.service-total strong { font-size: 1.6rem; }
+
+/* Guess the show */
+.puzzle-head { margin-bottom: 8px; }
+.puzzle-clues { margin: 0 0 12px; padding-left: 18px; }
+.puzzle-clues li { margin: 2px 0; }
+.puzzle-answer { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 12px; }
+.puzzle-answer.won { border-color: var(--good); }
+.puzzle-answer.lost { border-color: var(--bad); }
+.puzzle-answer p { margin: 0 0 6px; }
+.puzzle-grid { font-size: 1.2rem; letter-spacing: 2px; }
+.puzzle-guesses { list-style: none; padding: 0; margin: 12px 0 8px; display: grid; gap: 8px; }
+.puzzle-guess { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.puzzle-guess.correct { border-color: var(--good); }
+.puzzle-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.puzzle-chip { font-size: 0.85rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.puzzle-chip.hit { color: var(--good); border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
+.puzzle-chip.near { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+
+/* Call it */
+.call-input { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.call-input input[type=range] { flex: 1 1 180px; min-width: 0; }
+.call-value { font-size: 1.3rem; min-width: 2.5em; text-align: center; }
+.call-list li { padding: 8px 0 8px 10px; border-left: 3px solid var(--border); margin-bottom: 6px; }
+.call-row.won { border-left-color: var(--good); }
+.call-row.lost { border-left-color: var(--warn); }
+

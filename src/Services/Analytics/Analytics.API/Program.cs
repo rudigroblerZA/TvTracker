@@ -15,6 +15,11 @@ builder.Services.AddDatabaseInitializer<AnalyticsContext>();
 // In memory only: the time machine's weeks, the same for everyone in a time zone on a given day.
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton(TimeProvider.System);
+// Service logos (ServicesApi): one try each, without ServiceDefaults' retries, so a slow or refusing favicon service
+// doesn't hold the directory up.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddHttpClient("logos", client => client.Timeout = TimeSpan.FromSeconds(10)).RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 

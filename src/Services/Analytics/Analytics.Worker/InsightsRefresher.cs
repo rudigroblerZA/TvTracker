@@ -40,6 +40,17 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
             {
                 logger.LogError(ex, "Computing insights failed; will retry at the next interval");
             }
+
+            // After the documents, whose season verdicts say a season is over; on its own, so one failing doesn't stop the other.
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<SeasonCallScorer>().ScoreAsync(stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Scoring season calls failed; will retry at the next interval");
+            }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }

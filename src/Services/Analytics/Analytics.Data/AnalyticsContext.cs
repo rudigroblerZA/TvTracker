@@ -17,6 +17,9 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<UserEpisodeRating> EpisodeRatings => Set<UserEpisodeRating>();
     public DbSet<UserEpisodeWatch> Watches => Set<UserEpisodeWatch>();
     public DbSet<UserFollow> Follows => Set<UserFollow>();
+    public DbSet<UserPlanCopy> Plans => Set<UserPlanCopy>();
+    public DbSet<UserService> UserServices => Set<UserService>();
+    public DbSet<SeasonCall> SeasonCalls => Set<SeasonCall>();
 
     public DbSet<ShowInsightsRow> ShowInsights => Set<ShowInsightsRow>();
     public DbSet<PremiereRow> Premieres => Set<PremiereRow>();
@@ -169,6 +172,32 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.ToTable("creator_fingerprints");
             entity.HasKey(p => p.PersonId);
             entity.Property(p => p.Document).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<UserPlanCopy>(entity =>
+        {
+            entity.ToTable("user_plans");
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.UserId).HasMaxLength(64);
+            entity.Property(p => p.Plan).HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<UserService>(entity =>
+        {
+            entity.ToTable("user_services");
+            entity.HasKey(s => new { s.UserId, s.ServiceKey });
+            entity.Property(s => s.UserId).HasMaxLength(64);
+            entity.Property(s => s.ServiceKey).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<SeasonCall>(entity =>
+        {
+            entity.ToTable("season_calls");
+            entity.HasKey(c => new { c.UserId, c.ShowId, c.SeasonNumber });
+            entity.Property(c => c.UserId).HasMaxLength(64);
+            // The crowd's call per season, and the scorer's unscored calls.
+            entity.HasIndex(c => new { c.ShowId, c.SeasonNumber });
+            entity.HasIndex(c => c.ScoredAtUtc).HasFilter("\"ScoredAtUtc\" IS NULL");
         });
 
         modelBuilder.Entity<NetworkReportRow>(entity =>

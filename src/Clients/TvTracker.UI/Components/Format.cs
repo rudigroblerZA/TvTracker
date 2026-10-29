@@ -73,6 +73,9 @@ public static class Format
     /// <summary>A 0-1 share as a whole percentage, e.g. "42%".</summary>
     public static string Percent(double share) => $"{share * 100:0}%";
 
+    /// <summary>"$8.99", in US dollars whatever the device's culture, since the prices are US prices.</summary>
+    public static string Usd(decimal amount) => amount.ToString("$0.00", System.Globalization.CultureInfo.InvariantCulture);
+
     /// <summary>New follows in the last four weeks compared with the four before, e.g. "+12 in 4 weeks (up 50%)".</summary>
     public static string Growth(int recent, int previous) =>
         recent == 0 ? "no new follows in 4 weeks"

@@ -19,7 +19,9 @@
         }
         else
         {
-            <p>You're on <strong>@plan.Name</strong>@(plan.ChangedAtUtc is { } changed ? $" since {changed:d MMM yyyy}" : "").</p>
+            <p>
+                You're on <strong>@plan.Name</strong>@(plan.ChangedAtUtc is { } changed ? $" since {changed:d MMM yyyy}" : "")@(plan.Plan == Plans.Family && plan.Purchased != Plans.Family ? ", through a family you're in" : "").
+            </p>
 
             @* Both columns come from the shared Plans limits, so this table says what the services enforce. *@
             <div class="plan-grid">
@@ -30,7 +32,15 @@
                         <h2>@Plans.Name(key)</h2>
                         <ul class="plan-features">
                             <li>@(limits.MaxLists is { } max ? $"Up to {max} lists" : "As many lists as you like")</li>
-                            <li>@(limits.ShareLists ? "Share lists on your profile" : "Lists are just for you")</li>
+                            <li>@(limits.ShareLists ? "Share lists on your profile or by link" : "Lists are just for you")</li>
+                            @if (limits.TrackServices)
+                            {
+                                <li>Your services: what each streaming service costs per hour you watch</li>
+                            }
+                            @if (key == Plans.Family)
+                            {
+                                <li>@($"Shared with up to {Plans.FamilyMembers} people you invite")</li>
+                            }
                             <li>Everything else in @Brand.AppName</li>
                         </ul>
                         @if (key == plan.Plan)
@@ -41,9 +51,12 @@
                 }
             </div>
 
-            @if (plan.Plan != Plans.Plus)
+            <Feature Flag="@FeatureFlags.FamilyPlan">
+                <p><a href="settings/family">Your family</a><span class="muted small">@(plan.Purchased == Plans.Family ? " · invite people to share your plan" : " · join a family, or see who's in yours")</span></p>
+            </Feature>
+            @if (plan.Plan == Plans.Free)
             {
-                <p class="muted small">Upgrading in the app isn't available yet. Until it is, an admin can move you to @Plans.Name(Plans.Plus).</p>
+                <p class="muted small">Upgrading in the app isn't available yet. Until it is, an admin can move you to @Plans.Name(Plans.Plus) or @Plans.Name(Plans.Family), or someone on @Plans.Name(Plans.Family) can invite you.</p>
             }
         }
     </Authorized>

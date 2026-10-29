@@ -120,21 +120,26 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Search
 
 - **Order:** title matches first (most popular first), then up to 30 semantic matches with cosine distance < 0.65.
-- **Embeddings:** dmr/nomic-embed-text-v1.5 on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
+- **Embeddings:** dmr/qwen3-embedding-0.6b on Docker Model Runner by default (the AppHost's `Embeddings:Model`),
   or all-MiniLM-L6-v2 / bge-small run in-process with ONNX Runtime and Microsoft.ML.Tokenizers (`Catalog.Embeddings`).
   - Either way the model is exposed as `IEmbeddingGenerator<string, Embedding<float>>`, L2-normalised, 384 dimensions.
   - ONNX models are downloaded from Hugging Face at a pinned commit, sha256-checked, and cached under LocalApplicationData.
   - Until it loads, search is title-only.
   - **Configurable model:** `Embeddings:Model` picks an `EmbeddingModel` (files and checksums, pooling, prefixes,
     cutoff). Built in: all-MiniLM-L6-v2 (mean pooling, cutoff 0.65) and bge-small-en-v1.5 (CLS pooling,
-    an instruction prefix on search terms, cutoff 0.45), plus dmr/nomic-embed-text-v1.5 on Docker Model Runner
+    an instruction prefix on search terms, cutoff 0.45), plus dmr/qwen3-embedding-0.6b (the default; an instruction
+    on search terms, truncated from 1024, cutoff 0.46) and dmr/nomic-embed-text-v1.5 on Docker Model Runner
     (the AppHost's default; task prefixes, truncated from 768, cutoff 0.38). With no configuration at all (services run
     outside the AppHost), `EmbeddingOptions.Model` falls back to all-MiniLM-L6-v2, which needs no server. The AppHost sets it on Catalog.API and the sync worker
     together; search only compares vectors made by the current model.
   - **Cutoffs are per model:** each model spreads distances differently, so `MaxDistance` was tuned on test
     searches, between the expected shows and unrelated searches. Both cutoffs held when the catalog grew from 150 to
-    595 shows (42 searches): MiniLM ranks best (MRR 0.74; bge-small 0.68, nomic 0.63). The default is nomic on
-    Docker Model Runner anyway, by choice: the model runs out of process and can be swapped for any Docker Hub model.
+    595 shows (42 searches): MiniLM ranked best then (MRR 0.74; bge-small 0.68, nomic 0.63). The default runs on
+    Docker Model Runner by choice: the model runs out of process and can be swapped for any Docker Hub model.
+  - **Qwen3-Embedding 0.6B replaced nomic** as the default: on 41 searches over 846 shows, MRR 0.78 against 0.57 (top-1
+    30 against 18), and unrelated searches stayed at 0.463 or further while expected shows' 90th percentile was 0.455,
+    so the cutoff is 0.46. MiniLM wasn't rerun on that set. It costs ~640 MB, ~130 ms a search and about eight minutes to
+    embed the catalog on 4 CPU cores. The 8B model (README, "Not built yet") needs a GPU to be practical.
   - **Model servers:** `Source: Server` models are called over the OpenAI embeddings API by
     `ServerEmbeddingGenerator`. Docker Model Runner (`http://localhost:12434/engines/v1/`) is the default endpoint.
     - It uses its own `HttpClient`, without the standard resilience handler, so a server that's down doesn't add
@@ -244,7 +249,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `ShowNanogenresChangedIntegrationEvent` (all shows on its first run after start and daily, so lost events heal).
   - **Waits for embeddings:** it runs only once 80% of shows are embedded by the current model, else retries in 15
     minutes. Run on a fresh catalog or just after a model change, it found almost no clusters and wiped them all.
-  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38) + 0.6 ×
+  - **Distance:** 0.4 × text-embedding distance (scaled by the model's `MaxDistance` against nomic's 0.38, the model it
+    was tuned with) + 0.6 ×
     genre/type distance. With text alone, Ted Lasso's nearest shows were Scrubs and The Lincoln Lawyer: the
     summaries are only loosely topical.
   - **Clustering:** average-linkage, by the nearest-neighbour chain (O(n²)), cut at 0.25. Groups over 30 shows are
@@ -344,6 +350,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     are kept as ratios of (wait + 30 days), since they grow with the wait. It needs two past waits.
   - **When there's no forecast:** none for ended shows. Renewal and timing are only forecast between seasons with
     nothing scheduled or announced; a scheduled season is a fact (`NextPremiere`).
+- **Call it** (`CallItApi`, `season_calls`): a user's prediction of a running show's next season's rating, against the
+  rating forecast.
+  - **Which season:** the one after the latest to air (the first, for a show yet to air), open until its first episode
+    airs. There's no "locked" flag: once it airs, the open season becomes the next one, and the call reads as airing.
+  - **The model's rating is stored with the call** (as it stood when called or changed): the forecast moves as the show
+    airs, and "beat the model" should compare like with like. No forecast for that season, no comparison.
+  - **Anchoring:** the panel shows the model and the crowd only after a call. The Outlook card on the same page shows
+    the forecast anyway; hiding it would take a feature away, so the guard is only the panel's own order.
+  - **Scoring in the worker** (`SeasonCallScorer`, after each insights run): over means the season verdict called it,
+    a later season aired, or the show ended, with 3+ rated episodes; the actual is the season average to 2 decimals,
+    as the verdict computes it. A season that never gets a verdict (daily shows, too few ratings) waits for the next
+    season or the ending.
+  - **Written by two services' processes** in one database: Analytics.API writes calls, Analytics.Worker scores them.
+    Both are Analytics, so the one-database-per-service rule holds. Calls are deleted with the account and in the
+    data export.
+  - **Privacy:** the crowd's average needs 5 callers, and includes the caller's own call.
+  - **Tested** by seeding calls on finished seasons: Ted Lasso's season 4 scored 7.93, the season verdict's figure, and
+    six callers on Silo's season 4 gave a crowd average of 7.7.
 - **Will you finish it?** (`FinishOutlookApi`): computed on request from the caller's own watches.
   - **No probability:** per-person history is too thin for an honest one.
   - **What it gives:** the facts that decide it: pace, projected finish, on-track/slowing/stalled (14 and 30 days),
@@ -666,6 +690,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   outbox on every change, and `ListUnsharedIntegrationEvent` when it's unshared or deleted. Social keeps a copy and
   serves it under the profile rule. Updates carry `UpdatedAtUtc`, and an older one is ignored, since events can arrive
   out of order. Tracking's snapshot carries shared lists too (an optional trailing parameter), so a lost event heals.
+- **List links** (Tracking, `UserList.LinkToken`, `list-links` flag): a list's owner can make a link anyone opens,
+  signed in or not (`GET /api/v1/linked-lists/{token}`, anonymous).
+  - **In Tracking, not Social:** the link shows the list as Tracking has it, with no owner, so it needs neither Social's
+    copy nor its `Visibility`. A private profile or a block doesn't stop a link, by design: sending it is the owner's
+    choice, like sharing a document by link.
+  - **The token is the access:** 128 random bits (22 characters, base64url), unique, so links can't be enumerated and no
+    rate limit is needed for that. Turning the link off clears it; a new link gets a new token, so old copies stop working.
+  - **Address:** the UI builds `/l/{token}` on `IPlatformServices.PublicWebAddress`: the browser's base on the web, the
+    configured web address on the phone, since the app's own address means nothing to whoever receives the link.
 - **Tracking's migrations:** Tracking moved off `EnsureCreated` for the list `Shared` column. Its `InitialCreate` baseline
   was applied to a scratch database and diffed (`pg_dump -s`) against a database `EnsureCreated` made: identical.
 
@@ -718,6 +751,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
 - **Flag:** checked once per run without a user, so it can't target some users only.
 
+## Guess the show
+
+- **No table** (`PuzzleApi` on Catalog.API): the day's show is the pool's lowest SHA-256 of date and show id, skipping
+  the first choices of the 30 days before, so any process works it out alone and a show doesn't come back within a month.
+  Once chosen, a day's answer is cached for two days (HybridCache, so Redis shares it), and a pool change mid-day doesn't
+  move it.
+- **The pool:** popularity 99+, rated 7.5+, English, scripted or animated, a premiere date and two credited characters:
+  ~230 shows. Popularity 95 and 7.0 gave 437, and a sample of 30 included Tehran and Maigret, which few would name.
+- **Stateless, on trust:** the client says which attempt a guess is and gets the answer after the sixth, so the answer
+  can be had by asking; it's a game. Guesses and the record live on the device (`IPlatformServices` preferences, like the
+  spoiler shield), so it needs no account and no column anywhere.
+- **Clues don't give it away:** a name sharing a word of four letters or more with the title is skipped, and the lead's
+  character is left off when it does (Grey's Anatomy's lead is "Ellen Pompeo", not "as Meredith Grey"). The lead is the
+  first-billed safe name; the character clue is someone else's.
+- **Close** means within 3 years, one season, or another network on the same streaming service (`NetworkServices`).
+- **The shared grid** marks a miss amber when three or more of the seven comparisons matched or were close.
+
 ## Holiday episodes
 
 - **Found, not curated** (`HolidayApi` on Catalog.API): a Postgres regex per holiday over episode titles and summaries,
@@ -766,6 +816,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Identity already orchestrates account-wide things (deletion, export). A change goes out as
   `UserPlanChangedIntegrationEvent` through the outbox, and every plan rides the daily `UserProfileSnapshot` (optional
   trailing `Plan` and `PlanChangedAtUtc`), so a lost change heals.
+- **Effective plans** (`UserProfile.EffectivePlan`, `PlanState`): other services are only ever sent the plan a user
+  gets, never what they pay for, so a family member's copy says "family" (Plus's limits) and enforcement needs no idea
+  of families. `PlanState.RecomputeAsync` runs in the same save as anything that can move it (a plan set, a join, a
+  leave, a removal, an owner's deletion) and adds an event for each person whose plan moved; it reads memberships and
+  owners' plans as they'll be after the save, so one save carries the change and its events.
+- **Families** (`families`, `family_members`): one per owner, a person in at most one, an owner with members can't join
+  another, 5 members (`Plans.FamilyMembers`). The invite link is 128 random bits, like a list's; members see the owner's
+  name and each other's names only. A family ends with its owner's plan or account; members fall back to what they pay for.
+  - **Members don't invite:** joining turns off the joiner's own (empty) family's link, and a member asking for one gets
+    409; otherwise a Family payer could own a family while in another, and the page would show them only as a member.
+  - **Seats under a lock:** a join runs in a transaction holding the family's row (`FOR UPDATE`), so two people taking
+    the last seat at once can't both get in. Checked with three joins at once for one seat: one 200, two 409.
 - **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
   every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
   since events can arrive out of order; no row means free.
@@ -774,14 +836,37 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   the identity provider. A copy applies in seconds.
 - **Shared definition:** `Plans.Limits` is linked into the UI, so the plan page, the lists page and Tracking state the
   same limits.
+- **Sharing is free now:** Free started with no sharing, then sharing (profile and links) opened to every plan, since
+  shared lists bring people in. `PlanLimits.ShareLists` stays, and Tracking still checks it, so a plan can lose sharing
+  again by changing one value.
 - **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
   already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
   people's work.
 - **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
 - **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
+- **Analytics keeps a copy too** (`user_plans`, from the same events), for Your services.
 - **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
   applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
   Identity now reads flags, so the AppHost gives it flagd.
+
+## Your services
+
+- **A hand-kept directory** (`NetworkServices` in IntegrationEvents, linked into the UI): each catalog network's
+  streaming home, its site and the cheapest US plan's price, with the date it was checked. TVmaze gives a network's name
+  and nothing else. US broadcast networks map to the service their shows stream on, and are marked free over the air.
+  A price that couldn't be confirmed is left null rather than guessed.
+- **Logos inline:** Analytics.API fetches each service's icon through Google's favicon service once a week (HybridCache)
+  and sends them as `data:` URIs, so browsers and the phone never ask a third party (or need a route to Analytics) for an
+  image. Only the directory's domains are fetched.
+- **In Analytics:** the report needs watches, follows, upcoming episodes and each show's network, which only Analytics
+  has together. The services a user picks (`user_services`) are written by Analytics.API, the one table there a user
+  writes; they're deleted with the account and included in the data export (Analytics now has `/me/export`).
+- **Cost per hour** = the month's price over the hours watched on it in the last 30 days, bulk marks left out. Over $2
+  an hour (a rental) is pricey; nothing watched and none of the user's followed shows airing on it in the next 30 days
+  means it could be paused. A free or unpriced service gets "free" / "unpriced" instead: no cost to weigh, nothing to pause.
+- **Limit behind `plans`:** like Tracking's, the Plus limit applies only while the `plans` flag is on for the caller.
+- **Logos:** the favicon client has ServiceDefaults' retries removed (one try each, as Research's sources), and a fetch
+  that missed any logo is cached 15 minutes rather than the week.
 
 ## Feature flags
 

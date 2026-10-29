@@ -167,7 +167,16 @@ public record ListSummary(Guid Id, string Name, string? Description, int ItemCou
 public record ListItem(Guid ShowId, string? Title, string? PosterUrl, int Position, DateTime AddedAtUtc);
 
 /// <param name="Shared">Shown on the owner's Social page to the people who can see them.</param>
-public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false);
+/// <param name="LinkToken">The secret in the list's link; null without one.</param>
+public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false,
+    string? LinkToken = null);
+
+/// <summary>A list as its link shows it to anyone: no owner.</summary>
+public record LinkedList(string Name, string? Description, IReadOnlyList<LinkedListItem> Items, DateTime UpdatedAtUtc);
+
+public record LinkedListItem(Guid ShowId, string? Title, string? PosterUrl);
+
+public record ListLink(string Token);
 
 // Ratings
 
@@ -738,7 +747,86 @@ public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists,
 }
 
 /// <summary>The caller's plan, from Identity.</summary>
-public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc);
+/// <param name="Plan">The plan they get: their own, or the family plan they're in.</param>
+/// <param name="Purchased">The plan they pay for themselves.</param>
+public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc, string Purchased = "free",
+    bool TrackServices = false);
+
+/// <param name="Role">"owner", "member" or "none".</param>
+/// <param name="Active">Whether the owner pays for the family plan now.</param>
+/// <param name="InviteToken">The invite link's secret, for the owner; null while invites are off.</param>
+public record FamilyInfo(string Role, bool Active, string? OwnerName, IReadOnlyList<FamilyMemberInfo> Members, int Seats, string? InviteToken);
+
+/// <param name="UserId">Given to the owner only, to remove them.</param>
+public record FamilyMemberInfo(string? UserId, string DisplayName, DateTime JoinedAtUtc);
+
+public record FamilyInvite(string OwnerName, int SeatsLeft, bool Active);
+
+public record FamilyInviteLink(string Token);
 
 /// <summary>A user on the admins' plans page.</summary>
 public record PlanUser(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);
+
+/// <summary>The streaming services behind the networks, with logos and estimated prices.</summary>
+public record ServiceDirectory(string PricesAsOf, string PricesSource, IReadOnlyList<ServiceInfo> Services)
+{
+    public ServiceInfo? ForNetwork(string network) =>
+        Services.FirstOrDefault(s => s.Networks.Contains(network, StringComparer.OrdinalIgnoreCase));
+}
+
+/// <param name="MonthlyUsd">Cheapest US plan a month; 0 free; null unknown.</param>
+/// <param name="Logo">The icon as a data: URI; null when it couldn't be fetched.</param>
+public record ServiceInfo(string Key, string Name, decimal? MonthlyUsd, string? Note, string? Logo, IReadOnlyList<string> Networks);
+
+/// <param name="Allowed">Whether the user's plan lets them keep services.</param>
+public record MyServices(string Plan, bool Allowed, IReadOnlyList<string> Services);
+
+/// <summary>What the user's services cost per hour they watch, over the last and next WindowDays.</summary>
+public record ServicesReport(int WindowDays, decimal MonthlyUsd, int UnknownPrices, int Minutes, IReadOnlyList<ServiceUse> Services,
+    IReadOnlyList<ServiceUse> Missing, string PricesAsOf);
+
+/// <param name="Verdict">"value", "pricey", "quiet" or "pause".</param>
+public record ServiceUse(string Key, string Name, decimal? MonthlyUsd, int Minutes, decimal? CostPerHour, string Verdict,
+    IReadOnlyList<ServiceShow> Watched, IReadOnlyList<ServiceShow> Coming);
+
+public record ServiceShow(Guid ShowId, string Title, int Minutes, int Episodes, DateTimeOffset? NextAirsAtUtc);
+
+/// <summary>Guess the show: today's puzzle, without its answer.</summary>
+public record Puzzle(int Number, DateOnly Date, int MaxGuesses, IReadOnlyList<PuzzleClue> Clues);
+
+/// <param name="AfterWrong">How many wrong guesses unlock it.</param>
+public record PuzzleClue(string Key, int AfterWrong, string Text);
+
+/// <param name="Answer">Set once the puzzle is over.</param>
+public record PuzzleGuess(bool Correct, PuzzleFeedback Feedback, IReadOnlyList<PuzzleClue> Clues, PuzzleShow? Answer);
+
+/// <param name="Year">"same", "later" or "earlier": when the answer premiered, against the guess.</param>
+/// <param name="Network">"same", "service" (same streaming service) or "different".</param>
+/// <param name="Seasons">"same", "more" or "fewer": the answer's seasons, against the guess.</param>
+public record PuzzleFeedback(PuzzleShow Guess, int? GuessYear, string Year, bool YearClose, string? GuessNetwork, string Network,
+    IReadOnlyList<PuzzleGenre> Genres, string? GuessKind, bool SameKind, int GuessSeasons, string Seasons, bool SeasonsClose,
+    string GuessStatus, bool SameStatus, IReadOnlyList<string> SharedCast);
+
+public record PuzzleGenre(string Genre, bool Shared);
+
+public record PuzzleShow(Guid Id, string Title, string? PosterUrl);
+
+/// <summary>Call it on a show: its next season to call, the caller's call, and once called, the model's and the crowd's.</summary>
+/// <param name="SeasonNumber">The season open to a call; null for an ended show.</param>
+/// <param name="Crowd">Everyone's average call; null under 5 callers or before the caller has called.</param>
+public record ShowCall(int? SeasonNumber, DateTimeOffset? PremieresAtUtc, double? Mine, CallRange? Model, CrowdCall? Crowd,
+    IReadOnlyList<SeasonCallInfo> Past);
+
+public record CallRange(double Rating, double Low, double High);
+
+public record CrowdCall(double Rating, int Callers);
+
+/// <param name="State">"open", "airing" or "scored".</param>
+/// <param name="BeatModel">Scored with a model: true when the call was closer, false when the model was; null on a tie.</param>
+public record SeasonCallInfo(Guid ShowId, string Title, string? PosterUrl, int SeasonNumber, double Rating, double? Model, double? Actual,
+    string State, bool? BeatModel, DateTimeOffset? PremieresAtUtc);
+
+public record CallRecord(int Scored, double? AverageMiss, double? ModelAverageMiss, int BeatModel, int ModelWon);
+
+public record MyCalls(CallRecord Record, IReadOnlyList<SeasonCallInfo> Calls, IReadOnlyList<SeasonCallInfo> Suggestions);
+

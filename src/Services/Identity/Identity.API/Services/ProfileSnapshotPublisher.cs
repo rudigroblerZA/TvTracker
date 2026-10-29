@@ -52,7 +52,7 @@ public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimePr
                 .Where(p => after == null || string.Compare(p.UserId, after) > 0)
                 .OrderBy(p => p.UserId)
                 .Take(ProfilesPerBatch)
-                .Select(p => new { p.UserId, p.DisplayName, p.Plan, p.PlanChangedAtUtc })
+                .Select(p => new { p.UserId, p.DisplayName, Plan = p.EffectivePlan, PlanChangedAtUtc = p.EffectivePlanChangedAtUtc })
                 .ToListAsync(ct);
             if (batch.Count == 0)
             {

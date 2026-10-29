@@ -1,0 +1,85 @@
+@page "/family/join/{Token}"
+@attribute [RequiresFeature(FeatureFlags.FamilyPlan)]
+@inject IdentityClient Identity
+@inject NavigationManager Navigation
+
+<PageTitle>Join a family · @Brand.AppName</PageTitle>
+
+<h1>Join a family</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" />
+        @if (gone)
+        {
+            <p class="muted">This invite link has been turned off, or it isn't an invite link. Ask whoever sent it for a new one.</p>
+        }
+        else if (invite is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (!invite.Active)
+        {
+            <p>@($"{invite.OwnerName} isn't on the {Plans.Name(Plans.Family)} plan any more, so there's nothing to join.")</p>
+        }
+        else if (invite.SeatsLeft == 0)
+        {
+            <p>@($"{invite.OwnerName}'s family is full.")</p>
+        }
+        else
+        {
+            <p>
+                <strong>@invite.OwnerName</strong> invited you to their @Plans.Name(Plans.Family) plan. You'd get the same benefits
+                as @Plans.Name(Plans.Plus), with your own lists, ratings and watches; they don't see your activity through it.
+            </p>
+            <p><button class="btn" type="button" disabled="@joining" @onclick="JoinAsync">@(joining ? "Joining…" : "Join")</button></p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in, or create an account, to join this family plan." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private FamilyInvite? invite;
+    private bool gone;
+    private bool joining;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            invite = await Identity.GetFamilyInviteAsync(Token);
+            gone = invite is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task JoinAsync()
+    {
+        joining = true;
+        error = null;
+        try
+        {
+            await Identity.JoinFamilyAsync(Token);
+            Navigation.NavigateTo("settings/family");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            joining = false;
+        }
+    }
+}

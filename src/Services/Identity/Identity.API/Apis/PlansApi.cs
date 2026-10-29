@@ -1,4 +1,5 @@
 using Identity.API.Data;
+using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -8,9 +9,11 @@ using TvTracker.Persistence;
 
 namespace Identity.API.Apis;
 
-/// <param name="Plan">One of <see cref="Plans"/>.</param>
+/// <param name="Plan">The plan the user gets (<see cref="Plans"/>): their own, or the family plan they're in.</param>
+/// <param name="Purchased">The plan they pay for themselves.</param>
 /// <param name="MaxLists">The plan's list limit; null for none.</param>
-public record PlanDto(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc);
+public record PlanDto(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc, string Purchased = Plans.Free,
+    bool TrackServices = false);
 
 public record PlanUserDto(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);
 
@@ -87,7 +90,8 @@ public static class PlansApi
             profile.Plan = request.Plan;
             profile.PlanChangedAtUtc = now.UtcDateTime;
             profile.UpdatedAtUtc = now.UtcDateTime;
-            outbox.Add(new UserPlanChangedIntegrationEvent(profile.UserId, profile.Plan, now));
+            // Their own effective plan, and their family's members', who gain or lose the family plan with it.
+            await PlanState.RecomputeAsync(db, outbox, now, [profile.UserId, .. await PlanState.MembersOfAsync(db, profile.UserId, ct)], ct);
             await db.SaveChangesAsync(ct);
             await outbox.PublishAddedAsync(ct);
             loggers.CreateLogger(typeof(PlansApi)).LogInformation("Plan of {UserId} set to {Plan} by {Admin}",
@@ -99,7 +103,8 @@ public static class PlansApi
 
     private static PlanDto ToDto(UserProfile profile)
     {
-        var limits = Plans.Limits(profile.Plan);
-        return new PlanDto(profile.Plan, Plans.Name(profile.Plan), limits.MaxLists, limits.ShareLists, profile.PlanChangedAtUtc);
+        var limits = Plans.Limits(profile.EffectivePlan);
+        return new PlanDto(profile.EffectivePlan, Plans.Name(profile.EffectivePlan), limits.MaxLists, limits.ShareLists,
+            profile.EffectivePlanChangedAtUtc, profile.Plan, limits.TrackServices);
     }
 }
