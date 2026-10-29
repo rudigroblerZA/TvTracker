@@ -216,6 +216,17 @@ watching and your watchlist.
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
 
+**Guess the show** (`/puzzle`, from Discover; `show-puzzle` flag) is a daily puzzle: one popular show, the same for
+everyone, found in six guesses. Each guess is compared with the answer: when it premiered (earlier or later, amber within
+3 years), its network (amber for the same streaming service), the genres they share, scripted or animated, seasons (amber
+within one), running or ended, and actors in both casts. Each wrong guess adds a clue: the decade, the network, one of its
+characters, then its lead. A finished puzzle gives a spoiler-free square per guess to share, and your record (played,
+solved, days in a row) is kept on the device. It works signed out.
+- **API:** `GET /api/v1/puzzles/{date}` (Catalog.API) gives the day's number and first clue; `POST
+  /api/v1/puzzles/{date}/guesses` (`{ showId, attempt }`) compares a guess, returns the clues unlocked, and the answer
+  once it's solved or the sixth guess is in. Yesterday, today and tomorrow by UTC are playable, so every time zone has
+  its own today.
+
 **Mixtape** (`/mixtape`, from Discover and Blend; `mixtape` flag) is Blend for three to five shows: the shows that fit
 all of them, not just one. Breaking Bad + Ozark + Better Call Saul gives The Lincoln Lawyer, Bosch and Criminal Minds;
 Stranger Things + Severance + Black Mirror gives Travelers, Westworld and The Expanse; The Office + Superstore + Abbott
@@ -400,7 +411,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -522,7 +533,7 @@ read-only, without signing in or having an account.
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
   - My shows: lists.
-  - Discover: Prestige picks, Blend, Mixtape, Universes, nanogenres and network report cards.
+  - Discover: Prestige picks, Blend, Mixtape, Guess the show, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: Ask, the time machine and holiday episodes.
   - Stats: Year in TV.
@@ -1029,6 +1040,17 @@ How events flow:
     - **Backtested every run:** each model replays the catalog's history (what it would have said after every past
       season) and keeps the misses as its range. On the development catalog, ratings are off by 0.33 on average
       (1,440 seasons) and start dates by 22 days at the median (2,291 waits).
+  - **Call it** (`/calls`, linked from Insights, and a card on show pages; `call-it` flag): predict what a running show's
+    next season will rate on TVmaze, before it premieres, and see whether you beat the forecast above.
+    - **Making a call:** a slider from 5 to 10 on the show page; change or take it back until the season's first episode
+      airs, when it locks.
+    - **No peeking:** the card shows the model's forecast and everyone's average call (from 5 callers) only after
+      you've called. The forecast also sits in "What's next" on the same page; the card doesn't hide that.
+    - **Scored** once the season is over (the season verdict calls it, a later season airs, or the show ends): the
+      season's average episode rating, how far off you were, and whether you or the model came closer.
+    - **Your record** (`/calls`): calls scored, your average miss against the model's, calls won against it, and your
+      followed shows' next seasons to call, soonest premiere first.
+    - **API:** `GET`/`PUT`/`DELETE /api/v1/shows/{id}/call` and `GET /api/v1/me/calls` on Analytics.API (signed in).
   - **Will you finish it?** (show pages, and "Will you finish them?" on Stats): for shows you're part-way through,
     from your own watches. It shows facts, not a probability: there isn't enough history per person for an honest one.
     - **Pace:** your pace over the last four weeks, and when it gets you to the end of what's aired.

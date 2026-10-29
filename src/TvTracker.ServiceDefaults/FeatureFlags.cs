@@ -35,6 +35,8 @@ public static class FeatureFlags
     public const string Corrections = "corrections";
     public const string KnownFaces = "known-faces";
     public const string HolidayEpisodes = "holiday-episodes";
+    public const string ShowPuzzle = "show-puzzle";
+    public const string CallIt = "call-it";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";

@@ -799,3 +799,29 @@ h1:focus, h2:focus { outline: none; }
 .service-use { border-left: 4px solid var(--tone); }
 .service-total { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; margin: 8px 0 16px; }
 .service-total strong { font-size: 1.6rem; }
+
+/* Guess the show */
+.puzzle-head { margin-bottom: 8px; }
+.puzzle-clues { margin: 0 0 12px; padding-left: 18px; }
+.puzzle-clues li { margin: 2px 0; }
+.puzzle-answer { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 12px; }
+.puzzle-answer.won { border-color: var(--good); }
+.puzzle-answer.lost { border-color: var(--bad); }
+.puzzle-answer p { margin: 0 0 6px; }
+.puzzle-grid { font-size: 1.2rem; letter-spacing: 2px; }
+.puzzle-guesses { list-style: none; padding: 0; margin: 12px 0 8px; display: grid; gap: 8px; }
+.puzzle-guess { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.puzzle-guess.correct { border-color: var(--good); }
+.puzzle-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.puzzle-chip { font-size: 0.85rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.puzzle-chip.hit { color: var(--good); border-color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
+.puzzle-chip.near { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+
+/* Call it */
+.call-input { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.call-input input[type=range] { flex: 1 1 180px; min-width: 0; }
+.call-value { font-size: 1.3rem; min-width: 2.5em; text-align: center; }
+.call-list li { padding: 8px 0 8px 10px; border-left: 3px solid var(--border); margin-bottom: 6px; }
+.call-row.won { border-left-color: var(--good); }
+.call-row.lost { border-left-color: var(--warn); }
+

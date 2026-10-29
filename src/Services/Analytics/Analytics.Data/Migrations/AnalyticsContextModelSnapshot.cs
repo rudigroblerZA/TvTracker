@@ -384,6 +384,43 @@ namespace Analytics.Data.Migrations
                     b.ToTable("premieres", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.SeasonCall", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SeasonNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("Actual")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("CalledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("ModelRating")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Rating")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("ScoredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "ShowId", "SeasonNumber");
+
+                    b.HasIndex("ScoredAtUtc")
+                        .HasFilter("\"ScoredAtUtc\" IS NULL");
+
+                    b.HasIndex("ShowId", "SeasonNumber");
+
+                    b.ToTable("season_calls", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.ShowCopy", b =>
                 {
                     b.Property<Guid>("ShowId")

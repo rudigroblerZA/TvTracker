@@ -484,6 +484,7 @@ public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventH
         await db.Follows.Where(f => f.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Plans.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.UserServices.Where(s => s.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.SeasonCalls.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 }
 

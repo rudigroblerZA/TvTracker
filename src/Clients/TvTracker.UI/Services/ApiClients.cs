@@ -108,6 +108,13 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    /// <summary>Guess the show for a day (the device's date); null while the flag is off or there's no puzzle that day.</summary>
+    public Task<Puzzle?> GetPuzzleAsync(DateOnly date, CancellationToken ct = default) =>
+        GetAsync<Puzzle>(ApiClients.Catalog, $"api/v1/puzzles/{date:yyyy-MM-dd}", ct);
+
+    public Task<PuzzleGuess?> GuessPuzzleAsync(DateOnly date, Guid showId, int attempt, CancellationToken ct = default) =>
+        SendAsync<PuzzleGuess>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/puzzles/{date:yyyy-MM-dd}/guesses", new { showId, attempt }, ct);
+
     public Task<List<HolidaySummary>?> GetHolidaysAsync(CancellationToken ct = default) =>
         GetAsync<List<HolidaySummary>>(ApiClients.Catalog, "api/v1/holidays", ct);
 
@@ -419,6 +426,19 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<FinishOutlook>(ApiClients.Analytics, $"api/v1/shows/{showId}/finish-outlook", ct);
 
     /// <summary>Running shows the user is caught up on, with when each is back.</summary>
+    public Task<ShowCall?> GetShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowCall>(ApiClients.Analytics, $"api/v1/shows/{showId}/call", ct);
+
+    public Task<ShowCall?> SetShowCallAsync(Guid showId, double rating, CancellationToken ct = default) =>
+        SendAsync<ShowCall>(ApiClients.Analytics, HttpMethod.Put, $"api/v1/shows/{showId}/call", new { rating }, ct);
+
+    public Task DeleteShowCallAsync(Guid showId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Analytics, HttpMethod.Delete, $"api/v1/shows/{showId}/call", null, ct);
+
+    /// <summary>The user's season calls, their record against the model, and followed shows to call next.</summary>
+    public Task<MyCalls?> GetMyCallsAsync(CancellationToken ct = default) =>
+        GetAsync<MyCalls>(ApiClients.Analytics, "api/v1/me/calls", ct);
+
     public Task<WaitingRoom?> GetWaitingRoomAsync(CancellationToken ct = default) =>
         GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 
