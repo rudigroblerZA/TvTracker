@@ -382,7 +382,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -416,6 +416,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `awards-shelf` | Awards on show pages, `/prestige` and its Discover link, and the awards endpoints |
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
+| `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
+| `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -793,6 +795,19 @@ How events flow:
     - **Bulk marks:** 8 or more of a show's episodes marked at once ("watched up to S05E10") aren't counted, since when
       you watched them isn't known; the page says how many were left out.
     - **API:** `GET /api/v1/me/year?year=&tz=` on Analytics.API, signed in.
+  - **Episode duels** (`/shows/{id}/duels`, linked from show pages; `episode-duels` flag): rank a show's episodes you've
+    watched by picking the better of two, or skipping a pair you can't call. Your ranking builds as you go, with each
+    episode's wins and losses; "Start over" forgets them.
+    - **Pairs:** the episode in the fewest duels against one close to it in your ranking that it hasn't met, since
+      close calls are what the ranking still needs to learn.
+    - **Ranking:** a Bradley-Terry model of your answers, so the order doesn't depend on when you answered, and one
+      lucky win doesn't put an episode on top.
+    - **Only watched episodes;** unwatching one takes it out of the ranking.
+    - **API** (Ratings.API, signed in): `GET`, `POST {winnerId, loserId}` and `DELETE` on `/api/v1/shows/{id}/duels`.
+  - **Waiting room** (`/waiting`, linked from Up Next; `waiting-room` flag): running shows you're caught up on, soonest
+    back first: the next episode or season premiere when it's dated, else the forecast from the show's own past waits
+    (with "overdue" past its range), with how often comparable shows came back as a weak signal.
+    - **API:** `GET /api/v1/me/waiting` on Analytics.API, signed in.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

@@ -1,0 +1,87 @@
+@page "/waiting"
+@attribute [RequiresFeature(FeatureFlags.WaitingRoom)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>Waiting room · @Brand.AppName</PageTitle>
+
+<h1>Waiting room</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">Shows you're caught up on, and when each is back: the date when it's set, else a forecast from the show's own past waits.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (room is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (room.Shows.Count == 0)
+        {
+            <p class="muted">Nothing to wait for: you aren't caught up on any running show yet.</p>
+        }
+        else
+        {
+            <ol class="discovery">
+                @foreach (var show in room.Shows)
+                {
+                    <li @key="show.ShowId">
+                        <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
+                        <div>
+                            <a href="shows/@show.ShowId"><strong>@show.Title</strong></a>
+                            @if (show.Network is { } network)
+                            {
+                                <span class="muted small">@($" · {network}")</span>
+                            }
+                            <div class="@(show.Kind is "episode" or "season" ? "" : "muted") small">@When(show)</div>
+                            @if (show.Renewal is { } renewal && show.Kind is "forecast" or "unknown")
+                            {
+                                <div class="muted small">@($"{Format.Percent(renewal)} of comparable seasons got another (a weak signal)")</div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see when the shows you're caught up on are back." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private WaitingRoom? room;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            room = await Analytics.GetWaitingRoomAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string When(WaitingShow show) => show.Kind switch
+    {
+        "episode" => $"Next episode {Day(show.BackAtUtc!.Value)}",
+        "season" => $"Season {show.SeasonNumber} premieres {Day(show.BackAtUtc!.Value)}",
+        "forecast" when show.Overdue => $"Season {show.SeasonNumber} is overdue: it's been longer than its usual waits",
+        "forecast" => $"Season {show.SeasonNumber} likely around {show.Likely:MMMM yyyy} ({show.Earliest:MMM yyyy} – {show.Latest:MMM yyyy})",
+        _ => "No word on more yet"
+    };
+
+    private static string Day(DateTimeOffset at)
+    {
+        var days = (at.Date - DateTime.UtcNow.Date).Days;
+        return days switch { 0 => "today", 1 => "tomorrow", < 7 => $"on {at:dddd}", _ => $"on {at:d MMMM yyyy}" };
+    }
+}

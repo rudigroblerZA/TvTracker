@@ -701,3 +701,14 @@ a.chip { text-decoration: none; }
 .report dd .small { font-weight: 400; }
 .report dd.tone-good { color: var(--good); }
 .report dd.tone-bad { color: var(--bad); }
+
+/* Episode duels */
+
+.duel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.duel-option { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 18px; min-height: 120px;
+    background: var(--surface); color: inherit; font: inherit; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.duel-option:hover:not(:disabled), .duel-option:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.duel-option:disabled { opacity: 0.6; cursor: default; }
+.duel-code { color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+.duel-ranking li { padding: 3px 0; }
+@media (max-width: 520px) { .duel { grid-template-columns: 1fr; } .duel-option { min-height: 0; } }
