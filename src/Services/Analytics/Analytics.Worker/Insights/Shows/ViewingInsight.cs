@@ -2,7 +2,8 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Viewers per season, completion and drop-off, from our users' watched marks; none below the minimum number of viewers.</summary>
+/// <summary>
+/// Viewers per season, completion and drop-off, from our users' watched marks; none below the minimum number of viewers.</summary>
 public sealed class ViewingInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)

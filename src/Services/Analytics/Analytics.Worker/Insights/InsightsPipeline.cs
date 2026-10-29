@@ -1,7 +1,6 @@
-using System.Text.Json;
 using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
-using TvTracker.IntegrationEvents;
+using System.Text.Json;
 using TvTracker.Persistence;
 
 namespace Analytics.Worker.Insights;

@@ -1,11 +1,13 @@
-using System.Text.Json;
 using Analytics.Data;
+using System.Text.Json;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Show DNA, for Recommendations (<see cref="ShowDnaChangedIntegrationEvent"/>). A show without DNA is sent with no traits.</summary>
+/// <summary>
+/// Show DNA, for Recommendations (<see cref="ShowDnaChangedIntegrationEvent"/>). A show without DNA is sent with no traits.
+/// </summary>
 public sealed class DnaPublication : IInsightPublication
 {
     public PublicationBuilder Begin(bool publishAll) => new Builder(publishAll);
@@ -17,7 +19,9 @@ public sealed class DnaPublication : IInsightPublication
         protected override ShowDnaValues ValueOf(ShowInsights insights) =>
             new(insights.ShowId, (insights.Dna?.Traits ?? []).ToDictionary(t => t.Key, t => t.Value));
 
-        /// <summary>Documents from before DNA have none; a show that now has DNA is then sent.</summary>
+        /// <summary>
+        /// Documents from before DNA have none; a show that now has DNA is then sent.
+        /// </summary>
         protected override ShowDnaValues PreviousValueOf(JsonElement document) =>
             new(Guid.Empty, document.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object
                 ? dna.GetProperty("traits").EnumerateArray().ToDictionary(t => t.GetProperty("key").GetString()!, t => t.GetProperty("value").GetDouble())

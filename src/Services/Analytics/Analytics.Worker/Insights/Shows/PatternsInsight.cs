@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>How the show's episode ratings behave: finales, each season's best episode, consistency and the show's arc.</summary>
+/// <summary>
+/// How the show's episode ratings behave: finales, each season's best episode, consistency and the show's arc.
+/// </summary>
 public sealed class PatternsInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)

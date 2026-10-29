@@ -465,7 +465,12 @@ public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEvent
         }
         db.EpisodeNotes.AddRange(incoming.Values.Select(n => new EpisodeNoteCopy
         {
-            EpisodeId = n.EpisodeId, ShowId = n.ShowId, Mark = n.Mark, Reason = n.Reason, SourceUrl = n.SourceUrl, TakenAtUtc = e.TakenAtUtc
+            EpisodeId = n.EpisodeId,
+            ShowId = n.ShowId,
+            Mark = n.Mark,
+            Reason = n.Reason,
+            SourceUrl = n.SourceUrl,
+            TakenAtUtc = e.TakenAtUtc
         }));
 
         db.MarkProcessed(e, handler);

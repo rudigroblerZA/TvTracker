@@ -13,7 +13,9 @@ namespace Analytics.Worker.Insights;
 /// </summary>
 public sealed class DnaInsight : IShowInsight
 {
-    /// <summary>Season length and run length are scaled on a log scale: 6 episodes to 12 is as big a step as 12 to 24.</summary>
+    /// <summary>
+    /// Season length and run length are scaled on a log scale: 6 episodes to 12 is as big a step as 12 to 24.
+    /// </summary>
     private static readonly (double Low, double High) EpisodeMinutes = (22, 60);
     private static readonly (double Low, double High) EpisodesPerSeason = (6, 22);
     private static readonly (double Low, double High) RunHours = (6, 200);
@@ -21,16 +23,24 @@ public sealed class DnaInsight : IShowInsight
     private static readonly (double Low, double High) FirstYear = (1995, 2025);
     private static readonly (double Low, double High) Rating = (6.8, 8.6);
 
-    /// <summary>Episode-rating spread: 0.25 and under is steady (1), 0.75 and over a rollercoaster (0).</summary>
+    /// <summary>
+    /// Episode-rating spread: 0.25 and under is steady (1), 0.75 and over a rollercoaster (0).
+    /// </summary>
     private static readonly (double Low, double High) Spread = (0.25, 0.75);
 
-    /// <summary>Rating points gained or lost per season.</summary>
+    /// <summary>
+    /// Rating points gained or lost per season.
+    /// </summary>
     private static readonly (double Low, double High) Slope = (-0.25, 0.25);
 
-    /// <summary>A finale's rating against the rest of its season, averaged.</summary>
+    /// <summary>
+    /// A finale's rating against the rest of its season, averaged.
+    /// </summary>
     private static readonly (double Low, double High) FinaleDifference = (-0.1, 0.55);
 
-    /// <summary>Fewer aired episodes than this, and the show has no DNA yet.</summary>
+    /// <summary>
+    /// Fewer aired episodes than this, and the show has no DNA yet.
+    /// </summary>
     private const int MinAiredEpisodes = 3;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
@@ -144,7 +154,9 @@ public sealed class DnaInsight : IShowInsight
         return (drops, full.Count);
     }
 
-    /// <summary>Median days from one season's last episode to the next one's first; null with fewer than two aired seasons.</summary>
+    /// <summary>
+    /// Median days from one season's last episode to the next one's first; null with fewer than two aired seasons.
+    /// </summary>
     private static double? MedianGapDays(List<EpisodeCopy> aired)
     {
         var seasons = aired.Where(e => e.AirsAtUtc is not null)

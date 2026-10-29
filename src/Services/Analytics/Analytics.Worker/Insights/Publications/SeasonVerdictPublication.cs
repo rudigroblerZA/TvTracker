@@ -1,7 +1,7 @@
+using Analytics.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Analytics.Data;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 
@@ -25,7 +25,9 @@ public sealed class SeasonVerdictPublication : IInsightPublication
 
     public PublicationBuilder Begin(bool publishAll) => new Builder();
 
-    /// <summary>Stable for a show and season, so every send of its verdict is the same notification.</summary>
+    /// <summary>
+    /// Stable for a show and season, so every send of its verdict is the same notification.
+    /// </summary>
     private static Guid VerdictId(Guid showId, int season) =>
         new(SHA256.HashData(Encoding.UTF8.GetBytes($"season-verdict:{showId}:{season}"))[..16]);
 
@@ -55,7 +57,9 @@ public sealed class SeasonVerdictPublication : IInsightPublication
             return taken;
         }
 
-        /// <summary>The season the stored document had a verdict for, if any.</summary>
+        /// <summary>
+        /// The season the stored document had a verdict for, if any.
+        /// </summary>
         private static int? PreviousSeason(JsonElement? previous) =>
             previous is { } document && document.TryGetProperty("seasonVerdict", out var stored) && stored.ValueKind == JsonValueKind.Object
                 ? stored.GetProperty("number").GetInt32()

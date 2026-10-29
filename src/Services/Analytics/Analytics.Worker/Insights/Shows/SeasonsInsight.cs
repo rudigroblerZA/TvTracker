@@ -2,10 +2,14 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Per-season stats, the best and worst season, and whether the show is rising or falling.</summary>
+/// <summary>
+/// Per-season stats, the best and worst season, and whether the show is rising or falling.
+/// </summary>
 public sealed class SeasonsInsight : IShowInsight
 {
-    /// <summary>Change in rating per season (0-10 scale) beyond which a show is "rising" or "falling".</summary>
+    /// <summary>
+    /// Change in rating per season (0-10 scale) beyond which a show is "rising" or "falling"
+    /// .</summary>
     private const double TrendThreshold = 0.05;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
@@ -39,7 +43,9 @@ public sealed class SeasonsInsight : IShowInsight
             worst.Rating < best.Rating ? new SeasonHighlight(worst.Number, worst.Rating, source) : null);
     }
 
-    /// <summary>"rising", "falling" or "steady" from <see cref="ShowInsightContext.SeasonSlope"/>; null with fewer than three rated seasons.</summary>
+    /// <summary>
+    /// "rising", "falling" or "steady" from <see cref="ShowInsightContext.SeasonSlope"/>; null with fewer than three rated seasons.
+    /// </summary>
     private static string? Trend(double? slope) => slope switch
     {
         null => null,

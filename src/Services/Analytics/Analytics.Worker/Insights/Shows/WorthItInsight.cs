@@ -25,7 +25,9 @@ public sealed class WorthItInsight : IShowInsight
     private const double SlowStartPoints = -0.15;
     private const double GoodStartPoints = 0.1;
 
-    /// <summary>A decline costs this times the share of the running time from the season it sets in.</summary>
+    /// <summary>
+    /// A decline costs this times the share of the running time from the season it sets in.
+    /// </summary>
     private const double DeclinePoints = -0.6;
 
     private const double RollercoasterPoints = -0.15;

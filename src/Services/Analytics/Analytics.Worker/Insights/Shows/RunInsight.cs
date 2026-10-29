@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>How long the show has run: seasons, episodes, hours, first and last air dates, and its longest break.</summary>
+/// <summary>
+/// How long the show has run: seasons, episodes, hours, first and last air dates, and its longest break.
+/// </summary>
 public sealed class RunInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
