@@ -116,6 +116,7 @@
         ("bingeable", "Bingeable", "Short seasons, around 8 episodes, under 50 hours in all, with nothing left to wait for.", null),
         ("weekend-binges", "Weekend binges", "Everything aired fits in 12 hours or less.", null),
         ("fan-favorites", "Fan favorites", "Loved by {app} users (4.3★ or more), or by TVmaze's viewers (8.5 or more).", null),
+        ("worth-your-time", "Worth your time", "Shows whose hours pay off: the best worth-it scores, from ratings, starts, declines and endings.", FeatureFlags.WorthIt),
         ("worth-the-wait", "Worth the wait", "Well-rated shows with a slow start, and the episode where they get good.", FeatureFlags.GetsGood),
         ("great-endings", "Great endings", "Finished shows that stick the landing: a strong finale, and a final season that holds up.", FeatureFlags.Endings)
     ];
@@ -192,6 +193,7 @@
             "best-finales" => $"Finale rated {Format.Rating(item.Value)}",
             "bingeable" or "weekend-binges" => $"{Format.Duration((int)item.Value)} to watch it all",
             "fan-favorites" when item.Value > 0 => $"★ {item.Value:0.0} from {Brand.AppName} users",
+            "worth-your-time" => $"Worth it: {item.Value:0} / 100",
             "worth-the-wait" => $"Gets good here: rated {item.Value:0.0} higher from this episode on",
             "great-endings" => $"Finale rated {Format.Rating(item.Value)}",
             _ => null

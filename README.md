@@ -393,7 +393,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -428,6 +428,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
+| `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 
@@ -583,6 +584,7 @@ How events flow:
     - great endings: well-rated (7.5+) ended shows that stick the landing, most popular first;
     - worth the wait: well-rated shows (7.5+) with a slow start that rate at least 0.4 higher from the episode where
       they get good, most popular first (Person of Interest, Dark, Slow Horses, Severance).
+    - worth your time: shows whose worth-it score says worth it (75+), best first.
   - **Show page — prolific creators and producers:** who made the show, featuring the most prolific person.
     - **Prolific** means credited behind the camera on 10 or more shows on TVmaze. Dick Wolf has 57 and Chuck Lorre 19.
     - **What it shows:** their totals, best-known shows, and their other shows in the catalog.
@@ -864,6 +866,19 @@ How events flow:
       needs three. Ties read as ties ("ties for its best"). A show whose final season has too few rated episodes to
       check gets no verdict: 232 of 289 ended shows get one.
     - **Great endings:** a Discover list of well-rated (7.5+) ended shows that stick the landing, most popular first.
+  - **Is it worth it?** (show pages, signed in; `worth-it` flag): a 0-100 score for whether the hours pay off, with
+    every part behind it, and the first of the page's highlights.
+    - **How:** TVmaze's rating, moved by what the other insights found:
+      - a slow start: −0.15, or −0.3 when it gets good 10 h or more in; good from the first episode +0.1;
+      - a decline: −0.6 × the share of the running time from the season it sets in;
+      - the ending: sticks or great finale +0.3, weaker last season −0.1, finale lets down −0.3, fizzles −0.5;
+      - the spread of episode ratings: a rollercoaster −0.15, steady +0.1.
+    - **Score:** 6.0 on that scale is 0 and 9.0 is 100, so a typical show scores 50. The verdicts are worth it (75+),
+      mostly worth it (50+), mixed (30+) and hard to recommend.
+    - **Examples:** Breaking Bad 100, Better Call Saul 97, The Wire 88, Game of Thrones 66, Dexter 56, Severance 52,
+      How I Met Your Mother 22. A running show's ending isn't in it yet, and the panel says so.
+    - **Who gets one:** shows with a TVmaze rating and 5 or more rated episodes (595 of 846).
+    - **Worth your time:** a Discover list of the shows rated worth it, best scores first, most popular among equals.
   - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
     - **This week in TV history** (the default): what premiered and what ended this week in past years, and the
       best-rated episode of each year that week. Home shows four of the best-known milestones ("Once Upon a Time

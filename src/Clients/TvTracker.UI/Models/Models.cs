@@ -247,7 +247,18 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     SeasonHighlight? BestSeason, SeasonHighlight? WorstSeason, string? Trend, IReadOnlyList<TopEpisode> TopEpisodes, RunFacts Run,
     Premiere? NextPremiere, IReadOnlyList<SharedCast> SharedCast, Histograms? Histograms, Viewing? Viewing, Momentum? Momentum,
     EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
-    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null);
+    Landing? Landing = null, SeasonVerdict? SeasonVerdict = null, WorthIt? WorthIt = null);
+
+/// <summary>Is it worth the time? Analytics' 0-100 score, from the provider's rating and the factors that move it.</summary>
+/// <param name="Verdict">"worth-it", "mostly", "mixed" or "hard-to-recommend".</param>
+/// <param name="Value">The rating plus every factor's points, on the rating's scale.</param>
+/// <param name="StillRunning">The ending isn't in the score yet.</param>
+public record WorthIt(int Score, string Verdict, double Rating, double Value, IReadOnlyList<WorthItFactor> Factors, int RuntimeMinutes,
+    bool StillRunning);
+
+/// <param name="Key">"start", "decline", "ending" or "consistency".</param>
+/// <param name="Points">What it adds to the rating; negative takes away.</param>
+public record WorthItFactor(string Key, double Points, string Text);
 
 /// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
 /// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>

@@ -14,10 +14,10 @@ namespace Mcp.Server.Tools;
 public sealed class InsightTools(Backends backends, ShowResolver resolver)
 {
     private static readonly string[] DiscoveryLists =
-        ["hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable", "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings"];
+        ["hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable", "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings", "worth-your-time"];
 
     [McpServerTool(Name = "show_insights", ReadOnly = true, Idempotent = true)]
-    [Description("Everything computed about a show: seasons and their ratings, top and weakest episodes, consistency and arc, finales, when it gets good, whether it sticks the landing, show DNA (12 traits), tags, forecasts for its next season (renewal, timing, rating), shared cast, and our users' viewing (followers, drop-off) where enough users are behind it. Use for questions like \"<show> insights\". landing.verdict says whether it sticks the landing: sticks (strong finale and final season), great-finale (strong finale after a weak season), finale-lets-down, fizzles (weak finale and season), weaker-last-season, or as-it-ran (ends as good as it ran).")]
+    [Description("Everything computed about a show: seasons and their ratings, top and weakest episodes, consistency and arc, finales, when it gets good, whether it sticks the landing, show DNA (12 traits), tags, forecasts for its next season (renewal, timing, rating), shared cast, and our users' viewing (followers, drop-off) where enough users are behind it. Use for questions like \"<show> insights\". landing.verdict says whether it sticks the landing: sticks (strong finale and final season), great-finale (strong finale after a weak season), finale-lets-down, fizzles (weak finale and season), weaker-last-season, or as-it-ran (ends as good as it ran). worthIt is whether it's worth the time: score 0-100, verdict (worth-it, mostly, mixed, hard-to-recommend) and the factors behind it.")]
     public async Task<JsonNode> ShowInsights([Description("The show's title or catalog id.")] string show, CancellationToken ct = default)
     {
         if (await resolver.ResolveAsync(show, ct) is not { } found)
@@ -36,10 +36,10 @@ public sealed class InsightTools(Backends backends, ShowResolver resolver)
     }
 
     [McpServerTool(Name = "discover_list", ReadOnly = true, Idempotent = true)]
-    [Description("A ranked discovery list: hidden-gems, most-consistent, rollercoasters, best-finales, bingeable, weekend-binges, fan-favorites, worth-the-wait (slow starters and where they turn) or great-endings. Optionally within one genre.")]
+    [Description("A ranked discovery list: hidden-gems, most-consistent, rollercoasters, best-finales, bingeable, weekend-binges, fan-favorites, worth-the-wait (slow starters and where they turn), great-endings or worth-your-time (the best worth-it scores). Optionally within one genre.")]
     public async Task<JsonNode> DiscoverList(
         [Description("The list's key."), AllowedValues("hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable",
-            "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings")] string list,
+            "weekend-binges", "fan-favorites", "worth-the-wait", "great-endings", "worth-your-time")] string list,
         [Description("A genre such as Drama or Comedy; omit for all.")] string? genre = null,
         [Description("How many, 1 to 50.")] int limit = 20,
         CancellationToken ct = default)

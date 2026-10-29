@@ -1,0 +1,50 @@
+@* Is it worth the time? The score, and every part behind it: the provider's rating, then what moves it. *@
+@if (WorthIt is { } worth)
+{
+    <div class="insight-card worth-it tone-@Tone(worth.Verdict)">
+        <h3>Is it worth it?</h3>
+        <p class="worth-it-head">
+            <span class="worth-it-score">@worth.Score</span><span class="muted">@(" / 100 ")</span>
+            <span class="worth-it-verdict">@Headline(worth.Verdict)</span>
+        </p>
+        <div class="worth-it-meter" role="img" aria-label="@($"{worth.Score} out of 100")"><span style="width:@(worth.Score)%"></span></div>
+        <ul class="worth-it-parts">
+            <li><span>Rated @Format.Rating(worth.Rating) on TVmaze</span><span class="worth-it-points">@Format.Rating(worth.Rating)</span></li>
+            @foreach (var factor in worth.Factors)
+            {
+                <li>
+                    <span>@factor.Text</span>
+                    <span class="worth-it-points @(factor.Points < 0 ? "minus" : "plus")">@Points(factor.Points)</span>
+                </li>
+            }
+            <li class="worth-it-total"><span>Worth</span><span class="worth-it-points">@worth.Value.ToString("0.00")</span></li>
+        </ul>
+        <p class="small muted">
+            @(worth.RuntimeMinutes > 0 ? $"{Format.Hours(worth.RuntimeMinutes)} to watch it all. " : "")@(worth.StillRunning ? "Still running, so the ending isn't in it yet. " : "")From TVmaze's episode ratings: 50 is a typical show.
+        </p>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public WorthIt? WorthIt { get; set; }
+
+    /// <summary>The verdict in words; also the highlight card's headline.</summary>
+    public static string Headline(string verdict) => verdict switch
+    {
+        "worth-it" => "Worth it",
+        "mostly" => "Mostly worth it",
+        "mixed" => "Mixed",
+        _ => "Hard to recommend"
+    };
+
+    /// <summary>The highlight and panel tone: good, info, warn or bad.</summary>
+    public static string Tone(string verdict) => verdict switch
+    {
+        "worth-it" => "good",
+        "mostly" => "info",
+        "mixed" => "warn",
+        _ => "bad"
+    };
+
+    private static string Points(double points) => points < 0 ? $"−{-points:0.00}" : $"+{points:0.00}";
+}
