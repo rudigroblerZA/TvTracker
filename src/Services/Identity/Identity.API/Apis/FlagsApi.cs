@@ -174,7 +174,8 @@ public static class FlagsApi
         return document?["flags"]?.DeepClone().AsObject() ?? [];
     }
 
-    private static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) =>
+    /// <summary>An app admin: a Keycloak username in <c>Admin:Users</c>. Plans use the same list.</summary>
+    internal static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) =>
         user.FindFirstValue("preferred_username") is { } name
         && (config.GetSection("Admin:Users").Get<string[]>() ?? []).Contains(name, StringComparer.OrdinalIgnoreCase);
 

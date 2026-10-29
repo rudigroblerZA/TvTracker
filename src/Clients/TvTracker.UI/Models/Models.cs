@@ -726,3 +726,19 @@ public record Mixtape(IReadOnlyList<ShowSummary> Shows, bool Indexed, IReadOnlyL
 public record MixtapeMatch(ShowSummary Show, int Fit, IReadOnlyList<MixtapeLink> Links);
 
 public record MixtapeLink(Guid ShowId, int Closeness, IReadOnlyList<string> SharedGenres);
+
+/// <summary>What the caller's plan allows for lists, as Tracking enforces it.</summary>
+/// <param name="MaxLists">Lists the plan allows; null for no plan limit.</param>
+/// <param name="Lists">Lists they have; can be over MaxLists when made before the limits.</param>
+/// <param name="Enforced">False while the plans flag is off: no limits.</param>
+public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists, bool Enforced)
+{
+    public bool AtLimit => Enforced && MaxLists is { } max && Lists >= max;
+    public bool CanShare => !Enforced || ShareLists;
+}
+
+/// <summary>The caller's plan, from Identity.</summary>
+public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc);
+
+/// <summary>A user on the admins' plans page.</summary>
+public record PlanUser(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);

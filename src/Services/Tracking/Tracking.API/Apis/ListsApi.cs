@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using OpenFeature;
 using Tracking.API.Data;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
@@ -10,6 +12,12 @@ namespace Tracking.API.Apis;
 /// <summary>
 /// Custom lists, e.g. "Weekend binge". A shared list is sent to Social (<see cref="ListSharedIntegrationEvent"/>) on every
 /// change, through the outbox with the change, and taken back with <see cref="ListUnsharedIntegrationEvent"/>.
+/// <para>
+/// Plans (<see cref="Plans"/>, behind the <c>plans</c> flag): a free account may have <see cref="PlanLimits.MaxLists"/>
+/// lists and share none; past a limit the API answers 403 with a problem naming the plan that allows it. Lists made
+/// before the limits are kept, shared ones stay shared, and a free user may still edit, unshare or delete them: only
+/// a new list or a new share is refused. The plan comes from Tracking's copy (<see cref="UserPlanCopy"/>).
+/// </para>
 /// </summary>
 public static class ListsApi
 {
@@ -21,6 +29,7 @@ public static class ListsApi
         var api = app.MapGroup("/api/v1/lists").RequireAuthorization();
 
         api.MapGet("/", GetListsAsync);
+        api.MapGet("/limits", GetLimitsAsync);
         api.MapPost("/", CreateListAsync);
         api.MapGet("/{id:guid}", GetListAsync);
         api.MapPut("/{id:guid}", UpdateListAsync);
@@ -43,8 +52,17 @@ public static class ListsApi
         return TypedResults.Ok(lists);
     }
 
-    private static async Task<Results<Created<ListSummaryDto>, ValidationProblem>> CreateListAsync(
-        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, TimeProvider time, CancellationToken ct)
+    /// <summary>What the caller's plan allows, as the list endpoints enforce it, and how many lists they have.</summary>
+    private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
+    {
+        var userId = user.GetUserId();
+        var (plan, limits) = await PlanAsync(user, db, flags, ct);
+        var lists = await db.Lists.CountAsync(l => l.UserId == userId, ct);
+        return TypedResults.Ok(new ListLimitsDto(plan, limits?.MaxLists, limits?.ShareLists ?? true, lists, limits is not null));
+    }
+
+    private static async Task<Results<Created<ListSummaryDto>, ValidationProblem, ProblemHttpResult>> CreateListAsync(
+        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
         {
@@ -52,9 +70,14 @@ public static class ListsApi
         }
 
         var userId = user.GetUserId();
-        if (await db.Lists.CountAsync(l => l.UserId == userId, ct) >= MaxListsPerUser)
+        var count = await db.Lists.CountAsync(l => l.UserId == userId, ct);
+        if (count >= MaxListsPerUser)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [$"You can have at most {MaxListsPerUser} lists."] });
+        }
+        if (await PlanAsync(user, db, flags, ct) is (var plan, { MaxLists: { } max }) && count >= max)
+        {
+            return PlanLimit($"{Plans.Name(plan)} accounts can have {max} lists. {Plans.Name(Plans.Plus)} has as many as you like.");
         }
 
         var now = time.GetUtcNow().UtcDateTime;
@@ -97,9 +120,9 @@ public static class ListsApi
         return TypedResults.Ok(new ListDetailDto(list.Id, list.Name, list.Description, items, list.UpdatedAtUtc, list.Shared));
     }
 
-    private static async Task<Results<NoContent, NotFound, ValidationProblem>> UpdateListAsync(
-        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, TimeProvider time,
-        CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound, ValidationProblem, ProblemHttpResult>> UpdateListAsync(
+        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, IFeatureClient flags,
+        TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
         {
@@ -113,6 +136,11 @@ public static class ListsApi
         }
 
         var wasShared = list.Shared;
+        if (request.Shared == true && !wasShared && await PlanAsync(user, db, flags, ct) is (var plan, { ShareLists: false }))
+        {
+            return PlanLimit($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
+        }
+
         list.Name = request.Name.Trim();
         list.Description = request.Description?.Trim();
         list.Shared = request.Shared ?? list.Shared;
@@ -237,4 +265,23 @@ public static class ListsApi
         }
         return errors.Count == 0 ? null : errors;
     }
+
+    /// <summary>
+    /// The caller's plan and its limits; null limits while the <c>plans</c> flag is off for them (fail open: nobody is
+    /// limited then).
+    /// </summary>
+    private static async Task<(string Plan, PlanLimits? Limits)> PlanAsync(ClaimsPrincipal user, TrackingContext db, IFeatureClient flags,
+        CancellationToken ct)
+    {
+        var userId = user.GetUserId();
+        var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
+        var on = await flags.GetBooleanValueAsync(FeatureFlags.Plans, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct);
+        return (plan, on ? Plans.Limits(plan) : null);
+    }
+
+    /// <summary>403 with the reason, typed so clients can tell a plan limit from other refusals and offer the upgrade.</summary>
+    private static ProblemHttpResult PlanLimit(string detail) =>
+        TypedResults.Problem(detail, statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: PlanLimitProblem);
+
+    public const string PlanLimitProblem = "plan-limit";
 }

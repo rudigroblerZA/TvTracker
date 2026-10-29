@@ -11,6 +11,7 @@
     <!-- Show DNA's traits and labels, shared with Analytics and Recommendations. -->
     <Compile Include="..\..\TvTracker.IntegrationEvents\DnaTraits.cs" Link="Models\DnaTraits.cs" />
     <Compile Include="..\..\TvTracker.IntegrationEvents\SeasonVerdicts.cs" Link="Models\SeasonVerdicts.cs" />
+    <Compile Include="..\..\TvTracker.IntegrationEvents\Plans.cs" Link="Models\Plans.cs" />
   </ItemGroup>
 
   <ItemGroup>

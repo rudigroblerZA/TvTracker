@@ -768,3 +768,12 @@ h1:focus, h2:focus { outline: none; }
 .swatch-2 { background: var(--mix-2); }
 .swatch-3 { background: var(--mix-3); }
 .swatch-4 { background: var(--mix-4); }
+
+/* Plans: the note under lists, the plan page's cards and the admins' list */
+.plan-note { margin: 6px 0 12px; color: var(--muted); }
+.plan-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); margin: 12px 0; }
+.plan-card.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plan-card h2 { margin-top: 0; }
+.plan-features { padding-left: 18px; margin: 0 0 10px; display: grid; gap: 4px; }
+.plan-users { list-style: none; padding: 0; display: grid; gap: 8px; }
+.plan-users li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

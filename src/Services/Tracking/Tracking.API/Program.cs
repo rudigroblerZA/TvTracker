@@ -24,7 +24,9 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowStatusChangedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodesScheduledIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodeScheduledIntegrationEvent, CatalogEventHandlers>()
-    .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>();
+    .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>()
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>();
 builder.Services.AddIntegrationEventOutbox<TrackingContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);

@@ -760,6 +760,29 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Keyed blocks:** plan blocks (and Blend's cards) are `@key`ed by show. Without it, Blazor reused the `<img>` of a
   previous plan, and the browser showed the old poster until the new one loaded.
 
+## Plans
+
+- **Identity owns the plan** (`UserProfile.Plan`, `Plans` in IntegrationEvents): who pays is about the account, and
+  Identity already orchestrates account-wide things (deletion, export). A change goes out as
+  `UserPlanChangedIntegrationEvent` through the outbox, and every plan rides the daily `UserProfileSnapshot` (optional
+  trailing `Plan` and `PlanChangedAtUtc`), so a lost change heals.
+- **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
+  every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
+  since events can arrive out of order; no row means free.
+  - **Tested:** demo's copy deleted, then restored by the snapshot two minutes after start, with Identity's time.
+- **Not a token claim:** a Keycloak role would need a token refresh before a change applied, and would put billing in
+  the identity provider. A copy applies in seconds.
+- **Shared definition:** `Plans.Limits` is linked into the UI, so the plan page, the lists page and Tracking state the
+  same limits.
+- **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
+  already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
+  people's work.
+- **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
+- **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
+- **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
+  applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
+  Identity now reads flags, so the AppHost gives it flagd.
+
 ## Feature flags
 
 - **OpenFeature, served by flagd:** flags are in `TvTracker.AppHost/Flags/flagd.json`, mounted into the flagd
@@ -814,7 +837,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   marked seasons only, labels every fifth).
 - **Spoiler shield:** `SpoilerShield` (scoped) reads a device preference through `IPlatformServices` (localStorage
   on the web, MAUI `Preferences` on the phone). `<Spoiler Hidden=…>` swaps hidden content for a "Title hidden" button.
-  Per device by design, and it needed no column in Identity, which still uses `EnsureCreated`.
+  Per device by design, so it needs no column in Identity.
 - **White label:** the app's name is `Branding:AppName`, set once in the AppHost and passed as `Branding__AppName`.
   - **Two `Branding` types:** services use ServiceDefaults' (`TvTracker.Branding`, registered by
     `AddServiceDefaults`); the UI has its own (`TvTracker.UI.Services.Branding`), since the phone doesn't reference
@@ -845,12 +868,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Persistence
 
-- **Migrations:** Catalog, Analytics, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
-  migrations, applied at startup by their API. Identity still uses `EnsureCreated`.
+- **Migrations:** Catalog, Analytics, Identity, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core
+  migrations, applied at startup by their API. Identity moved last, for plans.
   - **Baselines:** a service moving off `EnsureCreated` makes its first migration from the unchanged model and passes
     its name as `AddDatabaseInitializer(baseline: "InitialCreate")`. A database `EnsureCreated` made is then recorded
     as at that migration and migrated from there, rather than refusing to start.
-  - **Checked:** Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
+  - **Checked:** Identity's, Notifications', Ratings', Recommendations' and Tracking's `InitialCreate` scripts were diffed against databases made by
     `EnsureCreated` (`pg_dump -s`); the schemas match.
 - **Connection budget** (`ConnectionPool` in TvTracker.Persistence): every service's Npgsql pool is capped at 8, with
   idle connections returned after 60 s, because all the databases share one server's `max_connections` (100).

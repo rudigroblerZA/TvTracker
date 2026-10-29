@@ -1,0 +1,73 @@
+@page "/settings/plan"
+@attribute [RequiresFeature(FeatureFlags.Plans)]
+@inject IdentityClient Identity
+
+<PageTitle>Your plan · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Your plan</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (plan is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else
+        {
+            <p>You're on <strong>@plan.Name</strong>@(plan.ChangedAtUtc is { } changed ? $" since {changed:d MMM yyyy}" : "").</p>
+
+            @* Both columns come from the shared Plans limits, so this table says what the services enforce. *@
+            <div class="plan-grid">
+                @foreach (var key in Plans.All)
+                {
+                    var limits = Plans.Limits(key);
+                    <section class="panel plan-card @(key == plan.Plan ? "current" : "")">
+                        <h2>@Plans.Name(key)</h2>
+                        <ul class="plan-features">
+                            <li>@(limits.MaxLists is { } max ? $"Up to {max} lists" : "As many lists as you like")</li>
+                            <li>@(limits.ShareLists ? "Share lists on your profile" : "Lists are just for you")</li>
+                            <li>Everything else in @Brand.AppName</li>
+                        </ul>
+                        @if (key == plan.Plan)
+                        {
+                            <p class="tag">Your plan</p>
+                        }
+                    </section>
+                }
+            </div>
+
+            @if (plan.Plan != Plans.Plus)
+            {
+                <p class="muted small">Upgrading in the app isn't available yet. Until it is, an admin can move you to @Plans.Name(Plans.Plus).</p>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private UserPlan? plan;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            plan = await Identity.GetMyPlanAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+}
