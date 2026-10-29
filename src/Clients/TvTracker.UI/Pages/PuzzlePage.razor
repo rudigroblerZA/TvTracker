@@ -1,0 +1,252 @@
+@page "/puzzle"
+@attribute [RequiresFeature(FeatureFlags.ShowPuzzle)]
+@using System.Text.Json
+@inject CatalogClient Catalog
+@inject IPlatformServices Platform
+
+<PageTitle>Guess the show · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Guess the show</h1>
+<p class="muted">
+    One show a day, the same for everyone. Each guess shows how close you are: when it premiered, its network, genres,
+    seasons and shared actors. Every wrong guess adds a clue.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (puzzle is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">@(missing ? "There's no puzzle today. Try again tomorrow." : "Loading…")</p>
+    }
+}
+else
+{
+    <section class="panel puzzle">
+        <div class="puzzle-head">
+            <strong>@($"#{puzzle.Number}")</strong>
+            <span class="muted small">@($" · {state.Guesses.Count} of {puzzle.MaxGuesses} guesses")</span>
+        </div>
+
+        <ul class="puzzle-clues">
+            @foreach (var clue in Clues)
+            {
+                <li @key="clue.Key">@clue.Text</li>
+            }
+        </ul>
+
+        @if (Over)
+        {
+            <div class="puzzle-answer @(Won ? "won" : "lost")">
+                <Poster Title="@state.Answer!.Title" Url="@state.Answer.PosterUrl" Size="small" />
+                <div>
+                    <p class="strong">@(Won ? $"Got it in {state.Guesses.Count}." : "Out of guesses. It was:")</p>
+                    <p><a href="shows/@state.Answer.Id">@state.Answer.Title</a></p>
+                    <p class="puzzle-grid" aria-label="Your guesses">@Grid</p>
+                    <button class="btn btn-quiet small" type="button" @onclick="ShareAsync">@(shared ? "Copied" : "Share result")</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <ShowPicker Label="Your guess" Selected="null" SelectedChanged="GuessAsync" ExcludeAll="@state.Guesses.Select(g => g.Feedback.Guess.Id).ToList()" />
+            @if (guessing)
+            {
+                <p class="muted small">Checking…</p>
+            }
+        }
+
+        @if (state.Guesses.Count > 0)
+        {
+            <ol class="puzzle-guesses" reversed>
+                @foreach (var guess in Enumerable.Reverse(state.Guesses))
+                {
+                    var f = guess.Feedback;
+                    <li class="puzzle-guess @(guess.Correct ? "correct" : "")" @key="f.Guess.Id">
+                        <div class="strong">@f.Guess.Title</div>
+                        <div class="puzzle-chips">
+                            <span class="puzzle-chip @Tone(f.Year == "same", f.YearClose)" title="Premiered">@($"{f.GuessYear?.ToString() ?? "?"} {Arrow(f.Year, "later", "earlier")}")</span>
+                            <span class="puzzle-chip @Tone(f.Network == "same", f.Network == "service")" title="Network">@(f.GuessNetwork ?? "No network")</span>
+                            @foreach (var genre in f.Genres)
+                            {
+                                <span class="puzzle-chip @Tone(genre.Shared, false)" title="Genre">@genre.Genre</span>
+                            }
+                            <span class="puzzle-chip @Tone(f.SameKind, false)" title="Kind">@(f.GuessKind ?? "unknown kind")</span>
+                            <span class="puzzle-chip @Tone(f.Seasons == "same", f.SeasonsClose)" title="Seasons">@($"{f.GuessSeasons} {(f.GuessSeasons == 1 ? "season" : "seasons")} {Arrow(f.Seasons, "more", "fewer")}")</span>
+                            <span class="puzzle-chip @Tone(f.SameStatus, false)" title="Status">@f.GuessStatus</span>
+                        </div>
+                        @if (f.SharedCast.Count > 0 && !guess.Correct)
+                        {
+                            <div class="small">@($"Shares {string.Join(", ", f.SharedCast)}")</div>
+                        }
+                    </li>
+                }
+            </ol>
+            <p class="muted small">Green matches, amber is close (within 3 years, a season, or the same streaming service); ↑ means the answer's is higher or later.</p>
+        }
+    </section>
+
+    @if (stats.Played > 0)
+    {
+        <section class="panel">
+            <h2>Your record</h2>
+            <div class="service-total">
+                <div><strong>@stats.Played</strong><span class="muted">@(" played")</span></div>
+                <div><strong>@(stats.Played == 0 ? 0 : stats.Won * 100 / stats.Played)%</strong><span class="muted">@(" solved")</span></div>
+                <div><strong>@stats.Streak</strong><span class="muted">@(" in a row")</span></div>
+                <div><strong>@stats.BestStreak</strong><span class="muted">@(" best run")</span></div>
+            </div>
+            <p class="muted small">Kept on this device.</p>
+        </section>
+    }
+}
+
+@code {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    private Puzzle? puzzle;
+    private DateOnly date;
+    private PuzzleState state = new();
+    private PuzzleStats stats = new();
+    private bool missing;
+    private bool guessing;
+    private bool shared;
+    private string? error;
+
+    /// <summary>A day's guesses on this device, so leaving and coming back keeps them.</summary>
+    private sealed class PuzzleState
+    {
+        public List<PuzzleGuess> Guesses { get; set; } = [];
+        public List<PuzzleClue> Clues { get; set; } = [];
+        public PuzzleShow? Answer { get; set; }
+    }
+
+    private sealed class PuzzleStats
+    {
+        public int Played { get; set; }
+        public int Won { get; set; }
+        public int Streak { get; set; }
+        public int BestStreak { get; set; }
+        public DateOnly? LastPlayed { get; set; }
+        public DateOnly? LastWon { get; set; }
+    }
+
+    private bool Over => state.Answer is not null;
+    private bool Won => state.Guesses.Any(g => g.Correct);
+    private IEnumerable<PuzzleClue> Clues => (state.Clues.Count > 0 ? state.Clues : puzzle!.Clues).OrderBy(c => c.AfterWrong);
+
+    private string StateKey => $"puzzle:{date:yyyy-MM-dd}";
+    private const string StatsKey = "puzzle:stats";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // The device's date, so the puzzle turns over at its midnight.
+            var zone = await Platform.GetDeviceTimeZoneAsync() is { } id && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var tz) ? tz : TimeZoneInfo.Utc;
+            date = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).DateTime);
+            puzzle = await Catalog.GetPuzzleAsync(date);
+            missing = puzzle is null;
+            state = Read<PuzzleState>(await Platform.GetPreferenceAsync(StateKey)) ?? new();
+            stats = Read<PuzzleStats>(await Platform.GetPreferenceAsync(StatsKey)) ?? new();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task GuessAsync(ShowSummary? show)
+    {
+        if (show is null || Over || guessing)
+        {
+            return;
+        }
+        guessing = true;
+        error = null;
+        try
+        {
+            if (await Catalog.GuessPuzzleAsync(date, show.Id, state.Guesses.Count + 1) is not { } guess)
+            {
+                return;
+            }
+            state.Guesses.Add(guess);
+            state.Clues = guess.Clues.ToList();
+            state.Answer = guess.Answer;
+            await Platform.SetPreferenceAsync(StateKey, JsonSerializer.Serialize(state, Json));
+            if (Over)
+            {
+                await RecordAsync();
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            guessing = false;
+        }
+    }
+
+    /// <summary>Counts a finished day once: played, solved, and the run of days solved in a row.</summary>
+    private async Task RecordAsync()
+    {
+        if (stats.LastPlayed == date)
+        {
+            return;
+        }
+        stats.Played++;
+        stats.LastPlayed = date;
+        if (Won)
+        {
+            stats.Won++;
+            stats.Streak = stats.LastWon == date.AddDays(-1) ? stats.Streak + 1 : 1;
+            stats.LastWon = date;
+            stats.BestStreak = Math.Max(stats.BestStreak, stats.Streak);
+        }
+        else
+        {
+            stats.Streak = 0;
+        }
+        await Platform.SetPreferenceAsync(StatsKey, JsonSerializer.Serialize(stats, Json));
+    }
+
+    /// <summary>One square per guess, spoiler-free: green solved, amber close (three or more matches), black far.</summary>
+    private string Grid => string.Concat(state.Guesses.Select(g =>
+        g.Correct ? "🟩" : Matches(g.Feedback) >= 3 ? "🟨" : "⬛"));
+
+    private static int Matches(PuzzleFeedback f) =>
+        (f.Year == "same" || f.YearClose ? 1 : 0) + (f.Network != "different" ? 1 : 0) + (f.Genres.Any(g => g.Shared) ? 1 : 0)
+        + (f.SameKind ? 1 : 0) + (f.Seasons == "same" || f.SeasonsClose ? 1 : 0) + (f.SameStatus ? 1 : 0) + (f.SharedCast.Count > 0 ? 1 : 0);
+
+    private async Task ShareAsync() =>
+        shared = await Platform.ShareLinkAsync(
+            $"{Brand.AppName} · Guess the show #{puzzle!.Number} · {(Won ? state.Guesses.Count.ToString() : "X")}/{puzzle.MaxGuesses} {Grid}",
+            $"{Platform.PublicWebAddress}puzzle");
+
+    private static string Tone(bool hit, bool near) => hit ? "hit" : near ? "near" : "miss";
+
+    private static string Arrow(string relation, string up, string down) => relation == up ? "↑" : relation == down ? "↓" : "";
+
+    private static T? Read<T>(string? json) where T : class
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json, Json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

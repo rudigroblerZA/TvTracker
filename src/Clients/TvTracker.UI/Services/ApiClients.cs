@@ -108,6 +108,13 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    /// <summary>Guess the show for a day (the device's date); null while the flag is off or there's no puzzle that day.</summary>
+    public Task<Puzzle?> GetPuzzleAsync(DateOnly date, CancellationToken ct = default) =>
+        GetAsync<Puzzle>(ApiClients.Catalog, $"api/v1/puzzles/{date:yyyy-MM-dd}", ct);
+
+    public Task<PuzzleGuess?> GuessPuzzleAsync(DateOnly date, Guid showId, int attempt, CancellationToken ct = default) =>
+        SendAsync<PuzzleGuess>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/puzzles/{date:yyyy-MM-dd}/guesses", new { showId, attempt }, ct);
+
     public Task<List<HolidaySummary>?> GetHolidaysAsync(CancellationToken ct = default) =>
         GetAsync<List<HolidaySummary>>(ApiClients.Catalog, "api/v1/holidays", ct);
 
