@@ -232,6 +232,7 @@
                 </div>
             }
 
+            <Feature Flag="@FeatureFlags.WorthIt"><WorthItPanel WorthIt="insights.WorthIt" /></Feature>
             <Feature Flag="@FeatureFlags.GetsGood"><GetsGoodPanel GetsGood="insights.GetsGood" DropOff="insights.Viewing?.DropOff" Watched="Watched" /></Feature>
             <Feature Flag="@FeatureFlags.Endings"><LandingPanel Landing="insights.Landing" /></Feature>
             <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>

@@ -420,6 +420,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Ties:** the finale's and the final season's places are stored as counts (rated higher, lower), not a share or a
     rank alone, so a tie reads as one ("ties for its best") rather than "higher than any other episode".
   - **Spoiler-free:** no titles, in the panel or the Great endings list.
+- **Is it worth it?** (`WorthItInsight`, the document's `WorthIt`): the provider's rating moved by the other stages'
+  findings (slow start, decline, ending, consistency), then 0-100 between fixed anchors (`WorthItScale`).
+  - **On the rating's scale first,** like `ShowValue`, so each part reads as rating points and the panel can list them
+    all; the ending's points are `ShowValue`'s, so the backlog, time off and the score agree.
+  - **Decline by share of the running time:** a show that fades in its last season loses little; How I Met Your
+    Mother, weaker for 58% of its hours, loses 0.35.
+  - **Fixed anchors (6.0 → 0, 9.0 → 100):** a percentile would move a show's score whenever the catalog grows. 595
+    shows scored when it was added: median 50, 13 at 100, 13% worth it, 40% mostly, 28% mixed, 18% hard to recommend.
+  - **Not in it:** our users' viewing (load-test data, and completion depends on length more than worth), and total
+    hours, which are shown beside the score rather than counted against it: a long show isn't worse, just longer.
+  - **Needs** a provider rating and 5+ rated episodes.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
   - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a

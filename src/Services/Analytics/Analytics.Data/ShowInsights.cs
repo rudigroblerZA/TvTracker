@@ -34,7 +34,70 @@ public record ShowInsights(
     Outlook? Outlook = null,
     GetsGood? GetsGood = null,
     Landing? Landing = null,
-    SeasonVerdict? SeasonVerdict = null);
+    SeasonVerdict? SeasonVerdict = null,
+    WorthIt? WorthIt = null);
+
+/// <summary>
+/// Is it worth your time? The provider's rating, moved by what decides whether the hours pay off: a slow start, a
+/// decline and the share of the show it covers, the ending, and how even the episodes are. On the rating's scale
+/// (<paramref name="Value"/>), then 0-100 between fixed anchors (<see cref="WorthItScale"/>). Every part is a <see cref="WorthItFactor"/> the UI shows, so the score is never a black box.
+/// </summary>
+/// <param name="Score">0-100: <see cref="WorthItScale.ZeroAt"/> on the rating's scale is 0, <see cref="WorthItScale.FullAt"/> 100.</param>
+/// <param name="Verdict">One of <see cref="WorthItVerdicts"/>.</param>
+/// <param name="Rating">The provider's rating the score starts from.</param>
+/// <param name="Value">The rating plus every factor's points.</param>
+/// <param name="RuntimeMinutes">What it takes: the aired regular episodes' running time.</param>
+/// <param name="StillRunning">The ending isn't in the score yet.</param>
+public record WorthIt(int Score, string Verdict, double Rating, double Value, IReadOnlyList<WorthItFactor> Factors,
+    int RuntimeMinutes, bool StillRunning);
+
+/// <param name="Key">One of <see cref="WorthItFactors"/>.</param>
+/// <param name="Points">What it adds to the rating (negative takes away).</param>
+/// <param name="Text">The fact behind it, e.g. "Weaker from season 4, 61% of its running time".</param>
+public record WorthItFactor(string Key, double Points, string Text);
+
+public static class WorthItFactors
+{
+    public const string Start = "start";
+    public const string Decline = "decline";
+    public const string Ending = "ending";
+    public const string Consistency = "consistency";
+}
+
+public static class WorthItVerdicts
+{
+    /// <summary>Score 75 and up.</summary>
+    public const string WorthIt = "worth-it";
+
+    /// <summary>50-74.</summary>
+    public const string Mostly = "mostly";
+
+    /// <summary>30-49.</summary>
+    public const string Mixed = "mixed";
+
+    /// <summary>Under 30.</summary>
+    public const string HardToRecommend = "hard-to-recommend";
+}
+
+/// <summary>
+/// The fixed anchors of <see cref="WorthIt.Score"/>. Over the 595 shows scored when it was added, the median score was
+/// 50, 13 shows reached 100, and the verdicts split 13% worth it, 40% mostly, 28% mixed and 18% hard to recommend. Fixed rather than percentiles, so a show's score only moves when the show does.
+/// </summary>
+public static class WorthItScale
+{
+    public const double ZeroAt = 6.0;
+    public const double FullAt = 9.0;
+
+    public static int Score(double value) => (int)Math.Round(100 * Math.Clamp((value - ZeroAt) / (FullAt - ZeroAt), 0, 1));
+
+    public static string Verdict(int score) => score switch
+    {
+        >= 75 => WorthItVerdicts.WorthIt,
+        >= 50 => WorthItVerdicts.Mostly,
+        >= 30 => WorthItVerdicts.Mixed,
+        _ => WorthItVerdicts.HardToRecommend
+    };
+}
 
 /// <summary>
 /// How a season that just finished did, for a few weeks after its finale: its rating against the show's other seasons,
@@ -373,8 +436,12 @@ public static class DiscoveryLists
     /// <summary>Well-rated ended shows that stick the landing (<see cref="LandingVerdicts.Sticks"/>), most popular first.</summary>
     public const string GreatEndings = "great-endings";
 
+    /// <summary>Shows by their <see cref="WorthIt"/> score, most popular first among equals.</summary>
+    public const string WorthYourTime = "worth-your-time";
+
     public static readonly IReadOnlyList<string> All =
-        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites, WorthTheWait, GreatEndings];
+        [HiddenGems, MostConsistent, Rollercoasters, BestFinales, Bingeable, WeekendBinges, FanFavorites, WorthTheWait, GreatEndings,
+            WorthYourTime];
 }
 
 /// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>

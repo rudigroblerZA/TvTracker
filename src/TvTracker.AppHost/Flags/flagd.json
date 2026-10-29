@@ -223,6 +223,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
     },
+    "worth-it": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Is it worth it?: a 0-100 score on show pages, with the parts behind it, and the Worth your time discovery list." }
+    },
     "year-in-tv": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

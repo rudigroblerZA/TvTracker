@@ -48,6 +48,15 @@
                 SeasonVerdictText.Tone(verdict), FeatureFlags.SeasonVerdict));
         }
 
+        // The summary of what follows: whether the hours pay off, and the biggest reason either way.
+        if (i.WorthIt is { } worth)
+        {
+            var reason = worth.Factors.OrderByDescending(f => Math.Abs(f.Points)).FirstOrDefault()?.Text;
+            list.Add(new("Worth it?", $"{worth.Score} · {WorthItPanel.Headline(worth.Verdict)}",
+                reason ?? $"Rated {Format.Rating(worth.Rating)} · {Format.Hours(worth.RuntimeMinutes)} to watch", WorthItPanel.Tone(worth.Verdict),
+                FeatureFlags.WorthIt));
+        }
+
         if (i.GetsGood is { } getsGood)
         {
             list.Add(getsGood.Turn is { } turn
