@@ -423,6 +423,9 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 
     /// <summary>Network report cards, most shows first, with the whole catalog as the baseline.</summary>
+    public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>
+        GetAsync<NetworkReportCards>(ApiClients.Analytics, "api/v1/insights/networks", ct, cacheForOffline: true);
+
     /// <summary>The services behind the networks, logos and prices; null while the your-services flag is off.</summary>
     public Task<ServiceDirectory?> GetServiceDirectoryAsync(CancellationToken ct = default) =>
         GetAsync<ServiceDirectory>(ApiClients.Analytics, "api/v1/networks/services", ct, cacheForOffline: true);
@@ -435,9 +438,6 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
 
     public Task<ServicesReport?> GetServicesReportAsync(CancellationToken ct = default) =>
         GetAsync<ServicesReport>(ApiClients.Analytics, "api/v1/me/services/report", ct);
-
-    public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>
-        GetAsync<NetworkReportCards>(ApiClients.Analytics, "api/v1/insights/networks", ct, cacheForOffline: true);
 
     /// <summary>The user's year in TV; the latest year with viewing when <paramref name="year"/> is null.</summary>
     public Task<YearInTv?> GetYearInTvAsync(int? year, string? timeZone, CancellationToken ct = default)

@@ -887,7 +887,8 @@ How events flow:
     - **The report:** your monthly total, and per service the hours you watched on it in the last 30 days, its cost per
       hour, the shows behind them, and the shows you follow with episodes on it in the next 30 days.
     - **Verdicts:** good value (up to $2 an hour, a rental's price), pricey (more), quiet (nothing watched, but your
-      shows are coming) and could pause (nothing watched, nothing coming).
+      shows are coming) and could pause (nothing watched, nothing coming). Free and unpriced services are listed without a
+      verdict on cost.
     - **Not on your services:** services you haven't picked that have your followed shows coming.
     - **Bulk marks** (8+ of a show's episodes at once) aren't counted as watching, as in Year in TV.
     - **API** (Analytics.API): `GET /api/v1/networks/services` (directory, prices and logos), `GET`/`PUT

@@ -789,6 +789,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Families** (`families`, `family_members`): one per owner, a person in at most one, an owner with members can't join
   another, 5 members (`Plans.FamilyMembers`). The invite link is 128 random bits, like a list's; members see the owner's
   name and each other's names only. A family ends with its owner's plan or account; members fall back to what they pay for.
+  - **Members don't invite:** joining turns off the joiner's own (empty) family's link, and a member asking for one gets
+    409; otherwise a Family payer could own a family while in another, and the page would show them only as a member.
+  - **Seats under a lock:** a join runs in a transaction holding the family's row (`FOR UPDATE`), so two people taking
+    the last seat at once can't both get in. Checked with three joins at once for one seat: one 200, two 409.
 - **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
   every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
   since events can arrive out of order; no row means free.
@@ -824,7 +828,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   writes; they're deleted with the account and included in the data export (Analytics now has `/me/export`).
 - **Cost per hour** = the month's price over the hours watched on it in the last 30 days, bulk marks left out. Over $2
   an hour (a rental) is pricey; nothing watched and none of the user's followed shows airing on it in the next 30 days
-  means it could be paused.
+  means it could be paused. A free or unpriced service gets "free" / "unpriced" instead: no cost to weigh, nothing to pause.
+- **Limit behind `plans`:** like Tracking's, the Plus limit applies only while the `plans` flag is on for the caller.
+- **Logos:** the favicon client has ServiceDefaults' retries removed (one try each, as Research's sources), and a fetch
+  that missed any logo is cached 15 minutes rather than the week.
 
 ## Feature flags
 
