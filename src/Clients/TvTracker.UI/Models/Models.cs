@@ -853,3 +853,15 @@ public record TvLifeYourYear(int Started, int Finished, int Minutes, TvLifeShow?
 
 public record TvLifeFacts(int OlderThanYou, TvLifeShow? Oldest, int? OldestYear, TvLifeShow? BornWith, int? BiggestYear, int TotalMinutes, int ShowsWatched);
 
+/// <summary>Where a show's cast went next: each member's main roles since the show ended (or, running, since it started).</summary>
+public record ShowAfterwards(Guid ShowId, bool Ended, DateOnly Since, int CastCount, int WentOn, int CreditsPending, BiggestRole? Biggest,
+    IReadOnlyList<CastAfterwards> Cast);
+
+public record BiggestRole(Guid PersonId, string Name, NextRole Role);
+
+public record CastAfterwards(Guid PersonId, string Name, string? PhotoUrl, string? Character, bool CreditsFetched, IReadOnlyList<NextRole> Roles);
+
+/// <param name="ShowId">Null for a show outside the catalog.</param>
+public record NextRole(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Character,
+    double Popularity, double? Rating);
+

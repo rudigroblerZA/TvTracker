@@ -1,0 +1,82 @@
+@inject CatalogClient Catalog
+
+@* Where the cast went next: each main cast member's roles since the show ended (or, for a running show, since it started). *@
+@if (afterwards is { Cast.Count: > 0 } a && (a.WentOn > 0 || a.CreditsPending < a.CastCount))
+{
+    <section aria-labelledby="afterwards-title">
+        <h2 id="afterwards-title">@(a.Ended ? "Where the cast went next" : "What the cast has done since")</h2>
+        <p class="muted small">
+            @($"{a.WentOn} of {a.CastCount} {(a.Ended ? $"went on to another main role after the finale ({a.Since:MMMM yyyy})" : $"have taken another main role since it started ({a.Since:yyyy})")}.")
+            @if (a.CreditsPending > 0)
+            {
+                <span>@($" {a.CreditsPending} {(a.CreditsPending == 1 ? "member's credits aren't" : "members' credits aren't")} in yet.")</span>
+            }
+        </p>
+        @if (a.Biggest is { } big)
+        {
+            <div class="afterwards-biggest">
+                <Poster Title="@big.Role.Title" Url="@big.Role.PosterUrl" Size="small" />
+                <div>
+                    <div class="muted small">The biggest</div>
+                    <div><a href="people/@big.PersonId" class="strong">@big.Name</a><span>@(big.Role.Character is { } c ? $" as {c} in " : " in ")</span>@Role(big.Role)</div>
+                </div>
+            </div>
+        }
+        <ul class="afterwards">
+            @foreach (var member in a.Cast.Where(m => m.Roles.Count > 0))
+            {
+                <li @key="member.PersonId">
+                    <div>
+                        <a href="people/@member.PersonId" class="strong">@member.Name</a>
+                        @if (member.Character is { } character)
+                        {
+                            <span class="muted small">@($" ({character})")</span>
+                        }
+                        <div class="roles small">
+                            @foreach (var role in member.Roles)
+                            {
+                                <span class="role" @key="role.ExternalId">@Role(role)<span class="muted">@(role.Year is { } y ? $" {y}" : "")</span></span>
+                            }
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+        @if (a.Cast.Any(m => m.CreditsFetched && m.Roles.Count == 0))
+        {
+            <p class="muted small">@($"No other main role since: {string.Join(", ", a.Cast.Where(m => m.CreditsFetched && m.Roles.Count == 0).Select(m => m.Name))}.")</p>
+        }
+        <p class="muted small">Main casts only, as TVmaze lists them: guest arcs and films don't appear.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowAfterwards? afterwards;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            afterwards = await Catalog.GetAfterwardsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            afterwards = null;
+        }
+    }
+
+    private static RenderFragment Role(NextRole role) => __builder =>
+    {
+        @if (role.ShowId is { } id)
+        {
+            <a href="shows/@id">@role.Title</a>
+        }
+        else
+        {
+            <a href="search?q=@Uri.EscapeDataString(role.Title)" title="Not in the catalog yet; search imports it">@role.Title</a>
+        }
+    };
+}

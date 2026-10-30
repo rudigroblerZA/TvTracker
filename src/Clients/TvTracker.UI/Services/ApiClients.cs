@@ -108,6 +108,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>The holidays with episodes made for them, the next one first.</summary>
+    /// <summary>Where a show's cast went next; null while the cast-afterwards flag is off.</summary>
+    public Task<ShowAfterwards?> GetAfterwardsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowAfterwards>(ApiClients.Catalog, $"api/v1/shows/{showId}/afterwards", ct, cacheForOffline: true);
+
     /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
     public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>
         GetAsync<DegreesResult>(ApiClients.Catalog, $"api/v1/degrees?from={from}&to={to}", ct);

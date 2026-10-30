@@ -39,6 +39,7 @@ public static class FeatureFlags
     public const string CallIt = "call-it";
     public const string SixDegrees = "six-degrees";
     public const string TvLife = "tv-life";
+    public const string CastAfterwards = "cast-afterwards";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
