@@ -238,6 +238,54 @@ public class PersonCastCredit
     public bool Voice { get; set; }
 }
 
+/// <summary>
+/// A show's page on Wikiquote, found through Wikidata by the show's TVmaze id, and when its lines were last fetched.
+/// A row with no <see cref="Page"/> means Wikidata knows no page; the lookup is repeated monthly.
+/// </summary>
+public class ShowQuoteSource
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>The page's title on en.wikiquote.org ("Breaking Bad"), or null when the show has none.</summary>
+    public string? Page { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+
+    /// <summary>When the page and its season pages were last read; null until the first time.</summary>
+    public DateTime? FetchedAtUtc { get; set; }
+
+    /// <summary>A page's address on Wikiquote, or its raw wikitext's.</summary>
+    public static string PageUrl(string page, bool raw = false)
+    {
+        var title = Uri.EscapeDataString(page.Replace(' ', '_')).Replace("%28", "(").Replace("%29", ")");
+        return raw ? $"https://en.wikiquote.org/w/index.php?title={title}&action=raw" : $"https://en.wikiquote.org/wiki/{title}";
+    }
+}
+
+/// <summary>
+/// One memorable line or exchange from Wikiquote (CC BY-SA), for a show or one of its episodes. Replaced whole for the
+/// show when its pages are read again.
+/// </summary>
+public class Quote
+{
+    public Guid Id { get; set; }
+
+    public Guid ShowId { get; set; }
+
+    /// <summary>The episode's numbers as Wikiquote heads it ("[1.01]"); both null for a line about the whole show.</summary>
+    public int? SeasonNumber { get; set; }
+
+    public int? EpisodeNumber { get; set; }
+
+    /// <summary>Order on the page, so an episode's lines read as Wikiquote lists them.</summary>
+    public int Position { get; set; }
+
+    /// <summary>Who says each line, matching <see cref="Lines"/> by index; empty for a stage direction or narration.</summary>
+    public List<string> Speakers { get; set; } = [];
+
+    public List<string> Lines { get; set; } = [];
+}
+
 /// <summary>A person who made a show, with their roles on it.</summary>
 public class ShowCreative
 {

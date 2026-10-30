@@ -1,0 +1,31 @@
+@* Memorable lines as Wikiquote lists them: each exchange a block, speakers in bold, stage directions muted. *@
+<ul class="quotes">
+    @foreach (var quote in Quotes)
+    {
+        <li>
+            @foreach (var line in quote.Lines)
+            {
+                @if (line.Speaker is { } speaker)
+                {
+                    <p><strong>@speaker</strong><span>@(": " + line.Text)</span></p>
+                }
+                else
+                {
+                    <p class="direction">@line.Text</p>
+                }
+            }
+        </li>
+    }
+</ul>
+<p class="muted small">
+    <span>@(More > 0 ? $"{More} more on " : "From ")</span><a href="@PageUrl" target="_blank" rel="noopener noreferrer">Wikiquote</a><span>, under </span><a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a><span>.</span>
+</p>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<QuoteText> Quotes { get; set; } = [];
+
+    [Parameter, EditorRequired] public string PageUrl { get; set; } = "";
+
+    /// <summary>How many more the page has than are shown.</summary>
+    [Parameter] public int More { get; set; }
+}

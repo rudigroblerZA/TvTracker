@@ -865,6 +865,21 @@ public record CastAfterwards(Guid PersonId, string Name, string? PhotoUrl, strin
 public record NextRole(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Character,
     double Popularity, double? Rating);
 
+/// <summary>Memorable lines from Wikiquote: a few for the show page, and which episodes have lines.</summary>
+/// <param name="FromEpisode">The episode <paramref name="Lines"/> come from, when the show's page has none about the whole show.</param>
+public record ShowQuotes(Guid ShowId, string PageUrl, IReadOnlyList<QuoteText> Lines, QuoteEpisode? FromEpisode, int Total,
+    IReadOnlyList<QuoteEpisode> Episodes);
+
+public record QuoteEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, int Count);
+
+/// <param name="More">How many more Wikiquote has for the episode; the page shows a few and links the rest.</param>
+public record EpisodeQuotes(Guid EpisodeId, string PageUrl, IReadOnlyList<QuoteText> Quotes, int More);
+
+public record QuoteText(IReadOnlyList<QuoteLine> Lines);
+
+/// <param name="Speaker">Null for a stage direction.</param>
+public record QuoteLine(string? Speaker, string Text);
+
 /// <summary>Spoiler watch: the viewer's shows with recent unwatched episodes, riskiest first.</summary>
 public record SpoilerWatch(IReadOnlyList<SpoilerRisk> Shows);
 

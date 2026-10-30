@@ -1,0 +1,38 @@
+@inject CatalogClient Catalog
+
+@* A few memorable lines on the show page: about the whole show, else the first episode's (the least a spoiler a
+   line can be). Each episode's page has its own. *@
+@if (quotes is { Lines.Count: > 0 } q)
+{
+    <section aria-labelledby="lines-title">
+        <h2 id="lines-title">Memorable lines</h2>
+        @if (q.FromEpisode is { } from)
+        {
+            <p class="muted small"><span>From </span><a href="episodes/@from.EpisodeId">@Format.EpisodeCode(from.SeasonNumber, from.EpisodeNumber)</a><span>@($". {q.Total} quotes across {q.Episodes.Count} {(q.Episodes.Count == 1 ? "episode" : "episodes")}; each episode's page has its own.")</span></p>
+        }
+        else if (q.Episodes.Count > 0)
+        {
+            <p class="muted small">@($"{q.Total} quotes across the show and {q.Episodes.Count} {(q.Episodes.Count == 1 ? "episode" : "episodes")}; each episode's page has its own.")</p>
+        }
+        <QuoteList Quotes="q.Lines" PageUrl="@q.PageUrl" />
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowQuotes? quotes;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            quotes = await Catalog.GetShowQuotesAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            quotes = null;
+        }
+    }
+}

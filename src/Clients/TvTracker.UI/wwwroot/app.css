@@ -854,6 +854,13 @@ h1:focus, h2:focus { outline: none; }
 .afterwards .roles a, .afterwards .roles .role { display: inline-flex; align-items: baseline; gap: 4px; }
 .afterwards-biggest { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 8px 0; }
 
+/* Memorable lines */
+.quotes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
+.quotes li { padding: 10px 14px; border-left: 3px solid var(--border); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
+.quotes p { margin: 0 0 4px; }
+.quotes p:last-child { margin-bottom: 0; }
+.quotes .direction { color: var(--muted); font-style: italic; }
+
 /* Spoiler watch */
 .spoiler-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
 .spoiler-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius); background: var(--surface); }
