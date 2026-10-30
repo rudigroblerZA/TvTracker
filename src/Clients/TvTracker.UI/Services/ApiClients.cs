@@ -107,10 +107,17 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<NanogenreDetail?> GetNanogenreAsync(string slug, CancellationToken ct = default) =>
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
-    /// <summary>The holidays with episodes made for them, the next one first.</summary>
     /// <summary>Where a show's cast went next; null while the cast-afterwards flag is off.</summary>
     public Task<ShowAfterwards?> GetAfterwardsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowAfterwards>(ApiClients.Catalog, $"api/v1/shows/{showId}/afterwards", ct, cacheForOffline: true);
+
+    /// <summary>A show's memorable lines from Wikiquote; null when it has none, or the memorable-lines flag is off.</summary>
+    public Task<ShowQuotes?> GetShowQuotesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowQuotes>(ApiClients.Catalog, $"api/v1/shows/{showId}/quotes", ct, cacheForOffline: true);
+
+    /// <summary>An episode's memorable lines; null when its show has none, or the flag is off.</summary>
+    public Task<EpisodeQuotes?> GetEpisodeQuotesAsync(Guid episodeId, CancellationToken ct = default) =>
+        GetAsync<EpisodeQuotes>(ApiClients.Catalog, $"api/v1/episodes/{episodeId}/quotes", ct, cacheForOffline: true);
 
     /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
     public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>
@@ -126,6 +133,7 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<PuzzleGuess?> GuessPuzzleAsync(DateOnly date, Guid showId, int attempt, CancellationToken ct = default) =>
         SendAsync<PuzzleGuess>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/puzzles/{date:yyyy-MM-dd}/guesses", new { showId, attempt }, ct);
 
+    /// <summary>The holidays with episodes made for them, the next one first.</summary>
     public Task<List<HolidaySummary>?> GetHolidaysAsync(CancellationToken ct = default) =>
         GetAsync<List<HolidaySummary>>(ApiClients.Catalog, "api/v1/holidays", ct);
 

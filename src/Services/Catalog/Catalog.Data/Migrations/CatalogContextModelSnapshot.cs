@@ -269,6 +269,38 @@ namespace Catalog.Data.Migrations
                     b.ToTable("person_cast_credits", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.Quote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("EpisodeNumber")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<List<string>>("Lines")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SeasonNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<List<string>>("Speakers")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShowId", "SeasonNumber", "EpisodeNumber");
+
+                    b.ToTable("quotes", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.Season", b =>
                 {
                     b.Property<Guid>("Id")
@@ -463,6 +495,26 @@ namespace Catalog.Data.Migrations
                     b.ToTable("show_embeddings", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowQuoteSource", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FetchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Page")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("ShowId");
+
+                    b.ToTable("show_quote_sources", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.WatchProvider", b =>
                 {
                     b.Property<Guid>("Id")
@@ -577,6 +629,15 @@ namespace Catalog.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Catalog.Data.Quote", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithMany()
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Catalog.Data.Season", b =>
                 {
                     b.HasOne("Catalog.Data.Show", null)
@@ -608,6 +669,15 @@ namespace Catalog.Data.Migrations
                     b.HasOne("Catalog.Data.Show", null)
                         .WithOne()
                         .HasForeignKey("Catalog.Data.ShowEmbedding", "ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowQuoteSource", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithOne()
+                        .HasForeignKey("Catalog.Data.ShowQuoteSource", "ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

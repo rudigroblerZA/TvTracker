@@ -32,6 +32,7 @@ public static class CatalogApi
         api.MapPuzzleApi();
         api.MapDegreesApi();
         api.MapAfterwardsApi();
+        api.MapQuotesApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

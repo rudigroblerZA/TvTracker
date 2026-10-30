@@ -224,6 +224,20 @@ link to a search, which imports them. Main casts only, as TVmaze lists them, so 
 members whose credits haven't been fetched yet are counted as pending. It works signed out.
 - **API:** `GET /api/v1/shows/{id}/afterwards` (Catalog.API, public, cached an hour per show).
 
+**Memorable lines** (on show and episode pages; `memorable-lines` flag): lines and short exchanges from
+[Wikiquote](https://en.wikiquote.org), credited to it under CC BY-SA 4.0. The show page shows the three shortest
+exchanges about the whole show (or, when its page has none, from the first episode with lines, which says the least),
+with how many quotes there are across how many episodes. Each episode page shows up to six of its own, behind the
+spoiler shield until you've watched it, and links Wikiquote for the rest. Shows without a Wikiquote page show nothing.
+It works signed out.
+- **Where they come from:** the sync worker finds each show's Wikiquote page through Wikidata (by TVmaze id), then
+  reads the page and its season pages one at a time, ten seconds apart, most popular shows first, about a show a
+  minute. Lines are refreshed every 60 days.
+- **Not scripts:** scripts and transcripts are copyrighted (BBC Writersroom's, the only official ones online, forbid
+  any computer analysis), so the app never fetches them. Wikiquote's quotes are chosen and kept short by its editors.
+- **API:** `GET /api/v1/shows/{id}/quotes` and `GET /api/v1/episodes/{id}/quotes` (Catalog.API, public; 404 for a show
+  with none).
+
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
 shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
 Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
@@ -431,7 +445,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 

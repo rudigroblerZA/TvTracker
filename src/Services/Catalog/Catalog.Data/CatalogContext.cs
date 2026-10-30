@@ -16,6 +16,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<CatalogOverride> Overrides => Set<CatalogOverride>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
+    public DbSet<ShowQuoteSource> QuoteSources => Set<ShowQuoteSource>();
+    public DbSet<Quote> Quotes => Set<Quote>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -116,6 +118,22 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(c => c.ShowExternalId).HasMaxLength(64);
             entity.Property(c => c.Title).HasMaxLength(256);
             entity.Property(c => c.Character).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<ShowQuoteSource>(entity =>
+        {
+            entity.ToTable("show_quote_sources");
+            entity.HasKey(q => q.ShowId);
+            entity.HasOne<Show>().WithOne().HasForeignKey<ShowQuoteSource>(q => q.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(q => q.Page).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<Quote>(entity =>
+        {
+            entity.ToTable("quotes");
+            entity.Property(q => q.Id).ValueGeneratedNever();
+            entity.HasOne<Show>().WithMany().HasForeignKey(q => q.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(q => new { q.ShowId, q.SeasonNumber, q.EpisodeNumber });
         });
 
         modelBuilder.Entity<CastMember>(entity =>

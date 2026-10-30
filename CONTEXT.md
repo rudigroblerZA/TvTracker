@@ -19,7 +19,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | --- | --- | --- |
 | Identity.API | profiles, region, timezone | Keycloak does sign-in; this orchestrates account deletion and data export across services |
 | Catalog.API | read side of `catalogdb` | search (title + semantic + tag filter), schedule, people, `/ops` dashboard; applies Catalog migrations |
-| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay |
+| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay; Wikiquote lines |
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
@@ -829,6 +829,30 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Pending credits:** the cast-credits backfill runs 30 people a minute, so a newly imported show's cast may have no
   credits yet; the section counts them as pending rather than reading "no other role".
 - **Cached** an hour per show (HybridCache); the page loads it after the cast, and it fails quietly.
+
+## Memorable lines
+
+- **Wikiquote, not scripts** (a decision): scripts and transcripts are copyrighted. BBC Writersroom, the one official
+  source online, allows private reading only and forbids "computer analysis"; transcript sites have no rights to the
+  dialogue. Wikiquote is CC BY-SA, its editors keep quotes short, and the app credits it under every list.
+- **Lines, not transcripts:** an exchange over 1,200 characters is left out at import (`WikiquoteParser.MaxCharacters`),
+  an episode page shows its six shortest (`QuotesApi.PerEpisode`) and links Wikiquote for the rest, and the show page
+  three. Sherlock's first episode has 31 exchanges there.
+- **Found by TVmaze id** (`QuotesService` in the sync worker): Wikidata's query service gives each show's enwikiquote
+  page (P8600, as Research finds shows), 100 shows a query, repeated monthly. 53 of the 100 most popular had one.
+- **Raw wikitext, gently:** `index.php?action=raw`, one page at a time, 10 s apart, a 429's Retry-After waited out.
+  The REST HTML endpoint answered 429 to nearly every request from the sandbox's shared address; the raw one to none
+  at that pace. A show is read about once a minute, most popular first, and refreshed every 60 days. Nothing here uses
+  TVmaze's limiter.
+- **Parsing** (`WikiquoteParser`): episode headings carry their numbers ("[1.01]"); where they don't, sub-headings of
+  "Series 1" are numbered in page order (Sherlock). An exchange is a run of `:'''Speaker''':` lines between `<hr>`
+  rules or blank lines; `*` bullets are single quotes, and their `**` notes and `:*` citations are skipped. A show's own
+  "Dialogue" or "Quotes" section is about the whole show, unless it sits under "About" (Breaking Bad's is an
+  interview). Anything else is skipped, so an unfamiliar layout gives fewer lines rather than wrong ones.
+- **Stored by number, joined on read:** `quotes` keeps the episode numbers and parallel `Speakers`/`Lines` arrays;
+  Catalog.API matches them to episodes when it reads, so a refresh that re-creates episodes loses nothing.
+- **Spoilers:** the show page takes lines about the whole show, else the first episode's. An episode's lines sit behind
+  the spoiler shield until it's watched, as its summary does.
 
 ## Six degrees
 
