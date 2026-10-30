@@ -470,6 +470,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<ServicesReport?> GetServicesReportAsync(CancellationToken ct = default) =>
         GetAsync<ServicesReport>(ApiClients.Analytics, "api/v1/me/services/report", ct);
 
+    /// <summary>The viewer's spoiler risk per show; null while the spoiler-watch flag is off.</summary>
+    public Task<SpoilerWatch?> GetSpoilerWatchAsync(CancellationToken ct = default) =>
+        GetAsync<SpoilerWatch>(ApiClients.Analytics, "api/v1/me/spoiler-watch", ct);
+
     /// <summary>Your TV life, from the year the user says they were born; null while the tv-life flag is off.</summary>
     public Task<TvLife?> GetTvLifeAsync(int born, string? timeZone, CancellationToken ct = default) =>
         GetAsync<TvLife>(ApiClients.Analytics, $"api/v1/me/tv-life?born={born}" + (string.IsNullOrEmpty(timeZone) ? "" : $"&tz={Uri.EscapeDataString(timeZone)}"), ct);

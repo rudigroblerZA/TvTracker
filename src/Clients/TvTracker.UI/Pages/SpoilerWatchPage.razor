@@ -1,0 +1,107 @@
+@page "/spoilers"
+@attribute [RequiresFeature(FeatureFlags.SpoilerWatch)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Spoiler watch · @Brand.AppName</PageTitle>
+
+<p><a href="up-next">← Up Next</a></p>
+<h1>Spoiler watch</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Spoilers go round in the days after an episode airs, and the bigger the show, the further they travel. These are
+            your shows with episodes out lately that you haven't seen, riskiest first. No titles here: a title can be a
+            spoiler on its own.
+        </p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (watch is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (watch.Shows.Count == 0)
+        {
+            <p>You're safe: nothing you follow has aired an episode you haven't seen in the last two weeks.</p>
+        }
+        else
+        {
+            <ul class="spoiler-list">
+                @foreach (var risk in watch.Shows)
+                {
+                    <li class="spoiler-row @risk.Level" @key="risk.ShowId">
+                        <Poster Title="@risk.Title" Url="@risk.PosterUrl" Size="small" />
+                        <div>
+                            <div class="spoiler-level">@Label(risk.Level)</div>
+                            <a class="strong" href="shows/@risk.ShowId">@risk.Title</a>
+                            <div class="small">@What(risk)</div>
+                            <div class="small muted">@Safe(risk)</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+            <p class="muted small">
+                The risk is each unseen episode from the last two weeks, a finale counting double and a premiere one and a
+                half, fading by the day, times how popular the show is.
+            </p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see which of your shows have spoilers about." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private SpoilerWatch? watch;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            watch = await Analytics.GetSpoilerWatchAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string Label(string level) => level switch
+    {
+        "high" => "High risk",
+        "medium" => "Some risk",
+        _ => "Low risk"
+    };
+
+    private string What(SpoilerRisk risk)
+    {
+        var latest = risk.Latest;
+        var episode = $"S{latest.SeasonNumber:00}E{latest.EpisodeNumber:00}";
+        var what = latest.Kind switch
+        {
+            "finale" => $"The season {latest.SeasonNumber} finale ({episode})",
+            "premiere" => $"The season {latest.SeasonNumber} premiere ({episode})",
+            _ => episode
+        };
+        var more = risk.Unseen > 1 ? $", and {risk.Unseen - 1} more you haven't seen," : "";
+        return $"{what}{more} aired {Format.Relative(latest.AiredAtUtc)}.";
+    }
+
+    private string Safe(SpoilerRisk risk)
+    {
+        var catchUp = risk.Started
+            ? $"{risk.Behind} {(risk.Behind == 1 ? "episode" : "episodes")} ({Format.Hours(risk.BehindMinutes)}) to be safe"
+            : "You haven't started it";
+        return risk.CalmsAround is { } calm
+            ? $"{catchUp} · calms down around {Session.ToLocal(calm):ddd d MMM}"
+            : catchUp;
+    }
+}

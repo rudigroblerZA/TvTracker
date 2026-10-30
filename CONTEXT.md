@@ -500,6 +500,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Not in it:** our users' viewing (load-test data, and completion depends on length more than worth), and total
     hours, which are shown beside the score rather than counted against it: a long show isn't worse, just longer.
   - **Needs** a provider rating and 5+ rated episodes.
+- **Spoiler watch** (`SpoilerWatchApi`): computed on request from the caller's follows and watches and the catalog
+  copy's air dates and popularity.
+  - **The model:** spoilers circulate in the days after an episode airs and fade as people move on, so each unseen
+    regular episode from the last 14 days adds weight × e^(−days/5), a finale 2 and a premiere 1.5; the sum is scaled by
+    the show's popularity (TVmaze's 0-100), since a top show's twist is everywhere and an obscure one's isn't. High
+    from 1.0 (a top show's finale the night it airs is 2.0), medium from 0.4, listed above 0.1.
+  - **Finale:** the season's last listed episode once nothing more of the season is still to air (as the essential
+    cut reads it). A whole-season drop counts every episode, which is right: all of it is out there at once.
+  - **Calms around:** the score decays as one, so it falls below medium ln(score / 0.4) × 5 days from now, if
+    nothing more airs.
+  - **No titles,** only season and episode numbers: a title can give the episode away.
+  - **Tested** with a user following four shows with a finale or premiere in the fortnight: American Horror Story's
+    finale that day 2.36 (high), Lupin's season drop with one episode watched 2.04 (high), Tulsa King's two weekly
+    episodes 0.35 (low). ~50 ms.
 - **Your TV life** (`TvLifeApi`): computed on request from the catalog copy and the caller's watches, for a birth year
   the caller gives. The year stays on the device (a preference, like the spoiler shield): a profile column for a
   birth year is personal data the app has no other use for.

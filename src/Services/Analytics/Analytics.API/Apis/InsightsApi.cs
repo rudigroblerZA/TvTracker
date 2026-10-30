@@ -79,6 +79,7 @@ public static class InsightsApi
         api.MapServicesApi();
         api.MapExportApi();
         api.MapTvLifeApi();
+        api.MapSpoilerWatchApi();
         api.MapCallItApi();
 
         return api;
