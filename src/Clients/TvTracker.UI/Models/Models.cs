@@ -842,3 +842,14 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 /// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
+/// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+public record TvLife(int Born, IReadOnlyList<TvLifeYear> Years, TvLifeFacts Facts);
+
+public record TvLifeYear(int Year, int Age, IReadOnlyList<TvLifeShow> Premieres, IReadOnlyList<TvLifeShow> Finales, TvLifeYourYear? Yours);
+
+public record TvLifeShow(Guid ShowId, string Title, string? PosterUrl, double? Rating, bool Watched);
+
+public record TvLifeYourYear(int Started, int Finished, int Minutes, TvLifeShow? TopShow);
+
+public record TvLifeFacts(int OlderThanYou, TvLifeShow? Oldest, int? OldestYear, TvLifeShow? BornWith, int? BiggestYear, int TotalMinutes, int ShowsWatched);
+

@@ -78,6 +78,7 @@ public static class InsightsApi
         api.MapWaitingRoomApi();
         api.MapServicesApi();
         api.MapExportApi();
+        api.MapTvLifeApi();
         api.MapCallItApi();
 
         return api;

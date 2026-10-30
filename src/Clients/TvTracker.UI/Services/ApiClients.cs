@@ -466,6 +466,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<ServicesReport?> GetServicesReportAsync(CancellationToken ct = default) =>
         GetAsync<ServicesReport>(ApiClients.Analytics, "api/v1/me/services/report", ct);
 
+    /// <summary>Your TV life, from the year the user says they were born; null while the tv-life flag is off.</summary>
+    public Task<TvLife?> GetTvLifeAsync(int born, string? timeZone, CancellationToken ct = default) =>
+        GetAsync<TvLife>(ApiClients.Analytics, $"api/v1/me/tv-life?born={born}" + (string.IsNullOrEmpty(timeZone) ? "" : $"&tz={Uri.EscapeDataString(timeZone)}"), ct);
+
     /// <summary>The user's year in TV; the latest year with viewing when <paramref name="year"/> is null.</summary>
     public Task<YearInTv?> GetYearInTvAsync(int? year, string? timeZone, CancellationToken ct = default)
     {
