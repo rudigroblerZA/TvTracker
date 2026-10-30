@@ -38,7 +38,7 @@ public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILo
             .ToLookup(e => e.ShowId);
         // Only the verdict's season number, by jsonb path, rather than every open show's whole document.
         var verdicts = (await db.Database
-                .SqlQuery<VerdictRow>($"SELECT \"ShowId\", (\"Document\"->'seasonVerdict'->>'number')::int AS \"Season\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
+                .SqlQuery<VerdictRow>($"SELECT \"ShowId\", (\"Document\"->{InsightDocuments.Paths.SeasonVerdict}->>{InsightDocuments.Paths.Number})::int AS \"Season\" FROM show_insights WHERE \"ShowId\" = ANY({showIds})")
                 .ToListAsync(ct))
             .ToDictionary(v => v.ShowId, v => v.Season);
 

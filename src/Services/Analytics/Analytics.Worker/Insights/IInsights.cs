@@ -70,6 +70,18 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
 
     private const string ComputedAt = "ComputedAtUtc";
 
+    /// <summary>A row's primary key values, compared one by one (a joined string could collide on a separator in a text key).</summary>
+    private sealed class RowKey(object?[] values) : IEquatable<RowKey>
+    {
+        private readonly object?[] values = values;
+
+        public bool Equals(RowKey? other) => other is not null && values.SequenceEqual(other.values);
+
+        public override bool Equals(object? obj) => Equals(obj as RowKey);
+
+        public override int GetHashCode() => values.Aggregate(17, (hash, value) => hash * 31 + (value?.GetHashCode() ?? 0));
+    }
+
     /// <summary>The row's values as one comparable string: every mapped property but the computed-at stamp, documents canonical.</summary>
     private static string Comparable(TRow row, IEnumerable<IProperty> properties)
     {
@@ -80,7 +92,7 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
             {
                 continue;
             }
-            var value = property.PropertyInfo!.GetValue(row);
+            var value = property.GetGetter().GetClrValue(row);
             text.Append(property.Name).Append('=');
             if (property.GetColumnType() == "jsonb" && value is string json)
             {
@@ -134,10 +146,10 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
         var entity = db.Model.FindEntityType(typeof(TRow))!;
         var key = entity.FindPrimaryKey()!.Properties;
         var properties = entity.GetProperties().ToList();
-        string KeyOf(TRow row) => string.Join('|', key.Select(p => p.PropertyInfo!.GetValue(row)));
+        RowKey KeyOf(TRow row) => new(key.Select(p => p.GetGetter().GetClrValue(row)).ToArray());
 
         var stored = (await table(db).ToListAsync(ct)).ToDictionary(KeyOf);
-        var seen = new HashSet<string>();
+        var seen = new HashSet<RowKey>();
         foreach (var row in rows)
         {
             var k = KeyOf(row);

@@ -37,12 +37,12 @@ public static class WaitingRoomApi
         var now = time.GetUtcNow();
 
         // Caught up: every aired regular episode watched (the aggregate), on a show that's still running.
-        var progress = (await Viewer.ProgressAsync(db, userId, now, null, ct)).Values.Where(p => p.AllWatched).Select(p => p.ShowId).ToList();
+        var progress = await Viewer.ProgressAsync(db, userId, now, null, ct);
+        var allWatched = progress.Values.Where(p => p.AllWatched).Select(p => p.ShowId).ToList();
         var shows = await db.Shows.AsNoTracking()
-            .Where(s => progress.Contains(s.ShowId) && s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled)
+            .Where(s => allWatched.Contains(s.ShowId) && s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled)
             .ToDictionaryAsync(s => s.ShowId, ct);
         var caughtUp = shows.Keys.ToList();
-        var latest = await Viewer.ProgressAsync(db, userId, now, caughtUp, ct);
         var upcoming = (await db.Episodes.AsNoTracking()
                 .Where(e => caughtUp.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc > now)
                 .Select(e => new { e.ShowId, e.SeasonNumber, e.AirsAtUtc })
@@ -54,9 +54,9 @@ public static class WaitingRoomApi
             {
                 var show = shows[id];
                 var insights = documents.GetValueOrDefault(id);
-                var lastAired = latest[id].LastAiredAtUtc;
+                var lastAired = progress[id].LastAiredAtUtc;
                 var next = upcoming[id].MinBy(e => e.AirsAtUtc);
-                var currentSeason = latest[id].LatestSeason;
+                var currentSeason = progress[id].LatestSeason;
 
                 if (next is not null && next.SeasonNumber == currentSeason)
                 {
