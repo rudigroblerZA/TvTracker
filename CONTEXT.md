@@ -500,6 +500,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Not in it:** our users' viewing (load-test data, and completion depends on length more than worth), and total
     hours, which are shown beside the score rather than counted against it: a long show isn't worse, just longer.
   - **Needs** a provider rating and 5+ rated episodes.
+- **Your TV life** (`TvLifeApi`): computed on request from the catalog copy and the caller's watches, for a birth year
+  the caller gives. The year stays on the device (a preference, like the spoiler shield): a profile column for a
+  birth year is personal data the app has no other use for.
+  - **Premieres and finales from episodes:** the copy keeps no premiere date, so a show counts for the year its first
+    regular episode aired, and an ended show for the year its last one did. Top 3 and 2 a year by popularity.
+  - **Bulk marks out** of minutes and "started", as Year in TV does; "finished" is the viewer aggregate's all-watched
+    with the last watch in that year. Years with nothing in the catalog and nothing watched are skipped.
+  - **Cost:** one aggregate over every show's regular episodes (~850 rows) plus the caller's watches; ~40 ms warm.
 - **TV time machine** (`TimeMachineApi`): computed on request from the catalog copy's air dates and the provider's
   ratings; nothing stored.
   - **Weeks in the user's calendar:** the client sends the profile time zone (`tz`), and a week is 7 local days, so a

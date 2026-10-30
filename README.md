@@ -423,7 +423,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -975,6 +975,12 @@ How events flow:
       How I Met Your Mother 22. A running show's ending isn't in it yet, and the panel says so.
     - **Who gets one:** shows with a TVmaze rating and 5 or more rated episodes (595 of 846).
     - **Worth your time:** a Discover list of the shows rated worth it, best scores first, most popular among equals.
+  - **Your TV life** (`/tv-life`, signed in; linked from Insights; `tv-life` flag): type the year you were born and get
+    every year of your life down a timeline, your age as the marker: the catalog's biggest premieres and finales that
+    year (the ones you've watched in bold), and your own year where you watched anything (hours, shows started and
+    finished, the show you watched most). On top: how many of your shows are older than you, the oldest, the show that
+    premiered the year you were born, and your biggest year. Your birth year stays on the device; nothing is stored.
+    - **API:** `GET /api/v1/me/tv-life?born=1985&tz=…` on Analytics.API.
   - **TV time machine** (`/time-machine`, signed in; a teaser on Home and a link on Insights): a week of TV history.
     - **This week in TV history** (the default): what premiered and what ended this week in past years, and the
       best-rated episode of each year that week. Home shows four of the best-known milestones ("Once Upon a Time

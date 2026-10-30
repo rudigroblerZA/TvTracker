@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "tv-life": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Your TV life: every year of your life with the biggest premieres and finales, and what you watched." }
+    },
     "six-degrees": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

@@ -1,0 +1,147 @@
+@page "/tv-life"
+@attribute [RequiresFeature(FeatureFlags.TvLife)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+@inject IPlatformServices Platform
+
+<PageTitle>Your TV life · @Brand.AppName</PageTitle>
+
+<p><a href="insights">← Insights</a></p>
+<h1>Your TV life</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Every year of your life, with the biggest shows that premiered and ended that year, and what you watched. Your
+            birth year stays on this device.
+        </p>
+        <form class="inline-form" @onsubmit="LoadAsync" @onsubmit:preventDefault>
+            <label>
+                <span class="muted small">Born in </span>
+                <input type="number" min="1920" max="@DateTime.UtcNow.Year" value="@born" @oninput="e => born = int.TryParse(e.Value?.ToString(), out var y) ? y : null" aria-label="Year you were born" style="width: 6em" />
+            </label>
+            <button class="btn" type="submit" disabled="@(born is null || loading)">@(loading ? "Loading…" : "Show my TV life")</button>
+        </form>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (life is { } l)
+        {
+            <section class="panel">
+                <div class="life-facts">
+                    <div><strong>@l.Years.Count</strong><span class="muted">@(" years with TV in them")</span></div>
+                    <div><strong>@l.Facts.ShowsWatched</strong><span class="muted">@(" shows watched")</span></div>
+                    <div><strong>@Format.Hours(l.Facts.TotalMinutes)</strong><span class="muted">@(" in all")</span></div>
+                    @if (l.Facts.BiggestYear is { } biggest)
+                    {
+                        <div><strong>@biggest</strong><span class="muted">@(" your biggest year")</span></div>
+                    }
+                </div>
+                @if (l.Facts.BornWith is { } bornWith)
+                {
+                    <p><span>@($"The year you were born, ")</span><a href="shows/@bornWith.ShowId">@bornWith.Title</a><span>@(" premiered.")</span></p>
+                }
+                @if (l.Facts.Oldest is { } oldest && l.Facts.OldestYear is { } oldestYear)
+                {
+                    <p>
+                        <span>@($"The oldest show you've watched is ")</span><a href="shows/@oldest.ShowId">@oldest.Title</a><span>@($" ({oldestYear})")</span>
+                        <span class="muted">@(l.Facts.OlderThanYou > 0 ? $" · {l.Facts.OlderThanYou} of your shows are older than you." : " · nothing you've watched is older than you.")</span>
+                    </p>
+                }
+            </section>
+
+            <ol class="life">
+                @foreach (var year in l.Years)
+                {
+                    <li class="life-year @(year.Yours is not null ? "yours" : "")" data-age="@year.Age" @key="year.Year">
+                        <h3>@year.Year</h3>
+                        @if (year.Yours is { } yours)
+                        {
+                            <div class="life-row">
+                                <span class="muted">You: </span>
+                                <span>@Yours(yours)</span>
+                                @if (yours.TopShow is { } top)
+                                {
+                                    <span class="muted">@(" · most of it ")</span><a href="shows/@top.ShowId">@top.Title</a>
+                                }
+                            </div>
+                        }
+                        @if (year.Premieres.Count > 0)
+                        {
+                            <div class="life-row"><span class="muted">Premiered: </span>@Shows(year.Premieres)</div>
+                        }
+                        @if (year.Finales.Count > 0)
+                        {
+                            <div class="life-row"><span class="muted">Ended: </span>@Shows(year.Finales)</div>
+                        }
+                    </li>
+                }
+            </ol>
+            <p class="muted small">Premieres and finales are the catalog's most popular shows for each year; the ones in bold you've watched. Years with nothing in the catalog and nothing watched are left out.</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see your life in TV." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private const string BornKey = "tv-life:born";
+
+    private int? born;
+    private TvLife? life;
+    private bool loading;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (int.TryParse(await Platform.GetPreferenceAsync(BornKey), out var saved))
+        {
+            born = saved;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (born is not { } year)
+        {
+            return;
+        }
+        loading = true;
+        error = null;
+        try
+        {
+            life = await Analytics.GetTvLifeAsync(year, Session.Profile?.TimeZone);
+            await Platform.SetPreferenceAsync(BornKey, year.ToString());
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static string Yours(TvLifeYourYear yours)
+    {
+        var parts = new List<string> { Format.Hours(yours.Minutes) };
+        if (yours.Started > 0) parts.Add($"started {yours.Started} {(yours.Started == 1 ? "show" : "shows")}");
+        if (yours.Finished > 0) parts.Add($"finished {yours.Finished}");
+        return string.Join(", ", parts);
+    }
+
+    private static RenderFragment Shows(IReadOnlyList<TvLifeShow> shows) => __builder =>
+    {
+        for (var i = 0; i < shows.Count; i++)
+        {
+            var show = shows[i];
+            <span class="life-show @(show.Watched ? "watched" : "")"><a href="shows/@show.ShowId">@show.Title</a></span>
+            @if (i < shows.Count - 1)
+            {
+                <span class="muted">@(" · ")</span>
+            }
+        }
+    };
+}

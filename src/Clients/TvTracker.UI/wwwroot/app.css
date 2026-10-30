@@ -834,3 +834,16 @@ h1:focus, h2:focus { outline: none; }
 .degrees-link { padding: 6px 10px 6px 28px; position: relative; }
 .degrees-link::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; border-left: 2px dashed var(--border); }
 
+/* Your TV life: one row per year down a line, the age as the marker. */
+.life { list-style: none; padding: 0; margin: 12px 0; border-left: 2px solid var(--border); }
+.life-year { position: relative; padding: 6px 0 14px 18px; }
+.life-year::before { content: attr(data-age); position: absolute; left: -16px; top: 6px; width: 30px; height: 30px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border); display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.life-year.yours::before { border-color: var(--accent); color: var(--accent); }
+.life-year h3 { margin: 4px 0 6px; }
+.life-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 2px 0; }
+.life-row .muted { flex: none; }
+.life-show { display: inline-flex; align-items: center; gap: 6px; }
+.life-show.watched { font-weight: 600; }
+.life-facts { display: flex; flex-wrap: wrap; gap: 14px 28px; margin: 8px 0; }
+.life-facts strong { font-size: 1.3rem; }
+
