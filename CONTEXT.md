@@ -804,6 +804,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
 - **Flag:** checked once per run without a user, so it can't target some users only.
 
+## Where the cast went next
+
+- **Provider credits again** (`AfterwardsApi` on Catalog.API): `person_cast_credits` with a premiere on or after the
+  show's last aired episode (ended) or its own premiere (running), per main cast member in billing order, the first
+  three each. Credits are what make it worth having: Breaking Bad's cast went to Better Call Saul, BoJack Horseman and
+  Your Honor, none of which need to be in the catalog.
+- **Self roles out** (`Universes.IsSelfRole`): a talk-show appearance as themselves isn't a role.
+- **The biggest** is the most popular role among them (then the best rated), shown with its poster above the list.
+- **Pending credits:** the cast-credits backfill runs 30 people a minute, so a newly imported show's cast may have no
+  credits yet; the section counts them as pending rather than reading "no other role".
+- **Cached** an hour per show (HybridCache); the page loads it after the cast, and it fails quietly.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

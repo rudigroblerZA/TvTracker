@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "cast-afterwards": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Where the cast went next: on a show page, each main cast member's roles since the show ended (or started)." }
+    },
     "tv-life": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

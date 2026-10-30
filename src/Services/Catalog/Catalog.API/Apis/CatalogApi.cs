@@ -31,6 +31,7 @@ public static class CatalogApi
         api.MapHolidayApi();
         api.MapPuzzleApi();
         api.MapDegreesApi();
+        api.MapAfterwardsApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

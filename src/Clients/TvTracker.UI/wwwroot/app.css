@@ -847,3 +847,10 @@ h1:focus, h2:focus { outline: none; }
 .life-facts { display: flex; flex-wrap: wrap; gap: 14px 28px; margin: 8px 0; }
 .life-facts strong { font-size: 1.3rem; }
 
+/* Where the cast went next */
+.afterwards { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.afterwards li { display: flex; gap: 10px; align-items: flex-start; }
+.afterwards .roles { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.afterwards .roles a, .afterwards .roles .role { display: inline-flex; align-items: baseline; gap: 4px; }
+.afterwards-biggest { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 8px 0; }
+

@@ -216,6 +216,14 @@ watching and your watchlist.
   typical one where an episode has none. `POST /api/v1/shows/mood` (Catalog.API, rate-limited like search) scores
   shows against a mood.
 
+**Where the cast went next** (on every show page, under the cast; `cast-afterwards` flag): for a show that has
+ended, each main cast member's main roles in shows that premiered after the finale, earliest first; for a running show,
+the roles they've taken since it started. It leads with the biggest of them (Breaking Bad: Bob Odenkirk as Jimmy
+McGill in Better Call Saul) and says how many of the cast went on to another main role. Shows outside the catalog
+link to a search, which imports them. Main casts only, as TVmaze lists them, so guest arcs and films don't appear;
+members whose credits haven't been fetched yet are counted as pending. It works signed out.
+- **API:** `GET /api/v1/shows/{id}/afterwards` (Catalog.API, public, cached an hour per show).
+
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
 shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
 Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
@@ -423,7 +431,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
