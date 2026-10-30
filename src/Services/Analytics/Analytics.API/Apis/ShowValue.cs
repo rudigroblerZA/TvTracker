@@ -53,19 +53,24 @@ internal static class ShowValue
     /// <param name="landing">The show's <see cref="LandingVerdicts"/> verdict, when it has one.</param>
     /// <param name="turn">Where a slow start turns, when the document found one.</param>
     /// <param name="limited">Tagged a limited series.</param>
-    internal static Assessment Assess(ShowCopy show, string? landing, GetsGoodTurn? turn, bool limited, HashSet<string> liked)
+    internal static Assessment Assess(ShowCopy show, string? landing, GetsGoodTurn? turn, bool limited, HashSet<string> liked) =>
+        Assess(show.ExternalRating, show.Genres, landing, turn, limited, liked);
+
+    /// <param name="externalRating">The provider's rating; a show without one counts as <see cref="UnratedValue"/>.</param>
+    internal static Assessment Assess(double? externalRating, IReadOnlyList<string> genres, string? landing, GetsGoodTurn? turn, bool limited,
+        HashSet<string> liked)
     {
         var reasons = new List<string>();
-        var value = show.ExternalRating ?? UnratedValue;
-        if (show.ExternalRating is { } rating)
+        var value = externalRating ?? UnratedValue;
+        if (externalRating is { } rating)
         {
             reasons.Add($"Rated {rating:0.0}");
         }
 
-        if (liked.Count > 0 && show.Genres.Count > 0)
+        if (liked.Count > 0 && genres.Count > 0)
         {
-            var shared = show.Genres.Where(liked.Contains).ToList();
-            value += TasteWeight * ((double)shared.Count / show.Genres.Count - 0.5);
+            var shared = genres.Where(liked.Contains).ToList();
+            value += TasteWeight * ((double)shared.Count / genres.Count - 0.5);
             if (shared.Count > 0)
             {
                 reasons.Add($"Your kind of show: {string.Join(", ", shared)}");

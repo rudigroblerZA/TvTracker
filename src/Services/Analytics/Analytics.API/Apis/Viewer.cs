@@ -34,9 +34,11 @@ public static class Viewer
         IReadOnlyCollection<Guid>? showIds, CancellationToken ct)
     {
         var mine = db.Watches.Where(w => w.UserId == userId);
-        var shows = showIds is null ? mine.Select(w => w.ShowId).Distinct() : showIds.AsQueryable();
-        var rows = await db.Episodes.AsNoTracking().AiredRegular(now)
-            .Where(e => shows.Contains(e.ShowId))
+        var episodes = db.Episodes.AsNoTracking().AiredRegular(now);
+        episodes = showIds is null
+            ? episodes.Where(e => mine.Select(w => w.ShowId).Contains(e.ShowId))
+            : episodes.Where(e => showIds.Contains(e.ShowId));
+        var rows = await episodes
             .GroupJoin(mine, e => e.EpisodeId, w => w.EpisodeId, (e, ws) => new { e, ws })
             .SelectMany(x => x.ws.DefaultIfEmpty(), (x, w) => new { x.e, w })
             .GroupBy(x => x.e.ShowId)

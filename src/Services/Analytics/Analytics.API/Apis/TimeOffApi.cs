@@ -52,8 +52,16 @@ public static class TimeOffApi
     /// <summary>The finished shows and what's known about their endings are the same for everyone; kept this long.</summary>
     private static readonly HybridCacheEntryOptions ShelfCache = new() { Expiration = TimeSpan.FromHours(1), LocalCacheExpiration = TimeSpan.FromHours(1) };
 
-    /// <summary>A finished show on the shelf, with the parts of its document the assessment reads.</summary>
-    public sealed record ShelfShow(ShowCopy Show, int Episodes, int Minutes, string? Landing, GetsGoodTurn? Turn, bool Limited);
+    /// <summary>
+    /// The finished shows, with only what the assessment reads. Immutable, so HybridCache hands out the cached instance
+    /// rather than deserializing several hundred shows on every request.
+    /// </summary>
+    [System.ComponentModel.ImmutableObject(true)]
+    public sealed record Shelf(IReadOnlyList<ShelfShow> Shows);
+
+    [System.ComponentModel.ImmutableObject(true)]
+    public sealed record ShelfShow(Guid ShowId, string Title, string? PosterUrl, double? ExternalRating, IReadOnlyList<string> Genres,
+        int Episodes, int Minutes, string? Landing, GetsGoodTurn? Turn, bool Limited);
 
     public static void MapTimeOffApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/time-off", GetAsync).RequireFeature(FeatureFlags.TimeOff);
@@ -76,12 +84,12 @@ public static class TimeOffApi
         var started = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => w.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
         var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
 
-        var candidates = shelf
-            .Where(s => !started.Contains(s.Show.ShowId) && s.Minutes >= MinMinutes && s.Minutes <= budget + overrun)
+        var candidates = shelf.Shows
+            .Where(s => !started.Contains(s.ShowId) && s.Minutes >= MinMinutes && s.Minutes <= budget + overrun)
             .Select(s =>
             {
-                var assessment = ShowValue.Assess(s.Show, s.Landing, s.Turn, s.Limited, liked);
-                return new TimeOffShowDto(s.Show.ShowId, s.Show.Title, s.Show.PosterUrl, s.Episodes, s.Minutes, assessment.Value,
+                var assessment = ShowValue.Assess(s.ExternalRating, s.Genres, s.Landing, s.Turn, s.Limited, liked);
+                return new TimeOffShowDto(s.ShowId, s.Title, s.PosterUrl, s.Episodes, s.Minutes, assessment.Value,
                     assessment.Landing, assessment.Limited, assessment.Reasons);
             })
             .Where(c => c.Value >= MinValue && c.Landing is not LandingVerdicts.Fizzles)
@@ -94,19 +102,19 @@ public static class TimeOffApi
     }
 
     /// <summary>Every ended show with a running time, and the parts of its document the assessment reads.</summary>
-    private static async Task<List<ShelfShow>> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
+    private static async Task<Shelf> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
     {
         var ended = await db.Shows.AsNoTracking().Where(s => s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled).ToListAsync(ct);
         var runs = await ShowValue.RunTimesAsync(db, ended.Select(s => s.ShowId).ToList(), now, ct);
         var insights = await ShowDocuments.LoadAsync(db, runs.Keys.ToList(), ct);
-        return ended.Where(s => runs.ContainsKey(s.ShowId))
+        return new Shelf(ended.Where(s => runs.ContainsKey(s.ShowId))
             .Select(s =>
             {
                 var document = insights.GetValueOrDefault(s.ShowId);
-                return new ShelfShow(s, runs[s.ShowId].Episodes, runs[s.ShowId].Minutes, document?.Landing?.Verdict, document?.GetsGood?.Turn,
-                    document?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true);
+                return new ShelfShow(s.ShowId, s.Title, s.PosterUrl, s.ExternalRating, s.Genres, runs[s.ShowId].Episodes, runs[s.ShowId].Minutes,
+                    document?.Landing?.Verdict, document?.GetsGood?.Turn, document?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true);
             })
-            .ToList();
+            .ToList());
     }
 
     /// <summary>
