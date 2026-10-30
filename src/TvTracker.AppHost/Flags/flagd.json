@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "spoiler-watch": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Spoiler watch: how exposed you are to spoilers for your shows right now, and when it calms down." }
+    },
     "cast-afterwards": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

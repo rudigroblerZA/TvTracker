@@ -431,7 +431,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -983,6 +983,13 @@ How events flow:
       How I Met Your Mother 22. A running show's ending isn't in it yet, and the panel says so.
     - **Who gets one:** shows with a TVmaze rating and 5 or more rated episodes (595 of 846).
     - **Worth your time:** a Discover list of the shows rated worth it, best scores first, most popular among equals.
+  - **Spoiler watch** (`/spoilers`, signed in; linked from Up Next; `spoiler-watch` flag): your followed and started
+    shows with episodes from the last two weeks you haven't seen, riskiest first: high, some or low risk, which
+    episode makes it so (a finale, a premiere, or just the latest; numbers only, never a title), how many episodes
+    it takes to be safe, and roughly when the risk calms down if nothing more airs.
+    - **The score:** each unseen episode counts 1 (a finale 2, a premiere 1.5), fading by e^(−days/5), all times
+      the show's popularity (0-1). High from 1.0, some from 0.4; under 0.1 a show isn't listed.
+    - **API:** `GET /api/v1/me/spoiler-watch` on Analytics.API.
   - **Your TV life** (`/tv-life`, signed in; linked from Insights; `tv-life` flag): type the year you were born and get
     every year of your life down a timeline, your age as the marker: the catalog's biggest premieres and finales that
     year (the ones you've watched in bold), and your own year where you watched anything (hours, shows started and

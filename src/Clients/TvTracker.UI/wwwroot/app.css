@@ -854,3 +854,14 @@ h1:focus, h2:focus { outline: none; }
 .afterwards .roles a, .afterwards .roles .role { display: inline-flex; align-items: baseline; gap: 4px; }
 .afterwards-biggest { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 8px 0; }
 
+/* Spoiler watch */
+.spoiler-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
+.spoiler-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius); background: var(--surface); }
+.spoiler-row.high { border-left-color: var(--bad); }
+.spoiler-row.medium { border-left-color: var(--warn); }
+.spoiler-row.low { border-left-color: var(--border); }
+.spoiler-level { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.spoiler-row.high .spoiler-level { color: var(--bad); }
+.spoiler-row.medium .spoiler-level { color: var(--warn); }
+.spoiler-row.low .spoiler-level { color: var(--muted); }
+

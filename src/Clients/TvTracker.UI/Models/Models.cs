@@ -865,3 +865,14 @@ public record CastAfterwards(Guid PersonId, string Name, string? PhotoUrl, strin
 public record NextRole(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Character,
     double Popularity, double? Rating);
 
+/// <summary>Spoiler watch: the viewer's shows with recent unwatched episodes, riskiest first.</summary>
+public record SpoilerWatch(IReadOnlyList<SpoilerRisk> Shows);
+
+/// <param name="Level">"high", "medium" or "low".</param>
+/// <param name="CalmsAround">When the risk should fall to low, if nothing more airs.</param>
+public record SpoilerRisk(Guid ShowId, string Title, string? PosterUrl, string Level, double Score, int Unseen, SpoilerEpisode Latest,
+    int Behind, int BehindMinutes, DateTimeOffset? CalmsAround, bool Started);
+
+/// <param name="Kind">"finale", "premiere" or "episode".</param>
+public record SpoilerEpisode(int SeasonNumber, int EpisodeNumber, DateTimeOffset AiredAtUtc, string Kind);
+
