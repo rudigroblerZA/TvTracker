@@ -467,6 +467,9 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
 - **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
   and the shows with the most shared cast.
 - **Backfills:** cast credits fetched this month (the reunion radar's data), shows with their makers, and careers.
+- **Wikimedia:** Memorable lines (quotes stored, shows read within 60 days, Wikiquote pages found) and the TV atlas
+  (shows looked up this month, with a setting, with a filming place, places). Wikimedia rate-limits shared addresses
+  hard, so a count that stays put usually means a job is waiting out a 429.
 - **Discovered structure:** nanogenres (clusters and pairings, shows covered, the largest), universes (the largest),
   and characters the same actor plays across catalog shows (character trails).
 - **Computed insights:** shows with DNA, creator fingerprints, forecasts, "when it gets good" turns, season verdicts out

@@ -117,7 +117,7 @@ const meter = parts => `<div class="meter">${parts.map(([v, total, color]) => `<
 function render(data) {
   const c = data.catalog, a = data.analytics, b = data.bulkImport, r = data.research, ix = c.semanticIndex;
   const o = c.overrides;
-  const bf = c.backfills, ng = c.nanogenres, u = c.universes;
+  const bf = c.backfills, ng = c.nanogenres, u = c.universes, w = c.wikimedia;
   const unavailable = empty("Analytics.API unavailable");
   const statuses = Object.entries(c.showsByStatus).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${n(v)} ${esc(k.toLowerCase())}`).join(" · ");
 
@@ -141,6 +141,14 @@ function render(data) {
     tile("Crew", `${pct(bf.showsWithCrew, c.shows)}%`,
       `${n(bf.showsWithCrew)} shows with makers · ${n(bf.peopleWithCareers)} careers`,
       meter([[bf.showsWithCrew, c.shows, "var(--good)"]])),
+    w ? tile("Memorable lines", n(w.quotes),
+          `quotes from ${n(w.quoteShowsRead)} shows · ${n(w.quoteEpisodes)} episodes<br>${n(w.quotePages)} Wikiquote pages found in ${n(w.quoteShowsChecked)} shows checked · last read ${ago(w.lastQuotesReadAtUtc)}`,
+          meter([[w.quoteShowsRead, w.quotePages, "var(--good)"]]))
+      : tile("Memorable lines", `<span class="down">—</span>`, "unknown"),
+    w ? tile("TV atlas", `${pct(w.settingsLookedUp, w.tvMazeShows)}%`,
+          `${n(w.settingsLookedUp)} / ${n(w.tvMazeShows)} shows looked up this month · last ${ago(w.lastSettingsAtUtc)}<br>${n(w.showsSet)} with a setting · ${n(w.showsFilmed)} with a filming place · ${n(w.places)} places`,
+          meter([[w.settingsLookedUp, w.tvMazeShows, "var(--good)"]]))
+      : tile("TV atlas", `<span class="down">—</span>`, "unknown"),
     tile("Nanogenres", n(ng.count), `${n(ng.clusters)} clusters · ${n(ng.count - ng.clusters)} pairings<br>${n(ng.showsCovered)} shows (${pct(ng.showsCovered, c.shows)}%) · ${ago(ng.computedAtUtc)}`),
     u ? tile("Universes", n(u.count), `${n(u.showsCovered)} shows in one<br>${n(u.characters)} characters across shows (character trails)`)
       : tile("Universes", `<span class="down">—</span>`, "map not built"),
