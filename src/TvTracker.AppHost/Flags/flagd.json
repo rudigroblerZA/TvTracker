@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "tv-atlas": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "TV atlas: where your shows are set, on a world map, and where each show is set on its page." }
+    },
     "tv-clock": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

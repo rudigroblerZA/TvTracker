@@ -4,6 +4,7 @@ using Catalog.SyncWorker;
 using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
 using Catalog.SyncWorker.Quotes;
+using Catalog.SyncWorker.Settings;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 
@@ -52,6 +53,8 @@ builder.Services.AddHostedService<CreativesService>();
 builder.Services.AddHostedService<CastCreditsService>();
 // Memorable lines from Wikiquote, for show and episode pages.
 builder.Services.AddHostedService<QuotesService>();
+// Where shows are set, from Wikidata, for the TV atlas.
+builder.Services.AddHostedService<SettingsService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
 // The sync worker pulls a Docker Model Runner model that isn't there yet; Catalog.API just waits for it.

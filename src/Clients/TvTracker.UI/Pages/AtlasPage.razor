@@ -1,0 +1,144 @@
+@page "/atlas"
+@attribute [RequiresFeature(FeatureFlags.TvAtlas)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>TV atlas · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>TV atlas</h1>
+<p class="muted">Where shows are set, from Wikidata. Select a dot to see what's set there.</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (Session.IsSignedIn)
+{
+    <div class="segmented" role="group" aria-label="Which shows">
+        <button class="btn @(popular ? "btn-quiet" : "")" @onclick="() => SwitchAsync(false)" aria-pressed="@(!popular)">Your shows</button>
+        <button class="btn @(popular ? "" : "btn-quiet")" @onclick="() => SwitchAsync(true)" aria-pressed="@popular">Popular shows</button>
+    </div>
+}
+
+@if (atlas is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else if (atlas.Places.Count == 0)
+{
+    <p>@(atlas.Yours
+        ? "None of your shows has a setting on the map yet. Settings come from Wikidata, a batch of shows at a time; try Popular shows."
+        : "No settings have been looked up yet. They come from Wikidata, a batch of shows at a time; try again later.")</p>
+}
+else
+{
+    <div class="life-facts">
+        <div><strong>@atlas.Places.Count</strong><span class="muted">@(atlas.Places.Count == 1 ? " place" : " places")</span></div>
+        <div><strong>@atlas.Countries.Count</strong><span class="muted">@(atlas.Countries.Count == 1 ? " country" : " countries")</span></div>
+        <div><strong>@($"{atlas.Placed} of {atlas.Shows}")</strong><span class="muted">@(atlas.Yours ? " of your shows on the map" : " shows on the map")</span></div>
+    </div>
+
+    <WorldMap Places="atlas.Places" Selected="@selected" OnSelect="Select" Label="@MapLabel()" />
+
+    @if (Chosen is { } chosen)
+    {
+        <section class="panel atlas-place" aria-live="polite">
+            <h2>@chosen.Name<span class="muted small">@(chosen.Country is { } c && c != chosen.Name ? $" · {c}" : "")</span></h2>
+            <div class="atlas-shows">
+                @foreach (var show in chosen.Shows)
+                {
+                    <a href="shows/@show.ShowId" class="atlas-show" @key="show.ShowId">
+                        <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+                        <span>@show.Title</span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+
+    <div class="atlas-columns">
+        <section aria-labelledby="places-title">
+            <h2 id="places-title">Most shows</h2>
+            <ol class="atlas-list">
+                @foreach (var place in atlas.Places.Take(12))
+                {
+                    <li @key="place.PlaceId">
+                        <button class="link" @onclick="() => Select(place.PlaceId)">@place.Name</button>
+                        <span class="muted small">@($" {place.Shows.Count} · {string.Join(", ", place.Shows.Take(3).Select(s => s.Title))}{(place.Shows.Count > 3 ? "…" : "")}")</span>
+                    </li>
+                }
+            </ol>
+        </section>
+        <section aria-labelledby="countries-title">
+            <h2 id="countries-title">@(atlas.Yours ? "Your TV passport" : "By country")</h2>
+            <ol class="atlas-list">
+                @foreach (var country in atlas.Countries.Take(12))
+                {
+                    <li @key="country.Name">
+                        <span>@country.Name</span>
+                        <span class="muted small">@($" {country.Shows} {(country.Shows == 1 ? "show" : "shows")}, {country.Places} {(country.Places == 1 ? "place" : "places")}")</span>
+                    </li>
+                }
+            </ol>
+        </section>
+    </div>
+    <p class="muted small">
+        <span>Settings from </span><a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a><span>
+            (narrative locations); map from Natural Earth. A show set in several places has a dot in each.</span>
+    </p>
+}
+
+@code {
+    /// <summary>The user's shows sent: everything they follow, which covers what they've started.</summary>
+    private const int MaxShows = 1000;
+
+    private Atlas? atlas;
+    private bool popular;
+    private string? selected;
+    private string? error;
+
+    private AtlasPlace? Chosen => atlas?.Places.FirstOrDefault(p => p.PlaceId == selected);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        atlas = null;
+        selected = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            IReadOnlyList<Guid> shows = [];
+            if (Session.IsSignedIn && !popular)
+            {
+                shows = (await Tracking.GetFollowsAsync() ?? []).Select(f => f.ShowId).Take(MaxShows).ToList();
+            }
+            atlas = await Catalog.GetAtlasAsync(shows);
+            selected = atlas?.Places.FirstOrDefault()?.PlaceId;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task SwitchAsync(bool toPopular)
+    {
+        if (popular == toPopular)
+        {
+            return Task.CompletedTask;
+        }
+        popular = toPopular;
+        return LoadAsync();
+    }
+
+    private void Select(string placeId) => selected = placeId;
+
+    private string MapLabel() => atlas is { Places.Count: > 0 } a
+        ? $"World map with {a.Places.Count} places; most shows are set in {a.Places[0].Name}."
+        : "World map";
+}

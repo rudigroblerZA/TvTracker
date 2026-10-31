@@ -286,6 +286,35 @@ public class Quote
     public List<string> Lines { get; set; } = [];
 }
 
+/// <summary>
+/// Where a show is set, from Wikidata's narrative location (P840) of the item with the show's TVmaze id: a place with
+/// coordinates on Earth. Replaced whole for the show at each lookup; a show with none simply has no rows.
+/// </summary>
+public class ShowSetting
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>The place's Wikidata item ("Q34804" for Albuquerque).</summary>
+    public required string PlaceId { get; set; }
+
+    public required string Name { get; set; }
+
+    /// <summary>The place's country, when Wikidata gives one in English.</summary>
+    public string? Country { get; set; }
+
+    public double Latitude { get; set; }
+
+    public double Longitude { get; set; }
+}
+
+/// <summary>When a show's settings were last looked up on Wikidata, found or not.</summary>
+public class ShowSettingLookup
+{
+    public Guid ShowId { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
 /// <summary>A person who made a show, with their roles on it.</summary>
 public class ShowCreative
 {

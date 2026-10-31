@@ -515,6 +515,50 @@ namespace Catalog.Data.Migrations
                     b.ToTable("show_quote_sources", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowSetting", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PlaceId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("ShowId", "PlaceId");
+
+                    b.HasIndex("PlaceId");
+
+                    b.ToTable("show_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowSettingLookup", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ShowId");
+
+                    b.ToTable("show_setting_lookups", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.WatchProvider", b =>
                 {
                     b.Property<Guid>("Id")
@@ -678,6 +722,24 @@ namespace Catalog.Data.Migrations
                     b.HasOne("Catalog.Data.Show", null)
                         .WithOne()
                         .HasForeignKey("Catalog.Data.ShowQuoteSource", "ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowSetting", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithMany()
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowSettingLookup", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithOne()
+                        .HasForeignKey("Catalog.Data.ShowSettingLookup", "ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

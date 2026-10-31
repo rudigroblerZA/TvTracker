@@ -34,6 +34,7 @@ public static class CatalogApi
         api.MapAfterwardsApi();
         api.MapQuotesApi();
         api.MapWhoSaidItApi();
+        api.MapAtlasApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

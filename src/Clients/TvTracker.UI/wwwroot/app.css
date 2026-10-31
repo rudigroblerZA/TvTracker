@@ -861,6 +861,21 @@ h1:focus, h2:focus { outline: none; }
 .quotes p:last-child { margin-bottom: 0; }
 .quotes .direction { color: var(--muted); font-style: italic; }
 
+/* TV atlas */
+.segmented { display: inline-flex; gap: 4px; margin: 4px 0 12px; }
+.world-map { width: 100%; height: auto; display: block; margin: 8px 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.world-map.compact { max-width: 420px; }
+.world-land { fill: light-dark(#d6d3d1, #3f3f46); stroke: none; }
+.world-dot { fill: var(--accent); fill-opacity: 0.75; stroke: var(--bg); stroke-width: 0.3; cursor: pointer; }
+.world-dot.selected { fill: var(--warn); fill-opacity: 1; stroke-width: 0.5; }
+.world-map.compact .world-dot { cursor: default; }
+.atlas-place h2 { margin-top: 0; }
+.atlas-shows { display: flex; flex-wrap: wrap; gap: 10px; }
+.atlas-show { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px; font-size: 0.85rem; text-align: center; }
+.atlas-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
+.atlas-list { padding-left: 20px; margin: 4px 0; }
+.atlas-list li { margin: 3px 0; }
+
 /* Your TV clock */
 .clock-labels { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 10px; font-size: 1.1rem; }
 .clock-grid { display: grid; grid-template-columns: 2.4em repeat(24, minmax(0, 1fr)); gap: 2px; align-items: center; max-width: 720px; }

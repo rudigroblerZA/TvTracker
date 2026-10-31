@@ -19,7 +19,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | --- | --- | --- |
 | Identity.API | profiles, region, timezone | Keycloak does sign-in; this orchestrates account deletion and data export across services |
 | Catalog.API | read side of `catalogdb` | search (title + semantic + tag filter), schedule, people, `/ops` dashboard; applies Catalog migrations |
-| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay; Wikiquote lines |
+| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay; Wikiquote lines; Wikidata settings |
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
@@ -879,6 +879,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   three recurring characters (two or more lines in the allowed episodes) to make a question; one-off speakers such as
   "Uniform" were options at first, and nobody could guess them. Shows are taken in turn, so a round isn't all one show.
 - **Answers in the response,** on trust, like Guess the show.
+
+## TV atlas
+
+- **Wikidata's narrative location** (P840) of the item with the show's TVmaze id, as Research and Memorable lines find
+  shows (`SettingsService` in the sync worker, `show_settings`): only places with coordinates on Earth (`geoGlobe` Q2),
+  since The Expanse's Moon has coordinates too. A show set in several places has a row (and a dot) for each; a city and
+  its state can both appear (Breaking Bad: New Mexico and Albuquerque), as Wikidata lists them.
+- **In batches:** one SPARQL query per 100 shows, a batch every two minutes while any are due, most popular first, each
+  show again monthly; its rows are replaced with what Wikidata says then. A sample of 30 popular shows found 17 with a
+  setting.
+- **A map drawn from data in the app** (`WorldOutline`): Natural Earth's 1:110m land (public domain) as one SVG path in
+  an equirectangular projection (x = longitude + 180, y = 90 − latitude), Antarctica left out and cut at 60°S, 46 KB.
+  Tiles from a map service would have the browser and phone ask a third party for every view, and OpenStreetMap's tile
+  servers aren't for app traffic.
+- **The user's shows from the page:** the UI posts the user's follows (as Holiday episodes does), so the catalog never
+  stores them. The popular atlas (150 shows) is cached an hour.
 
 ## Six degrees
 
