@@ -347,6 +347,24 @@ Useful local addresses:
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
 | DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
+### Backing up development data
+
+`scripts/backup.sh` saves every Postgres database (`pg_dump`, one file each) and Keycloak's `tvtracker` realm with its
+users to `backups/<UTC timestamp>` (git-ignored); `scripts/restore.sh <dir>` puts them back. Either takes
+`--databases-only` or `--keycloak-only`.
+
+- **Users keep their ids:** Keycloak's own export carries each user's id and password hash, and every service keys its
+  data on that id. Re-creating a user by hand gives a new id, and their follows, watches and ratings no longer belong
+  to anyone.
+- **Keycloak is stopped for a few seconds** during a backup, since its embedded database is held open while it runs;
+  sign-in is unavailable meanwhile.
+- **Restore with the AppHost stopped** (the script refuses otherwise): services would write over a database mid-restore.
+  Each database's objects are replaced in one transaction. Keycloak's current database is moved aside in its volume
+  (`h2-replaced-<timestamp>`), never deleted, and the realm imported into a fresh one.
+- **A corrupted Keycloak** ("File corrupted while reading record" at start) was the reason for these: after a Docker
+  crash its H2 file wouldn't open. Keycloak's export could still read it, and a restore of that export brought every
+  user back with their id.
+
 ### Bulk import
 
 `tvtracker-import` (`src/Tools/Catalog.ImportCli`) fills the catalog in bulk while the AppHost is running. It starts a job
