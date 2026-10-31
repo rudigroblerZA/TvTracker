@@ -8,17 +8,23 @@
 
 <p><a href="discover">← Discover</a></p>
 <h1>TV atlas</h1>
-<p class="muted">Where shows are set, from Wikidata. Select a dot to see what's set there.</p>
+<p class="muted">Where shows are set and where they were filmed, from Wikidata. Select a dot to see what's there.</p>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
-@if (Session.IsSignedIn)
-{
-    <div class="segmented" role="group" aria-label="Which shows">
-        <button class="btn @(popular ? "btn-quiet" : "")" @onclick="() => SwitchAsync(false)" aria-pressed="@(!popular)">Your shows</button>
-        <button class="btn @(popular ? "" : "btn-quiet")" @onclick="() => SwitchAsync(true)" aria-pressed="@popular">Popular shows</button>
+<div class="atlas-switches">
+    @if (Session.IsSignedIn)
+    {
+        <div class="segmented" role="group" aria-label="Which shows">
+            <button class="btn @(popular ? "btn-quiet" : "")" @onclick="() => SwitchAsync(false, filmed)" aria-pressed="@(!popular)">Your shows</button>
+            <button class="btn @(popular ? "" : "btn-quiet")" @onclick="() => SwitchAsync(true, filmed)" aria-pressed="@popular">Popular shows</button>
+        </div>
+    }
+    <div class="segmented" role="group" aria-label="Which places">
+        <button class="btn @(filmed ? "btn-quiet" : "")" @onclick="() => SwitchAsync(popular, false)" aria-pressed="@(!filmed)">Set in</button>
+        <button class="btn @(filmed ? "" : "btn-quiet")" @onclick="() => SwitchAsync(popular, true)" aria-pressed="@filmed">Filmed in</button>
     </div>
-}
+</div>
 
 @if (atlas is null)
 {
@@ -30,8 +36,8 @@
 else if (atlas.Places.Count == 0)
 {
     <p>@(atlas.Yours
-        ? "None of your shows has a setting on the map yet. Settings come from Wikidata, a batch of shows at a time; try Popular shows."
-        : "No settings have been looked up yet. They come from Wikidata, a batch of shows at a time; try again later.")</p>
+        ? $"None of your shows has {(filmed ? "a filming location" : "a setting")} on the map yet. Places come from Wikidata, a batch of shows at a time; try Popular shows."
+        : "No places have been looked up yet. They come from Wikidata, a batch of shows at a time; try again later.")</p>
 }
 else
 {
@@ -56,6 +62,32 @@ else
                     </a>
                 }
             </div>
+        </section>
+    }
+
+    @if (atlas.StandIns.Count > 0)
+    {
+        <section aria-labelledby="standins-title">
+            <h2 id="standins-title">Stand-in cities</h2>
+            <p class="muted small">@($"Filming places more than 300 km from anywhere the show is set: where {(atlas.Yours ? "your" : "these")} shows pretend to be somewhere else.")</p>
+            <ul class="standins">
+                @foreach (var city in atlas.StandIns.Take(8))
+                {
+                    <li @key="city.PlaceId">
+                        <strong>@city.Name</strong><span class="muted small">@(city.Country is { } c && c != city.Name ? $" · {c}" : "")</span>
+                        <div class="small">
+                            @foreach (var (show, i) in city.Shows.Take(4).Select((x, i) => (x, i)))
+                            {
+                                <span @key="show.ShowId">@(i > 0 ? "; " : "")<a href="shows/@show.ShowId">@show.Title</a>@($" plays {show.Plays}")</span>
+                            }
+                            @if (city.Shows.Count > 4)
+                            {
+                                <span class="muted">@($" and {city.Shows.Count - 4} more")</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
         </section>
     }
 
@@ -86,8 +118,8 @@ else
         </section>
     </div>
     <p class="muted small">
-        <span>Settings from </span><a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a><span>
-            (narrative locations); map from Natural Earth. A show set in several places has a dot in each.</span>
+        <span>Places from </span><a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer">Wikidata</a><span>
+            (narrative and filming locations); map from Natural Earth. A show in several places has a dot in each.</span>
     </p>
 }
 
@@ -97,6 +129,7 @@ else
 
     private Atlas? atlas;
     private bool popular;
+    private bool filmed;
     private string? selected;
     private string? error;
 
@@ -117,7 +150,7 @@ else
             {
                 shows = (await Tracking.GetFollowsAsync() ?? []).Select(f => f.ShowId).Take(MaxShows).ToList();
             }
-            atlas = await Catalog.GetAtlasAsync(shows);
+            atlas = await Catalog.GetAtlasAsync(shows, filmed);
             selected = atlas?.Places.FirstOrDefault()?.PlaceId;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -126,19 +159,19 @@ else
         }
     }
 
-    private Task SwitchAsync(bool toPopular)
+    private Task SwitchAsync(bool toPopular, bool toFilmed)
     {
-        if (popular == toPopular)
+        if (popular == toPopular && filmed == toFilmed)
         {
             return Task.CompletedTask;
         }
-        popular = toPopular;
+        (popular, filmed) = (toPopular, toFilmed);
         return LoadAsync();
     }
 
     private void Select(string placeId) => selected = placeId;
 
     private string MapLabel() => atlas is { Places.Count: > 0 } a
-        ? $"World map with {a.Places.Count} places; most shows are set in {a.Places[0].Name}."
+        ? $"World map with {a.Places.Count} places; most shows are {(filmed ? "filmed" : "set")} in {a.Places[0].Name}."
         : "World map";
 }

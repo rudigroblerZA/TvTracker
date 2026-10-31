@@ -127,9 +127,12 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<ShowSettings?> GetShowSettingsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowSettings>(ApiClients.Catalog, $"api/v1/shows/{showId}/settings", ct, cacheForOffline: true);
 
-    /// <summary>The TV atlas for the given shows (the user's), or the catalog's most popular when none; null while the flag is off.</summary>
-    public Task<Atlas?> GetAtlasAsync(IReadOnlyList<Guid> showIds, CancellationToken ct = default) =>
-        SendAsync<Atlas>(ApiClients.Catalog, HttpMethod.Post, "api/v1/atlas", new { showIds }, ct);
+    /// <summary>
+    /// The TV atlas for the given shows (the user's), or the catalog's most popular when none: where they're set, or with
+    /// <paramref name="filmed"/>, where they were filmed. Null while the flag is off.
+    /// </summary>
+    public Task<Atlas?> GetAtlasAsync(IReadOnlyList<Guid> showIds, bool filmed = false, CancellationToken ct = default) =>
+        SendAsync<Atlas>(ApiClients.Catalog, HttpMethod.Post, "api/v1/atlas", new { showIds, kind = filmed ? "filmed" : "set" }, ct);
 
     /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
     public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>

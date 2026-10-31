@@ -249,10 +249,12 @@ have lines, it uses popular shows' first episodes instead, and says so.
 **TV atlas** (`/atlas`, from Discover; and "Where it's set" on show pages; `tv-atlas` flag): where shows are set, on a
 world map. Signed in, it maps the shows you follow, with how many of them are on the map, the places with the most
 shows, and your TV passport (the countries your shows have taken you to); "Popular shows" maps the catalog's 150 most
-popular instead, and is what signed-out visitors see. Select a dot to see the shows set there. A show page with a
-setting says where it's set, with a small map zoomed to the place.
-- **Where it comes from:** Wikidata's narrative location for each show (found by TVmaze id), kept when the place has
-  coordinates on Earth. The sync worker looks shows up 100 at a time, most popular first, and again monthly. Plenty of
+popular instead, and is what signed-out visitors see. Select a dot to see the shows set there. "Filmed in" maps where
+the same shows were filmed instead, and **Stand-in cities** lists the filming places that play somewhere else (Atlanta
+playing Indiana for Stranger Things). A show page says where it's set and where it was filmed, with a small map (dots
+for settings, rings for filming places) and a line for each stand-in.
+- **Where it comes from:** Wikidata's narrative and filming locations for each show (found by TVmaze id), kept when the
+  place has coordinates on Earth. The sync worker looks shows up 100 at a time, most popular first, and again monthly. Plenty of
   shows have none (17 of a sample of 30 popular ones did), and those simply aren't on the map.
 - **The map** is drawn from Natural Earth's public-domain land outlines, shipped with the app, so it loads no map tiles
   from anyone.

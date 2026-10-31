@@ -287,12 +287,16 @@ public class Quote
 }
 
 /// <summary>
-/// Where a show is set, from Wikidata's narrative location (P840) of the item with the show's TVmaze id: a place with
-/// coordinates on Earth. Replaced whole for the show at each lookup; a show with none simply has no rows.
+/// A place a show is set in (Wikidata's narrative location, P840) or filmed in (filming location, P915), from the item
+/// with the show's TVmaze id: a place with coordinates on Earth. Replaced whole for the show at each lookup; a show with
+/// none simply has no rows.
 /// </summary>
 public class ShowSetting
 {
     public Guid ShowId { get; set; }
+
+    /// <summary><see cref="ShowSettingKinds.Set"/> or <see cref="ShowSettingKinds.Filmed"/>; a city can be both.</summary>
+    public string Kind { get; set; } = ShowSettingKinds.Set;
 
     /// <summary>The place's Wikidata item ("Q34804" for Albuquerque).</summary>
     public required string PlaceId { get; set; }
@@ -305,6 +309,12 @@ public class ShowSetting
     public double Latitude { get; set; }
 
     public double Longitude { get; set; }
+}
+
+public static class ShowSettingKinds
+{
+    public const string Set = "set";
+    public const string Filmed = "filmed";
 }
 
 /// <summary>When a show's settings were last looked up on Wikidata, found or not.</summary>
