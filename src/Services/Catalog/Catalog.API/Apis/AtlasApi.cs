@@ -56,7 +56,11 @@ public record AtlasCountryDto(string Name, int Shows, int Places);
 public static class AtlasApi
 {
     public const int Popular = 150;
-    public const double StandInKilometres = 300;
+    /// <summary>
+    /// A state's point sits near its middle, so a city in it can be a few hundred kilometres away: at 300 km, American
+    /// Horror Story's "California" counted as standing in for Los Angeles (~380 km). Real stand-ins found were 700 km+.
+    /// </summary>
+    public const double StandInKilometres = 500;
     private const int MaxShows = 1000;
     private static readonly TimeSpan PopularFor = TimeSpan.FromHours(1);
     private static readonly TimeSpan ShowFor = TimeSpan.FromMinutes(1);

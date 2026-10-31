@@ -69,7 +69,7 @@ else
     {
         <section aria-labelledby="standins-title">
             <h2 id="standins-title">Stand-in cities</h2>
-            <p class="muted small">@($"Filming places more than 300 km from anywhere the show is set: where {(atlas.Yours ? "your" : "these")} shows pretend to be somewhere else.")</p>
+            <p class="muted small">@($"Filming places more than 500 km from anywhere the show is set: where {(atlas.Yours ? "your" : "these")} shows pretend to be somewhere else.")</p>
             <ul class="standins">
                 @foreach (var city in atlas.StandIns.Take(8))
                 {

@@ -889,7 +889,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Filming locations** (P915) come in the same query, marked `filmed` in `show_settings.Kind` (part of the key, since
   a city can be both). Their granularity varies: Game of Thrones lists ten countries, Ted Lasso single pubs.
   Migration `FilmingLocations` cleared the lookup stamps, so every show was looked up again.
-- **Stand-ins:** a filming place more than 300 km from every place the show is set in plays somewhere else. Places that
+- **Stand-ins:** a filming place more than 500 km from every place the show is set in plays somewhere else (300 km
+  called American Horror Story's "California", whose point is mid-state, a stand-in for Los Angeles). Places that
   are a whole country (Wikidata gives them as their own country) are left out on both sides, since a country's point
   says nothing about where in it a show is. Computed on read, per show and for the atlas's list.
 - **In batches:** one SPARQL query per 25 shows, a batch every two minutes while any are due, most popular first, each
