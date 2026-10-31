@@ -49,6 +49,18 @@ public static class Format
         : $"{minutes / (60 * 24)} day{(minutes / (60 * 24) == 1 ? "" : "s")} {minutes % (60 * 24) / 60} h";
 
     /// <summary>Watching time in whole hours ("365 h") for long stretches, where days would be misleading.</summary>
+    /// <summary>A wait in days as people say it: "3 weeks", "8 months", "2 years 9 months".</summary>
+    public static string Wait(int days)
+    {
+        if (days < 14) return $"{days} {(days == 1 ? "day" : "days")}";
+        if (days < 60) return $"{Math.Round(days / 7.0):0} weeks";
+        var months = (int)Math.Round(days / 30.44);
+        if (months < 12) return $"{months} months";
+        var (years, rest) = (months / 12, months % 12);
+        var y = years == 1 ? "1 year" : $"{years} years";
+        return rest == 0 || years >= 10 ? y : $"{y} {rest} {(rest == 1 ? "month" : "months")}";
+    }
+
     public static string Hours(int minutes) => minutes < 120 ? Duration(minutes) : $"{Math.Round(minutes / 60.0):N0} h";
 
     /// <summary>

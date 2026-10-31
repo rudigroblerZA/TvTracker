@@ -142,6 +142,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<EpisodeLengthLists?> GetEpisodeLengthListsAsync(CancellationToken ct = default) =>
         GetAsync<EpisodeLengthLists>(ApiClients.Catalog, "api/v1/episode-lengths", ct, cacheForOffline: true);
 
+    /// <summary>A show's waits between seasons, and for a running show how long since its last episode; null with the flag off.</summary>
+    public Task<SeasonGaps?> GetSeasonGapsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<SeasonGaps>(ApiClients.Catalog, $"api/v1/shows/{showId}/season-gaps", ct, cacheForOffline: true);
+
+    /// <summary>The longest waits between seasons, revivals, and shows still waiting; null while the flag is off.</summary>
+    public Task<SeasonGapLists?> GetSeasonGapListsAsync(CancellationToken ct = default) =>
+        GetAsync<SeasonGapLists>(ApiClients.Catalog, "api/v1/season-gaps", ct, cacheForOffline: true);
+
     /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
     public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>
         GetAsync<DegreesResult>(ApiClients.Catalog, $"api/v1/degrees?from={from}&to={to}", ct);

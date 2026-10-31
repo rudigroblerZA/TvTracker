@@ -271,6 +271,15 @@ shows whose episodes grew and the ones that were trimmed, first season against l
 - **API:** `GET /api/v1/shows/{id}/episode-lengths` (404 with fewer than two seasons to compare) and
   `GET /api/v1/episode-lengths` (Catalog.API, public).
 
+**Between seasons** (on show pages, and `/season-gaps` from Discover; `season-gaps` flag): how long a show kept its
+viewers waiting. The show page draws each wait between seasons as a bar, says how far apart seasons usually came and
+which wait was longest, and for a running show how long it's been since the last episode and when it's back, if dated.
+The Discover page lists popular scripted shows' longest waits (under five years), the shows revived after five years or
+more, and the running shows with nothing new for a year or more. It works signed out.
+- **The rule:** a wait runs from a season's last episode to the next season's first, from TVmaze's air dates; a next
+  season with a date still to come counts as a scheduled wait. Daily shows are left out.
+- **API:** `GET /api/v1/shows/{id}/season-gaps` and `GET /api/v1/season-gaps` (Catalog.API, public).
+
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
 shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
 Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
@@ -499,7 +508,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 

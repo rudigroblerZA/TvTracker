@@ -36,6 +36,7 @@ public static class CatalogApi
         api.MapWhoSaidItApi();
         api.MapAtlasApi();
         api.MapEpisodeLengthsApi();
+        api.MapSeasonGapsApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();
