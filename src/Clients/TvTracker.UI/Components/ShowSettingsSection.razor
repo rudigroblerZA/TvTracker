@@ -1,18 +1,25 @@
 @inject CatalogClient Catalog
 
-@* Where a show is set, with a small map zoomed to the places; from Wikidata, so many shows have none and show nothing. *@
-@if (settings is { Places.Count: > 0 } s)
+@* Where a show is set and where it was filmed, with a small map zoomed to the places (filming places as rings); from
+   Wikidata, so many shows have neither and show nothing. *@
+@if (settings is { } s && (s.Places.Count > 0 || s.Filmed.Count > 0))
 {
     <section aria-labelledby="settings-title" class="show-settings">
         <h2 id="settings-title">Where it's set</h2>
-        <p>
-            @foreach (var (place, i) in s.Places.Select((p, i) => (p, i)))
-            {
-                <span @key="place.PlaceId">@(i == 0 ? "" : i == s.Places.Count - 1 ? " and " : ", ")@place.Name@(place.Country is { } c && c != place.Name ? $" ({c})" : "")</span>
-            }
-            <span class="muted small">@(" · ")</span><a href="atlas" class="small">TV atlas</a>
-        </p>
-        <WorldMap Places="s.Places" Compact="true" Label="@($"Map of where {Title} is set")" />
+        @if (s.Places.Count > 0)
+        {
+            <p><span class="muted">Set in </span>@Names(s.Places)</p>
+        }
+        @if (s.Filmed.Count > 0)
+        {
+            <p><span class="muted">Filmed in </span>@Names(s.Filmed)</p>
+        }
+        @foreach (var standIn in s.StandsIn)
+        {
+            <p class="stand-in" @key="standIn.PlaceId">@($"{standIn.Name} stands in for {standIn.Plays}.")</p>
+        }
+        <WorldMap Places="s.Places" Filmed="s.Filmed" Compact="true" Label="@($"Map of where {Title} is set and filmed")" />
+        <p class="muted small"><a href="atlas">TV atlas</a><span>@(s.Filmed.Count > 0 && s.Places.Count > 0 ? " · dots are settings, rings filming places" : "")</span></p>
     </section>
 }
 
@@ -34,5 +41,12 @@
             // Extra: the show page works without it.
             settings = null;
         }
+    }
+
+    /// <summary>"Albuquerque (United States), London and Paris (France)", the country left off a place that is one.</summary>
+    private static string Names(IReadOnlyList<AtlasPlace> places)
+    {
+        var names = places.Select(p => p.Country is { } c && c != p.Name ? $"{p.Name} ({c})" : p.Name).ToList();
+        return names.Count == 1 ? names[0] : $"{string.Join(", ", names[..^1])} and {names[^1]}";
     }
 }

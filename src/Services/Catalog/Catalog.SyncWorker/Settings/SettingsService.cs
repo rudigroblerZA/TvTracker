@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Catalog.SyncWorker.Settings;
 
 /// <summary>
-/// Where shows are set, for the TV atlas: Wikidata's narrative location (P840) of the item with each show's TVmaze id
-/// (P8600, as Research and Memorable lines find shows), kept when the place has coordinates on Earth (The Expanse's Moon
-/// has some too). One SPARQL query per <see cref="Batch"/> shows, a batch a round while any are due, most popular first;
+/// Where shows are set and filmed, for the TV atlas: Wikidata's narrative location (P840) and filming location (P915) of
+/// the item with each show's TVmaze id (P8600, as Research and Memorable lines find shows), kept when the place has
+/// coordinates on Earth (The Expanse's Moon has some too). Both come in one query, each row marked with its kind. One SPARQL query per <see cref="Batch"/> shows, a batch a round while any are due, most popular first;
 /// each show is looked up again monthly, and its rows are replaced with what Wikidata says then.
 /// <para>
 /// <b>Gently:</b> Wikidata limits shared addresses hard, so a 429 is waited out as asked (up to <see cref="MaxWait"/>),
@@ -37,9 +37,10 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
 
     // Q2 is Earth: places on other globes have coordinates too.
     private const string Sparql = """
-        SELECT ?tvmaze ?place ?placeLabel ?countryLabel ?lat ?lon WHERE {
+        SELECT ?tvmaze ?kind ?place ?placeLabel ?countryLabel ?lat ?lon WHERE {
           VALUES ?tvmaze { {IDS} }
-          ?item wdt:P8600 ?tvmaze; wdt:P840 ?place.
+          ?item wdt:P8600 ?tvmaze.
+          { ?item wdt:P840 ?place. BIND("set" AS ?kind) } UNION { ?item wdt:P915 ?place. BIND("filmed" AS ?kind) }
           ?place p:P625/psv:P625 ?coord.
           ?coord wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon; wikibase:geoGlobe wd:Q2.
           ?place rdfs:label ?placeLabel. FILTER(LANG(?placeLabel) = "en")
@@ -47,7 +48,7 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
         }
         """;
 
-    private sealed record Place(string ExternalId, string PlaceId, string Name, string? Country, double Latitude, double Longitude);
+    private sealed record Place(string ExternalId, string Kind, string PlaceId, string Name, string? Country, double Latitude, double Longitude);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -101,15 +102,16 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
             {
                 db.Settings.AddRange(places[show.ExternalId].Select(p => new ShowSetting
                 {
-                    ShowId = show.Id, PlaceId = p.PlaceId, Name = p.Name, Country = p.Country, Latitude = p.Latitude, Longitude = p.Longitude
+                    ShowId = show.Id, Kind = p.Kind, PlaceId = p.PlaceId, Name = p.Name, Country = p.Country, Latitude = p.Latitude, Longitude = p.Longitude
                 }));
                 db.SettingLookups.Add(new ShowSettingLookup { ShowId = show.Id, CheckedAtUtc = now });
             }
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         });
-        logger.LogInformation("TV atlas: looked up {Shows} shows, {Set} with a setting ({Places} places)",
-            due.Count, due.Count(s => places[s.ExternalId].Any()), places.Sum(p => p.Count()));
+        logger.LogInformation("TV atlas: looked up {Shows} shows, {Set} with a setting, {Filmed} with a filming location",
+            due.Count, due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Set)),
+            due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Filmed)));
         return due.Count;
     }
 
@@ -133,15 +135,16 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
         foreach (var row in json.RootElement.GetProperty("results").GetProperty("bindings").EnumerateArray())
         {
             string? Get(string name) => row.TryGetProperty(name, out var v) && v.GetProperty("value").GetString() is { Length: > 0 } s ? s : null;
-            if (Get("tvmaze") is { } id && Get("place") is { } place && Get("placeLabel") is { } name
+            if (Get("tvmaze") is { } id && Get("kind") is ShowSettingKinds.Set or ShowSettingKinds.Filmed && Get("place") is { } place
+                && Get("placeLabel") is { } name
                 && double.TryParse(Get("lat"), CultureInfo.InvariantCulture, out var lat)
                 && double.TryParse(Get("lon"), CultureInfo.InvariantCulture, out var lon))
             {
-                places.Add(new Place(id, place[(place.LastIndexOf('/') + 1)..], name[..Math.Min(name.Length, 256)],
+                places.Add(new Place(id, Get("kind")!, place[(place.LastIndexOf('/') + 1)..], name[..Math.Min(name.Length, 256)],
                     Get("countryLabel") is { } country ? country[..Math.Min(country.Length, 128)] : null, lat, lon));
             }
         }
-        return places.DistinctBy(p => (p.ExternalId, p.PlaceId)).ToList();
+        return places.DistinctBy(p => (p.ExternalId, p.Kind, p.PlaceId)).ToList();
     }
 
     private async Task<T> WithRetryAsync<T>(Func<Task<T>> call, CancellationToken ct)

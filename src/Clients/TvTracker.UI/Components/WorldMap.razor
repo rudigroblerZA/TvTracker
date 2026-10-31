@@ -1,5 +1,6 @@
 @using System.Globalization
-@* The TV atlas's map: the world's land (WorldOutline) with a dot per place, sized by how many shows are set there. *@
+@* The TV atlas's map: the world's land (WorldOutline) with a dot per place, sized by how many shows are there, and
+   optionally filming places as rings. *@
 <svg class="world-map @(Compact ? "compact" : "")" viewBox="@ViewBox" role="img" aria-label="@Label">
     <path class="world-land" d="@WorldOutline.Land" />
     @foreach (var place in Places.OrderBy(p => p.Shows.Count))
@@ -12,10 +13,21 @@
             <title>@($"{place.Name} · {place.Shows.Count} {(place.Shows.Count == 1 ? "show" : "shows")}")</title>
         </circle>
     }
+    @foreach (var place in Filmed)
+    {
+        var (x, y) = WorldOutline.Point(place.Latitude, place.Longitude);
+        <circle @key="@("filmed-" + place.PlaceId)" class="world-ring" cx="@x.ToString(CultureInfo.InvariantCulture)"
+                cy="@y.ToString(CultureInfo.InvariantCulture)" r="2.6">
+            <title>@($"Filmed in {place.Name}")</title>
+        </circle>
+    }
 </svg>
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<AtlasPlace> Places { get; set; } = [];
+
+    /// <summary>Filming places, drawn as rings over the dots; a show page passes these with its settings.</summary>
+    [Parameter] public IReadOnlyList<AtlasPlace> Filmed { get; set; } = [];
 
     [Parameter] public string? Selected { get; set; }
 
@@ -30,12 +42,13 @@
     {
         get
         {
-            if (!Compact || Places.Count == 0)
+            var all = Places.Concat(Filmed).ToList();
+            if (!Compact || all.Count == 0)
             {
                 return $"0 0 360 {WorldOutline.Height.ToString(CultureInfo.InvariantCulture)}";
             }
             // The places' box with room around it, at the map's 2.4:1 shape, inside the world.
-            var points = Places.Select(p => WorldOutline.Point(p.Latitude, p.Longitude)).ToList();
+            var points = all.Select(p => WorldOutline.Point(p.Latitude, p.Longitude)).ToList();
             var (cx, cy) = ((points.Min(p => p.X) + points.Max(p => p.X)) / 2, (points.Min(p => p.Y) + points.Max(p => p.Y)) / 2);
             var width = Math.Clamp(Math.Max(points.Max(p => p.X) - points.Min(p => p.X), (points.Max(p => p.Y) - points.Min(p => p.Y)) * 2.4) + 40, 60, 360);
             var height = width / 2.4;

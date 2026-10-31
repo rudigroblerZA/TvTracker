@@ -524,6 +524,12 @@ namespace Catalog.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("set");
+
                     b.Property<string>("Country")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -539,7 +545,7 @@ namespace Catalog.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.HasKey("ShowId", "PlaceId");
+                    b.HasKey("ShowId", "PlaceId", "Kind");
 
                     b.HasIndex("PlaceId");
 

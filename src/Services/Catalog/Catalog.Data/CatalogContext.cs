@@ -141,7 +141,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
         modelBuilder.Entity<ShowSetting>(entity =>
         {
             entity.ToTable("show_settings");
-            entity.HasKey(s => new { s.ShowId, s.PlaceId });
+            entity.HasKey(s => new { s.ShowId, s.PlaceId, s.Kind });
+            entity.Property(s => s.Kind).HasMaxLength(8).HasDefaultValue(ShowSettingKinds.Set);
             entity.HasOne<Show>().WithMany().HasForeignKey(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
             entity.Property(s => s.PlaceId).HasMaxLength(32);
             entity.Property(s => s.Name).HasMaxLength(256);

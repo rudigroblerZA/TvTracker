@@ -843,13 +843,23 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
-/// <summary>Where a show is set, from Wikidata.</summary>
-public record ShowSettings(Guid ShowId, IReadOnlyList<AtlasPlace> Places);
+/// <summary>Where a show is set and filmed, from Wikidata.</summary>
+/// <param name="StandsIn">Filming places far from anywhere it's set, each with the setting it plays.</param>
+public record ShowSettings(Guid ShowId, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasPlace> Filmed, IReadOnlyList<StandIn> StandsIn);
+
+public record StandIn(string PlaceId, string Name, string? Country, string Plays);
 
 /// <summary>The TV atlas: where a set of shows is set.</summary>
 /// <param name="Yours">From the user's shows, not the popular fallback.</param>
 /// <param name="Placed">Of <paramref name="Shows"/>, how many have a setting on the map.</param>
-public record Atlas(bool Yours, int Shows, int Placed, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasCountry> Countries);
+/// <param name="Kind">"set" or "filmed": which the places are.</param>
+/// <param name="StandIns">Filming places that play somewhere else, most shows first.</param>
+public record Atlas(bool Yours, string Kind, int Shows, int Placed, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasCountry> Countries,
+    IReadOnlyList<StandInCity> StandIns);
+
+public record StandInCity(string PlaceId, string Name, string? Country, IReadOnlyList<StandInShow> Shows);
+
+public record StandInShow(Guid ShowId, string Title, string? PosterUrl, string Plays);
 
 public record AtlasPlace(string PlaceId, string Name, string? Country, double Latitude, double Longitude, IReadOnlyList<AtlasShow> Shows);
 
