@@ -29,6 +29,10 @@ dotnet ef migrations add <Name> --project src/Services/Research/Research.API --o
 dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
 dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
 
+# Back up every database and Keycloak's realm with its users (to backups/<timestamp>); restore with the AppHost stopped
+scripts/backup.sh
+scripts/restore.sh backups/<timestamp>
+
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
 

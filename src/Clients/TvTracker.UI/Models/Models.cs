@@ -843,6 +843,20 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>Where a show is set, from Wikidata.</summary>
+public record ShowSettings(Guid ShowId, IReadOnlyList<AtlasPlace> Places);
+
+/// <summary>The TV atlas: where a set of shows is set.</summary>
+/// <param name="Yours">From the user's shows, not the popular fallback.</param>
+/// <param name="Placed">Of <paramref name="Shows"/>, how many have a setting on the map.</param>
+public record Atlas(bool Yours, int Shows, int Placed, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasCountry> Countries);
+
+public record AtlasPlace(string PlaceId, string Name, string? Country, double Latitude, double Longitude, IReadOnlyList<AtlasShow> Shows);
+
+public record AtlasShow(Guid ShowId, string Title, string? PosterUrl);
+
+public record AtlasCountry(string Name, int Shows, int Places);
+
 /// <summary>Your TV clock: when the user watches, from their last year of watches (bulk marks left out).</summary>
 /// <param name="Grid">Minutes by weekday (Monday first) and hour.</param>
 public record TvClock(bool Enough, DateOnly Since, int Episodes, int Minutes, int BulkLeftOut, IReadOnlyList<IReadOnlyList<int>> Grid,

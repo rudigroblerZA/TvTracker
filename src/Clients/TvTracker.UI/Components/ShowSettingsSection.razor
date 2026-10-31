@@ -1,0 +1,38 @@
+@inject CatalogClient Catalog
+
+@* Where a show is set, with a small map zoomed to the places; from Wikidata, so many shows have none and show nothing. *@
+@if (settings is { Places.Count: > 0 } s)
+{
+    <section aria-labelledby="settings-title" class="show-settings">
+        <h2 id="settings-title">Where it's set</h2>
+        <p>
+            @foreach (var (place, i) in s.Places.Select((p, i) => (p, i)))
+            {
+                <span @key="place.PlaceId">@(i == 0 ? "" : i == s.Places.Count - 1 ? " and " : ", ")@place.Name@(place.Country is { } c && c != place.Name ? $" ({c})" : "")</span>
+            }
+            <span class="muted small">@(" · ")</span><a href="atlas" class="small">TV atlas</a>
+        </p>
+        <WorldMap Places="s.Places" Compact="true" Label="@($"Map of where {Title} is set")" />
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    [Parameter] public string Title { get; set; } = "the show";
+
+    private ShowSettings? settings;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            settings = await Catalog.GetShowSettingsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            settings = null;
+        }
+    }
+}

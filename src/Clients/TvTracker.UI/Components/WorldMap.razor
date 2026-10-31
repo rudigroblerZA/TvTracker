@@ -1,0 +1,47 @@
+@using System.Globalization
+@* The TV atlas's map: the world's land (WorldOutline) with a dot per place, sized by how many shows are set there. *@
+<svg class="world-map @(Compact ? "compact" : "")" viewBox="@ViewBox" role="img" aria-label="@Label">
+    <path class="world-land" d="@WorldOutline.Land" />
+    @foreach (var place in Places.OrderBy(p => p.Shows.Count))
+    {
+        var (x, y) = WorldOutline.Point(place.Latitude, place.Longitude);
+        var r = Compact ? 2.2 : 1.4 + Math.Sqrt(place.Shows.Count) * 0.9;
+        <circle @key="place.PlaceId" class="world-dot @(place.PlaceId == Selected ? "selected" : "")" cx="@x.ToString(CultureInfo.InvariantCulture)"
+                cy="@y.ToString(CultureInfo.InvariantCulture)" r="@r.ToString("0.##", CultureInfo.InvariantCulture)"
+                @onclick="() => OnSelect.InvokeAsync(place.PlaceId)">
+            <title>@($"{place.Name} · {place.Shows.Count} {(place.Shows.Count == 1 ? "show" : "shows")}")</title>
+        </circle>
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AtlasPlace> Places { get; set; } = [];
+
+    [Parameter] public string? Selected { get; set; }
+
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+
+    /// <summary>Small, for a show page: zoomed to the show's places rather than the whole world.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    [Parameter] public string Label { get; set; } = "World map";
+
+    private string ViewBox
+    {
+        get
+        {
+            if (!Compact || Places.Count == 0)
+            {
+                return $"0 0 360 {WorldOutline.Height.ToString(CultureInfo.InvariantCulture)}";
+            }
+            // The places' box with room around it, at the map's 2.4:1 shape, inside the world.
+            var points = Places.Select(p => WorldOutline.Point(p.Latitude, p.Longitude)).ToList();
+            var (cx, cy) = ((points.Min(p => p.X) + points.Max(p => p.X)) / 2, (points.Min(p => p.Y) + points.Max(p => p.Y)) / 2);
+            var width = Math.Clamp(Math.Max(points.Max(p => p.X) - points.Min(p => p.X), (points.Max(p => p.Y) - points.Min(p => p.Y)) * 2.4) + 40, 60, 360);
+            var height = width / 2.4;
+            var x = Math.Clamp(cx - width / 2, 0, 360 - width);
+            var y = Math.Clamp(cy - height / 2, 0, WorldOutline.Height - height);
+            return string.Create(CultureInfo.InvariantCulture, $"{x:0.#} {y:0.#} {width:0.#} {height:0.#}");
+        }
+    }
+}

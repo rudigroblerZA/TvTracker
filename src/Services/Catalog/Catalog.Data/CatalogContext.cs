@@ -18,6 +18,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
     public DbSet<ShowQuoteSource> QuoteSources => Set<ShowQuoteSource>();
     public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<ShowSetting> Settings => Set<ShowSetting>();
+    public DbSet<ShowSettingLookup> SettingLookups => Set<ShowSettingLookup>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -134,6 +136,24 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(q => q.Id).ValueGeneratedNever();
             entity.HasOne<Show>().WithMany().HasForeignKey(q => q.ShowId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(q => new { q.ShowId, q.SeasonNumber, q.EpisodeNumber });
+        });
+
+        modelBuilder.Entity<ShowSetting>(entity =>
+        {
+            entity.ToTable("show_settings");
+            entity.HasKey(s => new { s.ShowId, s.PlaceId });
+            entity.HasOne<Show>().WithMany().HasForeignKey(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(s => s.PlaceId).HasMaxLength(32);
+            entity.Property(s => s.Name).HasMaxLength(256);
+            entity.Property(s => s.Country).HasMaxLength(128);
+            entity.HasIndex(s => s.PlaceId);
+        });
+
+        modelBuilder.Entity<ShowSettingLookup>(entity =>
+        {
+            entity.ToTable("show_setting_lookups");
+            entity.HasKey(s => s.ShowId);
+            entity.HasOne<Show>().WithOne().HasForeignKey<ShowSettingLookup>(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CastMember>(entity =>
