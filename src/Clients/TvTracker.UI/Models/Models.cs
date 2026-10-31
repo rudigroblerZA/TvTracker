@@ -880,6 +880,12 @@ public record QuoteText(IReadOnlyList<QuoteLine> Lines);
 /// <param name="Speaker">Null for a stage direction.</param>
 public record QuoteLine(string? Speaker, string Text);
 
+/// <summary>A round of Who said it?: lines from episodes the player has watched, or popular first episodes.</summary>
+public record WhoSaidItRound(bool FromWatched, IReadOnlyList<WhoSaidItQuestion> Questions);
+
+public record WhoSaidItQuestion(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
+    string Line, IReadOnlyList<string> Options, string Answer, string PageUrl);
+
 /// <summary>Spoiler watch: the viewer's shows with recent unwatched episodes, riskiest first.</summary>
 public record SpoilerWatch(IReadOnlyList<SpoilerRisk> Shows);
 

@@ -854,6 +854,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Spoilers:** the show page takes lines about the whole show, else the first episode's. An episode's lines sit behind
   the spoiler shield until it's watched, as its summary does.
 
+## Who said it?
+
+- **Spoiler-proof by construction** (`WhoSaidItApi` on Catalog.API): lines come only from episodes the player sends as
+  watched, and the options are characters with lines in those same episodes, so a question can't give away a scene or
+  a character's existence. Without any (signed out, or no started show has lines yet), popular shows' first episodes
+  with lines, which give the least away.
+- **Watches from the page:** the UI asks Tracking for the watched episodes of up to 20 started shows (one `/progress`
+  call each, as Holiday episodes and the watch order do) and posts them; the catalog never stores watches.
+- **One character, one name:** Wikiquote writes a character's short name in one episode and full name in another, so
+  names whose words sit inside one fuller name are merged into it. A name inside two different fuller ones stays as it
+  is.
+- **Fair lines:** 20-200 characters once stage directions are out, never naming any of the options, and a show needs
+  three recurring characters (two or more lines in the allowed episodes) to make a question; one-off speakers such as
+  "Uniform" were options at first, and nobody could guess them. Shows are taken in turn, so a round isn't all one show.
+- **Answers in the response,** on trust, like Guess the show.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

@@ -861,6 +861,14 @@ h1:focus, h2:focus { outline: none; }
 .quotes p:last-child { margin-bottom: 0; }
 .quotes .direction { color: var(--muted); font-style: italic; }
 
+/* Who said it? */
+.quiz-show { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.quiz-line { font-size: 1.15rem; margin: 0 0 14px; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; }
+.quiz-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.quiz-options .btn:disabled { opacity: 1; cursor: default; }
+.quiz-options .btn.right { background: var(--good); border-color: var(--good); color: #fff; }
+.quiz-options .btn.wrong { background: var(--bad); border-color: var(--bad); color: #fff; }
+
 /* Spoiler watch */
 .spoiler-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
 .spoiler-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--radius); background: var(--surface); }
