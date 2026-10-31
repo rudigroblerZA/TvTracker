@@ -33,7 +33,21 @@ public record CatalogOpsStats(
     OpsUniverses? Universes,
     IReadOnlyList<OpsFlag> Flags,
     OpsDataQuality DataQuality,
-    OpsOverrides? Overrides = null);
+    OpsOverrides? Overrides = null,
+    OpsWikimedia? Wikimedia = null);
+
+/// <summary>
+/// The sync worker's slow fetches from Wikimedia, for Memorable lines (Wikiquote) and the TV atlas (Wikidata), and how far
+/// through they are. Wikimedia rate-limits shared addresses hard, so a count that stays put usually means the job is
+/// waiting out a 429.
+/// </summary>
+/// <param name="QuoteShowsChecked">Shows looked up on Wikidata for a Wikiquote page; <paramref name="QuotePages"/> had one.</param>
+/// <param name="QuoteShowsRead">Of those with a page, read within the last 60 days.</param>
+/// <param name="SettingsLookedUp">Shows looked up for settings and filming locations within the month.</param>
+/// <param name="TvMazeShows">Shows the lookups cover (the catalog's TVmaze shows).</param>
+public record OpsWikimedia(int QuoteShowsChecked, int QuotePages, int QuoteShowsRead, int Quotes, int QuoteEpisodes,
+    DateTime? LastQuotesReadAtUtc, int TvMazeShows, int SettingsLookedUp, int ShowsSet, int ShowsFilmed, int Places,
+    DateTime? LastSettingsAtUtc);
 
 /// <summary>Values that replace the provider's (accepted corrections and saved research), by field.</summary>
 public record OpsOverrides(int Count, int Shows, IReadOnlyDictionary<string, int> ByField);
@@ -172,7 +186,28 @@ public static class OpsApi
             Universes: await GetUniversesAsync(db, universes, ct),
             Flags: await GetFlagsAsync(features, ct),
             DataQuality: await GetDataQualityAsync(db, ct),
-            Overrides: await GetOverridesAsync(db, ct));
+            Overrides: await GetOverridesAsync(db, ct),
+            Wikimedia: await GetWikimediaAsync(db, now, ct));
+    }
+
+    private static async Task<OpsWikimedia> GetWikimediaAsync(CatalogContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var refreshed = now.UtcDateTime.AddDays(-60);
+        var monthAgo = now.UtcDateTime.AddDays(-30);
+        return new OpsWikimedia(
+            await db.QuoteSources.CountAsync(ct),
+            await db.QuoteSources.CountAsync(q => q.Page != null, ct),
+            await db.QuoteSources.CountAsync(q => q.Page != null && q.FetchedAtUtc >= refreshed, ct),
+            await db.Quotes.CountAsync(ct),
+            await db.Quotes.Where(q => q.EpisodeNumber != null)
+                .Select(q => new { q.ShowId, q.SeasonNumber, q.EpisodeNumber }).Distinct().CountAsync(ct),
+            await db.QuoteSources.MaxAsync(q => q.FetchedAtUtc, ct),
+            await db.Shows.CountAsync(s => s.Source == "tvmaze", ct),
+            await db.SettingLookups.CountAsync(l => l.CheckedAtUtc >= monthAgo, ct),
+            await db.Settings.Where(s => s.Kind == ShowSettingKinds.Set).Select(s => s.ShowId).Distinct().CountAsync(ct),
+            await db.Settings.Where(s => s.Kind == ShowSettingKinds.Filmed).Select(s => s.ShowId).Distinct().CountAsync(ct),
+            await db.Settings.Select(s => s.PlaceId).Distinct().CountAsync(ct),
+            await db.SettingLookups.MaxAsync(l => (DateTime?)l.CheckedAtUtc, ct));
     }
 
     private static async Task<OpsOverrides> GetOverridesAsync(CatalogContext db, CancellationToken ct) =>
