@@ -902,6 +902,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **The user's shows from the page:** the UI posts the user's follows (as Holiday episodes does), so the catalog never
   stores them. The popular atlas (150 shows) is cached an hour.
 
+## Episode lengths
+
+- **Medians from the catalog** (`EpisodeLengthsApi` on Catalog.API): one SQL aggregate gives every show's regular
+  seasons' median runtime and totals (TVmaze has runtimes on 98% of aired episodes). A median, so Game of Thrones'
+  feature-length specials or a double finale don't decide a season.
+- **Verdict:** the last counted season (three or more timed episodes) against the first; longer or shorter at 20% and
+  8 minutes, both, so a half-hour sitcom moving from 22 to 26 minutes stays steady. The biggest change between
+  consecutive counted seasons is named at 10 minutes or more.
+- **The lists are scripted shows, most popular first,** starting from 15-minute episodes. Ranked by size of change,
+  they were led by data quirks (Sunny Bunnies' 3-minute shorts "growing" to 59) and competition shows doubling to
+  two-hour episodes. The show page gives every show's verdict.
+- **Computed together, cached 6 hours:** a few hundred shows' rows are one entry; the show page reads its row from it.
+- **Daily shows out** (a season over 60 episodes), as Holiday episodes and the season verdict leave them out.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

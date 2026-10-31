@@ -1,0 +1,60 @@
+@* How long a show's episodes run, season by season: a bar per season, and whether they grew or shrank. *@
+@inject CatalogClient Catalog
+
+@if (lengths is { } l)
+{
+    <section aria-labelledby="lengths-title">
+        <h2 id="lengths-title">Episode lengths</h2>
+        <p>@Summary(l)</p>
+        <div class="length-bars" role="img" aria-label="@($"Typical episode length by season, from {l.FirstMinutes} to {l.LastMinutes} minutes")">
+            @foreach (var season in l.Seasons)
+            {
+                <div class="length-bar @(season.Counted ? "" : "uncounted")" @key="season.Number"
+                     title="@($"Season {season.Number}: {season.Minutes} min typical, {season.Episodes} episodes, {Format.Hours(season.TotalMinutes)} in all")">
+                    <span class="length-value small">@season.Minutes</span>
+                    <span class="length-fill" style="height: @(Height(season))%"></span>
+                    <span class="length-label muted small">@($"S{season.Number}")</span>
+                </div>
+            }
+        </div>
+        <p class="muted small">Typical (median) episode length in minutes, from TVmaze's runtimes; specials left out.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private EpisodeLengths? lengths;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            lengths = await Catalog.GetEpisodeLengthsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            lengths = null;
+        }
+    }
+
+    private int Height(SeasonLength season)
+    {
+        var max = lengths!.Seasons.Max(s => s.Minutes);
+        return max == 0 ? 0 : Math.Max(4, (int)Math.Round(100.0 * season.Minutes / max));
+    }
+
+    private static string Summary(EpisodeLengths l)
+    {
+        var line = l.Verdict switch
+        {
+            "longer" => $"Episodes got longer: from about {l.FirstMinutes} to {l.LastMinutes} minutes.",
+            "shorter" => $"Episodes got shorter: from about {l.FirstMinutes} to {l.LastMinutes} minutes.",
+            _ => $"Episodes kept to about {l.LastMinutes} minutes."
+        };
+        return l.Jump is { } j
+            ? $"{line} The biggest change was season {j.ToSeason}, from {j.FromMinutes} to {j.ToMinutes}."
+            : line;
+    }
+}

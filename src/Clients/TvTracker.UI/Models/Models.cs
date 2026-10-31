@@ -843,6 +843,22 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>How long a show's episodes run season by season.</summary>
+/// <param name="Verdict">"longer", "shorter" or "steady": the last counted season against the first.</param>
+public record EpisodeLengths(Guid ShowId, string Verdict, int FirstMinutes, int LastMinutes, SeasonJump? Jump, IReadOnlyList<SeasonLength> Seasons);
+
+/// <param name="Minutes">The season's median episode runtime.</param>
+/// <param name="Counted">Enough episodes with a runtime to count in the verdict.</param>
+public record SeasonLength(int Number, int Episodes, int Minutes, int TotalMinutes, bool Counted);
+
+public record SeasonJump(int FromSeason, int ToSeason, int FromMinutes, int ToMinutes);
+
+public record EpisodeLengthLists(IReadOnlyList<LengthChange> Longer, IReadOnlyList<LengthChange> Shorter);
+
+/// <param name="Change">Last against first, as a share (0.5 is half as long again).</param>
+public record LengthChange(Guid ShowId, string Title, string? PosterUrl, int FirstSeason, int FirstMinutes, int LastSeason, int LastMinutes,
+    double Change, SeasonJump? Jump);
+
 /// <summary>Where a show is set and filmed, from Wikidata.</summary>
 /// <param name="StandsIn">Filming places far from anywhere it's set, each with the setting it plays.</param>
 public record ShowSettings(Guid ShowId, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasPlace> Filmed, IReadOnlyList<StandIn> StandsIn);
