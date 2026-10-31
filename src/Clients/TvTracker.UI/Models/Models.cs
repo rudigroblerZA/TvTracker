@@ -843,6 +843,25 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>Your TV clock: when the user watches, from their last year of watches (bulk marks left out).</summary>
+/// <param name="Grid">Minutes by weekday (Monday first) and hour.</param>
+public record TvClock(bool Enough, DateOnly Since, int Episodes, int Minutes, int BulkLeftOut, IReadOnlyList<IReadOnlyList<int>> Grid,
+    IReadOnlyList<ClockLabel> Labels, ClockPeak? Peak, IReadOnlyList<ClockShare> Periods, double WeekendShare, Sittings? Sittings,
+    IReadOnlyList<ClockShow> Shows);
+
+public record ClockLabel(string Key, string Name, double Share);
+
+/// <param name="Weekday">0 Monday to 6 Sunday.</param>
+public record ClockPeak(int Weekday, int Hour, int Minutes);
+
+public record ClockShare(string Key, string Name, double Share);
+
+public record Sittings(int Count, double AverageEpisodes, int AverageMinutes, double BingeShare, LongestSitting Longest);
+
+public record LongestSitting(DateOnly Date, int Episodes, int Minutes, Guid ShowId, string Title, string? PosterUrl, int Shows);
+
+public record ClockShow(Guid ShowId, string Title, string? PosterUrl, int Minutes, string Period, double PeriodShare, bool Weekend);
+
 public record TvLife(int Born, IReadOnlyList<TvLifeYear> Years, TvLifeFacts Facts);
 
 public record TvLifeYear(int Year, int Age, IReadOnlyList<TvLifeShow> Premieres, IReadOnlyList<TvLifeShow> Finales, TvLifeYourYear? Yours);
