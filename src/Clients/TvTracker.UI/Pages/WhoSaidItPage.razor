@@ -1,0 +1,138 @@
+@page "/who-said-it"
+@attribute [RequiresFeature(FeatureFlags.WhoSaidIt)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>Who said it? · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Who said it?</h1>
+<p class="muted">
+    A line from a show, and the characters who might have said it. Signed in, every line comes from an episode you've
+    watched, so nothing gets spoiled.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="StartAsync" />
+
+@if (round is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else if (round.Questions.Count == 0)
+{
+    <p>There are no lines to quiz you on yet. Memorable lines come from Wikiquote and arrive a show at a time; try again later.</p>
+}
+else if (index >= round.Questions.Count)
+{
+    <section class="panel">
+        <h2>@($"{score} of {round.Questions.Count}")</h2>
+        <p>@Verdict()</p>
+        <button class="btn" @onclick="StartAsync">Play again</button>
+    </section>
+}
+else
+{
+    var q = round.Questions[index];
+    @if (!round.FromWatched)
+    {
+        <p class="muted small">@(Session.IsSignedIn
+            ? "None of the shows you're watching have lines yet, so these are from popular shows' first episodes."
+            : "These are from popular shows' first episodes. Sign in to be quizzed on what you've watched.")</p>
+    }
+    <section class="panel" @key="index">
+        <div class="quiz-show">
+            <Poster Title="@q.ShowTitle" Url="@q.PosterUrl" Size="small" />
+            <div>
+                <div class="muted small">@($"Question {index + 1} of {round.Questions.Count}")</div>
+                <strong>@q.ShowTitle</strong>
+            </div>
+        </div>
+        <blockquote class="quiz-line">@q.Line</blockquote>
+        <div class="quiz-options">
+            @foreach (var option in q.Options)
+            {
+                <button class="btn @OptionClass(q, option)" disabled="@(picked is not null)" @onclick="() => Pick(q, option)">@option</button>
+            }
+        </div>
+        @if (picked is not null)
+        {
+            <p>
+                <strong>@(picked == q.Answer ? "Right." : $"It was {q.Answer}.")</strong>
+                <span>@(" Said in ")</span><a href="episodes/@q.EpisodeId">@Format.EpisodeCode(q.SeasonNumber, q.EpisodeNumber)</a><span>.</span>
+            </p>
+            <button class="btn" @onclick="Next">@(index + 1 < round.Questions.Count ? "Next" : "See your score")</button>
+        }
+        <p class="muted small">
+            <span>Line from </span><a href="@q.PageUrl" target="_blank" rel="noopener noreferrer">Wikiquote</a><span>, under </span><a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a><span>.</span>
+        </p>
+    </section>
+}
+
+@code {
+    /// <summary>Shows whose watched episodes are sent, most recently followed first; one progress call each.</summary>
+    private const int MaxShows = 20;
+
+    private WhoSaidItRound? round;
+    private int index;
+    private int score;
+    private string? picked;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => StartAsync();
+
+    private async Task StartAsync()
+    {
+        error = null;
+        round = null;
+        index = score = 0;
+        picked = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            round = await Catalog.GetWhoSaidItAsync(Session.IsSignedIn ? await WatchedAsync() : []);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>The watched episodes of the shows the user has started; the catalog never sees watches otherwise.</summary>
+    private async Task<IReadOnlyList<Guid>> WatchedAsync()
+    {
+        var follows = await Tracking.GetFollowsAsync() ?? [];
+        var started = follows.Where(f => f.WatchedCount > 0).OrderByDescending(f => f.FollowedAtUtc).Take(MaxShows).ToList();
+        var progress = await Task.WhenAll(started.Select(f => Tracking.GetProgressAsync(f.ShowId)));
+        return progress.Where(p => p is not null).SelectMany(p => p!.WatchedEpisodeIds).ToList();
+    }
+
+    private void Pick(WhoSaidItQuestion q, string option)
+    {
+        picked = option;
+        if (option == q.Answer)
+        {
+            score++;
+        }
+    }
+
+    private void Next()
+    {
+        index++;
+        picked = null;
+    }
+
+    private string OptionClass(WhoSaidItQuestion q, string option) =>
+        picked is null ? "btn-quiet" : option == q.Answer ? "right" : option == picked ? "wrong" : "btn-quiet";
+
+    private string Verdict() => ((double)score / round!.Questions.Count) switch
+    {
+        1 => "Every one. You were paying attention.",
+        >= 0.6 => "You know your shows.",
+        >= 0.4 => "Not bad. Some characters sound alike.",
+        _ => "Time for a rewatch?"
+    };
+}

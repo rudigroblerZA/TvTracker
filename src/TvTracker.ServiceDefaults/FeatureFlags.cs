@@ -42,6 +42,7 @@ public static class FeatureFlags
     public const string CastAfterwards = "cast-afterwards";
     public const string SpoilerWatch = "spoiler-watch";
     public const string MemorableLines = "memorable-lines";
+    public const string WhoSaidIt = "who-said-it";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";

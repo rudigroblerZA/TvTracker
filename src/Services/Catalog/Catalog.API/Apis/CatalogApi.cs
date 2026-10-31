@@ -33,6 +33,7 @@ public static class CatalogApi
         api.MapDegreesApi();
         api.MapAfterwardsApi();
         api.MapQuotesApi();
+        api.MapWhoSaidItApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();
