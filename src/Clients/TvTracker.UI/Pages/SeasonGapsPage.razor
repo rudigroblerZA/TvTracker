@@ -1,0 +1,91 @@
+@page "/season-gaps"
+@attribute [RequiresFeature(FeatureFlags.SeasonGaps)]
+@inject CatalogClient Catalog
+
+<PageTitle>Between seasons · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Between seasons</h1>
+<p class="muted">
+    How long popular scripted shows kept their viewers waiting: from a season's last episode to the next season's first,
+    from TVmaze's air dates.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (lists is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <div class="atlas-columns">
+        <section aria-labelledby="longest-title">
+            <h2 id="longest-title">Longest waits</h2>
+            <p class="muted small">Under five years between seasons.</p>
+            @Shows(lists.Longest)
+        </section>
+        <section aria-labelledby="revived-title">
+            <h2 id="revived-title">Revived</h2>
+            <p class="muted small">Back after five years or more.</p>
+            @Shows(lists.Revived)
+        </section>
+    </div>
+    <section aria-labelledby="waiting-title">
+        <h2 id="waiting-title">Still waiting</h2>
+        <p class="muted small">Running shows with no new episode for a year or more.</p>
+        @Shows(lists.WaitingNow)
+    </section>
+}
+
+@code {
+    private SeasonGapLists? lists;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Catalog.GetSeasonGapListsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static RenderFragment Shows(IReadOnlyList<GapShow> shows) => __builder =>
+    {
+        if (shows.Count == 0)
+        {
+            <p class="muted">None right now.</p>
+            return;
+        }
+        <ol class="length-list">
+            @foreach (var s in shows)
+            {
+                <li @key="s.ShowId">
+                    <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@s.ShowId">@s.Title</a>
+                        <div class="small">@Line(s)</div>
+                    </div>
+                </li>
+            }
+        </ol>
+    };
+
+    private static string Line(GapShow s) => s switch
+    {
+        { Gap: { } g } => $"{Format.Wait(g.Days)} before season {g.ToSeason} ({g.LastEpisode:yyyy} to {g.NextEpisode:yyyy}){(g.Scheduled ? ", scheduled" : "")}",
+        { Now: { BackOn: { } back } now } => $"{Format.Wait(now.Days)} since the last episode; back {back:d MMM yyyy}",
+        { Now: { } now } => $"{Format.Wait(now.Days)} since the last episode, no date yet",
+        _ => ""
+    };
+}

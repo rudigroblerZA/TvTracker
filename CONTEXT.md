@@ -916,6 +916,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Computed together, cached 6 hours:** a few hundred shows' rows are one entry; the show page reads its row from it.
 - **Daily shows out** (a season over 60 episodes), as Holiday episodes and the season verdict leave them out.
 
+## Between seasons
+
+- **From the catalog's air dates** (`SeasonGapsApi` on Catalog.API): one SQL aggregate gives each regular season's first
+  and last dated episode, the last aired one and the next to come. A wait runs from one season's last episode to the next
+  season's first; a dated first episode still to come makes it a scheduled wait, up to that date.
+- **Revivals apart:** waits of five years or more (Twin Peaks' 26) have a list of their own. In the longest-waits list
+  they'd crowd out every ordinary hiatus (Stranger Things' 3 years 5 months before season 5, Severance's 2 years 9).
+- **Waiting now** is for running shows only, from a year without an episode; the catalog already calls a show ended
+  after four quiet years with nothing scheduled.
+- **Lists:** scripted shows of popularity 90+, so they name shows people know. Computed together and cached 6 hours;
+  daily shows out, as Episode lengths does.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

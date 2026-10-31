@@ -843,6 +843,20 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>The waits between a show's seasons.</summary>
+/// <param name="TypicalDays">The median wait, given from three waits up.</param>
+/// <param name="Now">For a running show: since its last episode, and when it's back if dated.</param>
+public record SeasonGaps(Guid ShowId, IReadOnlyList<SeasonGap> Gaps, int? TypicalDays, SeasonGap? Longest, WaitingNow? Now);
+
+/// <param name="Scheduled">The next season hasn't started yet; the wait runs to its first date.</param>
+public record SeasonGap(int FromSeason, int ToSeason, DateOnly LastEpisode, DateOnly NextEpisode, int Days, bool Scheduled);
+
+public record WaitingNow(DateOnly Since, int Days, DateOnly? BackOn);
+
+public record SeasonGapLists(IReadOnlyList<GapShow> Longest, IReadOnlyList<GapShow> Revived, IReadOnlyList<GapShow> WaitingNow);
+
+public record GapShow(Guid ShowId, string Title, string? PosterUrl, SeasonGap? Gap, WaitingNow? Now);
+
 /// <summary>How long a show's episodes run season by season.</summary>
 /// <param name="Verdict">"longer", "shorter" or "steady": the last counted season against the first.</param>
 public record EpisodeLengths(Guid ShowId, string Verdict, int FirstMinutes, int LastMinutes, SeasonJump? Jump, IReadOnlyList<SeasonLength> Seasons);

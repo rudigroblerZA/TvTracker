@@ -1,0 +1,66 @@
+@* The waits between a show's seasons, as bars, and for a running show how long since its last episode. *@
+@inject CatalogClient Catalog
+
+@if (gaps is { } g && (g.Gaps.Count > 0 || g.Now is { Days: >= 60 }))
+{
+    <section aria-labelledby="gaps-title">
+        <h2 id="gaps-title">Between seasons</h2>
+        @if (g.Now is { } now && (now.Days >= 60 || now.BackOn is not null))
+        {
+            <p>
+                @if (now.BackOn is { } back)
+                {
+                    <span>@($"Last episode {now.Since:d MMM yyyy}, {Format.Wait(now.Days)} ago; back on {back:d MMM yyyy}.")</span>
+                }
+                else
+                {
+                    <span>@($"No new episode for {Format.Wait(now.Days)} (since {now.Since:d MMM yyyy}), and no return date yet.")</span>
+                }
+            </p>
+        }
+        @if (g.Gaps.Count > 0)
+        {
+            <p>@Summary(g)</p>
+            <ul class="gap-bars">
+                @foreach (var gap in g.Gaps)
+                {
+                    <li @key="gap.ToSeason">
+                        <span class="muted small">@($"S{gap.FromSeason} → S{gap.ToSeason}")</span>
+                        <span class="gap-track"><span class="gap-fill @(gap.Scheduled ? "scheduled" : "")" style="width: @(Width(gap))%"></span></span>
+                        <span class="small">@(Format.Wait(gap.Days) + (gap.Scheduled ? " (scheduled)" : ""))</span>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private SeasonGaps? gaps;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            gaps = await Catalog.GetSeasonGapsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            gaps = null;
+        }
+    }
+
+    private int Width(SeasonGap gap) => Math.Max(2, (int)Math.Round(100.0 * gap.Days / gaps!.Gaps.Max(x => x.Days)));
+
+    private static string Summary(SeasonGaps g) => g switch
+    {
+        { Longest: { } l, TypicalDays: { } typical } =>
+            $"Seasons usually came {Format.Wait(typical)} apart; the longest wait was before season {l.ToSeason}: {Format.Wait(l.Days)}.",
+        { Longest: { } l, Gaps.Count: > 1 } => $"The longest wait was before season {l.ToSeason}: {Format.Wait(l.Days)}.",
+        { Longest: { } l } => $"{Format.Wait(l.Days)} between season {l.FromSeason} and season {l.ToSeason}.",
+        _ => ""
+    };
+}
