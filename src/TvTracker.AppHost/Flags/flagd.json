@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "tv-clock": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Your TV clock: when you watch, what kind of viewer that makes you, and your sittings." }
+    },
     "who-said-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

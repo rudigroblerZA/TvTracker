@@ -514,6 +514,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Tested** with a user following four shows with a finale or premiere in the fortnight: American Horror Story's
     finale that day 2.36 (high), Lupin's season drop with one episode watched 2.04 (high), Tulsa King's two weekly
     episodes 0.35 (low). ~50 ms.
+- **Your TV clock** (`TvClockApi`): computed on request from the caller's own watches in the last year, in their time
+  zone, so no minimum counts beyond the 10 watches it takes to say anything.
+  - **When a watch happened:** a mark is usually made as an episode ends, so its minutes go to the hour of the mark less
+    half the running time.
+  - **Labels** are fixed thresholds on shares, not comparisons with other users (which would need the privacy rule): night
+    (22:00-05:00) 35%+, mornings 30%+, lunch (11:00-14:00) 30%+, prime time (19:00-23:00) 50%+, weekends 55%+ (an even
+    week is 29%), weeknights 85%+. At most two, strongest relative to its threshold first.
+  - **Sittings:** marks in a row, any show, each within the next episode's running time plus 30 minutes of the one
+    before. A binge is three or more episodes.
+  - **Bulk marks out,** as Year in TV: they say when a back catalog was entered, not watched.
 - **Your TV life** (`TvLifeApi`): computed on request from the catalog copy and the caller's watches, for a birth year
   the caller gives. The year stays on the device (a preference, like the spoiler shield): a profile column for a
   birth year is personal data the app has no other use for.

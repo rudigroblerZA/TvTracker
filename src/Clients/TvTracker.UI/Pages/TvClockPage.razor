@@ -1,0 +1,183 @@
+@page "/tv-clock"
+@attribute [RequiresFeature(FeatureFlags.TvClock)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Your TV clock · @Brand.AppName</PageTitle>
+
+<p><a href="insights">← Insights</a></p>
+<h1>Your TV clock</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">When you watch, from your last year of marking episodes watched, in your own time zone.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (clock is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else if (!clock.Enough)
+        {
+            <p>@($"There's not enough to read a clock from yet: {clock.Episodes} {(clock.Episodes == 1 ? "episode" : "episodes")} marked one at a time in the last year. Mark episodes as you watch them and come back.")</p>
+        }
+        else
+        {
+            <section class="panel">
+                @if (clock.Labels.Count > 0)
+                {
+                    <div class="clock-labels">
+                        @foreach (var label in clock.Labels)
+                        {
+                            <span class="clock-label" @key="label.Key"><strong>@label.Name</strong><span class="muted small">@($" · {LabelReason(label)}")</span></span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p><strong>All-rounder</strong><span class="muted">@(" · no time of day or week stands out.")</span></p>
+                }
+                <div class="life-facts">
+                    <div><strong>@clock.Episodes</strong><span class="muted">@(" episodes")</span></div>
+                    <div><strong>@Format.Hours(clock.Minutes)</strong><span class="muted">@(" watched")</span></div>
+                    @if (clock.Peak is { } peak)
+                    {
+                        <div><strong>@($"{Days[peak.Weekday]}s at {peak.Hour:00}:00")</strong><span class="muted">@(" your peak hour")</span></div>
+                    }
+                </div>
+            </section>
+
+            <section aria-labelledby="clock-grid-title">
+                <h2 id="clock-grid-title">Your week</h2>
+                <div class="clock-grid" role="img" aria-label="@GridDescription()">
+                    <span></span>
+                    @for (var h = 0; h < 24; h++)
+                    {
+                        <span class="clock-hour muted small">@(h % 6 == 0 ? $"{h:00}" : "")</span>
+                    }
+                    @for (var d = 0; d < 7; d++)
+                    {
+                        <span class="clock-day muted small">@Days[d][..3]</span>
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            var minutes = clock.Grid[d][h];
+                            <span class="clock-cell" style="@CellStyle(minutes)" title="@($"{Days[d]} {h:00}:00 · {Format.Hours(minutes)}")"></span>
+                        }
+                    }
+                </div>
+                <p class="muted small">
+                    @string.Join(" · ", clock.Periods.Select(p => $"{p.Name} {p.Share:0%}"))
+                    @($" · weekends {clock.WeekendShare:0%}")
+                </p>
+            </section>
+
+            @if (clock.Sittings is { } s)
+            {
+                <section aria-labelledby="sittings-title">
+                    <h2 id="sittings-title">Your sittings</h2>
+                    <p>@($"{s.Count} sittings, {s.AverageEpisodes:0.#} episodes and {Format.Hours(s.AverageMinutes)} on average. {s.BingeShare:0%} were binges of three or more.")</p>
+                    <div class="afterwards-biggest">
+                        <Poster Title="@s.Longest.Title" Url="@s.Longest.PosterUrl" Size="small" />
+                        <div>
+                            <div class="muted small">Your longest sitting</div>
+                            <div>
+                                <span>@($"{s.Longest.Episodes} episodes ({Format.Hours(s.Longest.Minutes)}) of ")</span><a href="shows/@s.Longest.ShowId">@s.Longest.Title</a>
+                                <span>@(s.Longest.Shows > 1 ? $" and {s.Longest.Shows - 1} more" : "")</span><span>@($" on {s.Longest.Date:ddd d MMM yyyy}.")</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            @if (clock.Shows.Count > 0)
+            {
+                <section aria-labelledby="clock-shows-title">
+                    <h2 id="clock-shows-title">When you watch what</h2>
+                    <ul class="spoiler-list">
+                        @foreach (var show in clock.Shows)
+                        {
+                            <li class="spoiler-row low" @key="show.ShowId">
+                                <Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" />
+                                <div>
+                                    <a class="strong" href="shows/@show.ShowId">@show.Title</a>
+                                    <div class="small">@ShowWhen(show)</div>
+                                    <div class="small muted">@Format.Hours(show.Minutes)</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (clock.BulkLeftOut > 0)
+            {
+                <p class="muted small">@($"{clock.BulkLeftOut} episodes marked in bulk (eight or more at once) are left out: they say when you caught the app up, not when you watched.")</p>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see when you watch." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly string[] Days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    private TvClock? clock;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            clock = await Analytics.GetTvClockAsync(Session.Profile?.TimeZone);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private string CellStyle(int minutes)
+    {
+        var max = clock!.Grid.SelectMany(d => d).Max();
+        // A square root so a few big binges don't wash out everything else.
+        var strength = max == 0 || minutes == 0 ? 0 : (int)Math.Round(15 + 85 * Math.Sqrt((double)minutes / max));
+        return strength == 0 ? "" : $"background: color-mix(in srgb, var(--accent) {strength}%, transparent)";
+    }
+
+    private string GridDescription() => clock?.Peak is { } peak
+        ? $"Minutes watched by weekday and hour; most on {Days[peak.Weekday]}s at {peak.Hour:00}:00."
+        : "Minutes watched by weekday and hour.";
+
+    private static string LabelReason(ClockLabel label) => label.Key switch
+    {
+        "night-owl" => $"{label.Share:0%} after 10 pm",
+        "early-bird" => $"{label.Share:0%} before 11 am",
+        "lunch-break" => $"{label.Share:0%} between 11 and 2",
+        "prime-time" => $"{label.Share:0%} between 7 and 11 pm",
+        "weekend-binger" => $"{label.Share:0%} on weekends",
+        "weeknight-regular" => $"{label.Share:0%} on weekdays",
+        _ => $"{label.Share:0%}"
+    };
+
+    private static string ShowWhen(ClockShow show)
+    {
+        var period = show.Period switch
+        {
+            "morning" => "mornings",
+            "daytime" => "in the daytime",
+            "evening" => "evenings",
+            _ => "late at night"
+        };
+        var when = show.PeriodShare >= 0.6 ? $"Mostly {period}" : $"Often {period}";
+        return show.Weekend ? $"{when}, at weekends" : when;
+    }
+}
