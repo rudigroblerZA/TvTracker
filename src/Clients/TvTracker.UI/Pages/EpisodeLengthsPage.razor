@@ -1,0 +1,81 @@
+@page "/episode-lengths"
+@attribute [RequiresFeature(FeatureFlags.EpisodeLengths)]
+@inject CatalogClient Catalog
+
+<PageTitle>Episode lengths · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Episode lengths</h1>
+<p class="muted">
+    Scripted shows whose typical episode grew or shrank between their first season and their latest, most popular first,
+    from TVmaze's runtimes.
+    A change counts at a fifth or more and at least eight minutes; specials and daily shows are left out.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (lists is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <div class="atlas-columns">
+        <section aria-labelledby="longer-title">
+            <h2 id="longer-title">Got longer</h2>
+            @Changes(lists.Longer, "No show's episodes grew enough to count.")
+        </section>
+        <section aria-labelledby="shorter-title">
+            <h2 id="shorter-title">Got shorter</h2>
+            @Changes(lists.Shorter, "No show's episodes shrank enough to count.")
+        </section>
+    </div>
+}
+
+@code {
+    private EpisodeLengthLists? lists;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Catalog.GetEpisodeLengthListsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static RenderFragment Changes(IReadOnlyList<LengthChange> changes, string none) => __builder =>
+    {
+        if (changes.Count == 0)
+        {
+            <p class="muted">@none</p>
+            return;
+        }
+        <ol class="length-list">
+            @foreach (var c in changes)
+            {
+                <li @key="c.ShowId">
+                    <Poster Title="@c.Title" Url="@c.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@c.ShowId">@c.Title</a>
+                        <div class="small">@($"{c.FirstMinutes} → {c.LastMinutes} min ({(c.Change > 0 ? "+" : "")}{c.Change:0%}), season {c.FirstSeason} to {c.LastSeason}")</div>
+                        @if (c.Jump is { } j)
+                        {
+                            <div class="small muted">@($"Biggest change: season {j.ToSeason}, {j.FromMinutes} → {j.ToMinutes} min")</div>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+    };
+}

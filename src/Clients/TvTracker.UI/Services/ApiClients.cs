@@ -134,6 +134,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<Atlas?> GetAtlasAsync(IReadOnlyList<Guid> showIds, bool filmed = false, CancellationToken ct = default) =>
         SendAsync<Atlas>(ApiClients.Catalog, HttpMethod.Post, "api/v1/atlas", new { showIds, kind = filmed ? "filmed" : "set" }, ct);
 
+    /// <summary>A show's episode lengths season by season; null with fewer than two seasons to compare, or the flag off.</summary>
+    public Task<EpisodeLengths?> GetEpisodeLengthsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<EpisodeLengths>(ApiClients.Catalog, $"api/v1/shows/{showId}/episode-lengths", ct, cacheForOffline: true);
+
+    /// <summary>The shows whose episodes grew or shrank the most; null while the flag is off.</summary>
+    public Task<EpisodeLengthLists?> GetEpisodeLengthListsAsync(CancellationToken ct = default) =>
+        GetAsync<EpisodeLengthLists>(ApiClients.Catalog, "api/v1/episode-lengths", ct, cacheForOffline: true);
+
     /// <summary>The shortest actor chain between two shows; null when none within six degrees, or the flag is off.</summary>
     public Task<DegreesResult?> GetDegreesAsync(Guid from, Guid to, CancellationToken ct = default) =>
         GetAsync<DegreesResult>(ApiClients.Catalog, $"api/v1/degrees?from={from}&to={to}", ct);

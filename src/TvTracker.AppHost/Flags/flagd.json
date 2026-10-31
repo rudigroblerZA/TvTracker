@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "episode-lengths": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Episode lengths: how long a show's episodes run season by season, and the shows that grew or shrank most." }
+    },
     "tv-atlas": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
