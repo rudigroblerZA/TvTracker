@@ -892,8 +892,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Stand-ins:** a filming place more than 300 km from every place the show is set in plays somewhere else. Places that
   are a whole country (Wikidata gives them as their own country) are left out on both sides, since a country's point
   says nothing about where in it a show is. Computed on read, per show and for the atlas's list.
-- **In batches:** one SPARQL query per 100 shows, a batch every two minutes while any are due, most popular first, each
-  show again monthly; its rows are replaced with what Wikidata says then. A sample of 30 popular shows found 17 with a
+- **In batches:** one SPARQL query per 25 shows, a batch every two minutes while any are due, most popular first, each
+  show again monthly; its rows are replaced with what Wikidata says then.
+- **One triple pattern, not a UNION:** the two properties come from a `VALUES` list (`?item ?property ?place`). As a
+  UNION, the planner ran the filming half across all of Wikidata: 25 shows timed out at 60 s (504), and the timeouts
+  counted against the sandbox's address and brought 429s, so the first re-lookup stored nothing for hours. Reshaped, 25
+  shows take ~6 s (23 settings, 40 filming places). A sample of 30 popular shows found 17 with a
   setting.
 - **A map drawn from data in the app** (`WorldOutline`): Natural Earth's 1:110m land (public domain) as one SVG path in
   an equirectangular projection (x = longitude + 180, y = 90 − latitude), Antarctica left out and cut at 60°S, 46 KB.

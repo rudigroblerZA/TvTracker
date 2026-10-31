@@ -11,8 +11,14 @@ namespace Catalog.SyncWorker.Settings;
 /// <summary>
 /// Where shows are set and filmed, for the TV atlas: Wikidata's narrative location (P840) and filming location (P915) of
 /// the item with each show's TVmaze id (P8600, as Research and Memorable lines find shows), kept when the place has
-/// coordinates on Earth (The Expanse's Moon has some too). Both come in one query, each row marked with its kind. One SPARQL query per <see cref="Batch"/> shows, a batch a round while any are due, most popular first;
-/// each show is looked up again monthly, and its rows are replaced with what Wikidata says then.
+/// coordinates on Earth (The Expanse's Moon has some too). Both come in one query, each row marked with its kind. One
+/// SPARQL query per <see cref="Batch"/> shows, a batch a round while any are due, most popular first; each show is
+/// looked up again monthly, and its rows are replaced with what Wikidata says then.
+/// <para>
+/// <b>A query Wikidata can answer:</b> the two properties are one triple pattern over a <c>VALUES</c> list, joined to the
+/// shows' items. Written as a UNION, the planner ran the filming-location half across all of Wikidata, and 25 shows timed
+/// out at 60 s (a 504), which then counted against the address and brought 429s; as it is, 25 shows take ~6 s.
+/// </para>
 /// <para>
 /// <b>Gently:</b> Wikidata limits shared addresses hard, so a 429 is waited out as asked (up to <see cref="MaxWait"/>),
 /// and a failed round is simply tried again in the next. A plain client with one try, as Research's sources.
@@ -21,7 +27,7 @@ namespace Catalog.SyncWorker.Settings;
 public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<SettingsService> logger) : BackgroundService
 {
     private const string Provider = "tvmaze";
-    private const int Batch = 100;
+    private const int Batch = 25;
     private const int Attempts = 3;
     private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(4);
     private static readonly TimeSpan Round = TimeSpan.FromMinutes(2);
@@ -39,8 +45,9 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
     private const string Sparql = """
         SELECT ?tvmaze ?kind ?place ?placeLabel ?countryLabel ?lat ?lon WHERE {
           VALUES ?tvmaze { {IDS} }
+          VALUES (?property ?kind) { (wdt:P840 "set") (wdt:P915 "filmed") }
           ?item wdt:P8600 ?tvmaze.
-          { ?item wdt:P840 ?place. BIND("set" AS ?kind) } UNION { ?item wdt:P915 ?place. BIND("filmed" AS ?kind) }
+          ?item ?property ?place.
           ?place p:P625/psv:P625 ?coord.
           ?coord wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon; wikibase:geoGlobe wd:Q2.
           ?place rdfs:label ?placeLabel. FILTER(LANG(?placeLabel) = "en")
