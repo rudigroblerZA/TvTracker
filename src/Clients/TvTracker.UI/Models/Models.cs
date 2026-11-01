@@ -842,6 +842,12 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 /// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
+/// <summary>Shows' milestone episodes (100th, 200th, …) coming up and just aired.</summary>
+public record Milestones(IReadOnlyList<Milestone> Upcoming, IReadOnlyList<Milestone> Reached);
+
+/// <param name="Number">Its place among the show's regular episodes, by the catalog's count.</param>
+public record Milestone(Guid ShowId, string Title, string? PosterUrl, int Number, int Season, int Episode, DateTimeOffset AirsAtUtc, bool Story);
+
 /// <summary>The catalog's actors born on one day of the year, best known first.</summary>
 public record Birthdays(DateOnly Date, IReadOnlyList<Birthday> People);
 

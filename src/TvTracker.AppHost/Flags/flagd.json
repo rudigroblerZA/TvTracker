@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "milestones": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
+    },
     "birthdays": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

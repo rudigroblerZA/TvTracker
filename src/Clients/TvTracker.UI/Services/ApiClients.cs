@@ -146,6 +146,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<SeasonGaps?> GetSeasonGapsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SeasonGaps>(ApiClients.Catalog, $"api/v1/shows/{showId}/season-gaps", ct, cacheForOffline: true);
 
+    /// <summary>Milestone episodes coming up and just aired; story shows only unless <paramref name="all"/>. Null with the flag off.</summary>
+    public Task<Milestones?> GetMilestonesAsync(bool all = false, CancellationToken ct = default) =>
+        GetAsync<Milestones>(ApiClients.Catalog, $"api/v1/milestones{(all ? "?all=true" : "")}", ct, cacheForOffline: true);
+
     /// <summary>The catalog's actors born on <paramref name="date"/>'s day of the year; null while the flag is off.</summary>
     public Task<Birthdays?> GetBirthdaysAsync(DateOnly date, CancellationToken ct = default) =>
         GetAsync<Birthdays>(ApiClients.Catalog, $"api/v1/birthdays?date={date:yyyy-MM-dd}", ct, cacheForOffline: true);

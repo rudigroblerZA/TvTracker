@@ -1,0 +1,125 @@
+@page "/milestones"
+@attribute [RequiresFeature(FeatureFlags.Milestones)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>Milestones · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Milestones</h1>
+<p class="muted">
+    Shows about to reach their 100th, 200th, 500th… episode, and the ones that just did. Counted from TVmaze's regular
+    episodes, so a network that counts specials or double episodes its own way may celebrate one either side.
+</p>
+
+<label class="small chips">
+    <input type="checkbox" checked="@all" @onchange="ToggleAllAsync" /> Include talk, news and reality shows
+</label>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (milestones is { } m)
+{
+    <section aria-labelledby="upcoming-title">
+        <h2 id="upcoming-title">Coming up</h2>
+        @List(m.Upcoming, "No milestone episode is scheduled in the next four months.")
+    </section>
+    <section aria-labelledby="reached-title">
+        <h2 id="reached-title">Just reached</h2>
+        @List(m.Reached, "None in the last 30 days.")
+    </section>
+}
+else if (error is null)
+{
+    <p class="muted">Loading…</p>
+}
+
+@code {
+    private Milestones? milestones;
+    private HashSet<Guid> followed = [];
+    private bool all;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsSignedIn)
+        {
+            try
+            {
+                followed = (await Tracking.GetFollowsAsync())?.Select(f => f.ShowId).ToHashSet() ?? [];
+            }
+            catch (HttpRequestException)
+            {
+                // Marking followed shows is extra; the lists work without it.
+            }
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            milestones = await Catalog.GetMilestonesAsync(all);
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task ToggleAllAsync(ChangeEventArgs e)
+    {
+        all = e.Value is true;
+        return LoadAsync();
+    }
+
+    private static string Ordinal(int n) => (n % 100) switch
+    {
+        11 or 12 or 13 => $"{n}th",
+        _ => (n % 10) switch { 1 => $"{n}st", 2 => $"{n}nd", 3 => $"{n}rd", _ => $"{n}th" }
+    };
+
+    private string When(Milestone m)
+    {
+        var local = Session.ToLocal(m.AirsAtUtc);
+        var days = (DateOnly.FromDateTime(local.DateTime).DayNumber - DateOnly.FromDateTime(Session.Now.DateTime).DayNumber);
+        var relative = days switch
+        {
+            0 => "today",
+            1 => "tomorrow",
+            -1 => "yesterday",
+            > 1 => $"in {days} days",
+            _ => $"{-days} days ago"
+        };
+        return $"{local:ddd d MMM}, {relative}";
+    }
+
+    private RenderFragment List(IReadOnlyList<Milestone> list, string none) => __builder =>
+    {
+        if (list.Count == 0)
+        {
+            <p class="muted">@none</p>
+            return;
+        }
+        <ol class="length-list">
+            @foreach (var m in list)
+            {
+                <li @key="@($"{m.ShowId}-{m.Number}")">
+                    <Poster Title="@m.Title" Url="@m.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@m.ShowId">@m.Title</a>
+                        @if (followed.Contains(m.ShowId))
+                        {
+                            @(" ")<span class="tag">You follow it</span>
+                        }
+                        <div class="small">@($"{Ordinal(m.Number)} episode · {Format.EpisodeCode(m.Season, m.Episode)}")</div>
+                        <div class="small muted">@When(m)</div>
+                    </div>
+                </li>
+            }
+        </ol>
+    };
+}

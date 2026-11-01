@@ -42,6 +42,7 @@ public static class CatalogApi
         api.MapTitleFormulasApi();
         api.MapEpisodeGridApi();
         api.MapBirthdaysApi();
+        api.MapMilestonesApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();
