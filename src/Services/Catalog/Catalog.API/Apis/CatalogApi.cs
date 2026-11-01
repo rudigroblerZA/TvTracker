@@ -38,6 +38,7 @@ public static class CatalogApi
         api.MapEpisodeLengthsApi();
         api.MapSeasonGapsApi();
         api.MapCastAgesApi();
+        api.MapCharacterNamesApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

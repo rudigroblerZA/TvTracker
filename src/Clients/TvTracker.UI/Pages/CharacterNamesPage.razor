@@ -1,0 +1,200 @@
+@page "/names"
+@attribute [RequiresFeature(FeatureFlags.CharacterNames)]
+@using System.Text.RegularExpressions
+@inject CatalogClient Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>@(report is { } r ? $"{r.Name} on TV" : "Characters' names") · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Characters' names</h1>
+<p class="muted">
+    Type a first name to find the TV characters who share it, from the main casts of shows across TVmaze, and how common it
+    was in each decade.
+</p>
+
+<form class="search-form" @onsubmit="SubmitAsync">
+    <input type="search" placeholder="A first name, e.g. Jesse" @bind="input" aria-label="First name" maxlength="30" />
+    <button type="submit" class="btn">Look up</button>
+</form>
+@if (invalid)
+{
+    <p class="muted small">A first name of 2 to 30 letters.</p>
+}
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (report is { } rep)
+{
+    <section aria-labelledby="name-title">
+        <h2 id="name-title">@rep.Name</h2>
+        <p>@Summary(rep)</p>
+        @if (rep.Decades.Count > 0)
+        {
+            var max = rep.Decades.Max(d => d.Count);
+            <ul class="gap-bars name-decades" aria-label="By decade">
+                @foreach (var d in rep.Decades)
+                {
+                    <li @key="d.Decade">
+                        <span class="muted small">@($"{d.Decade}s")</span>
+                        <span class="gap-track"><span class="gap-fill" style="width: @(Math.Max(3, 100 * d.Count / max))%"></span></span>
+                        <span class="small">@($"{d.Count} · #{d.Rank}")</span>
+                    </li>
+                }
+            </ul>
+            <p class="muted small">Characters by the decade their show premiered, and the name's place among that decade's names.</p>
+        }
+        @if (rep.Characters.Count > 0)
+        {
+            <ul class="name-list">
+                @foreach (var c in rep.Characters)
+                {
+                    <li @key="@($"{c.PersonId}-{c.Title}")">
+                        <Poster Title="@c.Title" Url="@c.PosterUrl" Size="small" />
+                        <div>
+                            <div class="strong">@c.Character</div>
+                            <div class="small">
+                                @if (c.ShowId is { } showId)
+                                {
+                                    <a href="shows/@showId">@c.Title</a>
+                                }
+                                else
+                                {
+                                    <span>@c.Title</span>
+                                }
+                                <span class="muted">@(c.Year is { } y ? $" ({y})" : "")</span>
+                            </div>
+                            <div class="small muted"><a href="people/@c.PersonId">@c.Actor</a></div>
+                        </div>
+                    </li>
+                }
+            </ul>
+            @if (rep.Count > rep.Characters.Count)
+            {
+                <p class="muted small">@($"The {rep.Characters.Count} from the most popular shows, shows here first, of {rep.Count}.")</p>
+            }
+        }
+        @if (rep.Surnames.Count > 0)
+        {
+            <h3>@($"{rep.Name} as a surname")</h3>
+            <p class="small">
+                @for (var i = 0; i < rep.Surnames.Count; i++)
+                {
+                    var c = rep.Surnames[i];
+                    <span @key="@($"{c.PersonId}-{c.Title}")">@(i > 0 ? ", " : "")@c.Character <span class="muted">@($"({c.Title})")</span></span>
+                }
+            </p>
+        }
+    </section>
+}
+
+@if (top is { } t)
+{
+    <section aria-labelledby="top-title">
+        <h2 id="top-title">The most common</h2>
+        <p class="muted small">@($"First names of {t.Characters:N0} characters, split by the actor's gender on TVmaze.")</p>
+        <h3>Women</h3>
+        @Chips(t.Women)
+        <h3>Men</h3>
+        @Chips(t.Men)
+    </section>
+    @if (t.Decades.Count > 0)
+    {
+        <section aria-labelledby="decades-title">
+            <h2 id="decades-title">By decade</h2>
+            <p class="muted small">By the decade the show premiered.</p>
+            <div class="name-columns">
+                @foreach (var d in t.Decades)
+                {
+                    <div @key="d.Decade">
+                        <h3>@($"{d.Decade}s")</h3>
+                        @Ranked(d.Women)
+                        @Ranked(d.Men)
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "name")] public string? Name { get; set; }
+
+    private string? input;
+    private NameReport? report;
+    private NameTop? top;
+    private string? error;
+    private bool invalid;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        input = Name;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        invalid = Name is { Length: > 0 } && !Valid(Name);
+        try
+        {
+            var name = Name is { } n && Valid(n) ? n.Trim() : null;
+            var reportTask = name is null ? Task.FromResult<NameReport?>(null) : Catalog.GetCharacterNameAsync(name);
+            top ??= await Catalog.GetCharacterNamesAsync();
+            report = await reportTask;
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task SubmitAsync()
+    {
+        if (input is not { } value || !Valid(value))
+        {
+            invalid = true;
+            return Task.CompletedTask;
+        }
+        Navigation.NavigateTo(Link(value.Trim()));
+        return Task.CompletedTask;
+    }
+
+    private static RenderFragment Chips(IReadOnlyList<NameCount> names) => __builder =>
+    {
+        <div class="chips">
+            @foreach (var n in names)
+            {
+                <a class="chip" href="@Link(n.Name)" @key="n.Name">@($"{n.Name} {n.Count}")</a>
+            }
+        </div>
+    };
+
+    private static RenderFragment Ranked(IReadOnlyList<NameCount> names) => __builder =>
+    {
+        <ol class="small">
+            @foreach (var n in names)
+            {
+                <li @key="n.Name"><a href="@Link(n.Name)">@n.Name</a> <span class="muted">@n.Count</span></li>
+            }
+        </ol>
+    };
+
+    private static string Link(string name) => $"names?name={Uri.EscapeDataString(name)}";
+
+    private static bool Valid(string name) => Regex.IsMatch(name.Trim(), @"^\p{L}[\p{L}'’\-]{1,29}$");
+
+    private static string Summary(NameReport r) => r switch
+    {
+        { Count: 0 } => $"No character in the main casts we know of has {r.Name} as a first name.",
+        { Rank: 1 } => $"{r.Count} characters have {r.Name} as a first name: the most common on TV.",
+        { Count: 1 } => $"One character has {r.Name} as a first name.",
+        _ => $"{r.Count} characters have {r.Name} as a first name: the {Ordinal(r.Rank!.Value)} most common on TV."
+    };
+
+    private static string Ordinal(int n) => (n % 100) switch
+    {
+        11 or 12 or 13 => $"{n}th",
+        _ => (n % 10) switch { 1 => $"{n}st", 2 => $"{n}nd", 3 => $"{n}rd", _ => $"{n}th" }
+    };
+}

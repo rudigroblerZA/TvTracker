@@ -291,6 +291,17 @@ where two or more of the cast grew up on screen, and the youngest and oldest cas
   needs two per show, and both pages say so.
 - **API:** `GET /api/v1/shows/{id}/cast-ages` and `GET /api/v1/cast-ages` (Catalog.API, public).
 
+**Characters' names** (`/names`, from Discover; `character-names` flag): type a first name to find the TV characters who
+share it (Jesse: Jesse Pinkman, Jesse Custer, Jesse Katsopolis and 18 more), how common it is (161st), how many there
+were in each decade by the show's premiere, and who has it as a surname. Without a name, the page lists the most common
+women's and men's names and each decade's top five. John is first by far (243 characters), three times Sarah, the
+most common woman's name. Each result links to its show page when the show is in the catalog. It works signed out.
+- **Where the names come from:** the main casts of shows across TVmaze (the actors' cast credits), plus the catalog's
+  casts; about 21,000 characters with a first and last name. Titles ("Detective", "Dr.", "Lady"), nicknames in quotes
+  and self roles are left out, and a one-word role ("Bartender") isn't counted, since it can't be told from a name.
+- **Women's and men's names** go by the actor's gender on TVmaze, so a voice role can land on the other side.
+- **API:** `GET /api/v1/character-names` and `GET /api/v1/character-names/{name}` (Catalog.API, public).
+
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
 shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
 Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
@@ -519,7 +530,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 

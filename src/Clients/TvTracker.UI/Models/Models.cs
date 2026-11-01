@@ -843,6 +843,24 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>TV characters who share a first name, and how common it is.</summary>
+/// <param name="Rank">Its place among all first names; null when no character has it.</param>
+/// <param name="Surnames">Characters with it as their last name.</param>
+public record NameReport(string Name, int Count, int? Rank, IReadOnlyList<NamedCharacter> Characters, IReadOnlyList<NamedCharacter> Surnames,
+    IReadOnlyList<NameDecade> Decades);
+
+/// <param name="ShowId">Set when the show is in the catalog.</param>
+public record NamedCharacter(string Character, Guid PersonId, string Actor, Guid? ShowId, string Title, string? PosterUrl, int? Year);
+
+public record NameDecade(int Decade, int Count, int Rank);
+
+/// <param name="Women">Played by women, by the actor's gender on TVmaze.</param>
+public record NameTop(int Characters, IReadOnlyList<NameCount> Women, IReadOnlyList<NameCount> Men, IReadOnlyList<NameDecadeTop> Decades);
+
+public record NameCount(string Name, int Count);
+
+public record NameDecadeTop(int Decade, int Characters, IReadOnlyList<NameCount> Women, IReadOnlyList<NameCount> Men);
+
 /// <summary>Each main cast member's age at a show's latest episode, and who grew up on screen.</summary>
 /// <param name="MedianAge">The living cast's median age at the latest episode, from four ages up.</param>
 public record CastAges(Guid ShowId, DateOnly FirstAired, DateOnly LastAired, bool Ended, int? MedianAge, IReadOnlyList<CastAge> Members);
