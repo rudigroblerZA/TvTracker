@@ -1,3 +1,4 @@
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +30,7 @@ public record GridRunDto(GridCellDto From, GridCellDto To, double Average);
 /// <see cref="RunLength"/> are marked, since a grid of a few hundred squares is hard to read alone.
 /// <list type="bullet">
 /// <item><b>Regular seasons only;</b> specials (season 0) have no place in a row.</item>
-/// <item><b>Daily shows</b> (a season over <see cref="DailySeason"/> episodes) get none, as Episode lengths and Between
+/// <item><b>Daily shows</b> (a season over <see cref="ShowRules.DailySeason"/> episodes) get none, as Episode lengths and Between
 /// seasons leave them out: a row of 200 dated episodes is a barcode, not a chart.</item>
 /// <item><b>Titles travel with the cells;</b> the page shows them only for episodes the viewer has watched or with the
 /// spoiler shield off, as it does every title.</item>
@@ -40,7 +41,6 @@ public static class EpisodeGridApi
 {
     public const int MinRated = 6;
     public const int RunLength = 5;
-    private const int DailySeason = 60;
     private const int MinSeasonRated = 3;
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(30);
 
@@ -69,7 +69,7 @@ public static class EpisodeGridApi
     {
         var rated = cells.Where(c => c.Rating is not null).ToList();
         var seasons = cells.GroupBy(c => c.Season).ToList();
-        if (rated.Count < MinRated || seasons.Any(s => s.Count() > DailySeason))
+        if (rated.Count < MinRated || seasons.Any(s => s.Count() > ShowRules.DailySeason))
         {
             return null;
         }

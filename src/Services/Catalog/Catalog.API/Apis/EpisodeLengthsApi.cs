@@ -1,3 +1,4 @@
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +48,6 @@ public static class EpisodeLengthsApi
     public const double ChangeShare = 0.2;
     public const int ChangeMinutes = 8;
     public const int JumpMinutes = 10;
-    private const int DailySeason = 60;
     private const int ListSize = 25;
 
     /// <summary>The lists start from episodes at least this long: shorter ones are TVmaze's shorts and compilations.</summary>
@@ -110,7 +110,7 @@ public static class EpisodeLengthsApi
                 GROUP BY "ShowId", "SeasonNumber"
                 """).ToListAsync(token);
             var shows = rows.GroupBy(r => r.ShowId)
-                .Where(g => g.All(r => r.Episodes <= DailySeason))
+                .Where(g => g.All(r => r.Episodes <= ShowRules.DailySeason))
                 .Select(g => Build(g.Key, g.OrderBy(r => r.SeasonNumber).ToList()))
                 .OfType<EpisodeLengthsDto>()
                 .ToList();

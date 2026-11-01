@@ -335,10 +335,11 @@ Your birthday stays on the device, like Your TV life's birth year; only the day 
 **Milestones** (`/milestones`, from Discover; `milestones` flag): shows about to reach their 100th, 150th, 200th, 250th,
 300th, 400th, 500th… episode in the next four months, and those that did in the last 30 days, with the date in your time
 zone and a countdown: Chicago Fire's 300th in 4 days, Law & Order: SVU's 600th, Abbott Elementary's 100th. Signed in,
-the shows you follow are marked. Scripted and animated shows by default; a box adds talk, news and reality shows. No
+the shows you follow are marked. Scripted and animated shows by default; a box adds every other kind (talk, news, reality, sports, game shows…). No
 episode titles, since a milestone episode is often an event. It works signed out.
 - **The catalog's count:** regular episodes in season and episode order, specials left out, so a network that counts
-  its own way may celebrate one either side. Daily shows are left out.
+  its own way may celebrate one either side. A number TVmaze lists twice (a same-night crossover) counts once. Daily
+  shows are left out.
 - **API:** `GET /api/v1/milestones?all=true|false` (Catalog.API, public).
 
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two

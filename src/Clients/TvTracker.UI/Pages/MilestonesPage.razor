@@ -14,7 +14,7 @@
 </p>
 
 <label class="small chips">
-    <input type="checkbox" checked="@all" @onchange="ToggleAllAsync" /> Include talk, news and reality shows
+    <input type="checkbox" checked="@all" @onchange="ToggleAllAsync" /> Include every kind of show (talk, news, reality, sports…)
 </label>
 
 <ErrorNotice Message="@error" OnRetry="LoadAsync" />
@@ -41,32 +41,46 @@ else if (error is null)
     private bool all;
     private string? error;
 
+    private int load;
+
     protected override async Task OnInitializedAsync()
     {
-        if (Session.IsSignedIn)
+        // The follows only mark rows, so they load beside the lists rather than before them.
+        var follows = Session.IsSignedIn ? LoadFollowsAsync() : Task.CompletedTask;
+        await Task.WhenAll(follows, LoadAsync());
+    }
+
+    private async Task LoadFollowsAsync()
+    {
+        try
         {
-            try
-            {
-                followed = (await Tracking.GetFollowsAsync())?.Select(f => f.ShowId).ToHashSet() ?? [];
-            }
-            catch (HttpRequestException)
-            {
-                // Marking followed shows is extra; the lists work without it.
-            }
+            followed = (await Tracking.GetFollowsAsync())?.Select(f => f.ShowId).ToHashSet() ?? [];
         }
-        await LoadAsync();
+        catch (HttpRequestException)
+        {
+            // Marking followed shows is extra; the lists work without it.
+        }
     }
 
     private async Task LoadAsync()
     {
-        error = null;
+        // Only the latest request lands, so a slow answer for the checkbox's old state can't replace the new one.
+        var mine = ++load;
+        (error, milestones) = (null, null);
         try
         {
-            milestones = await Catalog.GetMilestonesAsync(all);
+            var result = await Catalog.GetMilestonesAsync(all);
+            if (mine == load)
+            {
+                milestones = result;
+            }
         }
         catch (HttpRequestException ex)
         {
-            error = ErrorNotice.Describe(ex);
+            if (mine == load)
+            {
+                error = ErrorNotice.Describe(ex);
+            }
         }
     }
 

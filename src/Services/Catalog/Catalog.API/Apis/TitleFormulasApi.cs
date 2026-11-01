@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +43,7 @@ public record FormulaShowDto(Guid ShowId, string Title, string? PosterUrl, strin
 /// stand-ins for a missing title, not a formula. A show needs <see cref="MinTitled"/> real titles.</item>
 /// <item><b>Exceptions</b> are often the notable episodes (Friends' finale is "The Last One"). Every title carries its
 /// episode id, so the page keeps the ones the viewer hasn't watched behind the spoiler shield.</item>
-/// <item><b>Daily shows out</b> (a season over <see cref="DailySeason"/> episodes), as Episode lengths and Between seasons
+/// <item><b>Daily shows out</b> (a season over <see cref="ShowRules.DailySeason"/> episodes), as Episode lengths and Between seasons
 /// leave them out: their titles are guests' names and dates.</item>
 /// </list>
 /// Every show's formula is worked out together from one query of regular episodes' titles, cached <see cref="CacheFor"/>.
@@ -55,7 +56,6 @@ public static partial class TitleFormulasApi
     public const int MinTitled = 6;
     public const int MaxExceptions = 6;
     private const int MinMatching = 5;
-    private const int DailySeason = 60;
     private const int ListSize = 30;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
@@ -117,14 +117,14 @@ public static partial class TitleFormulasApi
                 .Select(e => new TitleRow(e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title))
                 .ToListAsync(token);
             var formulas = rows.GroupBy(r => r.ShowId)
-                .Where(g => g.GroupBy(r => r.SeasonNumber).All(season => season.Count() <= DailySeason))
+                .Where(g => g.GroupBy(r => r.SeasonNumber).All(season => season.Count() <= ShowRules.DailySeason))
                 .Select(g => Find(g.Key, g.Where(r => !string.IsNullOrWhiteSpace(r.Title) && !Placeholder().IsMatch(r.Title.Trim()))
                     .OrderBy(r => r.SeasonNumber).ThenBy(r => r.EpisodeNumber).ToList()))
                 .OfType<TitleFormulaDto>()
                 .ToDictionary(f => f.ShowId);
             var ids = formulas.Keys.ToList();
             var titles = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.Id))
-                .Select(s => new ShowRow(s.Id, s.Title, s.PosterUrl, s.Popularity, s.Keywords.Contains("scripted") || s.Keywords.Contains("animation")))
+                .Select(s => new ShowRow(s.Id, s.Title, s.PosterUrl, s.Popularity, s.Keywords.Any(k => ShowRules.StoryKinds.Contains(k))))
                 .ToListAsync(token);
             return new AllFormulas(formulas, titles);
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);

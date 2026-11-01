@@ -62,7 +62,6 @@ public static class PuzzleApi
     private const double MinPopularity = 99;
     private const double MinRating = 7.5;
     private const int NoRepeatDays = 30;
-    private static readonly HashSet<string> PuzzleKinds = ["scripted", "animation"];
 
     public static void MapPuzzleApi(this RouteGroupBuilder api)
     {
@@ -142,7 +141,7 @@ public static class PuzzleApi
     private static async Task<List<Guid>> PoolAsync(CatalogContext db, CancellationToken ct) =>
         await db.Shows.AsNoTracking()
             .Where(s => s.Popularity >= MinPopularity && s.ExternalRating >= MinRating && s.FirstAirDate != null
-                && s.Keywords.Contains("english") && s.Keywords.Any(k => PuzzleKinds.Contains(k))
+                && s.Keywords.Contains("english") && s.Keywords.Any(k => ShowRules.StoryKinds.Contains(k))
                 && s.Cast.Count(c => c.Character != null) >= 2)
             .OrderBy(s => s.Id)
             .Select(s => s.Id)
