@@ -843,6 +843,19 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>Each main cast member's age at a show's latest episode, and who grew up on screen.</summary>
+/// <param name="MedianAge">The living cast's median age at the latest episode, from four ages up.</param>
+public record CastAges(Guid ShowId, DateOnly FirstAired, DateOnly LastAired, bool Ended, int? MedianAge, IReadOnlyList<CastAge> Members);
+
+/// <param name="AgeAtLatest">At the latest episode, or at their death when that came first.</param>
+/// <param name="AgeAtStart">At the first episode; given only for those who grew up on screen.</param>
+public record CastAge(Guid PersonId, string Name, string? Character, string? PhotoUrl, int AgeAtLatest, int? AgeAtStart, bool GrewUp, DateOnly? DiedAt);
+
+public record CastAgeLists(IReadOnlyList<CastAgeShow> GrewUp, IReadOnlyList<CastAgeShow> Youngest, IReadOnlyList<CastAgeShow> Oldest);
+
+/// <param name="Members">Those who grew up on screen, in the grew-up list; otherwise empty.</param>
+public record CastAgeShow(Guid ShowId, string Title, string? PosterUrl, int FirstYear, int LastYear, int? MedianAge, IReadOnlyList<CastAge> Members);
+
 /// <summary>The waits between a show's seasons.</summary>
 /// <param name="TypicalDays">The median wait, given from three waits up.</param>
 /// <param name="Now">For a running show: since its last episode, and when it's back if dated.</param>

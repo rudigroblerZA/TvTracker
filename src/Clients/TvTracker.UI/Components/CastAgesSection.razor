@@ -1,0 +1,70 @@
+@* The main cast's ages at the show's latest episode (its finale, once ended), and who grew up on screen. *@
+@inject CatalogClient Catalog
+
+@if (ages is { Members.Count: >= 3 } a)
+{
+    var living = a.Members.Where(m => m.DiedAt is null).ToList();
+    var grew = a.Members.Where(m => m.GrewUp).ToList();
+    <section aria-labelledby="ages-title">
+        <h2 id="ages-title">Cast ages</h2>
+        <p>
+            @if (a.MedianAge is { } median && living.Count > 0)
+            {
+                var youngest = living.MinBy(m => m.AgeAtLatest)!;
+                var oldest = living.MaxBy(m => m.AgeAtLatest)!;
+                <span>@($"At {(a.Ended ? "the finale" : "the latest episode")} ({a.LastAired:d MMM yyyy}) the cast's median age was {median}: ")</span>
+                <span>@($"{youngest.Name} the youngest at {youngest.AgeAtLatest}, {oldest.Name} the oldest at {oldest.AgeAtLatest}.")</span>
+            }
+            else
+            {
+                <span>@($"Ages at {(a.Ended ? "the finale" : "the latest episode")} ({a.LastAired:d MMM yyyy}).")</span>
+            }
+        </p>
+        @if (grew.Count > 0)
+        {
+            <p>
+                <span class="strong">Grew up on screen: </span>
+                <span>@string.Join(", ", grew.Select(m => $"{m.Name} ({m.AgeAtStart} → {m.AgeAtLatest})"))</span>
+                <span class="muted small">@($" · from the first episode in {a.FirstAired:yyyy}, if they were there from the start")</span>
+            </p>
+        }
+        <ul class="age-list">
+            @foreach (var m in a.Members)
+            {
+                <li @key="m.PersonId">
+                    <span class="age-bar" style="width: @(Width(m.AgeAtLatest))%"></span>
+                    <span class="age-text">
+                        <a href="people/@m.PersonId">@m.Name</a>
+                        @if (m.Character is { } c)
+                        {
+                            <span class="muted small">@($" as {c}")</span>
+                        }
+                    </span>
+                    <span class="age-value small">@(m.DiedAt is { } died ? $"died {died:yyyy}, {m.AgeAtLatest}" : m.AgeAtLatest.ToString())</span>
+                </li>
+            }
+        </ul>
+        <p class="muted small">From TVmaze's birthdays, for the main cast as it is today; anyone without a birthday is left out.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private CastAges? ages;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            ages = await Catalog.GetCastAgesAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            ages = null;
+        }
+    }
+
+    private int Width(int age) => Math.Max(3, (int)Math.Round(100.0 * age / Math.Max(1, ages!.Members.Max(m => m.AgeAtLatest))));
+}

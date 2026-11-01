@@ -47,6 +47,7 @@ public static class FeatureFlags
     public const string TvAtlas = "tv-atlas";
     public const string EpisodeLengths = "episode-lengths";
     public const string SeasonGaps = "season-gaps";
+    public const string CastAges = "cast-ages";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
