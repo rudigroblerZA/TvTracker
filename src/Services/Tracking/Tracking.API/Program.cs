@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddFeatureFlags();
+builder.Services.AddUserPlans<Tracking.API.Services.CopiedUserPlans>();
 builder.AddDefaultAuthentication();
 
 builder.AddNpgsqlDbContext<TrackingContext>("trackingdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));

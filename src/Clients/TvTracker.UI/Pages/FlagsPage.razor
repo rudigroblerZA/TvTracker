@@ -20,8 +20,9 @@
         else
         {
             <p class="muted">
-                Turn a feature on or off for everyone. Services see a change within seconds; other people's open pages within
-                30 seconds. A flag you haven't set follows flagd.json, including any targeting there.
+                Turn a feature on or off for everyone, or make it part of the paid plans. Services see a change within seconds
+                (a plan change within a minute); other people's open pages within 30 seconds. A flag you haven't set follows
+                flagd.json, including any targeting and plans there.
             </p>
             <ul class="flag-list">
                 @foreach (var flag in flags)
@@ -32,6 +33,10 @@
                                 <code class="strong">@flag.Key</code>
                                 <span class="tag @(flag.On ? "flag-on" : "flag-off")">@(flag.On ? "On" : "Off")</span>
                             </div>
+                            @if (flag.Plans is { Count: > 0 } plans)
+                            {
+                                <div class="small"><span class="tag plan-tag">@string.Join(" & ", plans.Select(Plans.Name))</span>@(flag.Name is { } name ? $" {name}" : "")</div>
+                            }
                             @if (!string.IsNullOrEmpty(flag.Description))
                             {
                                 <div class="small">@flag.Description</div>
@@ -44,7 +49,8 @@
                         </div>
                         <div class="chips" role="radiogroup" aria-label="@flag.Key">
                             <button type="button" role="radio" aria-checked="@(flag.Override is null ? "true" : "false")" class="chip @(flag.Override is null ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, null)">flagd.json</button>
-                            <button type="button" role="radio" aria-checked="@(flag.Override == true ? "true" : "false")" class="chip @(flag.Override == true ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, true)">On</button>
+                            <button type="button" role="radio" aria-checked="@(flag.Override == true && flag.Plans is null ? "true" : "false")" class="chip @(flag.Override == true && flag.Plans is null ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, true)">On</button>
+                            <button type="button" role="radio" aria-checked="@(flag.Override == true && flag.Plans is not null ? "true" : "false")" class="chip @(flag.Override == true && flag.Plans is not null ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, true, Paid)">@($"{Plans.Name(Plans.Plus)} & {Plans.Name(Plans.Family)}")</button>
                             <button type="button" role="radio" aria-checked="@(flag.Override == false ? "true" : "false")" class="chip @(flag.Override == false ? "active" : "")" disabled="@busy" @onclick="() => SetAsync(flag, false)">Off</button>
                         </div>
                     </li>
@@ -79,13 +85,16 @@
         }
     }
 
-    private async Task SetAsync(FeatureFlagSetting flag, bool? on)
+    /// <summary>The paid plans, which a feature is made part of from here.</summary>
+    private static readonly string[] Paid = [Plans.Plus, Plans.Family];
+
+    private async Task SetAsync(FeatureFlagSetting flag, bool? on, IReadOnlyList<string>? plans = null)
     {
         busy = true;
         error = null;
         try
         {
-            if (await Identity.SetFeatureFlagAsync(flag.Key, on) is { } updated && flags is not null)
+            if (await Identity.SetFeatureFlagAsync(flag.Key, on, plans) is { } updated && flags is not null)
             {
                 flags[flags.IndexOf(flag)] = updated;
             }

@@ -1,0 +1,22 @@
+@inject FeatureFlagStore Flags
+
+@* Shown in place of a feature that's part of a plan the user isn't on: what the plan includes, from the flags. *@
+<h1>@($"Part of {Plans.Name(Plan)}")</h1>
+<p>
+    @($"This is one of the insights in {Plans.Name(Plan)}.")
+    @if (features is { Count: > 0 } f)
+    {
+        <span>@($" {Plans.Name(Plan)} adds {f.Count}: {string.Join(", ", f.Select(x => x.Name))}.")</span>
+    }
+</p>
+<p><a class="btn" href="settings/plan">@($"See {Plans.Name(Plan)}")</a></p>
+
+@code {
+    /// <summary>The plan's key ("plus", "family").</summary>
+    [Parameter, EditorRequired] public string Plan { get; set; } = "";
+
+    private List<PlanFeature>? features;
+
+    protected override async Task OnParametersSetAsync() =>
+        features = (await Flags.PlanFeaturesAsync()).Where(f => f.Plans.Contains(Plan)).ToList();
+}

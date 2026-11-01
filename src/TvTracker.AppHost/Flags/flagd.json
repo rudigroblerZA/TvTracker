@@ -17,19 +17,22 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Essential cut: the shorter way through a long show (/shows/{id}/essential-cut, and the teaser on show pages)." }
+      "metadata": { "description": "Essential cut: the shorter way through a long show (/shows/{id}/essential-cut, and the teaser on show pages).", "name": "Essential cut", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "tonight-plan": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Tonight's plan: episodes that fit the time and mood given (/tonight, and its links on Home and Up Next)." }
+      "metadata": { "description": "Tonight's plan: episodes that fit the time and mood given (/tonight, and its links on Home and Up Next).", "name": "Tonight's plan", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "reunion-radar": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Reunion radar: shows where actors from shows you love work together again (/reunions, and its link on For you)." }
+      "metadata": { "description": "Reunion radar: shows where actors from shows you love work together again (/reunions, and its link on For you).", "name": "Reunion radar", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "show-dna": {
       "state": "ENABLED",
@@ -41,7 +44,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Forecasts: the What's next panel on show pages, and Will you finish it? on show pages and Stats." }
+      "metadata": { "description": "Forecasts: the What's next panel on show pages, and Will you finish it? on show pages and Stats.", "name": "Forecasts", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "nanogenres": {
       "state": "ENABLED",
@@ -53,7 +57,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages." }
+      "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages.", "name": "DNA twins", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "gets-good": {
       "state": "ENABLED",
@@ -83,13 +88,15 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Previously on…: a rewatch refresher on the show page after a long break, and the Back after a break list on Up Next." }
+      "metadata": { "description": "Previously on…: a rewatch refresher on the show page after a long break, and the Back after a break list on Up Next.", "name": "Previously on…", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "catch-up": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next." }
+      "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next.", "name": "Catch-up planner", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "worth-going-back": {
       "state": "ENABLED",
@@ -125,7 +132,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share." }
+      "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share.", "name": "Tonight for two", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "community-insights": {
       "state": "ENABLED",
@@ -221,7 +229,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Your TV clock: when you watch, what kind of viewer that makes you, and your sittings." }
+      "metadata": { "description": "Your TV clock: when you watch, what kind of viewer that makes you, and your sittings.", "name": "Your TV clock", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "who-said-it": {
       "state": "ENABLED",
@@ -239,7 +248,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Spoiler watch: how exposed you are to spoilers for your shows right now, and when it calms down." }
+      "metadata": { "description": "Spoiler watch: how exposed you are to spoilers for your shows right now, and when it calms down.", "name": "Spoiler watch", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "cast-afterwards": {
       "state": "ENABLED",
@@ -251,7 +261,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Your TV life: every year of your life with the biggest premieres and finales, and what you watched." }
+      "metadata": { "description": "Your TV life: every year of your life with the biggest premieres and finales, and what you watched.", "name": "Your TV life", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "six-degrees": {
       "state": "ENABLED",
@@ -311,7 +322,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Taste twins: anonymous people whose ratings track yours, and what they loved that you haven't seen (5-user rule)." }
+      "metadata": { "description": "Taste twins: anonymous people whose ratings track yours, and what they loved that you haven't seen (5-user rule).", "name": "Taste twins", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "awards-shelf": {
       "state": "ENABLED",
@@ -341,13 +353,15 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them." }
+      "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them.", "name": "Mixtape", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "your-services": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Your services (Plus and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards." }
+      "metadata": { "description": "Your services (Plus and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards.", "name": "Your services", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "family-plan": {
       "state": "ENABLED",
@@ -377,13 +391,15 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows." }
+      "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows.", "name": "Year in TV", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "Ask the app: questions about shows answered by the local model with the app's MCP tools (signed in)." }
+      "metadata": { "description": "Ask the app: questions about shows answered by the local model with the app's MCP tools (signed in).", "name": "Ask the app", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "research": {
       "state": "ENABLED",

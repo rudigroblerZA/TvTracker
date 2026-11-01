@@ -1,9 +1,19 @@
 @inject FeatureFlagStore Flags
 
-@* Shows its content while the flag is on for the user, and Off (if given) while it's off; nothing until it knows. *@
+@* Shows its content while the flag is on for the user, and Off (if given) while it's off; nothing until it knows.
+   When it's off only because of the user's plan, Locked (if given) shows instead of Off, with the plan that unlocks
+   it; ShowLocked shows the content itself with that plan cascaded, for a card that marks itself (ToolLink). *@
 @if (enabled == true)
 {
     @ChildContent
+}
+else if (enabled == false && unlockedBy is { } plan && ShowLocked)
+{
+    <CascadingValue Value="new FeatureLock(plan)">@ChildContent</CascadingValue>
+}
+else if (enabled == false && unlockedBy is { } lockedTo && Locked is not null)
+{
+    @Locked(lockedTo)
 }
 else if (enabled == false)
 {
@@ -18,7 +28,18 @@ else if (enabled == false)
 
     [Parameter] public RenderFragment? Off { get; set; }
 
-    private bool? enabled;
+    /// <summary>Shown while the feature is off because of the user's plan; given the plan's key that would turn it on.</summary>
+    [Parameter] public RenderFragment<string>? Locked { get; set; }
 
-    protected override async Task OnParametersSetAsync() => enabled = await Flags.IsEnabledAsync(Flag);
+    /// <summary>Show the content anyway while it's locked to a plan, with a <see cref="FeatureLock"/> cascaded to it.</summary>
+    [Parameter] public bool ShowLocked { get; set; }
+
+    private bool? enabled;
+    private string? unlockedBy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        enabled = await Flags.IsEnabledAsync(Flag);
+        unlockedBy = enabled == false && (Locked is not null || ShowLocked) ? await Flags.UnlockedByAsync(Flag) : null;
+    }
 }

@@ -740,6 +740,8 @@ a.chip { text-decoration: none; }
     border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; }
 .tool-link strong { color: var(--accent); }
 .tool-link:hover, .tool-link:focus-visible { border-color: var(--accent); text-decoration: none; }
+/* A tool, or a flag, that is part of a paid plan */
+.plan-tag { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 /* On a phone the cards are just their names, so the page's own content starts on the first screen. */
 @media (max-width: 520px) {
     .tool-links { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }

@@ -41,8 +41,8 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
         GetAsync<List<FeatureFlagSetting>>(ApiClients.Identity, "api/v1/admin/flags", ct);
 
     /// <summary>Turns a flag on or off for everyone, or (null) back to what flagd.json says.</summary>
-    public Task<FeatureFlagSetting?> SetFeatureFlagAsync(string key, bool? on, CancellationToken ct = default) =>
-        SendAsync<FeatureFlagSetting>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/flags/{Uri.EscapeDataString(key)}", new { On = on }, ct);
+    public Task<FeatureFlagSetting?> SetFeatureFlagAsync(string key, bool? on, IReadOnlyList<string>? plans = null, CancellationToken ct = default) =>
+        SendAsync<FeatureFlagSetting>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/flags/{Uri.EscapeDataString(key)}", new { On = on, Plans = plans }, ct);
 
     /// <summary>The caller's family; null while the family-plan flag is off.</summary>
     public Task<FamilyInfo?> GetFamilyAsync(CancellationToken ct = default) =>

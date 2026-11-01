@@ -671,6 +671,12 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 Free, Plus and Family, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
 
+- **Insights by plan:** Plus and Family add 16 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
+  Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
+  clock, Your services, forecasts); everything else is free. A plan is a set of feature flags: each of those flags has a
+  plan rule in `Flags/flagd.json` (`"plans": "plus,family"` in its metadata), and an admin can put any feature into the
+  paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Plus tag and its page says what
+  Plus adds; `/settings/plan` lists each plan's insights from the flags. The services refuse a locked insight (404).
 - **Free:** tracking, ratings and lists without a plan limit (up to the service's cap of 100 lists). **Plus:** Your
   services and the Plus features. Every plan can share lists, on its profile and by link. Lists were capped at 3 on
   Free and sharing was Plus-only at first; both opened to everyone, since a cap on lists is a cap on tracking and

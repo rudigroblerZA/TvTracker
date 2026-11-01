@@ -10,11 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
+builder.Services.AddUserPlans<Social.API.Services.CopiedUserPlans>();
 
 builder.AddNpgsqlDbContext<SocialContext>("socialdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<SocialContext>();
 
 builder.AddRabbitMQEventBus("eventbus")
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>()
     .AddSubscription<ShowAddedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<ShowUpdatedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodesScheduledIntegrationEvent, CatalogEventHandlers>()

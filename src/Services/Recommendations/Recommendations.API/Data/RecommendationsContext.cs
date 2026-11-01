@@ -78,6 +78,19 @@ public class ShowNanogenres
     public List<string> Names { get; set; } = [];
 }
 
+/// <summary>
+/// A user's plan, copied from Identity's events and daily profile snapshot, for feature flags that are part of some plans
+/// only (see TvTracker's <c>UserPlansBase</c>). No row means free.
+/// </summary>
+public class UserPlanCopy
+{
+    public required string UserId { get; set; }
+    public required string Plan { get; set; }
+
+    /// <summary>When Identity set it; an older event is ignored, since events can arrive out of order.</summary>
+    public DateTimeOffset ChangedAtUtc { get; set; }
+}
+
 public class RecommendationsContext(DbContextOptions<RecommendationsContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<ShowFeatures> Shows => Set<ShowFeatures>();
@@ -88,11 +101,21 @@ public class RecommendationsContext(DbContextOptions<RecommendationsContext> opt
     public DbSet<UserRecommendation> UserRecommendations => Set<UserRecommendation>();
     public DbSet<DirtyUser> DirtyUsers => Set<DirtyUser>();
 
+    public DbSet<UserPlanCopy> Plans => Set<UserPlanCopy>();
+
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserPlanCopy>(entity =>
+        {
+            entity.ToTable("user_plans");
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.UserId).HasMaxLength(64);
+            entity.Property(p => p.Plan).HasMaxLength(16);
+        });
+
         modelBuilder.Entity<ShowFeatures>(entity =>
         {
             entity.ToTable("shows");
