@@ -83,10 +83,37 @@ public static class FeatureFlags
     public const bool DefaultValue = true;
 
     /// <summary>
-    /// The evaluation context for a user, so flags can target them: <c>targetingKey</c> is the Keycloak user id
-    /// (also what fractional rollouts hash), and <c>email</c> is included when known. Signed out, it's empty.
+    /// The context attribute that carries the caller's plan ("free", "plus", "family"; see <c>Plans</c>). A flag in a plan
+    /// has a targeting rule that turns it off when <c>plan</c> is set and isn't one of the flag's plans (<see cref="PlanRule"/>).
+    /// No <c>plan</c> means "not known" (the plan service is down, or the <see cref="Plans"/> flag is off), and the flag
+    /// stays on: fail open, like everything else here.
     /// </summary>
-    public static EvaluationContext ContextFor(ClaimsPrincipal? user)
+    public const string PlanAttribute = "plan";
+
+    /// <summary>The free plan's key, which signed-out callers are on.</summary>
+    public const string FreePlan = "free";
+
+    /// <summary>The flag metadata key listing a flag's plans, comma-separated ("plus,family"); absent = every plan.</summary>
+    public const string PlansMetadata = "plans";
+
+    /// <summary>The flag metadata key with a feature's short name, for the plan page ("Essential cut").</summary>
+    public const string NameMetadata = "name";
+
+    /// <summary>
+    /// The flagd targeting rule (JSON Logic) that limits a flag to <paramref name="plans"/>: off when the context's plan is
+    /// set and isn't one of them; otherwise null, so the flag's default variant decides.
+    /// </summary>
+    public static string PlanRule(IEnumerable<string> plans) =>
+        "{\"if\":[{\"and\":[{\"var\":\"plan\"},{\"!\":{\"in\":[{\"var\":\"plan\"},["
+        + string.Join(",", plans.Select(p => $"\"{p}\"")) + "]]}}]},\"off\",null]}";
+
+    /// <summary>
+    /// The evaluation context for a user, so flags can target them: <c>targetingKey</c> is the Keycloak user id
+    /// (also what fractional rollouts hash), and <c>email</c> is included when known. <paramref name="plan"/>, when
+    /// known, goes in as <see cref="PlanAttribute"/>, so a flag can be part of some plans only (the caller works it out:
+    /// <see cref="FreePlan"/> when signed out, and nothing while the <see cref="Plans"/> flag is off).
+    /// </summary>
+    public static EvaluationContext ContextFor(ClaimsPrincipal? user, string? plan = null)
     {
         var context = EvaluationContext.Builder();
         if (user?.Identity?.IsAuthenticated == true)
@@ -99,6 +126,10 @@ public static class FeatureFlags
             {
                 context.Set("email", email);
             }
+        }
+        if (plan is not null)
+        {
+            context.Set(PlanAttribute, plan);
         }
         return context.Build();
     }

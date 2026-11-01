@@ -9,19 +9,19 @@
 <AuthorizeView>
     <Authorized>
         <div class="tool-links">
-            <Feature Flag="@FeatureFlags.BacklogTriage">
+            <Feature Flag="@FeatureFlags.BacklogTriage" ShowLocked>
                 <ToolLink Href="backlog" Title="Your backlog">What to start next from the shows you follow, and what to let go.</ToolLink>
             </Feature>
-            <Feature Flag="@FeatureFlags.SpoilerWatch">
+            <Feature Flag="@FeatureFlags.SpoilerWatch" ShowLocked>
                 <ToolLink Href="spoilers" Title="Spoiler watch">Which of your shows have spoilers about right now, and when it's safe again.</ToolLink>
             </Feature>
-            <Feature Flag="@FeatureFlags.WaitingRoom">
+            <Feature Flag="@FeatureFlags.WaitingRoom" ShowLocked>
                 <ToolLink Href="waiting" Title="Waiting room">Shows you're caught up on, and when each is back.</ToolLink>
             </Feature>
-            <Feature Flag="@FeatureFlags.TonightPlan">
+            <Feature Flag="@FeatureFlags.TonightPlan" ShowLocked>
                 <ToolLink Href="tonight" Title="Plan tonight">Tell it how long you've got and your mood, and it picks the episodes.</ToolLink>
             </Feature>
-            <Feature Flag="@FeatureFlags.TimeOff">
+            <Feature Flag="@FeatureFlags.TimeOff" ShowLocked>
                 <ToolLink Href="time-off" Title="Fits your time off">Finished shows you could watch whole in the days you've got.</ToolLink>
             </Feature>
         </div>

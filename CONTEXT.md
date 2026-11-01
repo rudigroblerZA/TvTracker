@@ -1178,7 +1178,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
   already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
   people's work.
-- **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag).
+- **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag), including the
+  insights in plans (see Insights by plan).
 - **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
 - **Analytics keeps a copy too** (`user_plans`, from the same events), for Your services.
 - **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
@@ -1203,6 +1204,35 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Limit behind `plans`:** like Tracking's, the Plus limit applies only while the `plans` flag is on for the caller.
 - **Logos:** the favicon client has ServiceDefaults' retries removed (one try each, as Research's sources), and a fetch
   that missed any logo is cached 15 minutes rather than the week.
+
+## Insights by plan
+
+- **A plan is a set of feature flags** (a decision: monetisation sits in a balanced offer of insights, and changing the
+  offer shouldn't need a release). A flag in a plan carries a targeting rule (`FeatureFlags.PlanRule`) that turns it off
+  when the context's `plan` is set and isn't one of the flag's plans, plus metadata naming them (`plans`, `name`). The
+  offer is edited in flagd.json or on the flags page ("Plus & Family"), and the plan page lists it from the flags.
+- **The offer** (first cut, from the business plan): Plus and Family get 16 insights that read the viewer's own
+  history, plan their viewing or cost the most to run: essential cut, Tonight's plan and Tonight for two, catch-up,
+  Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
+  clock, Your services and forecasts. Everything about shows (DNA, gets good, endings, the grid, universes, the games
+  and trivia) stays free: it's what brings people in.
+- **The plan in the flag context** (`IUserPlans`, used by `RequireFeature` and the UI's `FeatureFlagStore`): signed out is
+  "free"; signed in, the plan Identity says the user gets (a family member's is "family"). Nothing while the `plans` flag
+  is off, or when the plan can't be found: then no plan rule applies, so an outage never takes a paid feature away.
+- **From each service's own copy, where it has one:** Tracking, Analytics, Social and Recommendations keep `user_plans` from
+  Identity's events and daily snapshot (Social and Recommendations gained theirs for this, migration `UserPlans`).
+  Catalog, Research and Assistant ask Identity (`/me/plan` with the caller's token, a minute per user).
+  - **Why not one way for all:** asking Identity was the first design, but Identity references Tracking, Ratings,
+    Recommendations, Notifications, Social and Analytics (account deletion and export), and referencing it back from
+    them made Aspire's start time out twice in a row (the AppHost started fine without the back-references). Copies are
+    also what the services' own limits already used.
+  - **Where a plan flag can live:** a service with a plan source. Ratings and Notifications have none, so a flag of theirs
+    put in a plan would stay on for everyone; give the service a copy first.
+- **Locked, not hidden:** the UI evaluates a locked flag again with plan "plus" (`UnlockedByAsync`); tool cards then stay
+  with a "Plus" tag (`<Feature ShowLocked>`), and the page shows what Plus adds instead of "Not available". Show-page
+  sections of a locked feature are still hidden.
+- **Checked in flagd** over OFREP with the rule as written: plan free → off (TARGETING_MATCH), plus or family → on, no plan
+  → on (DEFAULT).
 
 ## Feature flags
 

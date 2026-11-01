@@ -1,6 +1,7 @@
 @page "/settings/plan"
 @attribute [RequiresFeature(FeatureFlags.Plans)]
 @inject IdentityClient Identity
+@inject FeatureFlagStore Flags
 
 <PageTitle>Your plan · @Brand.AppName</PageTitle>
 
@@ -41,7 +42,18 @@
                             {
                                 <li>@($"Shared with up to {Plans.FamilyMembers} people you invite")</li>
                             }
-                            <li>Everything else in @Brand.AppName</li>
+                            @if (features is not null)
+                            {
+                                var mine = features.Where(f => f.Plans.Contains(key)).ToList();
+                                @if (mine.Count > 0)
+                                {
+                                    <li>
+                                        <span>@($"{mine.Count} insights: ")</span>
+                                        <span class="muted">@string.Join(", ", mine.Select(f => f.Name))</span>
+                                    </li>
+                                }
+                            }
+                            <li>@(key == Plans.Free ? $"Every other insight in {Brand.AppName}" : $"Everything in {Plans.Name(Plans.Free)}")</li>
                         </ul>
                         @if (key == plan.Plan)
                         {
@@ -67,6 +79,7 @@
 
 @code {
     private UserPlan? plan;
+    private IReadOnlyList<PlanFeature>? features;
     private string? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -77,6 +90,8 @@
         try
         {
             plan = await Identity.GetMyPlanAsync();
+            // Which insights each plan has comes from the flags (flagd.json and the flags page), not from code.
+            features = await Flags.PlanFeaturesAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddFeatureFlags();
+builder.Services.AddUserPlans<Analytics.API.Services.CopiedUserPlans>();
 builder.AddDefaultAuthentication();
 
 // Analytics.API owns the analyticsdb schema (EF Core migrations); the worker waits for this service to be healthy.

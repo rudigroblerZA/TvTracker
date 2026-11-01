@@ -571,7 +571,10 @@ public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
 /// <param name="Default">What flagd.json says.</param>
 /// <param name="Targeting">flagd.json treats some users differently; an override applies to everyone.</param>
 /// <param name="Override">Set on the flags page; null when flagd.json decides.</param>
-public record FeatureFlagSetting(string Key, string? Description, bool Default, bool Targeting, bool? Override, bool On);
+/// <param name="Plans">The plans the feature is part of; null for every plan.</param>
+/// <param name="Name">The feature's short name.</param>
+public record FeatureFlagSetting(string Key, string? Description, bool Default, bool Targeting, bool? Override, bool On,
+    IReadOnlyList<string>? Plans = null, string? Name = null);
 
 /// <summary>The result of flagging a comment or community insight (see Ratings.API's CommunityApi).</summary>
 public record FlagResult(bool Hidden, bool MarkedSpoiler);
