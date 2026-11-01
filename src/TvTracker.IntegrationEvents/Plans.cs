@@ -21,7 +21,9 @@ public static class Plans
     /// <summary>People a family plan's owner can invite, besides themselves.</summary>
     public const int FamilyMembers = 5;
 
-    private static readonly PlanLimits FreeLimits = new(MaxLists: 3, ShareLists: true, TrackServices: false);
+    // No list limit on Free: a cap on lists is a cap on tracking, which stays free (Plus sells insight). MaxLists stays,
+    // as ShareLists does, so a plan can get a limit back by changing one value.
+    private static readonly PlanLimits FreeLimits = new(MaxLists: null, ShareLists: true, TrackServices: false);
     private static readonly PlanLimits PlusLimits = new(MaxLists: null, ShareLists: true, TrackServices: true);
 
     /// <summary>The plan's limits; an unknown plan (or none yet) is free. Family has Plus's.</summary>

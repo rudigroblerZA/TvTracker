@@ -1171,6 +1171,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Sharing is free now:** Free started with no sharing, then sharing (profile and links) opened to every plan, since
   shared lists bring people in. `PlanLimits.ShareLists` stays, and Tracking still checks it, so a plan can lose sharing
   again by changing one value.
+- **Lists are free now:** Free was capped at 3 lists, which contradicted the business plan's "tracking stays free and
+  unlimited" and is the kind of cap that drew Trakt's 2025 backlash, so it went (1 November 2026). Plus sells insight
+  (Your services and the Plus features), not capacity. `PlanLimits.MaxLists` stays, and Tracking still enforces it, so
+  a cap can come back by changing one value; the service's own cap of 100 lists applies to everyone.
 - **Limits apply going forward:** a new list or a new share is refused (403, problem type `plan-limit`); what a user
   already has, shared or not, stays theirs to edit, unshare or delete. Taking things away on a downgrade would lose
   people's work.
