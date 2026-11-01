@@ -524,6 +524,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Sittings:** marks in a row, any show, each within the next episode's running time plus 30 minutes of the one
     before. A binge is three or more episodes.
   - **Bulk marks out,** as Year in TV: they say when a back catalog was entered, not watched.
+- **Streaks** (`StreaksApi`): computed on request from the caller's own watches and the catalog copy's air dates, in
+  their time zone, so no minimum counts; free, since a reason to come back daily is what it's for.
+  - **Days and weeks:** local dates with a watch, in a row; weeks run Monday to Sunday. The current run is alive until
+    the end of the day (week) after its last, and `AtRisk` says nothing's been watched yet today (this week), so a streak
+    isn't lost at midnight before the evening's episode.
+  - **Kept up, TV's own streak:** a show's regular aired episodes in air order, each watched within 7 days of airing (or
+    a day before, for marks across time zones). Episodes before the first kept one are skipped, so starting a show
+    late isn't a miss; an episode still inside its window is due, neither kept nor missed, and listed with its
+    deadline when it would extend a run of 2 or more. A season dropped at once counts when binged within the week.
+  - **Bulk marks out** (`CopyRules.BulkMark`), as Your TV clock and Year in TV. Episode numbers only, as Spoiler watch.
+  - **Tested** by marking demo's episodes of MobLand (one missed, then four kept, the latest unwatched) and Scrubs (three
+    kept, one late, two kept) at chosen times: 4 in a row with S02E07 due by 6 November, and 2 in a row with a best of 3.
+    ~20 ms warm.
 - **Your TV life** (`TvLifeApi`): computed on request from the catalog copy and the caller's watches, for a birth year
   the caller gives. The year stays on the device (a preference, like the spoiler shield): a profile column for a
   birth year is personal data the app has no other use for.

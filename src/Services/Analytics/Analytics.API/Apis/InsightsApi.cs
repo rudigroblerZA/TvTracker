@@ -81,6 +81,7 @@ public static class InsightsApi
         api.MapTvLifeApi();
         api.MapSpoilerWatchApi();
         api.MapTvClockApi();
+        api.MapStreaksApi();
         api.MapCallItApi();
 
         return api;

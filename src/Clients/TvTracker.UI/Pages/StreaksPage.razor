@@ -1,0 +1,145 @@
+@page "/streaks"
+@attribute [RequiresFeature(FeatureFlags.Streaks)]
+@inject AnalyticsClient Analytics
+@inject UserSession Session
+
+<PageTitle>Streaks · @Brand.AppName</PageTitle>
+
+<p><a href="insights">← Insights</a></p>
+<h1>Streaks</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">From the episodes you mark as you watch them, in your own time zone. Back-catalogue marks don't count.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (streaks is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+        }
+        else
+        {
+            <div class="stat-tiles">
+                @Tile("days", "days in a row", streaks.Days)
+                @Tile("weeks", "weeks in a row", streaks.Weeks)
+                @if (streaks.Best is { } best)
+                {
+                    <div class="stat">
+                        <div class="stat-value">@best.Longest</div>
+                        <div class="muted">
+                            <span>@("episodes kept up in a row, your best: ")</span><a href="shows/@best.ShowId">@best.Title</a>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (streaks.Due.Count > 0)
+            {
+                <section aria-labelledby="due-title">
+                    <h2 id="due-title">Watch to keep them going</h2>
+                    <ol class="length-list">
+                        @foreach (var d in streaks.Due)
+                        {
+                            <li @key="@($"{d.ShowId}-{d.Season}-{d.Episode}")">
+                                <Poster Title="@d.Title" Url="@d.PosterUrl" Size="small" />
+                                <div>
+                                    <a class="strong" href="shows/@d.ShowId">@d.Title</a>
+                                    <div class="small">@($"{Format.EpisodeCode(d.Season, d.Episode)} by {By(d.WatchBy)} keeps your {d.Streak}-episode run")</div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                </section>
+            }
+
+            <section aria-labelledby="kept-title">
+                <h2 id="kept-title">Kept up</h2>
+                <p class="muted small">@($"Shows whose new episodes you watch within {KeptUpDays} days of airing, episode after episode. A whole season dropped at once counts if you watch it within the week.")</p>
+                @if (streaks.KeptUp.Count == 0)
+                {
+                    <p class="muted">None running right now. Watch two new episodes of an airing show within a week of each airing to start one.</p>
+                }
+                else
+                {
+                    <ol class="length-list">
+                        @foreach (var k in streaks.KeptUp)
+                        {
+                            <li @key="k.ShowId">
+                                <Poster Title="@k.Title" Url="@k.PosterUrl" Size="small" />
+                                <div>
+                                    <a class="strong" href="shows/@k.ShowId">@k.Title</a>
+                                    <div class="small">@($"{k.Current} in a row, up to {Format.EpisodeCode(k.Season, k.Episode)}{(k.Longest > k.Current ? $" · best {k.Longest}" : "")}")</div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+
+            @if (streaks.BulkLeftOut > 0)
+            {
+                <p class="muted small">@($"{streaks.BulkLeftOut} episodes marked in bulk (a back catalogue at once) aren't counted.")</p>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see your streaks." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    /// <summary>Matches Analytics' window for keeping up (StreaksApi.KeptUpDays).</summary>
+    private const int KeptUpDays = 7;
+
+    private Streaks? streaks;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            streaks = await Analytics.GetStreaksAsync(Session.Profile?.TimeZone);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>"today", "tomorrow", or the weekday and date.</summary>
+    private string By(DateOnly day)
+    {
+        var today = DateOnly.FromDateTime(Session.Now.DateTime);
+        return (day.DayNumber - today.DayNumber) switch
+        {
+            0 => "today",
+            1 => "tomorrow",
+            _ => day.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)
+        };
+    }
+
+    private RenderFragment Tile(string unit, string label, Streak s) => __builder =>
+    {
+        <div class="stat">
+            <div class="stat-value">@s.Current</div>
+            <div class="muted">@label</div>
+            <div class="small">
+                @if (s.AtRisk)
+                {
+                    <span class="streak-risk">@(unit == "days" ? "Watch something today to keep it" : "Watch something this week to keep it")</span>
+                }
+                else if (s.Longest > 0)
+                {
+                    <span class="muted">@($"Best: {s.Longest}{(s.LongestFrom is { } f && s.LongestTo is { } t ? $", {f:d MMM yyyy} to {t:d MMM yyyy}" : "")}")</span>
+                }
+            </div>
+        </div>
+    };
+}

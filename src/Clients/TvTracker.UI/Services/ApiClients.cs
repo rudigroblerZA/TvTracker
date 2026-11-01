@@ -569,6 +569,10 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<TvClock?> GetTvClockAsync(string? timeZone, CancellationToken ct = default) =>
         GetAsync<TvClock>(ApiClients.Analytics, "api/v1/me/tv-clock" + (string.IsNullOrEmpty(timeZone) ? "" : $"?tz={Uri.EscapeDataString(timeZone)}"), ct);
 
+    /// <summary>The caller's streaks, in their time zone; null while the streaks flag is off.</summary>
+    public Task<Streaks?> GetStreaksAsync(string? timeZone, CancellationToken ct = default) =>
+        GetAsync<Streaks>(ApiClients.Analytics, "api/v1/me/streaks" + (string.IsNullOrEmpty(timeZone) ? "" : $"?tz={Uri.EscapeDataString(timeZone)}"), ct);
+
     /// <summary>Your TV life, from the year the user says they were born; null while the tv-life flag is off.</summary>
     public Task<TvLife?> GetTvLifeAsync(int born, string? timeZone, CancellationToken ct = default) =>
         GetAsync<TvLife>(ApiClients.Analytics, $"api/v1/me/tv-life?born={born}" + (string.IsNullOrEmpty(timeZone) ? "" : $"&tz={Uri.EscapeDataString(timeZone)}"), ct);

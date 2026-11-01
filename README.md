@@ -342,6 +342,18 @@ episode titles, since a milestone episode is often an event. It works signed out
   shows are left out.
 - **API:** `GET /api/v1/milestones?all=true|false` (Catalog.API, public).
 
+**Streaks** (`/streaks`, from Insights and Up Next; `streaks` flag; free, signed in): days and weeks in a row with
+something watched, and the shows you keep up with as they air: each new episode watched within 7 days of airing,
+episode after episode ("MobLand: 4 in a row, up to S02E06"). The page lists what's due to keep a run going ("S02E07 by
+Fri 6 Nov keeps your 4-episode run") and says when a daily or weekly streak needs something watched today or this week.
+- **Your time zone:** days and weeks are local (Monday to Sunday), and a streak stays alive until the end of the next
+  day or week, so it isn't lost at midnight before the evening's episode.
+- **Kept up:** episodes from before the first one you kept up don't count against you, an episode still inside its week
+  is due rather than missed, and a whole season dropped at once counts if you watch it within the week. Episode numbers
+  only, no titles.
+- **Back-catalogue marks don't count** (8 or more of a show at once), as on Your TV clock and Year in TV.
+- **API:** `GET /api/v1/me/streaks?tz=` (Analytics.API, signed in).
+
 **Far from home** (`/far-from-home`, from Discover, and a section on show pages; `far-from-home` flag): actors born
 outside the country their show is set in. Ted Lasso is set in England with Jason Sudeikis and Brendan Hunt born in the
 US; The Boys is set in the US with Karl Urban and Antony Starr born in New Zealand; Fargo has Martin Freeman, and
@@ -597,7 +609,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 

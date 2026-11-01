@@ -165,6 +165,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
+    "streaks": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Streaks: days and weeks in a row of watching, and shows kept up with (each new episode within a week of airing)." }
+    },
     "far-from-home": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
