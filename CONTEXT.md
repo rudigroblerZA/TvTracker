@@ -1014,6 +1014,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   life keeps the birth year: a profile column for it would be personal data the app has no other use for. Only the day
   goes to the catalog, as a date like any other.
 
+## Milestones
+
+- **One window function** (`MilestonesApi` on Catalog.API): every show's regular episodes numbered in season and episode
+  order (`row_number()`), dated or not, so an undated episode still takes its place; the 100th, 150th, 200th, 250th, 300th,
+  400th, 500th and every hundred to 1,000 that air between 30 days ago and 120 days ahead. Cached an hour.
+- **The catalog's count, said so:** specials are left out and networks count their own way (double episodes, specials),
+  so a celebrated "100th" can land one either side; the page says it.
+- **Story shows by default:** daily shows (a season over 60) are left out altogether, and talk, news and reality shows
+  only come with `all=true`; otherwise donghua with 200-episode seasons and daily magazines crowd out Chicago Fire's 300th.
+- **No titles:** a milestone episode is often an event, and its title can give it away.
+- **Followed shows** are marked by the page from Tracking's follows; the catalog never sees them.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

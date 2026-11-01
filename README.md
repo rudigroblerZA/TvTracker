@@ -332,6 +332,15 @@ Your birthday stays on the device, like Your TV life's birth year; only the day 
 - **29 February** birthdays are listed on 28 February in other years.
 - **API:** `GET /api/v1/birthdays?date=yyyy-MM-dd` (Catalog.API, public; the client sends its local date).
 
+**Milestones** (`/milestones`, from Discover; `milestones` flag): shows about to reach their 100th, 150th, 200th, 250th,
+300th, 400th, 500th… episode in the next four months, and those that did in the last 30 days, with the date in your time
+zone and a countdown: Chicago Fire's 300th in 4 days, Law & Order: SVU's 600th, Abbott Elementary's 100th. Signed in,
+the shows you follow are marked. Scripted and animated shows by default; a box adds talk, news and reality shows. No
+episode titles, since a milestone episode is often an event. It works signed out.
+- **The catalog's count:** regular episodes in season and episode order, specials left out, so a network that counts
+  its own way may celebrate one either side. Daily shows are left out.
+- **API:** `GET /api/v1/milestones?all=true|false` (Catalog.API, public).
+
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two
 shows: someone from the first was in a second show with someone from a third, and so on, up to six actors. Game of
 Thrones to The Office is two (Aidan Gillen to The Wire, Amy Ryan to The Office); Breaking Bad to Friends is three, through
@@ -560,7 +569,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
