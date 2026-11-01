@@ -1,0 +1,95 @@
+@page "/far-from-home"
+@attribute [RequiresFeature(FeatureFlags.FarFromHome)]
+@inject CatalogClient Catalog
+
+<PageTitle>Far from home · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Far from home</h1>
+<p class="muted">
+    Actors born in one country playing leads in a show set in another, and where the casts of each country's shows were
+    born. Birthplaces come from TVmaze and settings from Wikidata. Being born somewhere isn't the same as being from
+    there, so this only says where.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (data is { } d)
+{
+    <section aria-labelledby="leads-title">
+        <h2 id="leads-title">Leading from elsewhere</h2>
+        <p class="muted small">Popular shows with one of their first three billed born outside the country the show is set in.</p>
+        @if (d.Leads.Count == 0)
+        {
+            <p class="muted">None yet: settings are looked up from Wikidata a batch at a time.</p>
+        }
+        <ol class="length-list">
+            @foreach (var s in d.Leads)
+            {
+                <li @key="s.ShowId">
+                    <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@s.ShowId">@s.Title</a>
+                        <span class="muted small">@($" · set in {CastOriginsSection.Place(s.SetIn)}")</span>
+                        <div class="small">
+                            @for (var i = 0; i < s.Leads.Count; i++)
+                            {
+                                var p = s.Leads[i];
+                                @(i == 0 ? "" : "; ")<a href="people/@p.PersonId">@p.Name</a>@($", born in {CastOriginsSection.Place(p.BornIn)}")
+                            }
+                        </div>
+                    </div>
+                </li>
+            }
+        </ol>
+    </section>
+
+    <section aria-labelledby="countries-title">
+        <h2 id="countries-title">Where the casts were born</h2>
+        <p class="muted small">For each country with ten or more shows set there: their main casts' birthplaces, each actor counted once.</p>
+        @foreach (var c in d.Countries)
+        {
+            var share = c.Cast == 0 ? 0 : 100.0 * c.Home / c.Cast;
+            <div class="origins-country" @key="c.Country">
+                <h3>@($"Set in {CastOriginsSection.Place(c.Country)}")</h3>
+                <p class="small">@($"{c.Shows} shows, {c.Cast} cast members: {share:0}% born there.")</p>
+                <ul class="gap-bars">
+                    @foreach (var b in c.BornIn)
+                    {
+                        <li @key="b.Country">
+                            <span class="small">@b.Country</span>
+                            <span class="gap-track"><span class="gap-fill" style="width: @Width(b.Count, c.BornIn[0].Count)%"></span></span>
+                            <span class="small muted">@($"{b.Count} ({100.0 * b.Count / c.Cast:0.#}%)")</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </section>
+}
+else if (error is null)
+{
+    <p class="muted">Loading…</p>
+}
+
+@code {
+    private FarFromHome? data;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            data = await Catalog.GetFarFromHomeAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string Width(int count, int max) => (max == 0 ? 0 : 100.0 * count / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+}

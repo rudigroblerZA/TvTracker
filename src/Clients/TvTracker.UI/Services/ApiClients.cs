@@ -150,6 +150,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<Milestones?> GetMilestonesAsync(bool all = false, CancellationToken ct = default) =>
         GetAsync<Milestones>(ApiClients.Catalog, $"api/v1/milestones{(all ? "?all=true" : "")}", ct, cacheForOffline: true);
 
+    /// <summary>A show's main cast born outside the country it's set in; null when it isn't set in one country, or with the flag off.</summary>
+    public Task<ShowCastOrigins?> GetCastOriginsAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowCastOrigins>(ApiClients.Catalog, $"api/v1/shows/{showId}/cast-origins", ct, cacheForOffline: true);
+
+    /// <summary>Far from home's lists; null with the flag off.</summary>
+    public Task<FarFromHome?> GetFarFromHomeAsync(CancellationToken ct = default) =>
+        GetAsync<FarFromHome>(ApiClients.Catalog, "api/v1/far-from-home", ct, cacheForOffline: true);
+
     /// <summary>Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.</summary>
     public Task<ShowNamesakes?> GetNamesakesAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowNamesakes>(ApiClients.Catalog, $"api/v1/shows/{showId}/namesakes", ct, cacheForOffline: true);

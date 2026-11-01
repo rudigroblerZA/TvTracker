@@ -342,6 +342,19 @@ episode titles, since a milestone episode is often an event. It works signed out
   shows are left out.
 - **API:** `GET /api/v1/milestones?all=true|false` (Catalog.API, public).
 
+**Far from home** (`/far-from-home`, from Discover, and a section on show pages; `far-from-home` flag): actors born
+outside the country their show is set in. Ted Lasso is set in England with Jason Sudeikis and Brendan Hunt born in the
+US; The Boys is set in the US with Karl Urban and Antony Starr born in New Zealand; Fargo has Martin Freeman, and
+Shōgun's leads were born in the US and New Zealand. The page lists popular shows whose leads (the first three billed)
+were born elsewhere, and, for each country with ten or more shows set there, where their main casts were born: of 1,537
+cast members in US-set shows, 133 were born in the UK and 79 in Canada. It works signed out.
+- **Born, not from:** TVmaze gives a birthplace, not a nationality or an upbringing (Glenn Howerton was born in Japan
+  and raised in Florida), so the page says "born in".
+- **One setting country:** the setting is Wikidata's, as the TV atlas has it; a show set in several countries, or with
+  no setting, has no section. Scripted shows only, since animated casts are voices.
+- **API:** `GET /api/v1/shows/{id}/cast-origins` (204 when there's nothing to say) and `GET /api/v1/far-from-home`
+  (Catalog.API, public).
+
 **Same name** (`/namesakes`, from Discover, and a section on show pages; `namesakes` flag): other shows with the same
 title, and what they share. Doctor Who (2005) lists the 1963 series and the 2023 one, which brings back David Tennant
 and Catherine Tate; Ghosts (2021) lists the British Ghosts it came from; Matlock (2024) the 1986 Matlock. The page has
@@ -584,7 +597,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
