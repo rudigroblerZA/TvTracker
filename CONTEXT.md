@@ -987,6 +987,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   and dates. Daily shows (a season over 60 episodes) are left out altogether, as Episode lengths does, and a show page
   looks its formula up by id in the cached set.
 
+## Episode grid
+
+- **The fans' chart, from the catalog** (`EpisodeGridApi` on Catalog.API): one query per show of its regular episodes and
+  their provider ratings, cached 30 minutes per show (ratings move slowly; a refresh's new ones show within that).
+- **Marked for reading:** a grid of hundreds of squares says little alone, so it names the best and weakest episodes (the
+  earliest of a tie) and the best five in a row by average. A run follows air order across seasons, finale into
+  premiere, and an unrated episode breaks it.
+- **Left out:** specials (no place in a row), shows with fewer than six rated episodes, and daily shows (a season over
+  60), whose rows would be barcodes. A season's average needs three rated episodes.
+- **Tones on the app's scale:** 8.5+ and 8+ in the `--good` tones, as `Format.RatingTone` reads them, then 7+ neutral,
+  6+ `--warn`, under 6 `--bad`, each mixed with the surface so the number stays readable in both themes.
+- **Titles, as everywhere:** the cells carry titles, but the page puts them in tooltips and the summary only for watched
+  episodes (Tracking's `/progress`) or with the spoiler shield off; codes and ratings otherwise.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

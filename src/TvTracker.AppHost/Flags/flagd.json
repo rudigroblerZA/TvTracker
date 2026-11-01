@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "episode-grid": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Episode grid: every episode's rating by season on the show page, with the best and weakest episodes and the best run." }
+    },
     "title-formulas": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

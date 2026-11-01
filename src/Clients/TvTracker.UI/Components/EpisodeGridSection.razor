@@ -1,0 +1,134 @@
+@implements IDisposable
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+@inject SpoilerShield Shield
+
+@* The episode grid: one row per season, one square per episode, coloured by the provider's rating, with the best and
+   weakest episodes and the best run named underneath. Titles appear (in the cells' tooltips and the summary) only for
+   watched episodes or with the spoiler shield off, as everywhere; signed in, watched squares are outlined. *@
+@if (grid is { } g)
+{
+    var widest = g.Seasons.Max(s => s.Episodes.Count);
+    <section aria-labelledby="grid-title">
+        <h2 id="grid-title">Episode grid</h2>
+        <p class="small">
+            @if (g.Best is { } best)
+            {
+                <span>@($"Best: {Name(best)} ({Format.Rating(best.Rating!.Value)})")</span>
+            }
+            @if (g.Weakest is { } weakest)
+            {
+                <span>@($" · Weakest: {Name(weakest)} ({Format.Rating(weakest.Rating!.Value)})")</span>
+            }
+            @if (g.BestRun is { } run)
+            {
+                <span>@($" · Best run: {Code(run.From)} to {Code(run.To)}, averaging {run.Average:0.0}")</span>
+            }
+        </p>
+        <div class="episode-grid-scroll">
+            <table class="episode-grid" aria-label="Episode ratings by season">
+                <thead>
+                    <tr>
+                        <th scope="col"><span class="sr-only">Season</span></th>
+                        @for (var n = 1; n <= widest; n++)
+                        {
+                            <th scope="col" class="muted">@n</th>
+                        }
+                        <th scope="col" class="muted">Avg</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var season in g.Seasons)
+                    {
+                        <tr @key="season.Number">
+                            <th scope="row" class="muted">@($"S{season.Number}")</th>
+                            @for (var i = 0; i < widest; i++)
+                            {
+                                @if (i < season.Episodes.Count)
+                                {
+                                    var cell = season.Episodes[i];
+                                    <td @key="cell.EpisodeId">
+                                        <a href="episodes/@cell.EpisodeId" class="@Classes(g, cell)" title="@Tooltip(cell)">@(cell.Rating is { } r ? Format.Rating(r) : "")</a>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td></td>
+                                }
+                            }
+                            <td class="grid-average">@(season.Average is { } a ? Format.Rating(a) : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="muted small grid-legend">
+            <span class="grid-key grid-great"></span> 8.5+ <span class="grid-key grid-good"></span> 8+ <span class="grid-key grid-ok"></span> 7+
+            <span class="grid-key grid-low"></span> 6+ <span class="grid-key grid-poor"></span> under 6 · TVmaze's ratings@(watched.Count > 0 ? "; outlined: watched" : "")
+        </p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private EpisodeGrid? grid;
+    private HashSet<Guid> watched = [];
+    private bool shieldOn;
+
+    protected override void OnInitialized() => Shield.Changed += OnShieldChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            grid = await Catalog.GetEpisodeGridAsync(ShowId);
+            watched = [];
+            if (grid is not null && Session.IsSignedIn)
+            {
+                watched = (await Tracking.GetProgressAsync(ShowId))?.WatchedEpisodeIds.ToHashSet() ?? [];
+            }
+            shieldOn = await Shield.IsOnAsync();
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            grid = null;
+        }
+    }
+
+    private async void OnShieldChanged()
+    {
+        shieldOn = await Shield.IsOnAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Shield.Changed -= OnShieldChanged;
+
+    private bool CanName(GridCell cell) => !shieldOn || watched.Contains(cell.EpisodeId);
+
+    private static string Code(GridCell cell) => Format.EpisodeCode(cell.Season, cell.Number);
+
+    private string Name(GridCell cell) => CanName(cell) ? $"{Code(cell)} “{cell.Title}”" : Code(cell);
+
+    private string Tooltip(GridCell cell) =>
+        $"{Name(cell)}{(cell.Rating is { } r ? $" · {Format.Rating(r)}" : cell.Aired ? " · not rated" : " · not aired yet")}";
+
+    private string Classes(EpisodeGrid g, GridCell cell)
+    {
+        var tone = cell.Rating switch
+        {
+            null => cell.Aired ? "grid-none" : "grid-future",
+            >= 8.5 => "grid-great",
+            >= 8 => "grid-good",
+            >= 7 => "grid-ok",
+            >= 6 => "grid-low",
+            _ => "grid-poor"
+        };
+        var mark = cell.EpisodeId == g.Best?.EpisodeId ? " grid-best"
+            : cell.EpisodeId == g.Weakest?.EpisodeId ? " grid-weakest"
+            : "";
+        return $"grid-cell {tone}{mark}{(watched.Contains(cell.EpisodeId) ? " grid-seen" : "")}";
+    }
+}

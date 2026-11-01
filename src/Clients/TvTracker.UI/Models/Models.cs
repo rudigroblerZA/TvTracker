@@ -842,6 +842,16 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 /// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
+/// <summary>Every regular episode's rating by season, with the best and weakest episodes and the best run.</summary>
+public record EpisodeGrid(Guid ShowId, IReadOnlyList<GridSeason> Seasons, GridCell? Best, GridCell? Weakest, GridRun? BestRun);
+
+/// <param name="Average">The mean of its rated episodes, from three up.</param>
+public record GridSeason(int Number, double? Average, IReadOnlyList<GridCell> Episodes);
+
+public record GridCell(Guid EpisodeId, int Season, int Number, string Title, double? Rating, bool Aired);
+
+public record GridRun(GridCell From, GridCell To, double Average);
+
 /// <summary>A show's episode-title formula: the words most of its titles open with.</summary>
 /// <param name="Kind">"phrase", "numbered" or "article".</param>
 /// <param name="Exceptions">Titles that break it, often the notable episodes.</param>
