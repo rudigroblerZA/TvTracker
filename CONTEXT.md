@@ -948,6 +948,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   which the catalog doesn't fetch.
 - **Lists:** scripted shows of popularity 90+, as Between seasons.
 
+## Characters' names
+
+- **Provider credits plus catalog casts** (`CharacterNamesApi` on Catalog.API): one row per actor and show, from
+  `person_cast_credits` (main casts across TVmaze, as Six degrees uses) and the catalog's casts for actors whose credits
+  aren't fetched yet. About 21,000 of 30,000 credits read as a name.
+- **Parsing:** the first alias, without quoted nicknames and parentheses; leading titles are dropped (a list wider than
+  Universes': "DCI", "Assistant District Attorney", "Lady"), as are Jr. and numerals at the end. Two or more
+  capitalised words must remain: a lone "Bartender" or "Eleven" can't be told from a name, and "Security Guard" is
+  caught by a short list of role words. Self roles go by Universes' `IsSelfRole`.
+- **Gender from the actor:** TVmaze has no character gender, so the women's and men's lists use the actor's. Together,
+  the top 30 were men's names but for Sarah, Mary and Kate, which is why the page splits them.
+- **Decades** by the show's premiere. A name's place in a decade is given only for decades with 300+ characters (the
+  1980s on); the 1950s have a few dozen, where a place means nothing.
+- **In memory:** the index is built once (~3.4 s from cold) and cached 6 hours; a lookup filters it (~20 ms). A name is
+  a path segment of 2-30 letters, apostrophes or hyphens, and nothing about the searcher is stored or logged.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

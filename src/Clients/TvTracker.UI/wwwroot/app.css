@@ -898,6 +898,10 @@ h1:focus, h2:focus { outline: none; }
 .age-bar { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 4px; z-index: 0; }
 .age-text, .age-value { position: relative; z-index: 1; min-width: 0; }
 .age-value { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.name-list { list-style: none; padding: 0; margin: 8px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.name-list li { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.name-columns { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0 16px; }
+.name-columns ol { padding-left: 1.4em; margin: 4px 0 12px; }
 .atlas-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
 .atlas-list { padding-left: 20px; margin: 4px 0; }
 .atlas-list li { margin: 3px 0; }
