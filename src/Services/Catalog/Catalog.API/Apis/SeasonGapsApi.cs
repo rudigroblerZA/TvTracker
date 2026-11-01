@@ -1,3 +1,4 @@
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -49,7 +50,6 @@ public static class SeasonGapsApi
     public const int RevivalDays = 5 * 365;
     public const int WaitingDays = 365;
     public const double ListMinPopularity = 90;
-    private const int DailySeason = 60;
     private const int ListSize = 25;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
@@ -106,7 +106,7 @@ public static class SeasonGapsApi
                 GROUP BY "ShowId", "SeasonNumber"
                 """).ToListAsync(token);
             var shows = rows.GroupBy(r => r.ShowId)
-                .Where(g => g.All(r => r.Episodes <= DailySeason))
+                .Where(g => g.All(r => r.Episodes <= ShowRules.DailySeason))
                 .Select(g => Build(g.Key, g.OrderBy(r => r.SeasonNumber).ToList(), now))
                 .ToList();
             var ids = shows.Select(s => s.ShowId).ToList();

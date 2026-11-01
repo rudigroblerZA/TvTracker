@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,7 @@ public record HolidayShowsRequest(IReadOnlyList<Guid> ShowIds);
 /// <item><b>Summaries need the season:</b> a title match counts whenever it aired, but a summary match only when it
 /// aired near the holiday. Out of season, summaries mostly mention it in passing (The Middle's Valentine's episode
 /// recalls a Halloween hayride).</item>
-/// <item><b>Left out:</b> daily shows (a season of more than <see cref="DailySeasonEpisodes"/> episodes: morning shows,
+/// <item><b>Left out:</b> daily shows (a season of more than <see cref="ShowRules.DailySeason"/> episodes: morning shows,
 /// soaps), whose dated episodes mention every holiday; and shows named after the holiday, every episode of which
 /// matches, which are listed as <see cref="HolidayDto.SeasonShows"/> instead.</item>
 /// <item><b>Cached:</b> the whole catalog's matches per holiday for 6 hours, so a request filters in memory.</item>
@@ -42,7 +43,6 @@ public record HolidayShowsRequest(IReadOnlyList<Guid> ShowIds);
 /// </summary>
 public static class HolidayApi
 {
-    private const int DailySeasonEpisodes = 60;
     private const int MaxShows = 300;
     private const int MaxCatalogShows = 30;
     private const int PerShowInCatalog = 2;
@@ -156,7 +156,7 @@ public static class HolidayApi
         var daily = (await db.Episodes.AsNoTracking()
                 .Where(e => showIds.Contains(e.ShowId))
                 .GroupBy(e => new { e.ShowId, e.SeasonNumber })
-                .Where(g => g.Count() > DailySeasonEpisodes)
+                .Where(g => g.Count() > ShowRules.DailySeason)
                 .Select(g => g.Key.ShowId)
                 .ToListAsync(ct))
             .ToHashSet();

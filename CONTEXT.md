@@ -1016,15 +1016,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Milestones
 
-- **One window function** (`MilestonesApi` on Catalog.API): every show's regular episodes numbered in season and episode
-  order (`row_number()`), dated or not, so an undated episode still takes its place; the 100th, 150th, 200th, 250th, 300th,
-  400th, 500th and every hundred to 1,000 that air between 30 days ago and 120 days ahead. Cached an hour.
+- **One pass of window functions** (`MilestonesApi` on Catalog.API): every show's regular episodes numbered in season
+  and episode order (`row_number()`), dated or not, so an undated episode still takes its place, with each show's largest
+  season from the same pass; the 100th, 150th, 200th, 250th, 300th, 400th, 500th, 600th, 700th, 750th, 800th, 900th and
+  1,000th that air between 30 days ago and 120 days ahead. Cached an hour.
+- **One row per number:** TVmaze lists a same-night crossover's number twice (the data-quality notes), which made the
+  numbering arbitrary and every later milestone one too high; the earliest aired row of each number is kept.
 - **The catalog's count, said so:** specials are left out and networks count their own way (double episodes, specials),
   so a celebrated "100th" can land one either side; the page says it.
-- **Story shows by default:** daily shows (a season over 60) are left out altogether, and talk, news and reality shows
-  only come with `all=true`; otherwise donghua with 200-episode seasons and daily magazines crowd out Chicago Fire's 300th.
+- **Story shows by default:** daily shows (a season over 60) are left out altogether, and every other kind (talk, news,
+  reality, sports, game shows, …) and shows with no kind only come with `all=true`; otherwise donghua with 200-episode seasons and daily magazines crowd out Chicago Fire's 300th.
 - **No titles:** a milestone episode is often an event, and its title can give it away.
-- **Followed shows** are marked by the page from Tracking's follows; the catalog never sees them.
+- **Followed shows** are marked by the page from Tracking's follows, loaded beside the lists; the catalog never sees them.
+- **Shared rules** (`ShowRules` in Catalog.API): the daily-show threshold and the story kinds (scripted, animation) are
+  one constant each, used by Milestones, Episode lengths, Between seasons, Title formulas, the episode grid, Holiday
+  episodes and Guess the show, so the features agree on which shows they mean.
 
 ## Six degrees
 
