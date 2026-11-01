@@ -1,0 +1,59 @@
+@* Far from home: the main cast born outside the one country the show is set in. Hidden when there's no single setting
+   country, no birthplaces, or everyone was born there. *@
+@inject CatalogClient Catalog
+
+@if (origins is { Elsewhere.Count: > 0 } o)
+{
+    <section aria-labelledby="origins-title">
+        <h2 id="origins-title">Far from home</h2>
+        <p class="muted small">@Summary(o)</p>
+        <ul class="name-list">
+            @foreach (var p in o.Elsewhere)
+            {
+                <li @key="p.PersonId">
+                    <Poster Title="@p.Name" Url="@p.PhotoUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="people/@p.PersonId">@p.Name</a>
+                        @if (p.Lead)
+                        {
+                            @(" ")<span class="tag">Lead</span>
+                        }
+                        <div class="small">@($"born in {Place(p.BornIn)}")</div>
+                        @if (p.Character is { } c)
+                        {
+                            <div class="small muted">@($"as {c}")</div>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+        <p class="muted small">Birthplaces from TVmaze, the setting from Wikidata. Born somewhere isn't the same as being from there.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowCastOrigins? origins;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            origins = await Catalog.GetCastOriginsAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            origins = null;
+        }
+    }
+
+    private static string Summary(ShowCastOrigins o) =>
+        $"Set in {Place(o.SetIn)}; {o.Elsewhere.Count} of the {o.Known} main cast members with a known birthplace were born elsewhere.";
+
+    /// <summary>"the United States", "the United Kingdom", but "Canada".</summary>
+    internal static string Place(string country) =>
+        country.StartsWith("United ", StringComparison.Ordinal) || country.EndsWith(" Republic", StringComparison.Ordinal)
+            || country is "Netherlands" or "Philippines" or "Bahamas" or "Isle of Man" ? $"the {country}" : country;
+}

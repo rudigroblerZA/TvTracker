@@ -44,6 +44,7 @@ public static class CatalogApi
         api.MapBirthdaysApi();
         api.MapMilestonesApi();
         api.MapNamesakesApi();
+        api.MapFarFromHomeApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

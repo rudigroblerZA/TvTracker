@@ -157,6 +157,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
+    "far-from-home": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Far from home: main cast born outside the country a show is set in, and where each country's casts were born." }
+    },
     "namesakes": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

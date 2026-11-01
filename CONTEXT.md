@@ -1032,6 +1032,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   one constant each, used by Milestones, Episode lengths, Between seasons, Title formulas, the episode grid, Holiday
   episodes and Guess the show, so the features agree on which shows they mean.
 
+## Far from home
+
+- **Two sources compared** (`FarFromHomeApi` on Catalog.API): the TV atlas's settings (Wikidata's narrative location,
+  `show_settings`) against TVmaze's birthplaces (`people.Country`, on 86% of catalog actors). Nothing is stored; one
+  index of every show set in a single country is built and cached 6 hours (~0.7 s cold).
+- **Network country was the wrong yardstick:** compared with the network's country (Same name's lookups), HBO made Game
+  of Thrones and Outlander "American" shows with British casts. Where a show is set is what an accent has to match.
+- **Born, not from:** a birthplace isn't a nationality (Glenn Howerton, born in Japan, raised in Florida), so the API and
+  page only ever say "born in", and the page says so.
+- **Country names:** Wikidata says "South Korea" and "Russia", TVmaze "Korea, Republic of" and "Russian Federation", so
+  TVmaze's names are mapped to Wikidata's. Territories (Puerto Rico, the US Virgin Islands, Guam; the Isle of Man,
+  Jersey, Guernsey) count as their country when deciding "elsewhere", but the birthplace is shown as TVmaze gives it:
+  mapping it for display had Joe Locke "born in United Kingdom".
+- **Left out:** shows set in several countries or none, animated shows (voices) and self roles. Leads are the first
+  three billed; each country's breakdown counts each actor once, so One Chicago's shared cast isn't counted three times.
+
 ## Same name
 
 - **TVmaze's title search, not the catalog alone** (`NamesakesService` in the sync worker, `show_namesakes`): within the

@@ -1056,3 +1056,18 @@ public record NamesakeLists(IReadOnlyList<NamesakePair> Back, IReadOnlyList<Name
 public record NamesakePair(NamesakeShow Show, Namesake Other);
 
 public record NamesakeShow(Guid Id, string Title, string? PosterUrl, int? Year, string? Country);
+
+/// <summary>Far from home: a show's main cast born outside the one country it's set in.</summary>
+public record ShowCastOrigins(string SetIn, int Known, IReadOnlyList<BornElsewhere> Elsewhere);
+
+/// <param name="Lead">Among the first three billed.</param>
+public record BornElsewhere(Guid PersonId, string Name, string? PhotoUrl, string? Character, string BornIn, bool Lead);
+
+public record FarFromHome(IReadOnlyList<FarFromHomeShow> Leads, IReadOnlyList<SettingCountry> Countries);
+
+public record FarFromHomeShow(Guid ShowId, string Title, string? PosterUrl, string SetIn, IReadOnlyList<BornElsewhere> Leads);
+
+/// <param name="Home">Cast members born in the country the shows are set in.</param>
+public record SettingCountry(string Country, int Shows, int Cast, int Home, IReadOnlyList<BirthplaceCount> BornIn);
+
+public record BirthplaceCount(string Country, int Count);
