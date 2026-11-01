@@ -964,6 +964,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **In memory:** the index is built once (~3.4 s from cold) and cached 6 hours; a lookup filters it (~20 ms). A name is
   a path segment of 2-30 letters, apostrophes or hyphens, and nothing about the searcher is stored or logged.
 
+## Title formulas
+
+- **Found, not listed** (`TitleFormulasApi` on Catalog.API), like Holiday episodes: every show's regular episode titles
+  in one query, cached 6 hours. For one, two and three opening words (lower case, trailing punctuation and a possessive
+  dropped, so "Mr. Monk's 100th Case" follows "Mr. Monk"), the most common opening among titles longer than it.
+- **Thresholds:** a phrase of two or three words from 40% of titles, one word from 60%, and an article ("The", "Die",
+  "Le", …) from 90%, since a third of all titles open with one. Of those, the best is the share weighted 25% more per
+  extra word, and half for an article: Friends' "The One" (99%) beats "The" (100%) and "The One Where" (about half).
+- **Numbered:** an opening of "Chapter", "Part", "Day", "Book" and their equivalents in a few languages, followed by a
+  number (digits, Roman numerals, number words, hyphenated "Twenty-One") in 80% of those titles. Sabrina's "Chapter
+  Twenty-One" read as a phrase until hyphenated numbers counted.
+- **Placeholders out:** "Episode 5", "Chapter 3" alone, "Odcinek 1", "TBA" and "Untitled" are TVmaze's stand-ins for a
+  missing title, not a formula; a show needs six real titles and five that follow.
+- **Exceptions behind the shield:** the titles that break a formula are often the notable ones (Friends' finale, "The
+  Last One"), so the show page wraps them in `<Spoiler>`; the first three titles that follow it are shown as they are.
+- **Lists:** scripted and animated shows only, most popular first; talk and reality shows' titles are guests' names
+  and dates.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

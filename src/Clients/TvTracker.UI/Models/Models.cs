@@ -843,6 +843,18 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
 /// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>A show's episode-title formula: the words most of its titles open with.</summary>
+/// <param name="Kind">"phrase", "numbered" or "article".</param>
+/// <param name="Exceptions">Titles that break it, often the notable episodes; shown behind the spoiler shield.</param>
+public record TitleFormula(Guid ShowId, string Kind, string Prefix, int Matching, int Titled, IReadOnlyList<FormulaTitle> Examples,
+    IReadOnlyList<FormulaTitle> Exceptions);
+
+public record FormulaTitle(int Season, int Number, string Title);
+
+public record TitleFormulaLists(IReadOnlyList<FormulaShow> Phrases, IReadOnlyList<FormulaShow> Numbered, IReadOnlyList<FormulaShow> Articles);
+
+public record FormulaShow(Guid ShowId, string Title, string? PosterUrl, string Prefix, int Matching, int Titled, string? Example);
+
 /// <summary>TV characters who share a first name, and how common it is.</summary>
 /// <param name="Rank">Its place among all first names; null when no character has it.</param>
 /// <param name="Surnames">Characters with it as their last name.</param>
