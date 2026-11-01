@@ -150,6 +150,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<Milestones?> GetMilestonesAsync(bool all = false, CancellationToken ct = default) =>
         GetAsync<Milestones>(ApiClients.Catalog, $"api/v1/milestones{(all ? "?all=true" : "")}", ct, cacheForOffline: true);
 
+    /// <summary>Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.</summary>
+    public Task<ShowNamesakes?> GetNamesakesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowNamesakes>(ApiClients.Catalog, $"api/v1/shows/{showId}/namesakes", ct, cacheForOffline: true);
+
+    /// <summary>Same name's lists across the catalog; null with the flag off.</summary>
+    public Task<NamesakeLists?> GetNamesakeListsAsync(CancellationToken ct = default) =>
+        GetAsync<NamesakeLists>(ApiClients.Catalog, "api/v1/namesakes", ct, cacheForOffline: true);
+
     /// <summary>The catalog's actors born on <paramref name="date"/>'s day of the year; null while the flag is off.</summary>
     public Task<Birthdays?> GetBirthdaysAsync(DateOnly date, CancellationToken ct = default) =>
         GetAsync<Birthdays>(ApiClients.Catalog, $"api/v1/birthdays?date={date:yyyy-MM-dd}", ct, cacheForOffline: true);

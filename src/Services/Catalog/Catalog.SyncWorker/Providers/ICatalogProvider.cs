@@ -27,6 +27,12 @@ public interface ICatalogProvider
     /// <summary>External ids of shows matching a title search, best match first.</summary>
     Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The provider's shows for a title search, best match first, as summaries (no episodes or cast), for finding a
+    /// show's namesakes.
+    /// </summary>
+    Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default);
+
     /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
 
@@ -80,6 +86,12 @@ public record ProviderCareer(int Shows, int Created, int ExecutiveProduced, IRea
 public record ProviderActingRole(
     string ShowExternalId, string Title, string? PosterUrl, ShowStatus Status, DateOnly? Premiered, double Popularity, double? Rating,
     string? Character, bool Voice);
+
+/// <param name="Kind">The provider's type, lower case ("scripted", "animation", "reality", …), as a show's kind keyword.</param>
+/// <param name="Country">The network's or streaming service's country code ("GB", "US").</param>
+public record ProviderShowSummary(
+    string ExternalId, string Title, string? PosterUrl, DateOnly? Premiered, DateOnly? Ended, string? Network, string? Country, string? Language,
+    string? Kind, double Popularity, double? Rating);
 
 public record ProviderSeason(int Number, string Name, string? Overview, DateTimeOffset? PremieresAtUtc);
 

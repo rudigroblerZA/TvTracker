@@ -53,6 +53,7 @@ public static class FeatureFlags
     public const string EpisodeGrid = "episode-grid";
     public const string Birthdays = "birthdays";
     public const string Milestones = "milestones";
+    public const string Namesakes = "namesakes";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";

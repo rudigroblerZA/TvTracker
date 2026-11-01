@@ -1039,3 +1039,20 @@ public record SpoilerRisk(Guid ShowId, string Title, string? PosterUrl, string L
 /// <param name="Kind">"finale", "premiere" or "episode".</param>
 public record SpoilerEpisode(int SeasonNumber, int EpisodeNumber, DateTimeOffset AiredAtUtc, string Kind);
 
+
+/// <summary>Other shows with a show's title (Same name); <paramref name="Checked"/> is false until the show has been looked up.</summary>
+public record ShowNamesakes(string? Country, IReadOnlyList<Namesake> Namesakes, bool Checked);
+
+/// <param name="ShowId">Its catalog id when it's in the catalog too.</param>
+/// <param name="SharedCast">The show's actors credited in this one too: a comeback rather than a namesake.</param>
+public record Namesake(string ExternalId, Guid? ShowId, string Title, string? PosterUrl, int? Year, int? EndYear, string? Network, string? Country,
+    string? Language, string? Kind, double? Rating, IReadOnlyList<SharedActor> SharedCast);
+
+public record SharedActor(Guid PersonId, string Name, string? Character);
+
+/// <summary>Same name's lists: comebacks, the same title abroad, and the same title years apart.</summary>
+public record NamesakeLists(IReadOnlyList<NamesakePair> Back, IReadOnlyList<NamesakePair> Abroad, IReadOnlyList<NamesakePair> YearsApart);
+
+public record NamesakePair(NamesakeShow Show, Namesake Other);
+
+public record NamesakeShow(Guid Id, string Title, string? PosterUrl, int? Year, string? Country);

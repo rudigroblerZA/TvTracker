@@ -1,0 +1,43 @@
+@* One namesake: poster, title and years (linked when it's in the catalog, else a search, which imports it), its
+   network and country, and the cast it shares with the show it's listed under. *@
+
+<li>
+    <Poster Title="@Item.Title" Url="@Item.PosterUrl" Size="small" />
+    <div>
+        @if (Item.ShowId is { } id)
+        {
+            <a class="strong" href="shows/@id">@Item.Title</a>
+        }
+        else
+        {
+            <span class="strong">@Item.Title</span>
+            <span class="muted small">@(" · not in the catalog · ")</span><a class="small" href="search?q=@Uri.EscapeDataString(Item.Title)">search</a>
+        }
+        <div class="small">@Details()</div>
+        @if (Item.SharedCast.Count > 0)
+        {
+            <div class="small">
+                <span class="tag">Same cast</span>
+                @for (var i = 0; i < Item.SharedCast.Count; i++)
+                {
+                    var actor = Item.SharedCast[i];
+                    @(i == 0 ? " " : ", ")<a href="people/@actor.PersonId">@actor.Name</a>
+                }
+                <span class="muted">@($" in both")</span>
+            </div>
+        }
+    </div>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public Namesake Item { get; set; } = null!;
+
+    private string Details() => string.Join(" · ", new[]
+    {
+        Format.Years(Item.Year, Item.EndYear, Item.Year is not null && Item.EndYear is null),
+        Item.Network,
+        Item.Country is { } c ? Format.Country(c) : null,
+        Item.Kind is { } k and not "scripted" ? k : null,
+        Item.Rating is { } r ? $"rated {Format.Rating(r)}" : null
+    }.Where(s => !string.IsNullOrEmpty(s)));
+}

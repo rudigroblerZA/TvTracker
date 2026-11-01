@@ -157,6 +157,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
+    "namesakes": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Same name: remakes, revivals and namesakes of a show, found by title, with shared cast marked." }
+    },
     "birthdays": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

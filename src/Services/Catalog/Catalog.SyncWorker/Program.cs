@@ -55,6 +55,7 @@ builder.Services.AddHostedService<CastCreditsService>();
 builder.Services.AddHostedService<QuotesService>();
 // Where shows are set, from Wikidata, for the TV atlas.
 builder.Services.AddHostedService<SettingsService>();
+builder.Services.AddHostedService<Catalog.SyncWorker.Namesakes.NamesakesService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
 // The sync worker pulls a Docker Model Runner model that isn't there yet; Catalog.API just waits for it.

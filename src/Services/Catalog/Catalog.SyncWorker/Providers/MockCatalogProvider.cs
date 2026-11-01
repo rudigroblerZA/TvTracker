@@ -33,6 +33,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
             .ToList());
     }
 
+    public Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ProviderShowSummary>>([]);
+
     public Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>(BuildCatalog()
             .Where(s => s.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
