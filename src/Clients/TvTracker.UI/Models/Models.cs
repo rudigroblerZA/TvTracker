@@ -842,6 +842,16 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 /// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
+/// <summary>The catalog's actors born on one day of the year, best known first.</summary>
+public record Birthdays(DateOnly Date, IReadOnlyList<Birthday> People);
+
+/// <param name="Turns">Their age on the day asked about: what they turn, or would have turned.</param>
+/// <param name="Milestone">A round birthday (every ten years from 30) for the living.</param>
+public record Birthday(Guid PersonId, string Name, string? PhotoUrl, DateOnly Born, DateOnly? Died, int Turns, bool Milestone, BirthdayRole KnownFor,
+    int Shows);
+
+public record BirthdayRole(Guid ShowId, string Title, string? PosterUrl, string? Character);
+
 /// <summary>Every regular episode's rating by season, with the best and weakest episodes and the best run.</summary>
 public record EpisodeGrid(Guid ShowId, IReadOnlyList<GridSeason> Seasons, GridCell? Best, GridCell? Weakest, GridRun? BestRun);
 

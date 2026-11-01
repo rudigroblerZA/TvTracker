@@ -1,0 +1,192 @@
+@page "/birthdays"
+@attribute [RequiresFeature(FeatureFlags.Birthdays)]
+@using System.Globalization
+@inject CatalogClient Catalog
+@inject UserSession Session
+@inject IPlatformServices Platform
+
+<PageTitle>Birthdays · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Birthdays</h1>
+<p class="muted">Actors in the catalog born on this day, best known first, from TVmaze's birthdays.</p>
+
+<form class="search-form" @onsubmit="LoadDayAsync">
+    <label class="small" for="day">Day</label>
+    <input id="day" type="date" @bind="day" />
+    <button type="submit" class="btn">Show</button>
+    @if (day != today)
+    {
+        <button type="button" class="btn btn-quiet" @onclick="BackToTodayAsync">Today</button>
+    }
+</form>
+
+<ErrorNotice Message="@error" OnRetry="LoadDayAsync" />
+
+@if (onDay is { } d)
+{
+    <section aria-labelledby="day-title">
+        <h2 id="day-title">@(d.Date == today ? "Born today" : $"Born on {d.Date:d MMMM}")</h2>
+        @People(d)
+    </section>
+}
+
+<section aria-labelledby="twins-title">
+    <h2 id="twins-title">Your birthday twins</h2>
+    <p class="muted small">Your birthday stays on this device; only the day is sent, to find who shares it.</p>
+    <div class="chips">
+        <select @bind="month" aria-label="Month">
+            <option value="0">Month</option>
+            @for (var m = 1; m <= 12; m++)
+            {
+                <option value="@m">@CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(m)</option>
+            }
+        </select>
+        <select @bind="dayOfMonth" aria-label="Day">
+            <option value="0">Day</option>
+            @for (var n = 1; n <= 31; n++)
+            {
+                <option value="@n">@n</option>
+            }
+        </select>
+        <button type="button" class="btn" @onclick="SaveTwinsAsync" disabled="@(month == 0 || dayOfMonth == 0)">Find them</button>
+        @if (twins is not null)
+        {
+            <button type="button" class="btn btn-quiet" @onclick="ForgetAsync">Forget my birthday</button>
+        }
+    </div>
+    @if (twinsError is not null)
+    {
+        <p class="muted small">@twinsError</p>
+    }
+    @if (twins is { } t)
+    {
+        @People(t)
+    }
+</section>
+
+@code {
+    private const string BirthdayKey = "birthdays:mine";
+
+    private DateOnly today;
+    private DateOnly day;
+    private Birthdays? onDay;
+    private Birthdays? twins;
+    private int month;
+    private int dayOfMonth;
+    private string? error;
+    private string? twinsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = LocalToday();
+        day = today;
+        await LoadDayAsync();
+        if (await Platform.GetPreferenceAsync(BirthdayKey) is { } saved
+            && DateOnly.TryParseExact($"2000-{saved}", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var mine))
+        {
+            (month, dayOfMonth) = (mine.Month, mine.Day);
+            await LoadTwinsAsync();
+        }
+    }
+
+    /// <summary>Today in the profile's time zone when signed in, else the server's UTC date.</summary>
+    private DateOnly LocalToday()
+    {
+        var now = DateTimeOffset.UtcNow;
+        try
+        {
+            if (Session.Profile?.TimeZone is { Length: > 0 } tz)
+            {
+                now = TimeZoneInfo.ConvertTime(now, TimeZoneInfo.FindSystemTimeZoneById(tz));
+            }
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            // An unknown zone: UTC will do.
+        }
+        return DateOnly.FromDateTime(now.DateTime);
+    }
+
+    private async Task LoadDayAsync()
+    {
+        error = null;
+        try
+        {
+            onDay = await Catalog.GetBirthdaysAsync(day);
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task BackToTodayAsync()
+    {
+        day = today;
+        return LoadDayAsync();
+    }
+
+    private async Task SaveTwinsAsync()
+    {
+        twinsError = null;
+        // 2000 is a leap year, so 29 February is a birthday like any other.
+        if (month == 0 || dayOfMonth == 0 || dayOfMonth > DateTime.DaysInMonth(2000, month))
+        {
+            twinsError = "That day doesn't exist in that month.";
+            return;
+        }
+        await Platform.SetPreferenceAsync(BirthdayKey, $"{month:00}-{dayOfMonth:00}");
+        await LoadTwinsAsync();
+    }
+
+    private async Task LoadTwinsAsync()
+    {
+        try
+        {
+            // This year's birthday, so the ages are what they turn this year; 29 February falls back a day in other years.
+            var year = today.Year;
+            var d = month == 2 && dayOfMonth == 29 && !DateTime.IsLeapYear(year) ? 28 : dayOfMonth;
+            twins = await Catalog.GetBirthdaysAsync(new DateOnly(year, month, d));
+        }
+        catch (HttpRequestException ex)
+        {
+            twinsError = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task ForgetAsync()
+    {
+        await Platform.SetPreferenceAsync(BirthdayKey, null);
+        (twins, month, dayOfMonth) = (null, 0, 0);
+    }
+
+    /// <summary>"turns 40" today or ahead, "turned 54" for a day already past this year.</summary>
+    private string Age(Birthday p, DateOnly on) => p.Died is { } died
+        ? $"born {p.Born.Year}, died {died.Year}; would have turned {p.Turns}"
+        : $"{(on < today ? "turned" : "turns")} {p.Turns}{(p.Milestone ? ", a round one" : "")} · born {p.Born.Year}";
+
+    private RenderFragment People(Birthdays b) => __builder =>
+    {
+        if (b.People.Count == 0)
+        {
+            <p class="muted">Nobody in the catalog was born on that day.</p>
+            return;
+        }
+        <ul class="name-list">
+            @foreach (var p in b.People)
+            {
+                <li @key="p.PersonId">
+                    <Poster Title="@p.Name" Url="@p.PhotoUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="people/@p.PersonId">@p.Name</a>
+                        <div class="small">@Age(p, b.Date)</div>
+                        <div class="small muted">
+                            @(p.KnownFor.Character is { } c ? $"{c} in " : "")<a href="shows/@p.KnownFor.ShowId">@p.KnownFor.Title</a>@(p.Shows > 1 ? $" and {p.Shows - 1} more" : "")
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    };
+}

@@ -1001,6 +1001,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Titles, as everywhere:** the cells carry titles, but the page puts them in tooltips and the summary only for watched
   episodes (Tracking's `/progress`) or with the spoiler shield off; codes and ratings otherwise.
 
+## Birthdays
+
+- **From TVmaze's birthdays** (`BirthdaysApi` on Catalog.API), on about 60% of the catalog's people: everyone with a
+  birthday and a catalog role is indexed once (cached 6 hours) with their best-known role, and a day is a filter over it.
+- **The caller's day:** the client sends its local date (the profile's time zone when signed in), since today in Sydney
+  is yesterday in Los Angeles. 29 February birthdays are listed on 28 February in other years.
+- **Fame:** Σ over catalog roles of the show's popularity × 1 / (1 + billing order / 3), the reunion radar's billing
+  weight. By popularity alone, supporting players in 100-popularity shows outranked You's lead, since a fifth of the
+  catalog sits at 99 or 100. Self roles don't count.
+- **Your birthday stays on the device** (`IPlatformServices` preference `birthdays:mine`, month and day only), as Your TV
+  life keeps the birth year: a profile column for it would be personal data the app has no other use for. Only the day
+  goes to the catalog, as a date like any other.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every
