@@ -146,6 +146,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<SeasonGaps?> GetSeasonGapsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SeasonGaps>(ApiClients.Catalog, $"api/v1/shows/{showId}/season-gaps", ct, cacheForOffline: true);
 
+    /// <summary>A show's episode ratings by season; null when there's too little to chart or the flag is off.</summary>
+    public Task<EpisodeGrid?> GetEpisodeGridAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<EpisodeGrid>(ApiClients.Catalog, $"api/v1/shows/{showId}/episode-grid", ct, cacheForOffline: true);
+
     /// <summary>A show's episode-title formula; null when it has none or the flag is off.</summary>
     public Task<TitleFormula?> GetTitleFormulaAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<TitleFormula>(ApiClients.Catalog, $"api/v1/shows/{showId}/title-formula", ct, cacheForOffline: true);

@@ -40,6 +40,7 @@ public static class CatalogApi
         api.MapCastAgesApi();
         api.MapCharacterNamesApi();
         api.MapTitleFormulasApi();
+        api.MapEpisodeGridApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();
