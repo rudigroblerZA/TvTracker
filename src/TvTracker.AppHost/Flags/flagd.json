@@ -151,6 +151,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
+    "cast-ages": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Cast ages: each main cast member's age at a show's latest episode, who grew up on screen, and the youngest and oldest casts." }
+    },
     "season-gaps": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

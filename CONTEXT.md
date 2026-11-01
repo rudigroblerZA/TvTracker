@@ -933,6 +933,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Lists:** scripted shows of popularity 90+, so they name shows people know. Computed together and cached 6 hours;
   daily shows out, as Episode lengths does.
 
+## Cast ages
+
+- **From TVmaze's birthdays** (`CastAgesApi` on Catalog.API), on about 80% of main cast credits: each member's age at the
+  show's latest aired regular episode (the finale, once ended), or at their death when that came first. One aggregate of
+  every show's first and last aired episode plus the cast with birthdays; computed together and cached 6 hours.
+- **Age at the latest episode leads** because it's right whenever someone joined. Youngest and oldest casts rank by the
+  median of the living cast's ages (four or more), so one long-dead actor doesn't pull it down.
+- **Grew up on screen:** 6 to 15 at the first episode, 18+ by the latest, in a run of at most 15 years. The cast is
+  today's, with no join dates (TVmaze has none, and its cast credits have no seasons), so a later arrival looks like a child
+  at the premiere. Without the run cap, Law & Order's current cast "were" toddlers in 1990; with it, Charmed (Kaley Cuoco,
+  last season) and You (Jenna Ortega, season 2) still slip in. The list needs two such actors per show, the show page
+  gives only their ages at the start, and both say a later arrival can appear. Join dates would need per-episode cast,
+  which the catalog doesn't fetch.
+- **Lists:** scripted shows of popularity 90+, as Between seasons.
+
 ## Six degrees
 
 - **One graph in memory** (`DegreesGraph` on Catalog.API, cached 30 minutes like `Universes`): catalog shows plus every

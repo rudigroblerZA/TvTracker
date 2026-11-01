@@ -146,6 +146,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<SeasonGaps?> GetSeasonGapsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SeasonGaps>(ApiClients.Catalog, $"api/v1/shows/{showId}/season-gaps", ct, cacheForOffline: true);
 
+    /// <summary>A show's cast ages at its latest episode; null with the flag off.</summary>
+    public Task<CastAges?> GetCastAgesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<CastAges>(ApiClients.Catalog, $"api/v1/shows/{showId}/cast-ages", ct, cacheForOffline: true);
+
+    /// <summary>Who grew up on screen, and the youngest and oldest casts; null while the flag is off.</summary>
+    public Task<CastAgeLists?> GetCastAgeListsAsync(CancellationToken ct = default) =>
+        GetAsync<CastAgeLists>(ApiClients.Catalog, "api/v1/cast-ages", ct, cacheForOffline: true);
+
     /// <summary>The longest waits between seasons, revivals, and shows still waiting; null while the flag is off.</summary>
     public Task<SeasonGapLists?> GetSeasonGapListsAsync(CancellationToken ct = default) =>
         GetAsync<SeasonGapLists>(ApiClients.Catalog, "api/v1/season-gaps", ct, cacheForOffline: true);

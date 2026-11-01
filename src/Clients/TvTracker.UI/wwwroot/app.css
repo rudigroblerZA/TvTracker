@@ -893,6 +893,11 @@ h1:focus, h2:focus { outline: none; }
 .atlas-place h2 { margin-top: 0; }
 .atlas-shows { display: flex; flex-wrap: wrap; gap: 10px; }
 .atlas-show { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px; font-size: 0.85rem; text-align: center; }
+.age-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; max-width: 640px; }
+.age-list li { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border-radius: 4px; }
+.age-bar { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 4px; z-index: 0; }
+.age-text, .age-value { position: relative; z-index: 1; min-width: 0; }
+.age-value { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .atlas-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
 .atlas-list { padding-left: 20px; margin: 4px 0; }
 .atlas-list li { margin: 3px 0; }

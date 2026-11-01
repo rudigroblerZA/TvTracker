@@ -1,0 +1,107 @@
+@page "/cast-ages"
+@attribute [RequiresFeature(FeatureFlags.CastAges)]
+@inject CatalogClient Catalog
+
+<PageTitle>Cast ages · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Cast ages</h1>
+<p class="muted">
+    Popular scripted shows' main casts, from TVmaze's birthdays: who grew up on screen, and the youngest and oldest casts
+    at their latest episode.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (lists is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <section aria-labelledby="grew-title">
+        <h2 id="grew-title">Grew up on screen</h2>
+        <p class="muted small">
+            Shows where two or more of the cast were 6 to 15 at the first episode and adults by the latest, in a run of up to
+            15 years. TVmaze lists today's cast without saying when anyone joined, so a later arrival can turn up here.
+        </p>
+        @if (lists.GrewUp.Count == 0)
+        {
+            <p class="muted">None right now.</p>
+        }
+        else
+        {
+            <ol class="length-list">
+                @foreach (var s in lists.GrewUp)
+                {
+                    <li @key="s.ShowId">
+                        <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
+                        <div>
+                            <a class="strong" href="shows/@s.ShowId">@s.Title</a>
+                            <span class="muted small">@($" {Years(s)}")</span>
+                            <div class="small">@string.Join(", ", s.Members.Select(m => $"{m.Name} {m.AgeAtStart} → {m.AgeAtLatest}"))</div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+    <div class="atlas-columns">
+        <section aria-labelledby="young-title">
+            <h2 id="young-title">Youngest casts</h2>
+            <p class="muted small">The cast's median age at the latest episode, or the finale.</p>
+            @Ages(lists.Youngest)
+        </section>
+        <section aria-labelledby="old-title">
+            <h2 id="old-title">Oldest casts</h2>
+            <p class="muted small">The cast's median age at the latest episode, or the finale.</p>
+            @Ages(lists.Oldest)
+        </section>
+    </div>
+}
+
+@code {
+    private CastAgeLists? lists;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Catalog.GetCastAgeListsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string Years(CastAgeShow s) => s.FirstYear == s.LastYear ? $"{s.FirstYear}" : $"{s.FirstYear}–{s.LastYear}";
+
+    private static RenderFragment Ages(IReadOnlyList<CastAgeShow> shows) => __builder =>
+    {
+        if (shows.Count == 0)
+        {
+            <p class="muted">None right now.</p>
+            return;
+        }
+        <ol class="length-list">
+            @foreach (var s in shows)
+            {
+                <li @key="s.ShowId">
+                    <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@s.ShowId">@s.Title</a>
+                        <div class="small">@($"Median age {s.MedianAge} · {Years(s)}")</div>
+                    </div>
+                </li>
+            }
+        </ol>
+    };
+}
