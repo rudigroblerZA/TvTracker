@@ -51,6 +51,7 @@ public static class FeatureFlags
     public const string CharacterNames = "character-names";
     public const string TitleFormulas = "title-formulas";
     public const string EpisodeGrid = "episode-grid";
+    public const string Birthdays = "birthdays";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
