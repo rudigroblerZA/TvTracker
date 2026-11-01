@@ -146,6 +146,14 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<SeasonGaps?> GetSeasonGapsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<SeasonGaps>(ApiClients.Catalog, $"api/v1/shows/{showId}/season-gaps", ct, cacheForOffline: true);
 
+    /// <summary>A show's episode-title formula; null when it has none or the flag is off.</summary>
+    public Task<TitleFormula?> GetTitleFormulaAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<TitleFormula>(ApiClients.Catalog, $"api/v1/shows/{showId}/title-formula", ct, cacheForOffline: true);
+
+    /// <summary>Shows whose episode titles follow a formula; null while the flag is off.</summary>
+    public Task<TitleFormulaLists?> GetTitleFormulasAsync(CancellationToken ct = default) =>
+        GetAsync<TitleFormulaLists>(ApiClients.Catalog, "api/v1/title-formulas", ct, cacheForOffline: true);
+
     /// <summary>The most common characters' first names, overall and by decade; null while the flag is off.</summary>
     public Task<NameTop?> GetCharacterNamesAsync(CancellationToken ct = default) =>
         GetAsync<NameTop>(ApiClients.Catalog, "api/v1/character-names", ct, cacheForOffline: true);

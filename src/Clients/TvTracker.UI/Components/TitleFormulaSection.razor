@@ -1,0 +1,75 @@
+@* A show's episode-title formula: the words most of its titles open with, the first few that follow it, and the ones
+   that break it (often the notable episodes). Like every episode title, one the viewer hasn't watched sits behind the
+   spoiler shield. *@
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+@if (formula is { } f)
+{
+    <section aria-labelledby="formula-title">
+        <h2 id="formula-title">Episode titles</h2>
+        <p>@Lead(f)</p>
+        <ul class="formula-examples small">
+            @foreach (var e in f.Examples)
+            {
+                <li @key="e.EpisodeId"><span class="muted">@(Format.EpisodeCode(e.Season, e.Number) + " ")</span><Spoiler Hidden="!watched.Contains(e.EpisodeId)">@e.Title</Spoiler></li>
+            }
+        </ul>
+        @if (f.Exceptions.Count > 0)
+        {
+            <p class="small">
+                <span class="muted">@Breaks(f)</span>
+                @for (var i = 0; i < f.Exceptions.Count; i++)
+                {
+                    var e = f.Exceptions[i];
+                    <span @key="e.EpisodeId">@(i > 0 ? ", " : "")@(Format.EpisodeCode(e.Season, e.Number) + " ")<Spoiler Hidden="!watched.Contains(e.EpisodeId)">@e.Title</Spoiler></span>
+                }
+            </p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private TitleFormula? formula;
+    private HashSet<Guid> watched = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            formula = await Catalog.GetTitleFormulaAsync(ShowId);
+            watched = [];
+            if (formula is not null && Session.IsSignedIn)
+            {
+                // Signed out, nothing counts as watched, so with the shield on every title stays hidden.
+                watched = (await Tracking.GetProgressAsync(ShowId))?.WatchedEpisodeIds.ToHashSet() ?? [];
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            formula = null;
+        }
+    }
+
+    private static string Breaks(TitleFormula f) => (f.Titled - f.Matching) switch
+    {
+        1 => "The one that breaks it: ",
+        var n when n == f.Exceptions.Count => $"The {n} that break it: ",
+        var n => $"{n} break it, among them: "
+    };
+
+    private static string Lead(TitleFormula f)
+    {
+        var count = f.Matching == f.Titled ? $"all {f.Titled}" : $"{f.Matching} of {f.Titled}";
+        return f.Kind switch
+        {
+            "numbered" => $"Numbered episodes: {count} titles open with “{f.Prefix}” and a number.",
+            "article" => $"{(f.Matching == f.Titled ? "Every" : "Nearly every")} title starts “{f.Prefix}” ({count}).",
+            _ => $"A title formula: {count} episode titles open with “{f.Prefix}”."
+        };
+    }
+}

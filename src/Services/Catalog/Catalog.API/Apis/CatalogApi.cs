@@ -39,6 +39,7 @@ public static class CatalogApi
         api.MapSeasonGapsApi();
         api.MapCastAgesApi();
         api.MapCharacterNamesApi();
+        api.MapTitleFormulasApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

@@ -1,0 +1,93 @@
+@page "/title-formulas"
+@attribute [RequiresFeature(FeatureFlags.TitleFormulas)]
+@inject CatalogClient Catalog
+
+<PageTitle>Title formulas · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Title formulas</h1>
+<p class="muted">
+    Scripted and animated shows whose episode titles follow a pattern, found in TVmaze's titles, most popular first.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (lists is null)
+{
+    @if (error is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+}
+else
+{
+    <section aria-labelledby="phrases-title">
+        <h2 id="phrases-title">The same opening</h2>
+        <p class="muted small">Two in five titles or more open with the same words (one word: three in five).</p>
+        @Shows(lists.Phrases)
+    </section>
+    <div class="atlas-columns">
+        <section aria-labelledby="numbered-title">
+            <h2 id="numbered-title">Chapters and parts</h2>
+            <p class="muted small">Episodes numbered in their titles.</p>
+            @Shows(lists.Numbered)
+        </section>
+        <section aria-labelledby="articles-title">
+            <h2 id="articles-title">Always the same article</h2>
+            <p class="muted small">Nine in ten titles or more start “The” (or “Die”, “Le”, … in other languages).</p>
+            @Shows(lists.Articles)
+        </section>
+    </div>
+}
+
+@code {
+    private TitleFormulaLists? lists;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Catalog.GetTitleFormulasAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    /// <summary>The prefix with an ellipsis: "The One…", "What If…" (not "What If......"), "Mr. …" (not "Mr…").</summary>
+    private static string Opening(string prefix) =>
+        prefix.EndsWith("...") ? prefix[..^3] + "…"
+        : prefix.EndsWith('…') ? prefix
+        : prefix.EndsWith('.') ? prefix + " …"
+        : prefix + "…";
+
+    private static RenderFragment Shows(IReadOnlyList<FormulaShow> shows) => __builder =>
+    {
+        if (shows.Count == 0)
+        {
+            <p class="muted">None right now.</p>
+            return;
+        }
+        <ol class="length-list">
+            @foreach (var s in shows)
+            {
+                <li @key="s.ShowId">
+                    <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
+                    <div>
+                        <a class="strong" href="shows/@s.ShowId">@s.Title</a>
+                        <div class="small">@($"“{Opening(s.Prefix)}” · {(s.Matching == s.Titled ? $"all {s.Titled}" : $"{s.Matching} of {s.Titled}")}")</div>
+                        @if (s.Example is { } example)
+                        {
+                            <div class="small muted">@($"First: {example}")</div>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+    };
+}

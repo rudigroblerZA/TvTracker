@@ -49,6 +49,7 @@ public static class FeatureFlags
     public const string SeasonGaps = "season-gaps";
     public const string CastAges = "cast-ages";
     public const string CharacterNames = "character-names";
+    public const string TitleFormulas = "title-formulas";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
