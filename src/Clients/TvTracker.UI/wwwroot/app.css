@@ -871,6 +871,11 @@ h1:focus, h2:focus { outline: none; }
 .length-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .length-list li { display: flex; gap: 10px; align-items: center; }
 
+/* Same name */
+.namesake-pairs { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 14px; }
+.namesake-pairs > li { border-left: 3px solid var(--border); padding-left: 10px; }
+.namesake-pairs .length-list { margin: 4px 0 0; }
+
 /* Between seasons */
 .gap-bars { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; max-width: 640px; }
 .gap-bars li { display: grid; grid-template-columns: 5.5em 1fr 9em; gap: 8px; align-items: center; }

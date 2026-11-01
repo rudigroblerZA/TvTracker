@@ -325,6 +325,52 @@ public class ShowSettingLookup
     public DateTime CheckedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Another show on the provider with the same title as a catalog show (a remake, a revival, a namesake): found by the
+/// provider's title search, monthly. Facts only; whether it's a remake is for the reader, apart from shared cast, which
+/// Catalog.API works out from <see cref="PersonCastCredit"/>.
+/// </summary>
+public class ShowNamesake
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>The other show's provider id.</summary>
+    public required string ExternalId { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    public DateOnly? Premiered { get; set; }
+
+    public DateOnly? Ended { get; set; }
+
+    public string? Network { get; set; }
+
+    /// <summary>The network's country code ("GB", "US").</summary>
+    public string? Country { get; set; }
+
+    public string? Language { get; set; }
+
+    /// <summary>The provider's type, as a kind keyword ("scripted", "reality").</summary>
+    public string? Kind { get; set; }
+
+    public double Popularity { get; set; }
+
+    public double? Rating { get; set; }
+}
+
+/// <summary>When a show's namesakes were last looked up, found or not.</summary>
+public class ShowNamesakeLookup
+{
+    public Guid ShowId { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+
+    /// <summary>The network's country code of the catalog show itself, which the catalog doesn't otherwise keep.</summary>
+    public string? Country { get; set; }
+}
+
 /// <summary>A person who made a show, with their roles on it.</summary>
 public class ShowCreative
 {

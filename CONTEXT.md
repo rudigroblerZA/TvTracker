@@ -19,7 +19,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 | --- | --- | --- |
 | Identity.API | profiles, region, timezone | Keycloak does sign-in; this orchestrates account deletion and data export across services |
 | Catalog.API | read side of `catalogdb` | search (title + semantic + tag filter), schedule, people, `/ops` dashboard; applies Catalog migrations |
-| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay; Wikiquote lines; Wikidata settings |
+| Catalog.SyncWorker | write side of `catalogdb` | the only writer of shows; talks to TVmaze; publishes catalog events; embeddings; bulk import; replay; Wikiquote lines; Wikidata settings; namesakes |
 | Tracking.API | follows, watches, lists | Up Next, calendar, stats |
 | Ratings.API | ratings, comments, reactions, community insights, flags, corrections, moderation log | moderation for every user post; accepted corrections go to the sync worker |
 | Recommendations.API | picks, dismissals | |
@@ -1031,6 +1031,25 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Shared rules** (`ShowRules` in Catalog.API): the daily-show threshold and the story kinds (scripted, animation) are
   one constant each, used by Milestones, Episode lengths, Between seasons, Title formulas, the episode grid, Holiday
   episodes and Guess the show, so the features agree on which shows they mean.
+
+## Same name
+
+- **TVmaze's title search, not the catalog alone** (`NamesakesService` in the sync worker, `show_namesakes`): within the
+  catalog and its actors' provider credits, an older version only turns up when one of its actors is in a catalog show
+  (Shōgun's 1980 miniseries never did). One search per show, 20 a minute through the shared limiter, most popular first,
+  each again monthly; a show's rows are replaced with what the search says then, and a failed search leaves it due.
+- **Same title means the same normalised title** (`NamesakeTitles.Key`): case, punctuation, "&" as "and" and a trailing
+  parenthesis ("(2024)", "(US)") are ignored; anything else counts, so "Doctor Who: The Movie" is another title.
+- **The show's own country** comes from its own search result and is kept on the lookup row: the catalog stores a
+  network's name but not its country, and "another country" is the usual shape of a remake. TVmaze gives global
+  streamers' shows no country, so with either side missing the languages decide: by country alone, Criminal Minds'
+  Korean namesake was listed as "years apart" in the same country.
+- **Facts, not verdicts** (`NamesakesApi` on Catalog.API): a title can't tell a remake from a namesake (Friends of 1979),
+  so the API gives years, network, country, kind and shared cast. Shared cast is the show's main cast credited in the
+  namesake (`person_cast_credits`), self roles out: Doctor Who 2005 and 2023 share David Tennant and Catherine Tate.
+- **Lists** are scripted and animated catalog shows of popularity 90+ whose namesake is the same kind, each pair once,
+  under the later show when both are in the catalog. Cached an hour rather than six, since lookups fill in over the first
+  hour and Catalog.API isn't told when they do.
 
 ## Six degrees
 

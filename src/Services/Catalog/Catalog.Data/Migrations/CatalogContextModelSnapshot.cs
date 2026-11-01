@@ -495,6 +495,73 @@ namespace Catalog.Data.Migrations
                     b.ToTable("show_embeddings", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowNamesake", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<DateOnly?>("Ended")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Network")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double>("Popularity")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("PosterUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("Premiered")
+                        .HasColumnType("date");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("ShowId", "ExternalId");
+
+                    b.ToTable("show_namesakes", (string)null);
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowNamesakeLookup", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.HasKey("ShowId");
+
+                    b.ToTable("show_namesake_lookups", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.ShowQuoteSource", b =>
                 {
                     b.Property<Guid>("ShowId")
@@ -719,6 +786,24 @@ namespace Catalog.Data.Migrations
                     b.HasOne("Catalog.Data.Show", null)
                         .WithOne()
                         .HasForeignKey("Catalog.Data.ShowEmbedding", "ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowNamesake", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithMany()
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowNamesakeLookup", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithOne()
+                        .HasForeignKey("Catalog.Data.ShowNamesakeLookup", "ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -1,0 +1,82 @@
+@page "/namesakes"
+@attribute [RequiresFeature(FeatureFlags.Namesakes)]
+@inject CatalogClient Catalog
+
+<PageTitle>Same name · @Brand.AppName</PageTitle>
+
+<p><a href="discover">← Discover</a></p>
+<h1>Same name</h1>
+<p class="muted">
+    Popular shows that share their title with another: the ones some of the cast came back for, the same title made in
+    another country, and the same title years apart. A title alone doesn't make a remake, so this only says what's known.
+</p>
+
+<ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+@if (lists is { } l)
+{
+    @Section("back-title", "Came back", "Same title, some of the same cast: revivals and continuations.", l.Back)
+    @Section("abroad-title", "Another country", "Same title and kind, made in another country (or language), none of the same cast.", l.Abroad)
+    @Section("apart-title", "Years apart", "Same title and kind, the same country (or language, when TVmaze gives no country), ten years or more apart, none of the same cast.", l.YearsApart)
+}
+else if (error is null)
+{
+    <p class="muted">Loading…</p>
+}
+
+@code {
+    private NamesakeLists? lists;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            lists = await Catalog.GetNamesakeListsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string ShowLine(NamesakeShow s) =>
+        string.Join(" · ", new[] { s.Year?.ToString(), s.Country is { } c ? Format.Country(c) : null }.Where(x => x is not null));
+
+    private RenderFragment Section(string id, string title, string about, IReadOnlyList<NamesakePair> pairs) => __builder =>
+    {
+        <section aria-labelledby="@id">
+            <h2 id="@id">@title</h2>
+            <p class="muted small">@about</p>
+            @if (pairs.Count == 0)
+            {
+                <p class="muted">None yet. Shows are looked up a few a minute, so this fills in over the first hour.</p>
+            }
+            else
+            {
+                <ul class="namesake-pairs">
+                    @* A show with several namesakes (Ghosts: British, German, Indian) is one entry. *@
+                    @foreach (var group in pairs.GroupBy(p => p.Show.Id))
+                    {
+                        var show = group.First().Show;
+                        <li @key="show.Id">
+                            <div class="namesake-show">
+                                <a class="strong" href="shows/@show.Id">@show.Title</a>
+                                <span class="muted small">@($" · {ShowLine(show)}")</span>
+                            </div>
+                            <ol class="length-list">
+                                @foreach (var p in group)
+                                {
+                                    <NamesakeItem @key="p.Other.ExternalId" Item="p.Other" />
+                                }
+                            </ol>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    };
+}

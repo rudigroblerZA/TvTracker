@@ -115,4 +115,26 @@ public static class Format
 
         return past ? $"{text} ago" : $"in {text}";
     }
+
+    /// <summary>
+    /// A country's English name from its code ("GB" → "United Kingdom"), else the code: a phone in invariant
+    /// globalisation has no region data.
+    /// </summary>
+    public static string Country(string code)
+    {
+        try
+        {
+            return new System.Globalization.RegionInfo(code).EnglishName;
+        }
+        catch (ArgumentException)
+        {
+            return code;
+        }
+    }
+
+    /// <summary>"2005–2013", "2023–" for one still running, "1963".</summary>
+    public static string Years(int? from, int? to, bool running) => from is not { } start ? "year unknown"
+        : running ? $"{start}–"
+        : to is { } end && end != start ? $"{start}–{end}"
+        : start.ToString();
 }

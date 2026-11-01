@@ -1,0 +1,38 @@
+@* Same name: other shows with this show's title, earliest first, with any cast they share. Hidden when there are none. *@
+@inject CatalogClient Catalog
+
+@if (namesakes is { Namesakes.Count: > 0 } n)
+{
+    var back = n.Namesakes.Count(x => x.SharedCast.Count > 0);
+    <section aria-labelledby="namesakes-title">
+        <h2 id="namesakes-title">Same name</h2>
+        <p class="muted small">
+            @($"{n.Namesakes.Count} other {(n.Namesakes.Count == 1 ? "show is" : "shows are")} called this on TVmaze")@(back > 0 ? $"; {back} {(back == 1 ? "shares" : "share")} some of the cast" : "")@(". A remake, a revival or just the same name: the years, the country and the cast tell which.")
+        </p>
+        <ol class="length-list">
+            @foreach (var item in n.Namesakes)
+            {
+                <NamesakeItem @key="item.ExternalId" Item="item" />
+            }
+        </ol>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowNamesakes? namesakes;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            namesakes = await Catalog.GetNamesakesAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            namesakes = null;
+        }
+    }
+}

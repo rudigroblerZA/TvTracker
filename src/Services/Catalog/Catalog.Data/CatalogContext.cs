@@ -20,6 +20,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<ShowSetting> Settings => Set<ShowSetting>();
     public DbSet<ShowSettingLookup> SettingLookups => Set<ShowSettingLookup>();
+    public DbSet<ShowNamesake> Namesakes => Set<ShowNamesake>();
+    public DbSet<ShowNamesakeLookup> NamesakeLookups => Set<ShowNamesakeLookup>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -155,6 +157,27 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.ToTable("show_setting_lookups");
             entity.HasKey(s => s.ShowId);
             entity.HasOne<Show>().WithOne().HasForeignKey<ShowSettingLookup>(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ShowNamesake>(entity =>
+        {
+            entity.ToTable("show_namesakes");
+            entity.HasKey(n => new { n.ShowId, n.ExternalId });
+            entity.HasOne<Show>().WithMany().HasForeignKey(n => n.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(n => n.ExternalId).HasMaxLength(64);
+            entity.Property(n => n.Title).HasMaxLength(256);
+            entity.Property(n => n.Network).HasMaxLength(128);
+            entity.Property(n => n.Country).HasMaxLength(8);
+            entity.Property(n => n.Language).HasMaxLength(64);
+            entity.Property(n => n.Kind).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<ShowNamesakeLookup>(entity =>
+        {
+            entity.ToTable("show_namesake_lookups");
+            entity.HasKey(n => n.ShowId);
+            entity.Property(n => n.Country).HasMaxLength(8);
+            entity.HasOne<Show>().WithOne().HasForeignKey<ShowNamesakeLookup>(n => n.ShowId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CastMember>(entity =>

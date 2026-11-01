@@ -122,6 +122,33 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default)
+    {
+        // Up to 10 shows, best match first.
+        var results = await http.GetFromJsonAsync<List<TvMazeSearchResult>>(
+            $"search/shows?q={Uri.EscapeDataString(query)}", cancellationToken) ?? [];
+        return results
+            .Select(r => r.Show)
+            .OfType<TvMazeShow>()
+            .Select(show =>
+            {
+                var channel = show.Network ?? show.WebChannel;
+                return new ProviderShowSummary(
+                    show.Id.ToString(),
+                    Truncate(show.Name ?? $"Show {show.Id}", 256),
+                    show.Image?.Medium ?? show.Image?.Original,
+                    show.Premiered,
+                    show.Ended,
+                    channel?.Name is { } network ? Truncate(network, 128) : null,
+                    channel?.Country?.Code,
+                    show.Language is { } language ? Truncate(language, 64) : null,
+                    show.Type?.ToLowerInvariant() is { } type ? Truncate(type, 32) : null,
+                    show.Weight,
+                    show.Rating?.Average);
+            })
+            .ToList();
+    }
+
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
     {
         // In parallel with the show, so the extra call costs a request's worth of rate limit, not of time.
@@ -558,6 +585,7 @@ internal sealed record TvMazeShow
     public List<string> Genres { get; init; } = [];
     public string? Status { get; init; }
     public DateOnly? Premiered { get; init; }
+    public DateOnly? Ended { get; init; }
     public string? OfficialSite { get; init; }
     public double Weight { get; init; }
     public TvMazeChannel? Network { get; init; }
