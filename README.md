@@ -671,8 +671,9 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 Free, Plus and Family, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
 
-- **Free:** up to 3 lists. **Plus:** as many lists as you like (up to the service's cap of 100), and Your services.
-  Every plan can share lists, on its profile and by link; sharing was Plus-only at first and opened to everyone, since
+- **Free:** tracking, ratings and lists without a plan limit (up to the service's cap of 100 lists). **Plus:** Your
+  services and the Plus features. Every plan can share lists, on its profile and by link. Lists were capped at 3 on
+  Free and sharing was Plus-only at first; both opened to everyone, since a cap on lists is a cap on tracking and
   shared lists bring people in.
 - **Family** (`family-plan` flag): Plus for the owner and up to 5 people they invite, on one subscription.
   - **Inviting:** `/settings/family` gives the owner an invite link (`/family/join/{token}`), which they can share or
@@ -685,9 +686,9 @@ Free, Plus and Family, behind the `plans` flag. The plumbing for paid features i
     `DELETE /api/v1/me/family/members/{userId}`, `DELETE /api/v1/me/family/membership`,
     `GET /api/v1/family/invites/{token}` and `POST /api/v1/family/join` (`{"token":…}`; 409 with the reason when the
     family is full, ended, or you're in another).
-- **Where it shows:** the lists page says "2 of 3 lists on Free" and turns Create off at the limit, and `/settings/plan`
-  compares the plans and shows yours. Sharing still goes through the plan's `ShareLists`, so a plan can take it away
-  again without new plumbing.
+- **Where it shows:** `/settings/plan` compares the plans and shows yours. If a plan has a list limit again, the lists
+  page says "2 of 3 lists on Free" and turns Create off at it. Lists and sharing still go through the plan's
+  `MaxLists` and `ShareLists`, so a plan can get a limit back without new plumbing.
 - **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
   user can still edit, unshare or delete them. Only a new list or a new share is refused.
 - **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches

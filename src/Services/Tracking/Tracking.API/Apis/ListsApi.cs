@@ -15,8 +15,9 @@ namespace Tracking.API.Apis;
 /// Custom lists, e.g. "Weekend binge". A shared list is sent to Social (<see cref="ListSharedIntegrationEvent"/>) on every
 /// change, through the outbox with the change, and taken back with <see cref="ListUnsharedIntegrationEvent"/>.
 /// <para>
-/// Plans (<see cref="Plans"/>, behind the <c>plans</c> flag): a free account may have <see cref="PlanLimits.MaxLists"/>
-/// lists and share none; past a limit the API answers 403 with a problem naming the plan that allows it. Lists made
+/// Plans (<see cref="Plans"/>, behind the <c>plans</c> flag): a plan may limit lists (<see cref="PlanLimits.MaxLists"/>)
+/// and sharing (<see cref="PlanLimits.ShareLists"/>); no plan does today. Past a limit the API answers 403 with a problem
+/// naming the plan that allows it. Lists made
 /// before the limits are kept, shared ones stay shared, and a free user may still edit, unshare or delete them: only
 /// a new list or a new share is refused. The plan comes from Tracking's copy (<see cref="UserPlanCopy"/>).
 /// </para>
