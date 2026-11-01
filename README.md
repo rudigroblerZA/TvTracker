@@ -306,11 +306,12 @@ most common woman's name. Each result links to its show page when the show is in
 titles follow a pattern, found in TVmaze's titles rather than listed by hand. Friends' "The One…" (234 of 236), Monk's
 "Mr. Monk…", Scrubs' "My…", Stranger Things' and The Mandalorian's chapters, 24's "Day…", and The Big Bang Theory's
 "The…" (278 of 279). The show page gives the formula, the first three titles that follow it, and the ones that break it
-(Friends: only the finale, "The Last One"), which stay behind the spoiler shield. The Discover page lists scripted and
-animated shows by kind: the same opening, chapters and parts, and always "The". It works signed out.
+(Friends: only the finale, "The Last One"); titles you haven't watched stay behind the spoiler shield. The Discover
+page lists scripted and animated shows by kind: the same opening, chapters and parts, and always the same article. It
+works signed out.
 - **The rule:** the most common opening of one to three words. A phrase counts from two in five titles, one word from
   three in five, and "The" (or another language's article) from nine in ten. Placeholders such as "Episode 5" and
-  "TBA" are left out, and a show needs six real titles.
+  "TBA" are left out, as are daily shows, and a show needs six real titles.
 - **API:** `GET /api/v1/shows/{id}/title-formula` (404 when there's none) and `GET /api/v1/title-formulas` (Catalog.API, public).
 
 **Six degrees** (`/degrees`, from Discover; `six-degrees` flag) finds the shortest chain of actors between any two

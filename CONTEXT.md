@@ -977,10 +977,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Twenty-One" read as a phrase until hyphenated numbers counted.
 - **Placeholders out:** "Episode 5", "Chapter 3" alone, "Odcinek 1", "TBA" and "Untitled" are TVmaze's stand-ins for a
   missing title, not a formula; a show needs six real titles and five that follow.
-- **Exceptions behind the shield:** the titles that break a formula are often the notable ones (Friends' finale, "The
-  Last One"), so the show page wraps them in `<Spoiler>`; the first three titles that follow it are shown as they are.
+- **Titles behind the shield, as everywhere:** the titles that break a formula are often the notable ones (Friends'
+  finale, "The Last One"). Each title carries its episode id, and the show page reads the viewer's watched episodes from
+  Tracking (`/progress`, as Holiday episodes does), so an unwatched title, example or exception, sits behind `<Spoiler>`;
+  signed out, nothing counts as watched.
+- **The words that matched are the words shown:** each title is split once into lower-case keys for matching and the
+  words as written beside them, so the shown prefix is never a stray quote or a lone dash the keys skipped.
 - **Lists:** scripted and animated shows only, most popular first; talk and reality shows' titles are guests' names
-  and dates.
+  and dates. Daily shows (a season over 60 episodes) are left out altogether, as Episode lengths does, and a show page
+  looks its formula up by id in the cached set.
 
 ## Six degrees
 

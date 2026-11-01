@@ -842,14 +842,13 @@ public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesS
 /// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
-/// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
 /// <summary>A show's episode-title formula: the words most of its titles open with.</summary>
 /// <param name="Kind">"phrase", "numbered" or "article".</param>
-/// <param name="Exceptions">Titles that break it, often the notable episodes; shown behind the spoiler shield.</param>
+/// <param name="Exceptions">Titles that break it, often the notable episodes.</param>
 public record TitleFormula(Guid ShowId, string Kind, string Prefix, int Matching, int Titled, IReadOnlyList<FormulaTitle> Examples,
     IReadOnlyList<FormulaTitle> Exceptions);
 
-public record FormulaTitle(int Season, int Number, string Title);
+public record FormulaTitle(Guid EpisodeId, int Season, int Number, string Title);
 
 public record TitleFormulaLists(IReadOnlyList<FormulaShow> Phrases, IReadOnlyList<FormulaShow> Numbered, IReadOnlyList<FormulaShow> Articles);
 
@@ -959,6 +958,7 @@ public record LongestSitting(DateOnly Date, int Episodes, int Minutes, Guid Show
 
 public record ClockShow(Guid ShowId, string Title, string? PosterUrl, int Minutes, string Period, double PeriodShare, bool Weekend);
 
+/// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
 public record TvLife(int Born, IReadOnlyList<TvLifeYear> Years, TvLifeFacts Facts);
 
 public record TvLifeYear(int Year, int Age, IReadOnlyList<TvLifeShow> Premieres, IReadOnlyList<TvLifeShow> Finales, TvLifeYourYear? Yours);

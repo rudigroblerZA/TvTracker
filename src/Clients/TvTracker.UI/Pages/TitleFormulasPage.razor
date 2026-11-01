@@ -33,8 +33,8 @@ else
             @Shows(lists.Numbered)
         </section>
         <section aria-labelledby="articles-title">
-            <h2 id="articles-title">Always “The”</h2>
-            <p class="muted small">Nine in ten titles or more start “The”.</p>
+            <h2 id="articles-title">Always the same article</h2>
+            <p class="muted small">Nine in ten titles or more start “The” (or “Die”, “Le”, … in other languages).</p>
             @Shows(lists.Articles)
         </section>
     </div>
@@ -59,6 +59,13 @@ else
         }
     }
 
+    /// <summary>The prefix with an ellipsis: "The One…", "What If…" (not "What If......"), "Mr. …" (not "Mr…").</summary>
+    private static string Opening(string prefix) =>
+        prefix.EndsWith("...") ? prefix[..^3] + "…"
+        : prefix.EndsWith('…') ? prefix
+        : prefix.EndsWith('.') ? prefix + " …"
+        : prefix + "…";
+
     private static RenderFragment Shows(IReadOnlyList<FormulaShow> shows) => __builder =>
     {
         if (shows.Count == 0)
@@ -73,7 +80,7 @@ else
                     <Poster Title="@s.Title" Url="@s.PosterUrl" Size="small" />
                     <div>
                         <a class="strong" href="shows/@s.ShowId">@s.Title</a>
-                        <div class="small">@($"“{s.Prefix.TrimEnd('.', '…')}…” · {(s.Matching == s.Titled ? $"all {s.Titled}" : $"{s.Matching} of {s.Titled}")}")</div>
+                        <div class="small">@($"“{Opening(s.Prefix)}” · {(s.Matching == s.Titled ? $"all {s.Titled}" : $"{s.Matching} of {s.Titled}")}")</div>
                         @if (s.Example is { } example)
                         {
                             <div class="small muted">@($"First: {example}")</div>
