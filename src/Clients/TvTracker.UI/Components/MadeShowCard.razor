@@ -13,7 +13,7 @@
             }
             @if (Show.Status == ShowStatus.Upcoming)
             {
-                <span>@(" ")<span class="tag">Coming</span></span>
+                <span>@(" ")<span class="tag">@(Show.From is null ? "In development" : "Coming")</span></span>
             }
             else if (Show.New)
             {

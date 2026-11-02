@@ -18,6 +18,11 @@ public record LovedShowsDto(IReadOnlyList<LovedShowDto> Loved, IReadOnlyList<Gui
 /// </summary>
 public static class LovedShowsApi
 {
+    /// <summary>
+    /// The most the catalog reads; a longer history is cut to the most loved.
+    /// </summary>
+    private const int MaxLoved = 300;
+
     public static void MapLovedShowsApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/loved", GetAsync).RequireFeature(FeatureFlags.MakersForYou);
 
@@ -25,7 +30,7 @@ public static class LovedShowsApi
     {
         var (known, loved) = await ReunionsApi.LoveAsync(db, user.GetUserId(), ct);
         return TypedResults.Ok(new LovedShowsDto(
-            loved.OrderByDescending(l => l.Value).Select(l => new LovedShowDto(l.Key, l.Value)).ToList(),
+            loved.OrderByDescending(l => l.Value).Take(MaxLoved).Select(l => new LovedShowDto(l.Key, l.Value)).ToList(),
             known.ToList()));
     }
 }

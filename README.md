@@ -228,7 +228,8 @@ members whose credits haven't been fetched yet are counted as pending. It works 
 
 **From the makers** (TV's answer to following a director). Two parts:
 - **From the same creators** (on every show page; `makers` flag, free): each of the show's creators and developers
-  with their other shows, coming and newest first, with years and rating. Breaking Bad lists Vince Gilligan's Better
+  with their other shows, coming (soonest first) and newest first, with years and rating; projects TVmaze has
+  in development with no date come last. Breaking Bad lists Vince Gilligan's Better
   Call Saul, Battle Creek and Pluribus. Shows outside the catalog link to a search, which imports them. It works signed out.
 - **From the makers you love** (`/makers`, from For you; `makers-for-you` flag, Plus and Family): the creators and
   developers behind your 4- and 5-star shows and the ones you follow or watch, weighted by how much you love their

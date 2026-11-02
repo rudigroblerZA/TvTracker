@@ -30,6 +30,7 @@ public sealed class CreativesService(
 
     // Shows the provider failed, and when to try them again. Only this service's loop touches it.
     private readonly Dictionary<string, DateTimeOffset> _failed = [];
+    private readonly Dictionary<Guid, DateTimeOffset> _failedCareers = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -100,9 +101,11 @@ public sealed class CreativesService(
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
         var outbox = scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>();
         var staleBefore = time.GetUtcNow().UtcDateTime - CareerMaxAge;
+        var now = time.GetUtcNow();
+        var skip = _failedCareers.Where(f => f.Value > now).Select(f => f.Key).ToList();
 
         var due = await db.People
-            .Where(p => p.ExternalId != null && (p.CareerRefreshedAtUtc == null || p.CareerRefreshedAtUtc < staleBefore))
+            .Where(p => p.ExternalId != null && (p.CareerRefreshedAtUtc == null || p.CareerRefreshedAtUtc < staleBefore) && !skip.Contains(p.Id))
             .Where(p => db.Creatives.Any(c => c.PersonId == p.Id && (c.Roles.Contains("Creator") || c.Roles.Contains("Developer")))
                 || db.Creatives.Count(c => c.PersonId == p.Id) >= 2)
             .OrderBy(p => p.CareerRefreshedAtUtc != null)
@@ -112,25 +115,43 @@ public sealed class CreativesService(
 
         var personIds = due.Select(p => p.Id).ToList();
         var madeBefore = (await db.MadeShows.Where(m => personIds.Contains(m.PersonId)).ToListAsync(ct)).ToLookup(m => m.PersonId);
+        var refreshed = new List<Person>();
         foreach (var person in due)
         {
-            var career = await provider.GetCareerAsync(person.ExternalId!, ct);
-            // The shows they created or developed come with the same call (From the makers); each fetch replaces them.
-            db.MadeShows.RemoveRange(madeBefore[person.Id]);
-            db.MadeShows.AddRange((career?.Made ?? []).Select(m => new PersonMadeShow
+            ProviderCareer? career;
+            try
             {
-                PersonId = person.Id, ShowExternalId = m.ShowExternalId, Title = m.Title, PosterUrl = m.PosterUrl, Premiered = m.Premiered,
-                Ended = m.Ended, Status = m.Status, Rating = m.Rating, Popularity = m.Popularity, Kind = m.Kind, Roles = m.Roles.ToList()
-            }));
+                career = await provider.GetCareerAsync(person.ExternalId!, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // One person failing shouldn't lose the round, or come first in every round after.
+                _failedCareers[person.Id] = now + BackfillRetry;
+                logger.LogWarning(ex, "Couldn't refresh the career of person {ExternalId}; retrying in {Retry}", person.ExternalId, BackfillRetry);
+                continue;
+            }
+
+            // The shows they created or developed come with the same call (From the makers); each fetch replaces them.
+            // No career (no credits with their show, or the person gone) keeps what's stored rather than wiping it.
+            if (career is not null)
+            {
+                db.MadeShows.RemoveRange(madeBefore[person.Id]);
+                db.MadeShows.AddRange((career.Made ?? []).Select(m => new PersonMadeShow
+                {
+                    PersonId = person.Id, ShowExternalId = m.ShowExternalId, Title = m.Title, PosterUrl = m.PosterUrl, Premiered = m.Premiered,
+                    Ended = m.Ended, Status = m.Status, Rating = m.Rating, Popularity = m.Popularity, Kind = m.Kind, Roles = m.Roles.ToList()
+                }));
+            }
             person.CareerShows = career?.Shows;
             person.CareerCreated = career?.Created;
             person.CareerExecutiveProduced = career?.ExecutiveProduced;
             person.CareerNotableShows = career?.NotableShows.ToList() ?? [];
-            person.CareerRefreshedAtUtc = time.GetUtcNow().UtcDateTime;
+            person.CareerRefreshedAtUtc = now.UtcDateTime;
+            refreshed.Add(person);
         }
 
         // Analytics tags shows from prolific people with these.
-        foreach (var careers in CatalogSynchronizer.CareerEvents(due))
+        foreach (var careers in CatalogSynchronizer.CareerEvents(refreshed))
         {
             outbox.Add(careers);
         }

@@ -124,16 +124,20 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<NanogenreDetail>(ApiClients.Catalog, $"api/v1/nanogenres/{Uri.EscapeDataString(slug)}", ct, cacheForOffline: true);
 
     /// <summary>
-    /// Where a show's cast went next; null while the cast-afterwards flag is off.
+    /// From the same creators: the other shows by the show's creators and developers.
     /// </summary>
-    /// <summary>From the same creators: the other shows by the show's creators and developers.</summary>
     public Task<ShowMakers?> GetMakersAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowMakers>(ApiClients.Catalog, $"api/v1/shows/{showId}/makers", ct, cacheForOffline: true);
 
-    /// <summary>From the makers you love, from the loved and known shows Analytics gives (<see cref="AnalyticsClient.GetLovedShowsAsync"/>).</summary>
+    /// <summary>
+    /// From the makers you love, from the loved and known shows Analytics gives (<see cref="AnalyticsClient.GetLovedShowsAsync"/>).
+    /// </summary>
     public Task<MakersForYou?> GetMakersForYouAsync(LovedShows loved, CancellationToken ct = default) =>
         SendAsync<MakersForYou>(ApiClients.Catalog, HttpMethod.Post, "api/v1/makers/for-you", loved, ct);
 
+    /// <summary>
+    /// Where a show's cast went next; null while the cast-afterwards flag is off.
+    /// </summary>
     public Task<ShowAfterwards?> GetAfterwardsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowAfterwards>(ApiClients.Catalog, $"api/v1/shows/{showId}/afterwards", ct, cacheForOffline: true);
 
@@ -757,12 +761,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<TasteTwins>(ApiClients.Analytics, "api/v1/me/taste-twins", ct, cacheForOffline: true);
 
     /// <summary>
-    /// Shows where actors from the user's favourites work together again (the reunion radar).
+    /// The caller's loved and known shows, for From the makers you love.
     /// </summary>
-    /// <summary>The caller's loved and known shows, for From the makers you love.</summary>
     public Task<LovedShows?> GetLovedShowsAsync(CancellationToken ct = default) =>
         GetAsync<LovedShows>(ApiClients.Analytics, "api/v1/me/loved", ct);
 
+    /// <summary>
+    /// Shows where actors from the user's favourites work together again (the reunion radar).
+    /// </summary>
     public Task<ReunionRadar?> GetReunionsAsync(CancellationToken ct = default) =>
         GetAsync<ReunionRadar>(ApiClients.Analytics, "api/v1/me/reunions", ct, cacheForOffline: true);
 

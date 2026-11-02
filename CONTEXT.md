@@ -897,7 +897,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   credits into Analytics would have meant a contract, a handler, a table and its healing for one page.
 - **Ranking** (`MakersRanking`, a pure function): a maker's love is the summed weight of the viewer's loved shows they
   made; a pick's score is its makers' love (summed when two made it) × its rating / 10, unrated as 7. New (premiered
-  within a year, or coming) is listed apart, coming first; known and loved shows are left out.
+  within a year, or dated and coming) is listed apart, soonest coming first; known and loved shows are left out. The
+  page sends at most 300 loved shows, the most loved, so a long imported history is cut rather than refused.
+- **In development, undated:** TVmaze keeps abandoned projects "In Development" with no premiere for years, so such a
+  show is neither new, coming nor a pick; a show page lists it last, as in development.
+- **Credits kept on a miss:** a career fetch that fails is retried in an hour without holding up the round (the
+  migration made every career due at once), and one that comes back with no shows keeps the stored ones.
 
 ## Memorable lines
 
