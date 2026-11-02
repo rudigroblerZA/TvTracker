@@ -25,6 +25,48 @@ namespace Catalog.Data.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Catalog.Data.AffiliateConversion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid>("ClickId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Program")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClickId");
+
+                    b.HasIndex("ReceivedAtUtc");
+
+                    b.HasIndex("Program", "TransactionId")
+                        .IsUnique();
+
+                    b.ToTable("affiliate_conversions", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.CastMember", b =>
                 {
                     b.Property<Guid>("ShowId")
@@ -160,6 +202,54 @@ namespace Catalog.Data.Migrations
                     b.HasKey("Slug");
 
                     b.ToTable("nanogenres", (string)null);
+                });
+
+            modelBuilder.Entity("Catalog.Data.OutboundClick", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ClickedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Link")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Program")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<string>("Service")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Surface")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClickedAtUtc");
+
+                    b.ToTable("outbound_clicks", (string)null);
                 });
 
             modelBuilder.Entity("Catalog.Data.Person", b =>
@@ -709,6 +799,15 @@ namespace Catalog.Data.Migrations
                     b.HasKey("EventId", "Handler");
 
                     b.ToTable("processed_integration_events", (string)null);
+                });
+
+            modelBuilder.Entity("Catalog.Data.AffiliateConversion", b =>
+                {
+                    b.HasOne("Catalog.Data.OutboundClick", null)
+                        .WithMany()
+                        .HasForeignKey("ClickId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Catalog.Data.CastMember", b =>

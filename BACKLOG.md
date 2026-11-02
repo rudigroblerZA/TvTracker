@@ -256,6 +256,19 @@ All the features from the review have shipped; new ideas go here.
 - **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
   period's end, and the webhook rejects unsigned calls.
 
+### F2. Affiliate programs
+
+**P2 · S**
+
+- **Why:** affiliate links are counted and can be wrapped (CONTEXT.md, Affiliate links), but no program is configured,
+  so every click goes out plain and earns nothing.
+- **What:** join the networks the streaming services use (most run through Impact, Rakuten or Partnerize), add a program
+  per service and region with its postback key as a secret, and point each network's postback at the BFF. Filter known
+  bots from `/go` (user agent) before the counts are used in a negotiation. Count clicks from Your services and the
+  catch-up and backlog pages once they link to services.
+- **Done when:** a test conversion from a real network shows on `/settings/affiliates` against its click, and the
+  report's top unmonetised service has a program.
+
 ## Technical debt
 
 ### T1. Split `CatalogSynchronizer`

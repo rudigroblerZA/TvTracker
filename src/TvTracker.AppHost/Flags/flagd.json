@@ -165,6 +165,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
+    "affiliates": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Affiliate links: where-to-watch clicks go through a counted redirect (wrapped in a program's link when one covers the service), and admins see the clicks, conversions and revenue." }
+    },
     "history-import": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

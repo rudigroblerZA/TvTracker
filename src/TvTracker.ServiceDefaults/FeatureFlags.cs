@@ -57,6 +57,7 @@ public static class FeatureFlags
     public const string FarFromHome = "far-from-home";
     public const string Streaks = "streaks";
     public const string HistoryImport = "history-import";
+    public const string Affiliates = "affiliates";
     public const string Research = "research";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";

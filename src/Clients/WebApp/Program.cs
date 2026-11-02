@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Http.Resilience;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using TvTracker.UI.Models;
 using TvTracker.UI.Services;
 using WebApp.Components;
 using WebApp.Services;
@@ -117,6 +120,45 @@ app.MapGet("/account/login", (string? returnUrl) =>
 app.MapGet("/account/logout", () =>
     TypedResults.SignOut(new AuthenticationProperties { RedirectUri = "/" },
         [CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme]));
+
+// Where-to-watch clicks (affiliate links): Catalog.API records the click and says where to send the viewer, a link it
+// already lists for the show, wrapped by an affiliate program when one covers the service. A plain GET, so the show
+// page's links are ordinary links (open in a new tab, middle-click) and the phone can open them in the browser.
+app.MapGet("/go/{showId:guid}", async (Guid showId, string provider, int type, string region, string surface, HttpContext http,
+    IHttpClientFactory clients, ServerTokenStore tokens, ILoggerFactory loggers) =>
+{
+    using var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/outbound")
+    {
+        Content = JsonContent.Create(new { showId, provider, type, region, surface })
+    };
+    // Signed in, the click carries the user's plan (nothing else of theirs); the browser's address is only for the rate limit.
+    if (http.User.FindFirst("sub")?.Value is { } userId && await tokens.GetValidAccessTokenAsync(userId, http.RequestAborted) is { } token)
+    {
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
+    if (http.Connection.RemoteIpAddress is { } address)
+    {
+        request.Headers.TryAddWithoutValidation("X-Forwarded-For", address.ToString());
+    }
+
+    try
+    {
+        using var response = await clients.CreateClient(ApiClients.Catalog).SendAsync(request, http.RequestAborted);
+        if (response.IsSuccessStatusCode
+            && await response.Content.ReadFromJsonAsync<OutboundLink>(http.RequestAborted) is { } link
+            && Uri.TryCreate(link.Url, UriKind.Absolute, out var target) && (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp))
+        {
+            return Results.Redirect(target.AbsoluteUri);
+        }
+        loggers.CreateLogger("Outbound").LogWarning("Where-to-watch click for {ShowId} on {Provider} answered {Status}", showId, provider, response.StatusCode);
+    }
+    catch (HttpRequestException ex)
+    {
+        loggers.CreateLogger("Outbound").LogWarning(ex, "Where-to-watch click for {ShowId} on {Provider} failed", showId, provider);
+    }
+    // Back to the show, whose links are direct while the flag is off or the catalog can't be reached.
+    return Results.Redirect($"/shows/{showId}");
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

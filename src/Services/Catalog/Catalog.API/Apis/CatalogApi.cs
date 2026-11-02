@@ -46,6 +46,7 @@ public static class CatalogApi
         api.MapNamesakesApi();
         api.MapFarFromHomeApi();
         api.MapHistoryImportApi();
+        api.MapAffiliateApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();
@@ -310,7 +311,7 @@ public static class CatalogApi
     }
 
     /// <summary>The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.</summary>
-    private static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
+    internal static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
         StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
         : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search
             ? new(provider.ProviderName, provider.Type, search, WatchLink.Search)
