@@ -456,9 +456,6 @@ public class ShowNamesakeLookup
 }
 
 /// <summary>
-/// A person who made a show, with their roles on it.
-/// </summary>
-/// <summary>
 /// A show someone created or developed, from the provider's crew credits for them (fetched with their career, so no
 /// call of its own): what From the makers lists, in the catalog or not. Each person's rows are replaced at every fetch,
 /// and matched to catalog shows by the provider's id when read, so a show imported later links up.
@@ -494,6 +491,9 @@ public class PersonMadeShow
     public List<string> Roles { get; set; } = [];
 }
 
+/// <summary>
+/// A person who made a show, with their roles on it.
+/// </summary>
 public class ShowCreative
 {
     public Guid ShowId { get; set; }

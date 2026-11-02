@@ -3,7 +3,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;
 
-/// <summary>From the makers you love: makers weighed by the love of their shows, picks by that love and their rating.</summary>
+/// <summary>
+/// From the makers you love: makers weighed by the love of their shows, picks by that love and their rating.
+/// </summary>
 public class MakersRankingTests
 {
     private static readonly Guid BreakingBad = Guid.NewGuid(), Saul = Guid.NewGuid(), Fleabag = Guid.NewGuid(), Office = Guid.NewGuid();
@@ -76,6 +78,36 @@ public class MakersRankingTests
         // Listed, but as not in yet rather than as having made nothing else.
         Assert.True(Assert.Single(result.Makers).Pending);
     }
+
+    [Fact]
+    public void Coming_shows_are_listed_soonest_first_and_undated_projects_are_left_out()
+    {
+        var makers = new[]
+        {
+            Maker(Gilligan, "Vince Gilligan", [BreakingBad],
+                Coming("2029", 2029), Coming("2027", 2027), Coming("pitch", null), Made("recent", null, 8, isNew: true))
+        };
+
+        var result = MakersRanking.Build([new(BreakingBad, 1)], new HashSet<Guid>(), Titles, makers);
+
+        Assert.Equal(["2027", "2029", "recent"], result.New.Select(p => p.Show.ExternalId));
+        Assert.DoesNotContain(result.Picks, p => p.Show.ExternalId == "pitch");
+        Assert.Equal(3, result.Makers[0].OtherShows);
+    }
+
+    [Fact]
+    public void A_makers_shows_read_coming_then_newest_then_in_development()
+    {
+        MadeShowDto[] shows = [Made("old", null, 8, from: 2001), Coming("pitch", null), Made("newer", null, 8, from: 2015), Coming("2029", 2029),
+            Coming("2027", 2027)];
+
+        var ordered = shows.OrderBy(MakersRanking.Order).ThenBy(MakersRanking.OrderYear).Select(s => s.ExternalId);
+
+        Assert.Equal(["2027", "2029", "newer", "old", "pitch"], ordered);
+    }
+
+    private static MadeShowDto Coming(string externalId, int? from) =>
+        new(null, externalId, externalId, null, from, null, ShowStatus.Upcoming, null, 90, from is not null);
 
     private static MakersRanking.Maker Maker(Guid id, string name, Guid[] loved, params MadeShowDto[] made) =>
         new(id, name, null, false, loved, made);
