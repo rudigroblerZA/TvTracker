@@ -524,6 +524,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Sittings:** marks in a row, any show, each within the next episode's running time plus 30 minutes of the one
     before. A binge is three or more episodes.
   - **Bulk marks out,** as Year in TV: they say when a back catalog was entered, not watched.
+- **Streaks** (`StreaksApi`): computed on request from the caller's own watches and the catalog copy's air dates, in
+  their time zone, so no minimum counts; free, since a reason to come back daily is what it's for.
+  - **Days and weeks:** local dates with a watch, in a row; weeks run Monday to Sunday. The current run is alive until
+    the end of the day (week) after its last, and `AtRisk` says nothing's been watched yet today (this week), so a streak
+    isn't lost at midnight before the evening's episode.
+  - **Kept up, TV's own streak:** a show's regular aired episodes in air order, each watched within 7 days of airing (or
+    a day before, for marks across time zones). Episodes before the first kept one are skipped, so starting a show
+    late isn't a miss; an episode still inside its window is due, neither kept nor missed, and listed with its
+    deadline when it would extend a run of 2 or more. A season dropped at once counts when binged within the week.
+  - **Bulk marks out** (`CopyRules.BulkMark`), as Your TV clock and Year in TV. Episode numbers only, as Spoiler watch.
+  - **Tested** by marking demo's episodes of MobLand (one missed, then four kept, the latest unwatched) and Scrubs (three
+    kept, one late, two kept) at chosen times: 4 in a row with S02E07 due by 6 November, and 2 in a row with a best of 3.
+    ~20 ms warm.
 - **Your TV life** (`TvLifeApi`): computed on request from the catalog copy and the caller's watches, for a birth year
   the caller gives. The year stays on the device (a preference, like the spoiler shield): a profile column for a
   birth year is personal data the app has no other use for.
@@ -1204,6 +1217,33 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Limit behind `plans`:** like Tracking's, the Plus limit applies only while the `plans` flag is on for the caller.
 - **Logos:** the favicon client has ServiceDefaults' retries removed (one try each, as Research's sources), and a fetch
   that missed any logo is cached 15 minutes rather than the week.
+
+## Bring your history
+
+- **Why first** (from the competitor analysis): the plan's first segment is former TV Time users, every rival built a TV
+  Time importer (JustWatch, Trakt, Serializd), and this app had none. The one thing the others drop is the date of each
+  watch, which is what the personal insights run on, so the import keeps it.
+- **Read on the client** (`HistoryImportParser` in TvTracker.UI): the file never leaves the app whole. Columns are matched
+  loosely by name, since TV Time's exports changed names over the years (`s_no`/`season_number`/`episode_season_number`/
+  `season`), and account files in the archive (tokens, logins, devices) are never opened. Zone-less times are read in the
+  profile's time zone, so a Tuesday evening stays one. Movies are skipped: the catalog has none.
+- **Formats:** TV Time's `tracking-prod-records-v2.csv` (`key` rows `watch-episode-*`, `rewatch-episode-*`, `user-series-*`
+  with `is_followed`/`is_for_later`/`is_archived`, `tracking-stats`; `s_id` is TheTVDB's), `followed_tv_show.csv`, the older
+  `seen_episode.csv`; TV Time Out and Liberator CSVs (`series_tvdb_id` or `tvdb_id`, `season`, `episode`, `is_watched`,
+  `watched_at`, `status`); Trakt JSON (history items with `watched_at`, or the watched list with `last_watched_at`;
+  `ids.tvdb`); any CSV with a title or TVDB id, season, episode and date. The TV Time layout comes from importers' code
+  and research notes, not a real archive: none was to hand after the shutdown, so the first real file may add a column.
+- **Resolving in the sync worker** (`HistoryResolver`, `POST /api/v1/imports/resolve`): TheTVDB ids go through TVmaze's
+  `lookup/shows?thetvdb=`; titles are searched and taken only on a title match (year within one when given), because
+  the first result for "Ghosts" is a coin toss. Found shows are imported when missing. Lookups are cached 30 days
+  (misses a day). Ten shows a call: each missing show is two provider calls on the shared limiter.
+- **Catalog.API maps** (`HistoryImportApi`, signed in, search's rate limit) the worker's ids to catalog show and
+  episode ids by season and episode number; the catalog never sees the watches.
+- **Tracking marks** (`ImportWatchesAsync`, `POST /api/v1/watched/import`, 500 a call) each watch at its own time, the
+  earliest per episode, follows a new show from its first watch, and sends one `EpisodeWatched` per moment so Analytics
+  and Social keep the times. Already-watched episodes are left alone, so a repeat import is a no-op; nothing is unmarked.
+- **The page orchestrates** (`/settings/import`), as Holiday episodes and Who said it? do: resolve in batches of ten with
+  progress, then mark in chunks, then statuses (planned, stopped). Stopping keeps what's done; a rerun skips it.
 
 ## Insights by plan
 

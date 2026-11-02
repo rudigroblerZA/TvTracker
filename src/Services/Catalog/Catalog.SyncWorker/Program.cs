@@ -45,6 +45,7 @@ else
 }
 
 builder.Services.AddScoped<CatalogSynchronizer>();
+builder.Services.AddScoped<HistoryResolver>();
 builder.Services.AddSingleton<CatalogReplayRunner>();
 builder.Services.AddSingleton<BulkImportRunner>();
 builder.Services.AddHostedService<CatalogSyncService>();

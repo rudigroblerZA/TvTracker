@@ -1074,3 +1074,31 @@ public record FarFromHomeShow(Guid ShowId, string Title, string? PosterUrl, stri
 public record SettingCountry(string Country, int Shows, int Cast, int Home, IReadOnlyList<BirthplaceCount> BornIn);
 
 public record BirthplaceCount(string Country, int Count);
+
+/// <summary>Streaks: days and weeks in a row of watching, and shows kept up with as they air.</summary>
+public record Streaks(int Episodes, int BulkLeftOut, Streak Days, Streak Weeks, IReadOnlyList<KeptUp> KeptUp, IReadOnlyList<StreakDue> Due, KeptUp? Best);
+
+/// <param name="AtRisk">Alive, but nothing watched yet today (this week).</param>
+public record Streak(int Current, int Longest, DateOnly? LongestFrom, DateOnly? LongestTo, bool AtRisk);
+
+/// <param name="Current">Episodes in a row, up to the latest aired, each watched within a week of airing.</param>
+public record KeptUp(Guid ShowId, string Title, string? PosterUrl, int Current, int Longest, int Season, int Episode);
+
+/// <param name="WatchBy">The last day watching it keeps the run.</param>
+public record StreakDue(Guid ShowId, string Title, string? PosterUrl, int Season, int Episode, DateOnly WatchBy, int Streak);
+
+/// <summary>Bring your history: a show from an export to resolve, with the episode numbers watched.</summary>
+public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes);
+
+public record HistoryEpisodeNumber(int Season, int Number);
+
+/// <param name="Outcome">"found", "imported", "not-found" or "failed".</param>
+public record HistoryShow(string Key, Guid? ShowId, string? Title, string? PosterUrl, string Outcome, IReadOnlyList<HistoryEpisode> Episodes);
+
+public record HistoryEpisode(int Season, int Number, Guid EpisodeId);
+
+public record HistoryResolveResult(IReadOnlyList<HistoryShow> Shows);
+
+public record ImportedWatch(Guid EpisodeId, DateTimeOffset WatchedAtUtc);
+
+public record ImportWatchesResult(int Added);

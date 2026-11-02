@@ -1,0 +1,296 @@
+@page "/settings/import"
+@attribute [RequiresFeature(FeatureFlags.HistoryImport)]
+@inject CatalogClient Catalog
+@inject TrackingClient Tracking
+@inject UserSession Session
+
+<PageTitle>Bring your history · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Bring your history</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Import what you've watched from a TV Time archive (the GDPR zip, or the TV Time Out and Liberator files), a
+            Trakt export, or any CSV with a show, a season, an episode and a date. Every watch keeps its original date, so
+            Year in TV, Your TV clock and Streaks read your past as it happened. The file is read here and only the
+            episodes and dates are sent; nothing you already have is changed.
+        </p>
+
+        @if (parsed is null)
+        {
+            <div class="panel">
+                <label class="small" for="history-file">Export file (.zip, .csv or .json, up to 64 MB)</label>
+                <InputFile id="history-file" OnChange="ChooseAsync" accept=".zip,.csv,.json" disabled="@reading" />
+                @if (reading)
+                {
+                    <p class="muted small">Reading…</p>
+                }
+            </div>
+        }
+        else if (summary is null)
+        {
+            <section class="panel">
+                <h2>What's in it</h2>
+                <ul>
+                    <li>@($"{parsed.Watches.Count} episodes watched across {parsed.Shows.Count} shows, from {parsed.Source}")</li>
+                    @if (parsed.Earliest is { } first && parsed.Latest is { } last)
+                    {
+                        <li>@($"Dated from {first:d MMM yyyy} to {last:d MMM yyyy}")@(parsed.Undated > 0 ? $"; {parsed.Undated} without a date (they'll be marked as of today)" : "")</li>
+                    }
+                    else if (parsed.Watches.Count > 0)
+                    {
+                        <li>No dates in the file: every watch will be marked as of today.</li>
+                    }
+                    <li>@($"{parsed.Follows.Count} shows followed or saved for later")</li>
+                    @if (parsed.Skipped > 0)
+                    {
+                        <li class="muted">@($"{parsed.Skipped} rows skipped (movies, or no show or episode number)")</li>
+                    }
+                </ul>
+                <details>
+                    <summary class="small">Files read</summary>
+                    <ul class="small muted">
+                        @foreach (var f in parsed.Files)
+                        {
+                            <li>@f</li>
+                        }
+                    </ul>
+                </details>
+                @if (parsed.Watches.Count == 0 && parsed.Follows.Count == 0)
+                {
+                    <p>Nothing to import was found. The file needs a show and an episode number per row.</p>
+                    <button class="btn btn-quiet" type="button" @onclick="Reset">Choose another file</button>
+                }
+                else if (!importing)
+                {
+                    <p class="small muted">@($"Shows the catalog doesn't have yet are added as it goes, a few a minute, so {parsed.Shows.Count} shows can take a few minutes.")</p>
+                    <button class="btn" type="button" @onclick="ImportAsync">Import</button>
+                    @(" ")<button class="btn btn-quiet" type="button" @onclick="Reset">Choose another file</button>
+                }
+                else
+                {
+                    <p role="status">@progress</p>
+                    <div class="gap-track"><span class="gap-fill" style="width: @Percent%"></span></div>
+                    <p><button class="btn btn-quiet" type="button" @onclick="() => cancel?.Cancel()">Stop</button></p>
+                }
+                <ErrorNotice Message="@error" />
+            </section>
+        }
+        else
+        {
+            <section class="panel">
+                <h2>@(cancelled ? "Stopped" : "Done")</h2>
+                <ul>
+                    <li>@($"{summary.Added} episodes marked watched, with their dates")@(summary.AlreadyHad > 0 ? $" ({summary.AlreadyHad} were already marked)" : "")</li>
+                    <li>@($"{summary.Matched} shows matched")@(summary.Imported > 0 ? $", {summary.Imported} of them added to the catalog for you" : "")</li>
+                    @if (summary.Follows > 0)
+                    {
+                        <li>@($"{summary.Follows} shows set to plan to watch or stopped, as they were")</li>
+                    }
+                    @if (summary.MissingEpisodes > 0)
+                    {
+                        <li class="muted">@($"{summary.MissingEpisodes} watches had no matching episode (specials, or numbering the catalog counts differently)")</li>
+                    }
+                </ul>
+                @if (summary.Unmatched.Count > 0)
+                {
+                    <h3>@($"{summary.Unmatched.Count} shows couldn't be found")</h3>
+                    <p class="muted small">Search for one to add it to the catalog, then import the file again: watches already marked are skipped.</p>
+                    <ul class="small">
+                        @foreach (var title in summary.Unmatched.Take(50))
+                        {
+                            <li><a href="search?q=@Uri.EscapeDataString(title)">@title</a></li>
+                        }
+                    </ul>
+                }
+                @if (summary.Failed > 0)
+                {
+                    <p class="muted small">@($"{summary.Failed} shows couldn't be looked up right now; import the file again later and they'll be tried again.")</p>
+                }
+                <div class="tool-links">
+                    <ToolLink Href="year-in-tv" Title="Year in TV">Your years, now with the history behind them.</ToolLink>
+                    <ToolLink Href="streaks" Title="Streaks">Your longest runs, from the dates you brought.</ToolLink>
+                    <ToolLink Href="upnext" Title="Up Next">Where each show left off.</ToolLink>
+                </div>
+                <p><button class="btn btn-quiet" type="button" @onclick="Reset">Import another file</button></p>
+            </section>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to import your history." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private const long MaxBytes = 64L * 1024 * 1024;
+    private const int ShowsPerCall = 10;
+    private const int WatchesPerCall = 500;
+
+    private ParsedHistory? parsed;
+    private bool reading;
+    private bool importing;
+    private bool cancelled;
+    private string progress = "";
+    private int done, total;
+    private string? error;
+    private CancellationTokenSource? cancel;
+    private ImportSummary? summary;
+
+    private sealed record ImportSummary(int Added, int AlreadyHad, int Matched, int Imported, int Follows, int MissingEpisodes, int Failed, List<string> Unmatched);
+
+    private int Percent => total == 0 ? 0 : Math.Min(100, 100 * done / total);
+
+    private async Task ChooseAsync(InputFileChangeEventArgs e)
+    {
+        error = null;
+        reading = true;
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            var zone = Session.Profile?.TimeZone is { Length: > 0 } tz && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+            // Read fully first: the parser seeks (zip), and a browser stream doesn't.
+            using var buffer = new MemoryStream();
+            await using (var stream = e.File.OpenReadStream(MaxBytes))
+            {
+                await stream.CopyToAsync(buffer);
+            }
+            buffer.Position = 0;
+            parsed = HistoryImportParser.Parse(buffer, e.File.Name, zone);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            error = ex is IOException && ex.Message.Contains("exceeds") ? "That file is over 64 MB." : "That file couldn't be read as a zip, CSV or JSON export.";
+        }
+        finally
+        {
+            reading = false;
+        }
+    }
+
+    private void Reset()
+    {
+        parsed = null;
+        summary = null;
+        error = null;
+        cancelled = false;
+        importing = false;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (parsed is null)
+        {
+            return;
+        }
+        importing = true;
+        cancelled = false;
+        error = null;
+        cancel = new CancellationTokenSource();
+        var ct = cancel.Token;
+        var watchesByShow = parsed.Watches.GroupBy(w => w.ShowKey).ToDictionary(g => g.Key, g => g.ToList());
+        var shows = parsed.Shows.Values.OrderBy(s => s.Title, StringComparer.CurrentCulture).ToList();
+        total = shows.Count + parsed.Watches.Count;
+        done = 0;
+        int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0;
+        var unmatched = new List<string>();
+        var episodeIds = new Dictionary<string, Dictionary<(int, int), Guid>>();
+        var showIds = new Dictionary<string, Guid>();
+        try
+        {
+            // 1. Shows, in small batches, since each one the catalog lacks is fetched from the provider.
+            foreach (var batch in shows.Chunk(ShowsPerCall))
+            {
+                ct.ThrowIfCancellationRequested();
+                progress = $"Finding shows: {done} of {shows.Count}…";
+                StateHasChanged();
+                var request = batch.Select(s => new HistoryShowRequest(s.Key, s.TvdbId, s.Title, s.Year,
+                    (watchesByShow.GetValueOrDefault(s.Key) ?? []).Select(w => new HistoryEpisodeNumber(w.Season, w.Episode)).Distinct().ToList())).ToList();
+                var result = await Catalog.ResolveHistoryAsync(request, ct);
+                foreach (var show in batch)
+                {
+                    var r = result?.Shows.FirstOrDefault(x => x.Key == show.Key);
+                    if (r?.ShowId is { } id)
+                    {
+                        matched++;
+                        if (r.Outcome == "imported") imported++;
+                        showIds[show.Key] = id;
+                        episodeIds[show.Key] = r.Episodes.GroupBy(e => (e.Season, e.Number)).ToDictionary(g => g.Key, g => g.First().EpisodeId);
+                    }
+                    else if (r?.Outcome == "failed") failed++;
+                    else unmatched.Add(show.Title.Length > 0 ? show.Title : $"TVDB {show.TvdbId}");
+                }
+                done += batch.Length;
+            }
+
+            // 2. Watches, with their own times; the ones without a date as of now.
+            var now = DateTimeOffset.UtcNow;
+            var toMark = new List<ImportedWatch>();
+            foreach (var w in parsed.Watches)
+            {
+                if (episodeIds.TryGetValue(w.ShowKey, out var map) && map.TryGetValue((w.Season, w.Episode), out var episodeId))
+                {
+                    toMark.Add(new ImportedWatch(episodeId, w.WatchedAtUtc ?? now));
+                }
+                else if (showIds.ContainsKey(w.ShowKey))
+                {
+                    missing++;
+                }
+            }
+            foreach (var chunk in toMark.Chunk(WatchesPerCall))
+            {
+                ct.ThrowIfCancellationRequested();
+                progress = $"Marking episodes: {done - shows.Count} of {toMark.Count}…";
+                StateHasChanged();
+                var result = await Tracking.ImportWatchesAsync(chunk, ct);
+                added += result?.Added ?? 0;
+                alreadyHad += chunk.Length - (result?.Added ?? 0);
+                done += chunk.Length;
+            }
+
+            // 3. Plan-to-watch and stopped, for shows the export says so about; watched shows are followed already.
+            foreach (var follow in parsed.Follows.Where(f => f.Status is "plan" or "stopped" && showIds.ContainsKey(f.ShowKey)))
+            {
+                ct.ThrowIfCancellationRequested();
+                var showId = showIds[follow.ShowKey];
+                if (follow.Status == "plan")
+                {
+                    if (!watchesByShow.ContainsKey(follow.ShowKey) && await Tracking.GetFollowAsync(showId, ct) is null)
+                    {
+                        await Tracking.FollowAsync(showId, WatchStatus.PlanToWatch, ct);
+                        follows++;
+                    }
+                }
+                else
+                {
+                    if (await Tracking.GetFollowAsync(showId, ct) is null)
+                    {
+                        await Tracking.FollowAsync(showId, WatchStatus.Stopped, ct);
+                    }
+                    else
+                    {
+                        await Tracking.SetStatusAsync(showId, WatchStatus.Stopped, ct);
+                    }
+                    follows++;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+            cancelled = true;
+        }
+        finally
+        {
+            importing = false;
+            cancel.Dispose();
+            cancel = null;
+        }
+        summary = new ImportSummary(added, alreadyHad, matched, imported, follows, missing, failed, unmatched);
+    }
+}

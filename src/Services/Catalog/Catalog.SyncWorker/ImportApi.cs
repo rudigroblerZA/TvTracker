@@ -20,6 +20,12 @@ public static class ImportApi
 
         api.MapPost("/search", ImportSearchResultsAsync);
 
+        // Bring your history: the shows in someone's export, found by TheTVDB id or title and imported when missing.
+        api.MapPost("/resolve", async (ResolveShowsRequest request, HistoryResolver resolver, IHostApplicationLifetime lifetime) =>
+            request.Shows is { Count: > 0 and <= HistoryResolver.MaxShows }
+                ? Results.Ok(await resolver.ResolveAsync(request, lifetime.ApplicationStopping))
+                : Results.Problem($"Give 1 to {HistoryResolver.MaxShows} shows.", statusCode: StatusCodes.Status400BadRequest));
+
         // Used by a service that starts after shows were imported (Analytics on first start) to build its copy.
         api.MapPost("/replay", Replay);
 

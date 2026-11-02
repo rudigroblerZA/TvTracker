@@ -73,6 +73,9 @@ var app = builder.Build();
 app.MapDefaultEndpoints();
 
 app.UseAuthentication();
+// Explicit, after authentication: with only UseAuthentication called, the authorization middleware is added before it,
+// and an endpoint that requires sign-in (Bring your history) answers 401 to every token.
+app.UseAuthorization();
 app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())

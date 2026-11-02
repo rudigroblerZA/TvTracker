@@ -36,6 +36,17 @@ public record MarkWatchedRequest(
 
 public record MarkWatchedResult(int Added, IReadOnlyList<Guid> EpisodeIds);
 
+/// <summary>Watches from an export (Bring your history), each with the time it was watched.</summary>
+public record ImportWatchesRequest(IReadOnlyList<ImportedWatch> Watches)
+{
+    public const int MaxWatches = 500;
+}
+
+public record ImportedWatch(Guid EpisodeId, DateTimeOffset WatchedAtUtc);
+
+/// <param name="Added">Watches added; ones already marked aren't counted.</param>
+public record ImportWatchesResult(int Added);
+
 public record EpisodeRefDto(
     Guid EpisodeId,
     Guid ShowId,

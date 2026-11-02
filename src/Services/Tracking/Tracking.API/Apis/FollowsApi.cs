@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tracking.API.Data;
 using Tracking.API.Services;
+using TvTracker;
 
 namespace Tracking.API.Apis;
 
@@ -19,6 +20,7 @@ public static class FollowsApi
         api.MapPut("/follows/{showId:guid}/status", UpdateStatusAsync);
 
         api.MapPost("/watched", MarkWatchedAsync);
+        api.MapPost("/watched/import", ImportWatchesAsync).RequireFeature(FeatureFlags.HistoryImport);
         api.MapDelete("/watched/{episodeId:guid}", UnmarkWatchedAsync);
 
         return api;
@@ -156,6 +158,18 @@ public static class FollowsApi
 
         var added = await tracking.MarkWatchedAsync(user.GetUserId(), episodes, request.WatchedAtUtc, ct);
         return TypedResults.Ok(new MarkWatchedResult(added.Count, added));
+    }
+
+    /// <summary>Bring your history: up to <see cref="ImportWatchesRequest.MaxWatches"/> watches with their own times (see <see cref="TrackingService.ImportWatchesAsync"/>).</summary>
+    private static async Task<Results<Ok<ImportWatchesResult>, ValidationProblem>> ImportWatchesAsync(
+        ImportWatchesRequest request, ClaimsPrincipal user, TrackingService tracking, CancellationToken ct)
+    {
+        if (request.Watches is not { Count: > 0 and <= ImportWatchesRequest.MaxWatches })
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["watches"] = [$"Give 1 to {ImportWatchesRequest.MaxWatches} watches."] });
+        }
+        var added = await tracking.ImportWatchesAsync(user.GetUserId(), request.Watches.Select(w => (w.EpisodeId, w.WatchedAtUtc)).ToList(), ct);
+        return TypedResults.Ok(new ImportWatchesResult(added));
     }
 
     private static async Task<Results<NoContent, NotFound>> UnmarkWatchedAsync(
