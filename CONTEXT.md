@@ -1234,8 +1234,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `ids.tvdb`); any CSV with a title or TVDB id, season, episode and date. The TV Time layout comes from importers' code
   and research notes, not a real archive: none was to hand after the shutdown, so the first real file may add a column.
 - **Resolving in the sync worker** (`HistoryResolver`, `POST /api/v1/imports/resolve`): TheTVDB ids go through TVmaze's
-  `lookup/shows?thetvdb=`; titles are searched and taken only on a title match (year within one when given), because
-  the first result for "Ghosts" is a coin toss. Found shows are imported when missing. Lookups are cached 30 days
+  `lookup/shows?thetvdb=`; titles are searched and taken only on a title match as Same name reads titles
+  (`NamesakeTitles.Key`; year within one when given), because the first result for "Ghosts" is a coin toss. Found shows are imported when missing. Lookups are cached 30 days
   (misses a day). Ten shows a call: each missing show is two provider calls on the shared limiter.
 - **Catalog.API maps** (`HistoryImportApi`, signed in, search's rate limit) the worker's ids to catalog show and
   episode ids by season and episode number; the catalog never sees the watches.

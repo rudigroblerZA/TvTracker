@@ -148,8 +148,12 @@
         reading = true;
         try
         {
+            if (e.File.Size > MaxBytes)
+            {
+                error = "That file is over 64 MB.";
+                return;
+            }
             await Session.EnsureLoadedAsync();
-            var zone = Session.Profile?.TimeZone is { Length: > 0 } tz && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
             // Read fully first: the parser seeks (zip), and a browser stream doesn't.
             using var buffer = new MemoryStream();
             await using (var stream = e.File.OpenReadStream(MaxBytes))
@@ -157,11 +161,11 @@
                 await stream.CopyToAsync(buffer);
             }
             buffer.Position = 0;
-            parsed = HistoryImportParser.Parse(buffer, e.File.Name, zone);
+            parsed = HistoryImportParser.Parse(buffer, e.File.Name, Session.TimeZone);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
         {
-            error = ex is IOException && ex.Message.Contains("exceeds") ? "That file is over 64 MB." : "That file couldn't be read as a zip, CSV or JSON export.";
+            error = "That file couldn't be read as a zip, CSV or JSON export.";
         }
         finally
         {
@@ -175,7 +179,6 @@
         summary = null;
         error = null;
         cancelled = false;
-        importing = false;
     }
 
     private async Task ImportAsync()
@@ -195,8 +198,8 @@
         done = 0;
         int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0;
         var unmatched = new List<string>();
-        var episodeIds = new Dictionary<string, Dictionary<(int, int), Guid>>();
-        var showIds = new Dictionary<string, Guid>();
+        // Each matched show's catalog id and its episode ids by (season, number).
+        var found = new Dictionary<string, (Guid ShowId, Dictionary<(int, int), Guid> Episodes)>();
         try
         {
             // 1. Shows, in small batches, since each one the catalog lacks is fetched from the provider.
@@ -215,8 +218,7 @@
                     {
                         matched++;
                         if (r.Outcome == "imported") imported++;
-                        showIds[show.Key] = id;
-                        episodeIds[show.Key] = r.Episodes.GroupBy(e => (e.Season, e.Number)).ToDictionary(g => g.Key, g => g.First().EpisodeId);
+                        found[show.Key] = (id, r.Episodes.ToDictionary(e => (e.Season, e.Number), e => e.EpisodeId));
                     }
                     else if (r?.Outcome == "failed") failed++;
                     else unmatched.Add(show.Title.Length > 0 ? show.Title : $"TVDB {show.TvdbId}");
@@ -229,11 +231,15 @@
             var toMark = new List<ImportedWatch>();
             foreach (var w in parsed.Watches)
             {
-                if (episodeIds.TryGetValue(w.ShowKey, out var map) && map.TryGetValue((w.Season, w.Episode), out var episodeId))
+                if (!found.TryGetValue(w.ShowKey, out var show))
+                {
+                    continue;
+                }
+                if (show.Episodes.TryGetValue((w.Season, w.Episode), out var episodeId))
                 {
                     toMark.Add(new ImportedWatch(episodeId, w.WatchedAtUtc ?? now));
                 }
-                else if (showIds.ContainsKey(w.ShowKey))
+                else
                 {
                     missing++;
                 }
@@ -249,31 +255,29 @@
                 done += chunk.Length;
             }
 
-            // 3. Plan-to-watch and stopped, for shows the export says so about; watched shows are followed already.
-            foreach (var follow in parsed.Follows.Where(f => f.Status is "plan" or "stopped" && showIds.ContainsKey(f.ShowKey)))
+            // 3. Plan-to-watch and stopped, for shows the export says so about; watched shows are followed already, and
+            // a follow the user has isn't moved to plan to watch.
+            var statuses = parsed.Follows.Where(f => f.Status is "plan" or "stopped" && found.ContainsKey(f.ShowKey))
+                .Where(f => f.Status == "stopped" || !watchesByShow.ContainsKey(f.ShowKey)).ToList();
+            var existing = statuses.Count > 0 ? (await Tracking.GetFollowsAsync(ct: ct) ?? []).Select(f => f.ShowId).ToHashSet() : new HashSet<Guid>();
+            foreach (var follow in statuses)
             {
                 ct.ThrowIfCancellationRequested();
-                var showId = showIds[follow.ShowKey];
-                if (follow.Status == "plan")
+                var showId = found[follow.ShowKey].ShowId;
+                var status = follow.Status == "plan" ? WatchStatus.PlanToWatch : WatchStatus.Stopped;
+                if (!existing.Contains(showId))
                 {
-                    if (!watchesByShow.ContainsKey(follow.ShowKey) && await Tracking.GetFollowAsync(showId, ct) is null)
-                    {
-                        await Tracking.FollowAsync(showId, WatchStatus.PlanToWatch, ct);
-                        follows++;
-                    }
+                    await Tracking.FollowAsync(showId, status, ct);
+                }
+                else if (status == WatchStatus.Stopped)
+                {
+                    await Tracking.SetStatusAsync(showId, status, ct);
                 }
                 else
                 {
-                    if (await Tracking.GetFollowAsync(showId, ct) is null)
-                    {
-                        await Tracking.FollowAsync(showId, WatchStatus.Stopped, ct);
-                    }
-                    else
-                    {
-                        await Tracking.SetStatusAsync(showId, WatchStatus.Stopped, ct);
-                    }
-                    follows++;
+                    continue;
                 }
+                follows++;
             }
         }
         catch (OperationCanceledException)
