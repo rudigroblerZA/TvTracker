@@ -102,7 +102,11 @@ public sealed class CreativesService(
         var outbox = scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>();
         var staleBefore = time.GetUtcNow().UtcDateTime - CareerMaxAge;
         var now = time.GetUtcNow();
-        var skip = _failedCareers.Where(f => f.Value > now).Select(f => f.Key).ToList();
+        foreach (var expired in _failedCareers.Where(f => f.Value <= now).Select(f => f.Key).ToList())
+        {
+            _failedCareers.Remove(expired);
+        }
+        var skip = _failedCareers.Keys.ToList();
 
         var due = await db.People
             .Where(p => p.ExternalId != null && (p.CareerRefreshedAtUtc == null || p.CareerRefreshedAtUtc < staleBefore) && !skip.Contains(p.Id))
@@ -157,6 +161,6 @@ public sealed class CreativesService(
         }
         await db.SaveChangesAsync(ct);
         await outbox.PublishAddedAsync(ct);
-        return due.Count;
+        return refreshed.Count;
     }
 }
