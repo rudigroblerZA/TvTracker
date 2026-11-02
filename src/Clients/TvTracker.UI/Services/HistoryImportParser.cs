@@ -17,13 +17,9 @@ public sealed record ParsedFollow(string ShowKey, string Status);
 
 /// <param name="Files">The files that were read, with what each gave.</param>
 /// <param name="Skipped">Rows that couldn't be read (no show, no episode number, …).</param>
+/// <param name="Earliest">The earliest dated watch, and <paramref name="Latest"/> the latest; <paramref name="Undated"/> counts the rest.</param>
 public sealed record ParsedHistory(string Source, Dictionary<string, ParsedShow> Shows, List<ParsedWatch> Watches, List<ParsedFollow> Follows,
-    List<string> Files, int Skipped)
-{
-    public DateTimeOffset? Earliest => Watches.Where(w => w.WatchedAtUtc is not null).Min(w => w.WatchedAtUtc);
-    public DateTimeOffset? Latest => Watches.Where(w => w.WatchedAtUtc is not null).Max(w => w.WatchedAtUtc);
-    public int Undated => Watches.Count(w => w.WatchedAtUtc is null);
-}
+    List<string> Files, int Skipped, DateTimeOffset? Earliest, DateTimeOffset? Latest, int Undated);
 
 /// <summary>
 /// Reads a viewing-history export into shows, watches and follows, for Bring your history. It takes the official TV Time
@@ -52,8 +48,9 @@ public static partial class HistoryImportParser
     public static ParsedHistory Parse(Stream file, string fileName, TimeZoneInfo zone)
     {
         var shows = new Dictionary<string, ParsedShow>();
-        var watches = new Dictionary<(string, int, int), ParsedWatch>();
-        var rewatches = new Dictionary<(string, int, int), ParsedWatch>();
+        // Each episode once: a first watch replaces a rewatch row, a rewatch row never replaces a first watch, and within a
+        // kind the earliest time wins.
+        var watches = new Dictionary<(string, int, int), (ParsedWatch Watch, bool Rewatch)>();
         var follows = new Dictionary<string, ParsedFollow>();
         var files = new List<string>();
         var skipped = 0;
@@ -62,38 +59,19 @@ public static partial class HistoryImportParser
         void ReadEntry(string name, Stream content)
         {
             var lower = name.ToLowerInvariant();
-            if (lower.EndsWith(".json"))
+            var (w, f, n, kind) = lower.EndsWith(".json") ? ReadJson(content) : lower.EndsWith(".csv") ? ReadCsv(content) : (0, 0, 0, null);
+            if (w > 0 || f > 0)
             {
-                var (s, w, f, n) = ReadJson(content, zone);
-                if (w > 0 || f > 0 || s > 0)
-                {
-                    files.Add($"{Path.GetFileName(name)}: {w} watches, {f} follows");
-                    source = "Trakt";
-                }
-                skipped += n;
-                // ReadJson merged into the shared dictionaries through closures below.
-                return;
+                files.Add($"{Path.GetFileName(name)}: {w} watches, {f} follows");
+                source = kind ?? source;
             }
-            if (!lower.EndsWith(".csv"))
-            {
-                return;
-            }
-            var (sw, sf, sn, kind) = ReadCsv(content);
-            if (sw > 0 || sf > 0)
-            {
-                files.Add($"{Path.GetFileName(name)}: {sw} watches, {sf} follows");
-                if (kind is not null)
-                {
-                    source = kind;
-                }
-            }
-            skipped += sn;
+            skipped += n;
         }
 
-        (int, int, int, int) ReadJson(Stream content, TimeZoneInfo tz)
+        (int, int, int, string?) ReadJson(Stream content)
         {
             using var doc = JsonDocument.Parse(content);
-            int s = 0, w = 0, f = 0, n = 0;
+            int w = 0, f = 0, n = 0;
             foreach (var item in Items(doc.RootElement))
             {
                 // Trakt: {watched_at, type: "episode", episode: {season, number}, show: {title, year, ids: {tvdb}}}
@@ -104,10 +82,9 @@ public static partial class HistoryImportParser
                         show.TryGetProperty("title", out var t) ? t.GetString() : null,
                         show.TryGetProperty("year", out var y) && y.ValueKind == JsonValueKind.Number ? y.GetInt32() : null);
                     if (key is null) { n++; continue; }
-                    s++;
                     if (item.TryGetProperty("episode", out var ep) && ep.ValueKind == JsonValueKind.Object)
                     {
-                        var at = item.TryGetProperty("watched_at", out var wa) ? ParseDate(wa.GetString(), tz) : null;
+                        var at = item.TryGetProperty("watched_at", out var wa) ? ParseDate(wa.GetString(), zone) : null;
                         if (AddWatch(key, Int(ep, "season"), Int(ep, "number"), at, first: true)) w++; else n++;
                     }
                     else if (item.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
@@ -119,7 +96,7 @@ public static partial class HistoryImportParser
                             if (!season.TryGetProperty("episodes", out var eps)) continue;
                             foreach (var e in eps.EnumerateArray())
                             {
-                                var at = e.TryGetProperty("last_watched_at", out var lw) ? ParseDate(lw.GetString(), tz) : null;
+                                var at = e.TryGetProperty("last_watched_at", out var lw) ? ParseDate(lw.GetString(), zone) : null;
                                 if (AddWatch(key, sn, Int(e, "number"), at, first: true)) w++; else n++;
                             }
                         }
@@ -131,7 +108,7 @@ public static partial class HistoryImportParser
                     }
                 }
             }
-            return (s, w, f, n);
+            return (w, f, n, "Trakt");
         }
 
         (int, int, int, string?) ReadCsv(Stream content)
@@ -212,12 +189,17 @@ public static partial class HistoryImportParser
         bool AddWatch(string key, int? season, int? episode, DateTimeOffset? at, bool first)
         {
             if (season is not { } s || episode is not { } e || e <= 0 || s < 0) return false;
-            var target = first ? watches : rewatches;
             var id = (key, s, e);
-            if (!target.TryGetValue(id, out var known) || (at is not null && (known.WatchedAtUtc is null || at < known.WatchedAtUtc)))
+            if (watches.TryGetValue(id, out var known))
             {
-                target[id] = new ParsedWatch(key, s, e, at ?? known?.WatchedAtUtc);
+                if (known.Rewatch == !first)
+                {
+                    if (at is not null && (known.Watch.WatchedAtUtc is null || at < known.Watch.WatchedAtUtc)) watches[id] = (known.Watch with { WatchedAtUtc = at }, known.Rewatch);
+                    return true;
+                }
+                if (!first) return true;
             }
+            watches[id] = (new ParsedWatch(key, s, e, at), !first);
             return true;
         }
 
@@ -228,10 +210,7 @@ public static partial class HistoryImportParser
             foreach (var entry in zip.Entries.Where(e => e.Length > 0 && !IsPrivate(e.Name)).OrderBy(e => e.FullName, StringComparer.Ordinal))
             {
                 using var content = entry.Open();
-                using var buffer = new MemoryStream();
-                content.CopyTo(buffer);
-                buffer.Position = 0;
-                ReadEntry(entry.FullName, buffer);
+                ReadEntry(entry.FullName, content);
             }
             if (source == "a CSV file") source = "a TV Time archive";
         }
@@ -240,13 +219,11 @@ public static partial class HistoryImportParser
             ReadEntry(fileName, file);
         }
 
-        foreach (var (id, rewatch) in rewatches.Where(r => !watches.ContainsKey(r.Key)))
-        {
-            watches[id] = rewatch;
-        }
-        var used = watches.Values.Select(w => w.ShowKey).Concat(follows.Keys).ToHashSet();
-        return new ParsedHistory(source, shows.Where(s => used.Contains(s.Key)).ToDictionary(s => s.Key, s => s.Value),
-            watches.Values.OrderBy(w => w.WatchedAtUtc ?? DateTimeOffset.MaxValue).ToList(), follows.Values.ToList(), files, skipped);
+        var all = watches.Values.Select(v => v.Watch).OrderBy(w => w.WatchedAtUtc ?? DateTimeOffset.MaxValue).ToList();
+        var used = all.Select(w => w.ShowKey).Concat(follows.Keys).ToHashSet();
+        var dated = all.Where(w => w.WatchedAtUtc is not null).ToList();
+        return new ParsedHistory(source, shows.Where(s => used.Contains(s.Key)).ToDictionary(s => s.Key, s => s.Value), all, follows.Values.ToList(),
+            files, skipped, dated.FirstOrDefault()?.WatchedAtUtc, dated.LastOrDefault()?.WatchedAtUtc, all.Count - dated.Count);
     }
 
     /// <summary>Account files in a TV Time archive that an importer has no business opening.</summary>

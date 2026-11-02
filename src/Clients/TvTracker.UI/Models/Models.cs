@@ -1076,7 +1076,7 @@ public record SettingCountry(string Country, int Shows, int Cast, int Home, IRea
 public record BirthplaceCount(string Country, int Count);
 
 /// <summary>Streaks: days and weeks in a row of watching, and shows kept up with as they air.</summary>
-public record Streaks(int Episodes, int BulkLeftOut, Streak Days, Streak Weeks, IReadOnlyList<KeptUp> KeptUp, IReadOnlyList<StreakDue> Due, KeptUp? Best);
+public record Streaks(int KeptUpDays, int BulkLeftOut, Streak Days, Streak Weeks, IReadOnlyList<KeptUp> KeptUp, IReadOnlyList<StreakDue> Due, KeptUp? Best);
 
 /// <param name="AtRisk">Alive, but nothing watched yet today (this week).</param>
 public record Streak(int Current, int Longest, DateOnly? LongestFrom, DateOnly? LongestTo, bool AtRisk);

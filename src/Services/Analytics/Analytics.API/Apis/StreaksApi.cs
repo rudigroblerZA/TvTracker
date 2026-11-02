@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Claims;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -7,6 +6,7 @@ using TvTracker;
 
 namespace Analytics.API.Apis;
 
+/// <param name="KeptUpDays">The window for keeping up, so the page states the rule the figures follow.</param>
 /// <param name="BulkLeftOut">Marks of a back catalog left out (<see cref="CopyRules.BulkMark"/>+ at once).</param>
 /// <param name="Days">Days in a row with something watched.</param>
 /// <param name="Weeks">Weeks (Monday to Sunday) in a row with something watched; the longest run's dates are its first Monday
@@ -15,7 +15,7 @@ namespace Analytics.API.Apis;
 /// longest current run first.</param>
 /// <param name="Due">Aired episodes still inside their window that would extend a kept-up run, soonest deadline first.</param>
 /// <param name="Best">The longest kept-up run ever, on any show.</param>
-public record StreaksDto(int Episodes, int BulkLeftOut, StreakDto Days, StreakDto Weeks, IReadOnlyList<KeptUpDto> KeptUp,
+public record StreaksDto(int KeptUpDays, int BulkLeftOut, StreakDto Days, StreakDto Weeks, IReadOnlyList<KeptUpDto> KeptUp,
     IReadOnlyList<StreakDueDto> Due, KeptUpDto? Best);
 
 /// <param name="Current">The run that's still alive: ending today (this week), or yesterday (last week) with today
@@ -68,9 +68,8 @@ public static class StreaksApi
         var now = time.GetUtcNow();
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
 
-        var rows = await db.Watches.AsNoTracking().Where(w => w.UserId == userId)
-            .Select(w => new { w.EpisodeId, w.ShowId, w.WatchedAtUtc }).ToListAsync(ct);
-        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).Select(g => g.Key).ToHashSet();
+        var rows = await db.Watches.AsNoTracking().Where(w => w.UserId == userId).ToListAsync(ct);
+        var bulk = CopyRules.BulkMarks(rows);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc))).ToList();
 
         DateOnly Local(DateTime utc) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone));
@@ -80,44 +79,37 @@ public static class StreaksApi
         // A run of weeks ends on its last week's Sunday, not the Monday that starts it.
         weekStreak = weekStreak with { LongestTo = weekStreak.LongestTo?.AddDays(6) };
 
-        // Kept up: every regular aired episode of the shows the caller watched outside bulk marks, in air order.
+        // Kept up: the regular aired episodes of the shows the caller watched outside bulk marks, in air order. An episode
+        // can only be kept if it aired after the earliest watch less the window, so a back catalog watched years later isn't loaded.
         var showIds = watches.Select(w => w.ShowId).Distinct().ToList();
-        var aired = await db.Episodes.AsNoTracking()
-            .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc != null && e.AirsAtUtc <= now)
+        var since = watches.Count > 0 ? new DateTimeOffset(watches.Min(w => w.WatchedAtUtc), TimeSpan.Zero).AddDays(-KeptUpDays) : now;
+        var aired = await db.Episodes.AsNoTracking().AiredRegular(now)
+            .Where(e => showIds.Contains(e.ShowId) && e.AirsAtUtc >= since)
             .Select(e => new Aired(e.EpisodeId, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.AirsAtUtc!.Value))
             .ToListAsync(ct);
-        var watchedAt = watches.GroupBy(w => w.EpisodeId).ToDictionary(g => g.Key, g => g.Min(w => w.WatchedAtUtc));
-        var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId))
-            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
+        var watchedAt = watches.GroupBy(w => w.EpisodeId).ToDictionary(g => g.Key, g => new DateTimeOffset(g.Min(w => w.WatchedAtUtc), TimeSpan.Zero));
 
         var keptUp = new List<KeptUpDto>();
         var due = new List<StreakDueDto>();
         KeptUpDto? best = null;
-        foreach (var show in aired.GroupBy(e => e.ShowId).Where(g => shows.ContainsKey(g.Key)))
+        foreach (var show in aired.GroupBy(e => e.ShowId))
         {
-            var info = shows[show.Key];
-            // Kept (true), missed (false) or still due (null), oldest first.
+            // Kept (true), missed (false) or still due (null), oldest first, from the first kept one on.
             var states = show.OrderBy(e => e.AirsAtUtc).ThenBy(e => e.Season).ThenBy(e => e.Episode)
                 .Select(e =>
                 {
                     var deadline = e.AirsAtUtc.AddDays(KeptUpDays);
-                    bool? kept = watchedAt.TryGetValue(e.EpisodeId, out var at)
-                        && new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Utc)) is var w
-                        && w >= e.AirsAtUtc - Early && w <= deadline
-                            ? true
-                            : deadline > now && !watchedAt.ContainsKey(e.EpisodeId) ? null : false;
+                    bool? kept = watchedAt.TryGetValue(e.EpisodeId, out var w) ? w >= e.AirsAtUtc - Early && w <= deadline
+                        : deadline > now ? null : false;
                     return (Episode: e, Kept: kept, Deadline: deadline);
                 })
                 .SkipWhile(s => s.Kept != true)
                 .ToList();
-            if (states.Count == 0)
-            {
-                continue;
-            }
+            var decided = states.Where(s => s.Kept is not null).ToList();
 
             int longest = 0, run = 0;
             Aired? longestEnd = null;
-            foreach (var s in states.Where(s => s.Kept is not null))
+            foreach (var s in decided)
             {
                 run = s.Kept == true ? run + 1 : 0;
                 if (run > longest)
@@ -125,26 +117,33 @@ public static class StreaksApi
                     (longest, longestEnd) = (run, s.Episode);
                 }
             }
-            var decided = states.Where(s => s.Kept is not null).ToList();
             var current = decided.AsEnumerable().Reverse().TakeWhile(s => s.Kept == true).Count();
-            var latest = decided.LastOrDefault(s => s.Kept == true).Episode;
 
-            if (current >= MinKeptUp && latest is not null)
+            if (current >= MinKeptUp)
             {
-                keptUp.Add(new KeptUpDto(show.Key, info.Title, info.PosterUrl, current, longest, latest.Season, latest.Episode));
-                due.AddRange(states.Where(s => s.Kept is null).Select(s => new StreakDueDto(show.Key, info.Title, info.PosterUrl,
+                var latest = decided.Last(s => s.Kept == true).Episode;
+                keptUp.Add(new KeptUpDto(show.Key, "", null, current, longest, latest.Season, latest.Episode));
+                due.AddRange(states.Where(s => s.Kept is null).Select(s => new StreakDueDto(show.Key, "", null,
                     s.Episode.Season, s.Episode.Episode, DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.Deadline, zone).DateTime), current)));
             }
-            if (longestEnd is not null && longest >= MinKeptUp && (best is null || longest > best.Longest))
+            if (longest >= MinKeptUp && (best is null || longest > best.Longest))
             {
-                best = new KeptUpDto(show.Key, info.Title, info.PosterUrl, current, longest, longestEnd.Season, longestEnd.Episode);
+                best = new KeptUpDto(show.Key, "", null, current, longest, longestEnd!.Season, longestEnd.Episode);
             }
         }
 
-        return TypedResults.Ok(new StreaksDto(watches.Count, rows.Count - watches.Count, dayStreak, weekStreak,
-            keptUp.OrderByDescending(k => k.Current).ThenBy(k => k.Title, StringComparer.Ordinal).Take(MaxShows).ToList(),
-            due.OrderBy(d => d.WatchBy).ThenByDescending(d => d.Streak).ThenBy(d => d.Season).ThenBy(d => d.Episode).Take(MaxShows).ToList(),
-            best));
+        // Titles and posters for the shows with a streak, not every show the caller ever watched.
+        var shown = keptUp.Select(k => k.ShowId).Concat(due.Select(d => d.ShowId)).Concat(best is null ? [] : new[] { best.ShowId }).Distinct().ToList();
+        var shows = await db.Shows.AsNoTracking().Where(s => shown.Contains(s.ShowId))
+            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
+        KeptUpDto Name(KeptUpDto k) => k with { Title = shows[k.ShowId].Title, PosterUrl = shows[k.ShowId].PosterUrl };
+
+        return TypedResults.Ok(new StreaksDto(KeptUpDays, rows.Count - watches.Count, dayStreak, weekStreak,
+            keptUp.Where(k => shows.ContainsKey(k.ShowId)).Select(Name)
+                .OrderByDescending(k => k.Current).ThenBy(k => k.Title, StringComparer.Ordinal).Take(MaxShows).ToList(),
+            due.Where(d => shows.ContainsKey(d.ShowId)).Select(d => d with { Title = shows[d.ShowId].Title, PosterUrl = shows[d.ShowId].PosterUrl })
+                .OrderBy(d => d.WatchBy).ThenByDescending(d => d.Streak).ThenBy(d => d.Season).ThenBy(d => d.Episode).Take(MaxShows).ToList(),
+            best is not null && shows.ContainsKey(best.ShowId) ? Name(best) : null));
     }
 
     /// <summary>The Monday a date's week starts on.</summary>

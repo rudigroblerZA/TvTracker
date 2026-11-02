@@ -23,8 +23,8 @@
         else
         {
             <div class="stat-tiles">
-                @Tile("days", "days in a row", streaks.Days)
-                @Tile("weeks", "weeks in a row", streaks.Weeks)
+                @Tile("days in a row", "Watch something today to keep it", streaks.Days)
+                @Tile("weeks in a row", "Watch something this week to keep it", streaks.Weeks)
                 @if (streaks.Best is { } best)
                 {
                     <div class="stat">
@@ -57,7 +57,7 @@
 
             <section aria-labelledby="kept-title">
                 <h2 id="kept-title">Kept up</h2>
-                <p class="muted small">@($"Shows whose new episodes you watch within {KeptUpDays} days of airing, episode after episode. A whole season dropped at once counts if you watch it within the week.")</p>
+                <p class="muted small">@($"Shows whose new episodes you watch within {streaks.KeptUpDays} days of airing, episode after episode. A whole season dropped at once counts if you watch it within the week.")</p>
                 @if (streaks.KeptUp.Count == 0)
                 {
                     <p class="muted">None running right now. Watch two new episodes of an airing show within a week of each airing to start one.</p>
@@ -91,9 +91,6 @@
 </AuthorizeView>
 
 @code {
-    /// <summary>Matches Analytics' window for keeping up (StreaksApi.KeptUpDays).</summary>
-    private const int KeptUpDays = 7;
-
     private Streaks? streaks;
     private string? error;
 
@@ -125,7 +122,7 @@
         };
     }
 
-    private RenderFragment Tile(string unit, string label, Streak s) => __builder =>
+    private RenderFragment Tile(string label, string keepIt, Streak s) => __builder =>
     {
         <div class="stat">
             <div class="stat-value">@s.Current</div>
@@ -133,7 +130,7 @@
             <div class="small">
                 @if (s.AtRisk)
                 {
-                    <span class="streak-risk">@(unit == "days" ? "Watch something today to keep it" : "Watch something this week to keep it")</span>
+                    <span class="streak-risk">@keepIt</span>
                 }
                 else if (s.Longest > 0)
                 {
