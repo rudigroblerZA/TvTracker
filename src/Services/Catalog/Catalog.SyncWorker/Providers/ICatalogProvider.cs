@@ -33,6 +33,12 @@ public interface ICatalogProvider
     /// </summary>
     Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The provider's id of the show with a TheTVDB id, or null when it has none: what a TV Time or TV Time Out export
+    /// identifies shows by.
+    /// </summary>
+    Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default);
+
     /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
 

@@ -62,7 +62,29 @@ public sealed class CatalogImportClient(HttpClient http, HybridCache cache, Sear
         }
     }
 
+    /// <summary>
+    /// Bring your history: asks the worker to find (and import when missing) up to <see cref="MaxResolve"/> shows of an
+    /// export, by TheTVDB id or title. Not cached here: the worker caches each lookup, and the shows are then in the
+    /// catalog. One call is up to ~25 provider calls, so it can take a dozen seconds.
+    /// </summary>
+    public async Task<IReadOnlyList<ResolvedShow>> ResolveAsync(IReadOnlyList<ResolveShowRequest> shows, CancellationToken ct)
+    {
+        using var response = await http.PostAsJsonAsync("api/v1/imports/resolve", new { Shows = shows.Take(MaxResolve) }, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ResolveShowsResult>(ct))?.Shows ?? [];
+    }
+
+    public const int MaxResolve = 10;
+
+    private sealed record ResolveShowsResult(List<ResolvedShow> Shows);
+
     private sealed class ImportCapReachedException : Exception;
 
     private sealed record SearchImportResult(int Imported);
 }
+
+/// <param name="Key">The caller's handle for the show, given back unchanged.</param>
+public record ResolveShowRequest(string Key, string? TvdbId, string? Title, int? Year);
+
+/// <param name="Outcome">"found", "imported", "not-found" or "failed".</param>
+public record ResolvedShow(string Key, string? ExternalId, string Outcome);

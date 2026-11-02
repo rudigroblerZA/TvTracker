@@ -33,6 +33,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
             .ToList());
     }
 
+    public Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<string?>(null);
+
     public Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ProviderShowSummary>>([]);
 

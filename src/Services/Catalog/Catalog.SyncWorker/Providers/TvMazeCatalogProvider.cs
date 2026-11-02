@@ -122,6 +122,19 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
+    public async Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default)
+    {
+        // TVmaze answers with a redirect to the show (followed by the client) or 404 when it has no show with that id.
+        using var response = await http.GetAsync($"lookup/shows?thetvdb={Uri.EscapeDataString(tvdbId)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        var show = await response.Content.ReadFromJsonAsync<TvMazeShow>(cancellationToken);
+        return show is { Id: > 0 } ? show.Id.ToString() : null;
+    }
+
     public async Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default)
     {
         // Up to 10 shows, best match first.

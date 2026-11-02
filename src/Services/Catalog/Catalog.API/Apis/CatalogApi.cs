@@ -45,6 +45,7 @@ public static class CatalogApi
         api.MapMilestonesApi();
         api.MapNamesakesApi();
         api.MapFarFromHomeApi();
+        api.MapHistoryImportApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

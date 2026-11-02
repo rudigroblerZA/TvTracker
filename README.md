@@ -342,6 +342,22 @@ episode titles, since a milestone episode is often an event. It works signed out
   shows are left out.
 - **API:** `GET /api/v1/milestones?all=true|false` (Catalog.API, public).
 
+**Bring your history** (`/settings/import`, from Settings; `history-import` flag; free, signed in): import what you
+watched elsewhere, dates included. It reads the official TV Time archive (the GDPR zip: `tracking-prod-records-v2.csv`,
+`followed_tv_show.csv`, the older `seen_episode.csv`), the TV Time Out and Liberator files, a Trakt export (history or
+watched JSON), or any CSV with a show, a season, an episode and a date. The file is read in the app and only the episodes
+and dates are sent, so Year in TV, Your TV clock and Streaks read your past as it happened; other importers keep the
+episodes and lose the dates.
+- **Shows are found** by TheTVDB id (what TV Time uses) or by title and year, and added to the catalog when it lacks
+  them, a few a minute, with progress shown; a title that can't be matched is listed with a search link, and importing
+  the file again picks it up. Specials and numbering the catalog counts differently are reported, not guessed.
+- **Dates:** TV Time's times have no zone and are read in your profile's time zone; a bare date lands mid-day; a watch
+  with no date is marked as of today. The earliest time for an episode wins; rewatches aren't kept.
+- **Nothing is undone:** episodes already marked stay as they are, so running an import twice adds nothing. Shows the
+  export says you'd planned or stopped get that status; shows with watches are followed from their first watch.
+- **API:** `POST /api/v1/history/resolve` (Catalog.API, signed in, up to 10 shows a call) and
+  `POST /api/v1/watched/import` (Tracking.API, up to 500 watches with their times).
+
 **Streaks** (`/streaks`, from Insights and Up Next; `streaks` flag; free, signed in): days and weeks in a row with
 something watched, and the shows you keep up with as they air: each new episode watched within 7 days of airing,
 episode after episode ("MobLand: 4 in a row, up to S02E06"). The page lists what's due to keep a run going ("S02E07 by
@@ -609,7 +625,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 

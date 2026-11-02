@@ -136,6 +136,69 @@ public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox 
     }
 
     /// <summary>
+    /// Marks episodes watched at their own times, for Bring your history: each watch keeps the date the export gives it, so
+    /// Year in TV, the TV clock and streaks read the user's past as it happened. Episodes already watched are left as they
+    /// are (a second import adds nothing), a show watched for the first time is followed from its earliest watch, and the
+    /// events carry each watch's time, as the phone's offline replay does. Returns how many watches were added.
+    /// </summary>
+    public async Task<int> ImportWatchesAsync(string userId, IReadOnlyList<(Guid EpisodeId, DateTimeOffset WatchedAtUtc)> watches, CancellationToken ct)
+    {
+        if (watches.Count == 0)
+        {
+            return 0;
+        }
+        var now = time.GetUtcNow();
+        var ids = watches.Select(w => w.EpisodeId).Distinct().ToList();
+        var episodes = await db.Episodes.Where(e => ids.Contains(e.EpisodeId)).ToDictionaryAsync(e => e.EpisodeId, ct);
+        var alreadyWatched = (await db.WatchedEpisodes.Where(w => w.UserId == userId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
+        // The earliest time given for an episode is its watch; a time in the future is now.
+        var wanted = watches
+            .Where(w => episodes.ContainsKey(w.EpisodeId) && !alreadyWatched.Contains(w.EpisodeId))
+            .GroupBy(w => w.EpisodeId)
+            .Select(g => (Episode: episodes[g.Key], At: g.Min(w => w.WatchedAtUtc) is var at && at <= now ? at.UtcDateTime : now.UtcDateTime))
+            .ToList();
+
+        var added = 0;
+        foreach (var showGroup in wanted.GroupBy(w => w.Episode.ShowId))
+        {
+            var showId = showGroup.Key;
+            var earliest = showGroup.Min(w => w.At);
+            db.WatchedEpisodes.AddRange(showGroup.Select(w => new WatchedEpisode { UserId = userId, EpisodeId = w.Episode.EpisodeId, ShowId = showId, WatchedAtUtc = w.At }));
+            added += showGroup.Count();
+
+            var follow = await db.Follows.FindAsync([userId, showId], ct);
+            if (follow is null)
+            {
+                follow = new Follow { UserId = userId, ShowId = showId, Status = WatchStatus.Watching, FollowedAtUtc = earliest, UpdatedAtUtc = earliest };
+                db.Follows.Add(follow);
+                outbox.Add(new ShowFollowedIntegrationEvent(userId, showId));
+            }
+            else if (follow.Status is WatchStatus.PlanToWatch or WatchStatus.Paused)
+            {
+                follow.Status = WatchStatus.Watching;
+                follow.UpdatedAtUtc = now.UtcDateTime;
+            }
+
+            // One event per moment, so consumers keep each watch's own time.
+            foreach (var moment in showGroup.GroupBy(w => w.At))
+            {
+                outbox.Add(new EpisodeWatchedIntegrationEvent(userId, showId, moment.Select(w => w.Episode.EpisodeId).ToList(), new DateTimeOffset(moment.Key, TimeSpan.Zero)));
+            }
+
+            var newIds = showGroup.Select(w => w.Episode.EpisodeId).ToList();
+            if (follow.Status != WatchStatus.Completed && await IsFinishedAsync(userId, showId, newIds, now, ct))
+            {
+                follow.Status = WatchStatus.Completed;
+                follow.UpdatedAtUtc = showGroup.Max(w => w.At);
+                outbox.Add(new ShowCompletedIntegrationEvent(userId, showId));
+            }
+        }
+
+        await SaveAsync(userId, ct);
+        return added;
+    }
+
+    /// <summary>
     /// Removes a watched mark. <paramref name="changedAt"/> is when the user made the change (offline replays);
     /// a mark made after that time is kept, so the most recent change wins.
     /// </summary>

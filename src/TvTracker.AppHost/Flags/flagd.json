@@ -165,6 +165,12 @@
       "defaultVariant": "on",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
+    "history-import": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Bring your history: import a TV Time, TV Time Out or Trakt export, keeping the original watch dates." }
+    },
     "streaks": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

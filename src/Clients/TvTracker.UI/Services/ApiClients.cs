@@ -158,6 +158,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<FarFromHome?> GetFarFromHomeAsync(CancellationToken ct = default) =>
         GetAsync<FarFromHome>(ApiClients.Catalog, "api/v1/far-from-home", ct, cacheForOffline: true);
 
+    /// <summary>Bring your history: catalog ids for up to 10 shows of an export, importing missing ones; null with the flag off.</summary>
+    public Task<HistoryResolveResult?> ResolveHistoryAsync(IReadOnlyList<HistoryShowRequest> shows, CancellationToken ct = default) =>
+        SendAsync<HistoryResolveResult>(ApiClients.Catalog, HttpMethod.Post, "api/v1/history/resolve", new { shows }, ct);
+
     /// <summary>Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.</summary>
     public Task<ShowNamesakes?> GetNamesakesAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowNamesakes>(ApiClients.Catalog, $"api/v1/shows/{showId}/namesakes", ct, cacheForOffline: true);
@@ -297,6 +301,10 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
         SendAsync<Follow>(ApiClients.Tracking, HttpMethod.Put, $"api/v1/follows/{showId}/status", new { status }, ct, queueIfOffline: true);
 
     /// <summary>Marks episodes watched. The current time is sent so offline replays keep it.</summary>
+    /// <summary>Bring your history: up to 500 watches with their own times; null with the flag off.</summary>
+    public Task<ImportWatchesResult?> ImportWatchesAsync(IReadOnlyList<ImportedWatch> watches, CancellationToken ct = default) =>
+        SendAsync<ImportWatchesResult>(ApiClients.Tracking, HttpMethod.Post, "api/v1/watched/import", new { watches }, ct);
+
     public Task MarkWatchedAsync(MarkWatched request, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Post, "api/v1/watched",
             request with { WatchedAtUtc = request.WatchedAtUtc ?? DateTimeOffset.UtcNow }, ct, queueIfOffline: true);

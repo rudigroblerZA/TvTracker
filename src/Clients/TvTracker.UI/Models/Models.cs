@@ -1086,3 +1086,19 @@ public record KeptUp(Guid ShowId, string Title, string? PosterUrl, int Current, 
 
 /// <param name="WatchBy">The last day watching it keeps the run.</param>
 public record StreakDue(Guid ShowId, string Title, string? PosterUrl, int Season, int Episode, DateOnly WatchBy, int Streak);
+
+/// <summary>Bring your history: a show from an export to resolve, with the episode numbers watched.</summary>
+public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes);
+
+public record HistoryEpisodeNumber(int Season, int Number);
+
+/// <param name="Outcome">"found", "imported", "not-found" or "failed".</param>
+public record HistoryShow(string Key, Guid? ShowId, string? Title, string? PosterUrl, string Outcome, IReadOnlyList<HistoryEpisode> Episodes);
+
+public record HistoryEpisode(int Season, int Number, Guid EpisodeId);
+
+public record HistoryResolveResult(IReadOnlyList<HistoryShow> Shows);
+
+public record ImportedWatch(Guid EpisodeId, DateTimeOffset WatchedAtUtc);
+
+public record ImportWatchesResult(int Added);
