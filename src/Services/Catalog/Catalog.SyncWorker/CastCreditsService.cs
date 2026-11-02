@@ -8,15 +8,19 @@ namespace Catalog.SyncWorker;
 /// <summary>
 /// Fetches every catalog actor's roles across the provider, for the reunion radar (Analytics finds where two actors of a
 /// show someone loves work together again). One call per person, <see cref="PeoplePerRound"/> people a minute so the
-/// provider's rate limit stays shared, leads of popular shows first; refreshed monthly. Each round's people are sent
-/// as one <see cref="TvTracker.IntegrationEvents.PeopleCastCreditsUpdatedIntegrationEvent"/>.
+/// provider's rate limit stays shared, leads of popular shows first; refreshed when the provider says they changed, else
+/// every 120 days. Each round's people are sent as one <see cref="TvTracker.IntegrationEvents.PeopleCastCreditsUpdatedIntegrationEvent"/>.
 /// </summary>
 public sealed class CastCreditsService(
     IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<CastCreditsService> logger) : BackgroundService
 {
     private const int PeoplePerRound = 30;
     private static readonly TimeSpan Round = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
+    /// <summary>
+    /// A safety net: a person's credits are refreshed sooner when the provider's update list says they changed
+    /// (<see cref="ProviderChanges"/>).
+    /// </summary>
+    private static readonly TimeSpan MaxAge = TimeSpan.FromDays(120);
     private static readonly TimeSpan FailureRetry = TimeSpan.FromHours(1);
 
     // People the provider failed, and when to try them again. Only this service's loop touches it.
@@ -44,6 +48,7 @@ public sealed class CastCreditsService(
 
     private async Task<int> RefreshAsync(CancellationToken ct)
     {
+        using var caller = TvMazeCaller.Begin("cast-credits", TvMazeLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

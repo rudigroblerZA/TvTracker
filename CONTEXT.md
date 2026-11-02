@@ -73,17 +73,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `MockCatalogProvider` (`Catalog:Provider=mock` for offline). Shows are stored per provider (`Source` + `ExternalId`).
 - **Rate limit:** TVmaze allows 20 calls per 10 s. One limiter is shared by everything: hourly import, refreshes, search
   imports, bulk import, the creatives backfill and career refreshes. New background work must spend calls sparingly.
-  `CreativesService`, for example, does 30 shows and 30 people a minute.
+  `CreativesService`, for example, does 30 shows and 30 people a minute. New work names itself with
+  `TvMazeCaller.Begin` (see TVmaze budget).
 - **Combined request:** `/shows/{id}?embed[]=episodes&embed[]=seasons&embed[]=cast&embed[]=images`.
   - **Outage fallback:** on a 5xx after retries, `TvMazeEmbedOutage` switches to separate requests for 15 minutes.
   - **Needed parts:** the show, episodes and seasons. Without them the show isn't imported this time.
   - **Optional parts:** cast and images. `CastMissing` / `ImagesMissing` tell the synchronizer to keep what it has.
 - **Crew:** always `/shows/{id}/crew` (the crew embed returned 502 while the rest worked). On failure the result is null,
   and the show is retried hourly by `CreativesService`.
-- **Careers:** `/people/{id}/crewcredits?embed=show`, refreshed monthly. Fetched for creators and developers, and for
+- **Careers:** `/people/{id}/crewcredits?embed=show`, refreshed when the person changes (else every 120 days). Fetched for creators and developers, and for
   anyone credited on at least 2 catalog shows.
 - **Cast credits:** `/people/{id}/castcredits?embed=show`, for every actor in a catalog show (`CastCreditsService`).
-  - **Pace:** 30 people a minute, leads of popular shows first, refreshed monthly; about 6,000 people take ~3.5 hours.
+  - **Pace:** 30 people a minute, leads of popular shows first, refreshed when the person changes (else every 120 days);
+    about 6,000 people take ~3.5 hours.
   - **Format:** stored as `PersonCastCredit` and sent as `PeopleCastCreditsUpdatedIntegrationEvent` (each person's
     list replaces the last); also sent with a replay.
   - **Character names:** they come in each credit's `_links.character.name`, so no character embed is needed.
@@ -93,6 +95,29 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   airing ended when nothing aired for 4 years and nothing is scheduled (a dated or TBA episode, or a dated season);
   undated empty seasons don't count. A new episode brings it back on the next refresh. It moved 9 shows; Shōgun and
   Fargo (2024) stay airing.
+- **TVmaze budget** (`Providers/TvMazeBudget.cs`, `ProviderChanges`): measured first, then spent where it counts.
+  - **Refresh what changed:** TVmaze's update lists (`/updates/shows`, `/updates/people`, one call each an hour) give
+    every id changed in the last day with when. A change to a show's episodes counts as the show's, and a person
+    counts as changed when a credit of theirs is created or deleted (TVmaze's API documentation). Changed catalog shows
+    are due now, changed people's credits and careers stale (stamped `ProviderChanges.Stale`, the epoch, so they go first).
+    Before this, 887 shows were refreshed on a timer, about 590 a day (each two calls with the crew), when TVmaze had
+    changed 76 of them that day and 274 that week; 93 of 6,117 cast members changed in a day.
+  - **The timer stays as a safety net** (`CatalogSynchronizer.NextRefresh`): every 3 days while an episode aired in the
+    last 14 (ratings come from votes after airing and may not mark the show changed), weekly while running, monthly
+    once ended; people every 120 days. A followed show is still refreshed at once.
+  - **TVmaze's edge cache** holds answers up to an hour, so a change counts once it's an hour old, and a sync made
+    within an hour after it is repeated once (`ProviderChanges.Changed`). After a start the first look covers a week.
+  - **Two lanes** (`TvMazeRateLimiter`, a sliding log of grant times, 18 a 10 s window): callers set their lane with
+    `TvMazeCaller.Begin(name, lane)` (an `AsyncLocal`), and calls outside any scope are background "other". A waiting
+    interactive call (search imports, history imports) always goes before any background one, and background calls
+    only start below 12 in the window, so 6 permits are always free for someone who turns up. .NET's
+    `SlidingWindowRateLimiter` was one first-come queue: a cast-credits round could put a search behind dozens of
+    calls. Background loops await each call in turn, so their queue stays a few deep.
+  - **Measured** (`TvMazeUsage`): every call counted by caller, lane and HTTP status, and its wait for a permit, on the
+    `TvTracker.Catalog.TvMaze` meter (ServiceDefaults now adds every `TvTracker.*` meter) and, for the last hour, in
+    memory for `/ops` (the worker's `GET /api/v1/imports/tvmaze`). Retries go through the limiter, so each counts.
+  - **One process:** the limiter is in memory, so a second sync worker would double the rate; keep one, or move the
+    limiter into Redis first.
 - **Summaries:** HTML is stripped and entities decoded until stable, since some TVmaze summaries are escaped twice.
 - **Data quality** (`/ops`): what TVmaze leaves out (half of aired episodes unrated, mostly daily and reality shows;
   "Episode N" titles on anime and daily shows; duplicate numbers on same-night crossovers), and whether Analytics'
@@ -1487,7 +1512,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
 - **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
-  overrides, where-to-watch links, HTML stripping and the presumed-ended status; Analytics' copy rules, streaks, the
+  overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, and the TVmaze budget
+  (the two-lane limiter on a fake clock, the change rule and the refresh schedule); Analytics' copy rules, streaks, the
   essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages.
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.

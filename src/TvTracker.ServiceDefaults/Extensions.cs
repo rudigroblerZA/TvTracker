@@ -49,7 +49,9 @@ public static class Extensions
             {
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    // The services' own meters (TvTracker.Catalog.TvMaze, ...).
+                    .AddMeter("TvTracker.*");
             })
             .WithTracing(tracing =>
             {

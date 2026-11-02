@@ -38,6 +38,12 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
     public Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default) =>
         Task.FromResult<string?>(null);
 
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>?>(null);
+
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedPeopleAsync(TimeSpan within, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>?>(null);
+
     public Task<IReadOnlyList<ProviderShowSummary>> SearchShowsAsync(string query, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ProviderShowSummary>>([]);
 

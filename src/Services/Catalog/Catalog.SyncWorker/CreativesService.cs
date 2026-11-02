@@ -11,7 +11,8 @@ namespace Catalog.SyncWorker;
 /// <list type="bullet">
 /// <item>re-syncs shows without creatives (imported before they were, or whose crew the provider failed to return), and</item>
 /// <item>fetches career figures for the people that matter for the "prolific producer" insight: every creator or
-/// developer, and anyone credited on at least two of the catalog's shows. Figures are refreshed monthly.</item>
+/// developer, and anyone credited on at least two of the catalog's shows. Figures are refreshed when the provider says the
+/// person changed, else every 120 days.</item>
 /// </list>
 /// </summary>
 public sealed class CreativesService(
@@ -20,7 +21,11 @@ public sealed class CreativesService(
     private const int ShowsPerRound = 30;
     private const int PeoplePerRound = 30;
     private static readonly TimeSpan Round = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan CareerMaxAge = TimeSpan.FromDays(30);
+    /// <summary>
+    /// A safety net: a career is refreshed sooner when the provider's update list says the person changed
+    /// (<see cref="ProviderChanges"/>).
+    /// </summary>
+    private static readonly TimeSpan CareerMaxAge = TimeSpan.FromDays(120);
     private static readonly TimeSpan BackfillRetry = TimeSpan.FromHours(1);
 
     // Shows the provider failed, and when to try them again. Only this service's loop touches it.
@@ -50,6 +55,7 @@ public sealed class CreativesService(
 
     private async Task<int> BackfillShowsAsync(CancellationToken ct)
     {
+        using var caller = TvMazeCaller.Begin("crew", TvMazeLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
@@ -88,6 +94,7 @@ public sealed class CreativesService(
 
     private async Task<int> RefreshCareersAsync(CancellationToken ct)
     {
+        using var caller = TvMazeCaller.Begin("careers", TvMazeLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

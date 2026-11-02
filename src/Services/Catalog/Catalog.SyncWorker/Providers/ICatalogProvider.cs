@@ -44,6 +44,18 @@ public interface ICatalogProvider
     Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The provider's shows changed within <paramref name="within"/>, by id, with when each last changed; a change to an
+    /// episode counts as the show's. Null when the provider keeps no such list for that long, or none at all.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The provider's people changed within <paramref name="within"/>, by id, with when; a cast or crew credit of theirs
+    /// created or deleted counts. Null when the provider keeps no such list for that long, or none at all.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedPeopleAsync(TimeSpan within, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Full details of one show, or null if the provider no longer has it.
     /// </summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);

@@ -50,6 +50,7 @@ public sealed class NamesakesService(IServiceScopeFactory scopeFactory, TimeProv
 
     private async Task<int> LookUpAsync(CancellationToken ct)
     {
+        using var caller = TvMazeCaller.Begin("namesakes", TvMazeLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
