@@ -51,7 +51,7 @@
                                         var show = maker.LovedShows[i];
                                         <a href="shows/@show.Id">@show.Title</a>@(i < maker.LovedShows.Count - 1 ? ", " : "")
                                     }
-                                    <span>@(maker.OtherShows > 0 ? $" · {maker.OtherShows} more you haven't seen" : " · nothing else you haven't seen")</span>
+                                    <span>@(maker.Pending ? " · their other shows aren't in yet" : maker.OtherShows > 0 ? $" · {maker.OtherShows} more you haven't seen" : " · nothing else you haven't seen")</span>
                                 </div>
                             </li>
                         }

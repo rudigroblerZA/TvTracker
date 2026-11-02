@@ -73,6 +73,8 @@ public class MakersRankingTests
 
         Assert.Equal((1, 1), (result.LovedShows, result.MakersPending));
         Assert.Empty(result.Picks);
+        // Listed, but as not in yet rather than as having made nothing else.
+        Assert.True(Assert.Single(result.Makers).Pending);
     }
 
     private static MakersRanking.Maker Maker(Guid id, string name, Guid[] loved, params MadeShowDto[] made) =>

@@ -29,7 +29,9 @@ public record MakersForYouRequest(IReadOnlyList<LovedShowInput> Loved, IReadOnly
 
 /// <param name="Love">The summed love of the caller's shows they made.</param>
 /// <param name="OtherShows">Their shows the caller doesn't know yet.</param>
-public record YourMakerDto(Guid PersonId, string Name, string? PhotoUrl, double Love, IReadOnlyList<ShowRefDto> LovedShows, int OtherShows);
+/// <param name="Pending">Their credits aren't fetched yet, so <paramref name="OtherShows"/> is unknown, not none.</param>
+public record YourMakerDto(Guid PersonId, string Name, string? PhotoUrl, double Love, IReadOnlyList<ShowRefDto> LovedShows, int OtherShows,
+    bool Pending = false);
 
 /// <param name="Because">The loved show the caller knows them for.</param>
 public record MakerCreditDto(Guid PersonId, string Name, ShowRefDto Because);
@@ -211,7 +213,7 @@ internal static class MakersRanking
                 .Take(MaxMakers)
                 .Select(m => new YourMakerDto(m.PersonId, m.Name, m.PhotoUrl, Math.Round(love[m.PersonId], 2),
                     m.LovedShowIds.Select(id => new ShowRefDto(id, titles.GetValueOrDefault(id) ?? "")).OrderBy(s => s.Title, StringComparer.Ordinal).ToList(),
-                    m.Made.Count(Unknown)))
+                    m.Made.Count(Unknown), m.Pending))
                 .ToList(),
             candidates.Where(c => c.Show.New)
                 .OrderByDescending(c => c.Show.Status == ShowStatus.Upcoming).ThenByDescending(c => c.Show.From ?? int.MaxValue)

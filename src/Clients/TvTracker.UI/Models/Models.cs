@@ -1291,7 +1291,9 @@ public record LovedShows(IReadOnlyList<LovedShow> Loved, IReadOnlyList<Guid> Kno
 
 public record LovedShow(Guid ShowId, double Weight);
 
-public record YourMaker(Guid PersonId, string Name, string? PhotoUrl, double Love, IReadOnlyList<ShowRef> LovedShows, int OtherShows);
+/// <param name="Pending">Their credits aren't in yet, so what else they made is unknown for now.</param>
+public record YourMaker(Guid PersonId, string Name, string? PhotoUrl, double Love, IReadOnlyList<ShowRef> LovedShows, int OtherShows,
+    bool Pending = false);
 
 public record MakerCredit(Guid PersonId, string Name, ShowRef Because);
 
