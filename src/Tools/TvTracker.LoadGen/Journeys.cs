@@ -202,7 +202,9 @@ public sealed class ShowPool
 
     public Guid Show() => shows[Random.Shared.Next(shows.Count)];
 
-    /// <summary>A random show and one of its first season's episodes (null when it has none).</summary>
+    /// <summary>
+    /// A random show and one of its first season's episodes (null when it has none).
+    /// </summary>
     public async Task<(Guid Show, Guid? Episode)> EpisodeAsync(VirtualUser user, CancellationToken ct)
     {
         var show = Show();

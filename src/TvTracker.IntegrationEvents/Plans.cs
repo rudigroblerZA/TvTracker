@@ -13,12 +13,16 @@ public static class Plans
     public const string Free = "free";
     public const string Plus = "plus";
 
-    /// <summary>Plus for the owner and up to <see cref="FamilyMembers"/> people they invite, on one subscription.</summary>
+    /// <summary>
+    /// Plus for the owner and up to <see cref="FamilyMembers"/> people they invite, on one subscription.
+    /// </summary>
     public const string Family = "family";
 
     public static readonly IReadOnlyList<string> All = [Free, Plus, Family];
 
-    /// <summary>People a family plan's owner can invite, besides themselves.</summary>
+    /// <summary>
+    /// People a family plan's owner can invite, besides themselves.
+    /// </summary>
     public const int FamilyMembers = 5;
 
     // No list limit on Free: a cap on lists is a cap on tracking, which stays free (Plus sells insight). MaxLists stays,
@@ -26,10 +30,14 @@ public static class Plans
     private static readonly PlanLimits FreeLimits = new(MaxLists: null, ShareLists: true, TrackServices: false);
     private static readonly PlanLimits PlusLimits = new(MaxLists: null, ShareLists: true, TrackServices: true);
 
-    /// <summary>The plan's limits; an unknown plan (or none yet) is free. Family has Plus's.</summary>
+    /// <summary>
+    /// The plan's limits; an unknown plan (or none yet) is free. Family has Plus's.
+    /// </summary>
     public static PlanLimits Limits(string? plan) => plan is Plus or Family ? PlusLimits : FreeLimits;
 
-    /// <summary>"Free", "Plus" or "Family", as the UI and error messages name the plan.</summary>
+    /// <summary>
+    /// "Free", "Plus" or "Family", as the UI and error messages name the plan.
+    /// </summary>
     public static string Name(string? plan) => plan switch
     {
         Plus => "Plus",

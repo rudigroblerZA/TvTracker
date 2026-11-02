@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>The show's best episodes: by the provider's rating, then ours.</summary>
+/// <summary>
+/// The show's best episodes: by the provider's rating, then ours.
+/// </summary>
 public sealed class TopEpisodesInsight : IShowInsight
 {
     private const int TopEpisodesPerShow = 5;

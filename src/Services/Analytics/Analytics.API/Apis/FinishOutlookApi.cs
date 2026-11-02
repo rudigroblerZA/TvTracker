@@ -45,12 +45,16 @@ public record FinishRecordDto(int Comparable, int Finished);
 /// </summary>
 public static class FinishOutlookApi
 {
-    /// <summary>Watched within this many days: on track.</summary>
+    /// <summary>
+    /// Watched within this many days: on track.
+    /// </summary>
     public const int OnTrackDays = 14;
 
     private const int PaceDays = 28;
 
-    /// <summary>Your record is shown from this many comparable shows.</summary>
+    /// <summary>
+    /// Your record is shown from this many comparable shows.
+    /// </summary>
     private const int MinComparable = 3;
 
     public static void MapFinishOutlookApi(this RouteGroupBuilder api)
@@ -63,7 +67,9 @@ public static class FinishOutlookApi
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct) =>
         TypedResults.Ok(await OutlooksAsync(db, user.GetUserId(), null, time.GetUtcNow(), ct));
 
-    /// <summary>204 when you haven't started the show, or are caught up.</summary>
+    /// <summary>
+    /// 204 when you haven't started the show, or are caught up.
+    /// </summary>
     private static async Task<Results<Ok<FinishOutlookDto>, NoContent>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {

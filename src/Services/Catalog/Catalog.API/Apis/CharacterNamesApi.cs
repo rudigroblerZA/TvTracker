@@ -73,7 +73,9 @@ public static partial class CharacterNamesApi
         "empress", "saint", "st", "the", "young", "old", "older", "little", "baby", "big", "dj", "ser"
     };
 
-    /// <summary>Words that open a role, not a name ("Various Characters", "Unnamed Woman").</summary>
+    /// <summary>
+    /// Words that open a role, not a name ("Various Characters", "Unnamed Woman").
+    /// </summary>
     private static readonly HashSet<string> NotNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "various", "unnamed", "unknown", "additional", "voice", "voices", "narrator", "host", "guest", "himself", "herself", "self",
@@ -82,7 +84,9 @@ public static partial class CharacterNamesApi
 
     private static readonly HashSet<string> Suffixes = new(StringComparer.OrdinalIgnoreCase) { "jr", "sr", "ii", "iii", "iv", "esq" };
 
-    /// <summary>One character: their name's first and last word, the actor and the show.</summary>
+    /// <summary>
+    /// One character: their name's first and last word, the actor and the show.
+    /// </summary>
     private sealed record Entry(string First, string Last, string Character, Guid PersonId, string Actor, string? Gender, Guid? ShowId,
         string Title, string? PosterUrl, int? Year, double Popularity);
 
@@ -144,7 +148,9 @@ public static partial class CharacterNamesApi
         .Take(take)
         .ToList();
 
-    /// <summary>Places by count, with ties sharing a place (two names with 40 characters are both 7th).</summary>
+    /// <summary>
+    /// Places by count, with ties sharing a place (two names with 40 characters are both 7th).
+    /// </summary>
     private static Dictionary<string, int> Ranks(IEnumerable<Entry> entries)
     {
         var counts = entries.GroupBy(e => e.First).Select(g => (Name: g.Key, Count: g.Count())).OrderByDescending(n => n.Count).ToList();
@@ -188,7 +194,9 @@ public static partial class CharacterNamesApi
             return new Index(entries, Ranks(entries), decades.ToDictionary(g => g.Key, g => Ranks(g)), decades.ToDictionary(g => g.Key, g => g.Count()));
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
-    /// <summary>A character's first and last name, title-cased, or null when it doesn't read as a person's name.</summary>
+    /// <summary>
+    /// A character's first and last name, title-cased, or null when it doesn't read as a person's name.
+    /// </summary>
     internal static (string First, string Last)? Parse(string character)
     {
         var alias = Quoted().Replace(character.Split('/')[0], " ");
@@ -214,7 +222,9 @@ public static partial class CharacterNamesApi
     [GeneratedRegex("\"[^\"]*\"|“[^”]*”|\\([^)]*\\)")]
     private static partial Regex Quoted();
 
-    /// <summary>A capitalised word: a letter then letters, apostrophes or hyphens ("O'Brien", "Mary-Kate", "McNulty").</summary>
+    /// <summary>
+    /// A capitalised word: a letter then letters, apostrophes or hyphens ("O'Brien", "Mary-Kate", "McNulty").
+    /// </summary>
     [GeneratedRegex(@"^\p{Lu}[\p{L}'’\-]+$")]
     private static partial Regex Word();
 

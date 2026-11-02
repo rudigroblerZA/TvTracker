@@ -13,12 +13,16 @@ namespace Social.API.Apis;
 /// </summary>
 internal static class Visibility
 {
-    /// <summary>The people <paramref name="me"/> has blocked or been blocked by.</summary>
+    /// <summary>
+    /// The people <paramref name="me"/> has blocked or been blocked by.
+    /// </summary>
     public static IQueryable<string> BlockedWith(SocialContext db, string me) =>
         db.Blocks.Where(b => b.BlockerId == me).Select(b => b.BlockedId)
             .Union(db.Blocks.Where(b => b.BlockedId == me).Select(b => b.BlockerId));
 
-    /// <summary>The people <paramref name="me"/> follows (approved) whose activity they can see: the feed's authors.</summary>
+    /// <summary>
+    /// The people <paramref name="me"/> follows (approved) whose activity they can see: the feed's authors.
+    /// </summary>
     public static IQueryable<string> VisibleFollowees(SocialContext db, string me)
     {
         var blocked = BlockedWith(db, me);

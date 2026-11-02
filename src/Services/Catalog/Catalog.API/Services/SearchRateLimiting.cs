@@ -5,13 +5,19 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Catalog.API.Services;
 
-/// <summary>Limits for <see cref="SearchRateLimiting"/>; bound from the "SearchRateLimit" configuration section.</summary>
+/// <summary>
+/// Limits for <see cref="SearchRateLimiting"/>; bound from the "SearchRateLimit" configuration section.
+/// </summary>
 public sealed class SearchRateLimitOptions
 {
-    /// <summary>Searches a signed-in user, or one client IP (from the mobile gateway or the web app), may make in a burst.</summary>
+    /// <summary>
+    /// Searches a signed-in user, or one client IP (from the mobile gateway or the web app), may make in a burst.
+    /// </summary>
     public int PerClientBurst { get; set; } = 20;
 
-    /// <summary>Searches per minute a signed-in user or client IP gets back after a burst.</summary>
+    /// <summary>
+    /// Searches per minute a signed-in user or client IP gets back after a burst.
+    /// </summary>
     public int PerClientPerMinute { get; set; } = 30;
 
     /// <summary>
@@ -22,7 +28,9 @@ public sealed class SearchRateLimitOptions
 
     public int SharedPerMinute { get; set; } = 300;
 
-    /// <summary>New search terms per minute, across all callers, that may be sent to the sync worker for import.</summary>
+    /// <summary>
+    /// New search terms per minute, across all callers, that may be sent to the sync worker for import.
+    /// </summary>
     public int ImportsPerMinute { get; set; } = 30;
 }
 

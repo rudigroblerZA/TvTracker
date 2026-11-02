@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Current followers and new follows over the last eight weeks; none below the minimum number of followers.</summary>
+/// <summary>
+/// Current followers and new follows over the last eight weeks; none below the minimum number of followers.
+/// </summary>
 public sealed class MomentumInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)

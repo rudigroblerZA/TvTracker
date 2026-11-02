@@ -2,7 +2,9 @@ using Catalog.API.Services;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Crossover events: same-named episodes of different shows within a week, part markers ignored.</summary>
+/// <summary>
+/// Crossover events: same-named episodes of different shows within a week, part markers ignored.
+/// </summary>
 public class CrossoversTests
 {
     private static readonly Guid Fire = Guid.NewGuid(), Med = Guid.NewGuid(), Pd = Guid.NewGuid();

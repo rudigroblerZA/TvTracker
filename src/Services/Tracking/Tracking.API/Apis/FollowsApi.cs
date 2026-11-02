@@ -160,7 +160,9 @@ public static class FollowsApi
         return TypedResults.Ok(new MarkWatchedResult(added.Count, added));
     }
 
-    /// <summary>Bring your history: up to <see cref="ImportWatchesRequest.MaxWatches"/> watches with their own times (see <see cref="TrackingService.ImportWatchesAsync"/>).</summary>
+    /// <summary>
+    /// Bring your history: up to <see cref="ImportWatchesRequest.MaxWatches"/> watches with their own times (see <see cref="TrackingService.ImportWatchesAsync"/>).
+    /// </summary>
     private static async Task<Results<Ok<ImportWatchesResult>, ValidationProblem>> ImportWatchesAsync(
         ImportWatchesRequest request, ClaimsPrincipal user, TrackingService tracking, CancellationToken ct)
     {

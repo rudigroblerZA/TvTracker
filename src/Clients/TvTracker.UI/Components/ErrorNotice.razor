@@ -13,7 +13,9 @@
     [Parameter] public string? Message { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
 
-    /// <summary>Turns an exception from an API call into a message for people.</summary>
+    /// <summary>
+    /// Turns an exception from an API call into a message for people.
+    /// </summary>
     public static string Describe(Exception ex) => ex switch
     {
         SignInRequiredException => "Your session has ended. Please sign in again.",

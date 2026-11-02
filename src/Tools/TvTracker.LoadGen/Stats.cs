@@ -28,7 +28,9 @@ public sealed class Stats
 
     private static bool IsError(int status) => status == 0 || status >= 500;
 
-    /// <summary>One line for the last <paramref name="window"/>: requests a second, errors, throttled, p95.</summary>
+    /// <summary>
+    /// One line for the last <paramref name="window"/>: requests a second, errors, throttled, p95.
+    /// </summary>
     public string Progress(TimeSpan window, int activeUsers)
     {
         var since = Environment.TickCount64 - (long)window.TotalMilliseconds;
@@ -77,7 +79,9 @@ public sealed class Stats
         return report.ToString();
     }
 
-    /// <summary>All requests as CSV (endpoint, count, errors, 429, 404, p50, p95, p99, max), for comparing runs.</summary>
+    /// <summary>
+    /// All requests as CSV (endpoint, count, errors, 429, 404, p50, p95, p99, max), for comparing runs.
+    /// </summary>
     public string Csv()
     {
         var csv = new StringBuilder("endpoint,count,errors,throttled,not_found,p50_ms,p95_ms,p99_ms,max_ms\n");

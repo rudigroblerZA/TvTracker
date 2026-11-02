@@ -113,7 +113,9 @@ public sealed class DatabaseInitializer<TContext>(
     private sealed record SchemaState(int Tables, bool HasHistory);
 }
 
-/// <summary>The database was created before its context had migrations, so it can't be upgraded in place.</summary>
+/// <summary>
+/// The database was created before its context had migrations, so it can't be upgraded in place.
+/// </summary>
 public sealed class PreMigrationsDatabaseException(string context) : InvalidOperationException(
     $"The database for {context} was created before it used EF Core migrations and can't be upgraded in place. " +
     "In development, delete the Postgres data volume (docker volume ls | grep postgres, then docker volume rm <name>) " +

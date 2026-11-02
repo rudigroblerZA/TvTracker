@@ -40,7 +40,9 @@ public interface IUserPlans
 /// </summary>
 public abstract class UserPlansBase(IFeatureClient flags, IMemoryCache cache) : IUserPlans
 {
-    /// <summary>How long a user's plan is kept: a change reaches the service within this time.</summary>
+    /// <summary>
+    /// How long a user's plan is kept: a change reaches the service within this time.
+    /// </summary>
     protected virtual TimeSpan CacheFor => TimeSpan.FromSeconds(30);
 
     public async Task<string?> PlanAsync(HttpContext context)
@@ -70,7 +72,9 @@ public abstract class UserPlansBase(IFeatureClient flags, IMemoryCache cache) : 
         return plan;
     }
 
-    /// <summary>The user's plan, or null when it can't be found.</summary>
+    /// <summary>
+    /// The user's plan, or null when it can't be found.
+    /// </summary>
     protected abstract Task<string?> LookUpAsync(HttpContext context, string userId);
 }
 

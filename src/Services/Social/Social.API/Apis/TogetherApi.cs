@@ -6,7 +6,9 @@ using TvTracker;
 
 namespace Social.API.Apis;
 
-/// <summary>How far someone is through a show: episodes watched of those aired, and the furthest one.</summary>
+/// <summary>
+/// How far someone is through a show: episodes watched of those aired, and the furthest one.
+/// </summary>
 /// <param name="Finished">Every aired regular episode watched.</param>
 public record ProgressDto(int Watched, int Aired, EpisodeCodeDto? Furthest, bool Finished);
 
@@ -38,7 +40,9 @@ public static class TogetherApi
         api.MapGet("/people/{userId}/together", GetTogetherAsync);
     }
 
-    /// <summary>People the caller follows and can see, furthest along first, then raters.</summary>
+    /// <summary>
+    /// People the caller follows and can see, furthest along first, then raters.
+    /// </summary>
     private static async Task<Ok<FriendsOnShowDto>> GetFriendsAsync(Guid showId, ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
     {
         var visible = Visibility.VisibleFollowees(db, SocialApi.UserId(user));
@@ -96,7 +100,9 @@ public static class TogetherApi
         return TypedResults.Ok(new TogetherDto(person, together));
     }
 
-    /// <summary>Shows a user follows or has watched any of.</summary>
+    /// <summary>
+    /// Shows a user follows or has watched any of.
+    /// </summary>
     internal static async Task<HashSet<Guid>> ShowsOfAsync(SocialContext db, string userId, CancellationToken ct) =>
         (await db.UserShows.Where(s => s.UserId == userId && s.Followed).Select(s => s.ShowId)
             .Union(db.Watches.Where(w => w.UserId == userId).Select(w => w.ShowId))
@@ -114,7 +120,9 @@ public static class TogetherApi
         return order > 0 ? "you" : order < 0 ? "them" : "level";
     }
 
-    /// <summary>Each user's progress through each show, keyed by (user, show), from their watches and the episode copy.</summary>
+    /// <summary>
+    /// Each user's progress through each show, keyed by (user, show), from their watches and the episode copy.
+    /// </summary>
     private static async Task<Dictionary<(string, Guid), ProgressDto>> ProgressAsync(
         SocialContext db, List<string> userIds, List<Guid> showIds, DateTimeOffset now, CancellationToken ct)
     {

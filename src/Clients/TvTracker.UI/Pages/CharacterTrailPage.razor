@@ -121,7 +121,9 @@ else
         }
     }
 
-    /// <summary>The user's follows, and progress for each followed catalog show on the trail (one call per show, as the watch order does).</summary>
+    /// <summary>
+    /// The user's follows, and progress for each followed catalog show on the trail (one call per show, as the watch order does).
+    /// </summary>
     private async Task LoadProgressAsync()
     {
         var follows = await Tracking.GetFollowsAsync() ?? [];
@@ -152,12 +154,16 @@ else
         }
     }
 
-    /// <summary>The same name but for case, quotes and punctuation ("Gustavo 'Gus' Fring").</summary>
+    /// <summary>
+    /// The same name but for case, quotes and punctuation ("Gustavo 'Gus' Fring").
+    /// </summary>
     private bool SameName(string character) => Letters(character) == Letters(trail?.Character ?? "");
 
     private static string Letters(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
-    /// <summary>The first alias, for the heading ("Frank Castle" for "Frank Castle / The Punisher").</summary>
+    /// <summary>
+    /// The first alias, for the heading ("Frank Castle" for "Frank Castle / The Punisher").
+    /// </summary>
     private static string Plain(string character) => character.Split('/')[0].Trim();
 
     private string Details(TrailShow show)

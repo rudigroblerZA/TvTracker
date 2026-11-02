@@ -10,7 +10,9 @@ public sealed class TopEpisodesList : IListInsight
 {
     private const int TopEpisodesPerList = 50;
 
-    /// <summary>A show contributes at most this many episodes to a list, so one show can't fill it.</summary>
+    /// <summary>
+    /// A show contributes at most this many episodes to a list, so one show can't fill it.
+    /// </summary>
     public const int MaxEpisodesPerShow = 2;
 
     public ListBuilder Begin(InsightSources sources) => new Builder();

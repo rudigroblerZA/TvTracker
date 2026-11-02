@@ -8,10 +8,14 @@ public record ShowRatedIntegrationEvent(string UserId, Guid ShowId, int Stars) :
 
 public record EpisodeRatedIntegrationEvent(string UserId, Guid ShowId, Guid EpisodeId, int Stars) : IntegrationEvent;
 
-/// <summary>The user removed their rating of a show.</summary>
+/// <summary>
+/// The user removed their rating of a show.
+/// </summary>
 public record ShowRatingRemovedIntegrationEvent(string UserId, Guid ShowId) : IntegrationEvent;
 
-/// <summary>The user removed their rating of an episode.</summary>
+/// <summary>
+/// The user removed their rating of an episode.
+/// </summary>
 public record EpisodeRatingRemovedIntegrationEvent(string UserId, Guid ShowId, Guid EpisodeId) : IntegrationEvent;
 
 /// <summary>

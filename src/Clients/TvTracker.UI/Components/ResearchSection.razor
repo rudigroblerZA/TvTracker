@@ -72,7 +72,9 @@
     private bool canResearch;
     private Guid loadedFor;
 
-    /// <summary>Facts the show page doesn't already show (its summary, network and premiere are the catalog's, which saving set).</summary>
+    /// <summary>
+    /// Facts the show page doesn't already show (its summary, network and premiere are the catalog's, which saving set).
+    /// </summary>
     private List<SavedResearchFact> Facts => saved?.Facts.Where(f => f.Key is not ("summary" or "network" or "premiered")).ToList() ?? [];
 
     protected override async Task OnParametersSetAsync()

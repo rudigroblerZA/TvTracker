@@ -188,7 +188,9 @@
 
     private int maxDay => report?.Days.Select(d => d.Clicks).DefaultIfEmpty(0).Max() ?? 0;
 
-    /// <summary>Services that sent clicks with no program covering them, most first.</summary>
+    /// <summary>
+    /// Services that sent clicks with no program covering them, most first.
+    /// </summary>
     private List<AffiliateServiceRow>? Unmonetised =>
         report?.Services.Where(s => s.Program is null && s.Clicks > 0).OrderByDescending(s => s.Clicks).Take(5).ToList();
 

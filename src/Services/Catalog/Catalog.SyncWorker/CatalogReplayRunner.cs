@@ -8,7 +8,9 @@ public sealed class CatalogReplayRunner(IServiceScopeFactory scopeFactory, IHost
 {
     private int _running;
 
-    /// <summary>Starts a replay, or returns false when one is already running.</summary>
+    /// <summary>
+    /// Starts a replay, or returns false when one is already running.
+    /// </summary>
     public bool TryStart()
     {
         if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)

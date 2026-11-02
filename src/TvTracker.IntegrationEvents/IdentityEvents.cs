@@ -14,7 +14,9 @@ public record UserProfileUpdatedIntegrationEvent(
     string Region,
     string Language) : IntegrationEvent;
 
-/// <summary>Every service deletes that user's data when it receives this.</summary>
+/// <summary>
+/// Every service deletes that user's data when it receives this.
+/// </summary>
 public record UserDeletedIntegrationEvent(string UserId) : IntegrationEvent;
 
 /// <summary>
@@ -26,5 +28,7 @@ public record UserDeletedIntegrationEvent(string UserId) : IntegrationEvent;
 public record UserProfileSnapshotIntegrationEvent(string UserId, string DisplayName, string? Plan = null, DateTimeOffset? PlanChangedAtUtc = null)
     : IntegrationEvent;
 
-/// <summary>A user's plan changed (<see cref="Plans"/>). Copies keep the latest by <paramref name="ChangedAtUtc"/>.</summary>
+/// <summary>
+/// A user's plan changed (<see cref="Plans"/>). Copies keep the latest by <paramref name="ChangedAtUtc"/>.
+/// </summary>
 public record UserPlanChangedIntegrationEvent(string UserId, string Plan, DateTimeOffset ChangedAtUtc) : IntegrationEvent;

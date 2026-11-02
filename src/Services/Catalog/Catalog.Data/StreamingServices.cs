@@ -1,6 +1,8 @@
 namespace Catalog.Data;
 
-/// <summary>What a where-to-watch link opens: the service's site, its search for the show, or the show's own page.</summary>
+/// <summary>
+/// What a where-to-watch link opens: the service's site, its search for the show, or the show's own page.
+/// </summary>
 public enum WatchLink
 {
     Site,
@@ -8,7 +10,9 @@ public enum WatchLink
     Title
 }
 
-/// <summary>A streaming service the catalog knows how to link into.</summary>
+/// <summary>
+/// A streaming service the catalog knows how to link into.
+/// </summary>
 /// <param name="Name">The name shown for a network show listed under the service (House of the Dragon on HBO Max).</param>
 /// <param name="Hosts">Its web hosts, without "www.", optionally with a path ("amazon.com/gp/video"); a subdomain of one
 /// counts too, and a path matches whole segments only.</param>
@@ -55,11 +59,15 @@ public static class StreamingServices
         new("NOW", ["nowtv.com"], [])
     ];
 
-    /// <summary>The known service an address belongs to, if any.</summary>
+    /// <summary>
+    /// The known service an address belongs to, if any.
+    /// </summary>
     public static StreamingService? For(string? url) =>
         Parse(url) is { } uri ? Known.FirstOrDefault(s => s.Hosts.Any(h => Matches(uri, h))) : null;
 
-    /// <summary>Whether the address is a show's page on a known service (see <see cref="StreamingService.TitlePaths"/>).</summary>
+    /// <summary>
+    /// Whether the address is a show's page on a known service (see <see cref="StreamingService.TitlePaths"/>).
+    /// </summary>
     public static bool IsTitlePage(string? url) =>
         Parse(url) is { } uri && For(url) is { } service
         && service.TitlePaths.Any(p => uri.AbsolutePath.StartsWith(p, StringComparison.OrdinalIgnoreCase)

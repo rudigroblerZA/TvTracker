@@ -115,7 +115,9 @@ else
     private bool shared;
     private string? error;
 
-    /// <summary>A day's guesses on this device, so leaving and coming back keeps them.</summary>
+    /// <summary>
+    /// A day's guesses on this device, so leaving and coming back keeps them.
+    /// </summary>
     private sealed class PuzzleState
     {
         public List<PuzzleGuess> Guesses { get; set; } = [];
@@ -194,7 +196,9 @@ else
         }
     }
 
-    /// <summary>Counts a finished day once: played, solved, and the run of days solved in a row.</summary>
+    /// <summary>
+    /// Counts a finished day once: played, solved, and the run of days solved in a row.
+    /// </summary>
     private async Task RecordAsync()
     {
         if (stats.LastPlayed == date)
@@ -217,7 +221,9 @@ else
         await Platform.SetPreferenceAsync(StatsKey, JsonSerializer.Serialize(stats, Json));
     }
 
-    /// <summary>One square per guess, spoiler-free: green solved, amber close (three or more matches), black far.</summary>
+    /// <summary>
+    /// One square per guess, spoiler-free: green solved, amber close (three or more matches), black far.
+    /// </summary>
     private string Grid => string.Concat(state.Guesses.Select(g =>
         g.Correct ? "🟩" : Matches(g.Feedback) >= 3 ? "🟨" : "⬛"));
 

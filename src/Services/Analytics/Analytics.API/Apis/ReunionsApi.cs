@@ -42,7 +42,9 @@ public static partial class ReunionsApi
     private const int MaxReunions = 40;
     private const int MinActors = 2;
 
-    /// <summary>A role billed this far down counts half as much as the lead: weight 1 / (1 + order / 3).</summary>
+    /// <summary>
+    /// A role billed this far down counts half as much as the lead: weight 1 / (1 + order / 3).
+    /// </summary>
     private const double BillingHalfLife = 3;
 
     private const int MinWatchedEpisodes = 3;
@@ -136,7 +138,9 @@ public static partial class ReunionsApi
         _ => followed || watchedEpisodes >= MinWatchedEpisodes ? 0.5 : 0
     };
 
-    /// <summary>Premiering soon, or premiered within the last year.</summary>
+    /// <summary>
+    /// Premiering soon, or premiered within the last year.
+    /// </summary>
     private static bool IsNew(PersonCastCreditCopy show, DateTimeOffset now) =>
         show.Status == ShowStatus.Upcoming || show.Premiered >= DateOnly.FromDateTime(now.UtcDateTime.AddYears(-1));
 

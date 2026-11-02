@@ -5,7 +5,9 @@ using static Analytics.UnitTests.Build;
 
 namespace Analytics.UnitTests;
 
-/// <summary>The essential cut at "lean" (see CONTEXT.md, Essential cut).</summary>
+/// <summary>
+/// The essential cut at "lean" (see CONTEXT.md, Essential cut).
+/// </summary>
 public class EssentialCutTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

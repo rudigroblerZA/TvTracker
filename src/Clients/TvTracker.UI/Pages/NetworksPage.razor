@@ -150,7 +150,9 @@
         }
     }
 
-    /// <summary>"On Paramount+ · from $8.99 a month", and for US broadcast networks that they're free over the air.</summary>
+    /// <summary>
+    /// "On Paramount+ · from $8.99 a month", and for US broadcast networks that they're free over the air.
+    /// </summary>
     private static string ServiceLine(string network, ServiceInfo service)
     {
         var on = string.Equals(service.Name, network, StringComparison.OrdinalIgnoreCase) ? "" : $"On {service.Name} · ";
@@ -180,7 +182,9 @@
 
     private static string Versus(double? catalog) => catalog is { } c ? $" · catalog {Format.Percent(c)}" : "";
 
-    /// <summary>"good" when the first is clearly above the second (by 5 points, or 10%), "bad" when clearly below.</summary>
+    /// <summary>
+    /// "good" when the first is clearly above the second (by 5 points, or 10%), "bad" when clearly below.
+    /// </summary>
     private static string Tone(double? value, double? against) =>
         value is not { } v || against is not { } a ? "" : v - a >= Math.Max(0.05, Math.Abs(a) * 0.1) ? "tone-good"
             : a - v >= Math.Max(0.05, Math.Abs(a) * 0.1) ? "tone-bad" : "";

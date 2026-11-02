@@ -7,7 +7,9 @@ public class Show
 {
     public Guid Id { get; set; }
 
-    /// <summary>Which provider the show came from ("mock", "tmdb", "tvmaze").</summary>
+    /// <summary>
+    /// Which provider the show came from ("mock", "tmdb", "tvmaze").
+    /// </summary>
     public required string Source { get; set; }
 
     public required string ExternalId { get; set; }
@@ -18,10 +20,14 @@ public class Show
 
     public string? PosterUrl { get; set; }
 
-    /// <summary>A large wide image (the provider's background art), for the show page's hero.</summary>
+    /// <summary>
+    /// A large wide image (the provider's background art), for the show page's hero.
+    /// </summary>
     public string? BackdropUrl { get; set; }
 
-    /// <summary>A thin wide banner, usually with the show's logo (TVmaze's 758×140 "banner").</summary>
+    /// <summary>
+    /// A thin wide banner, usually with the show's logo (TVmaze's 758×140 "banner").
+    /// </summary>
     public string? BannerUrl { get; set; }
 
     public DateOnly? FirstAirDate { get; set; }
@@ -36,7 +42,9 @@ public class Show
 
     public double Popularity { get; set; }
 
-    /// <summary>The provider's average rating (0-10, e.g. TVmaze's), or null if it has none.</summary>
+    /// <summary>
+    /// The provider's average rating (0-10, e.g. TVmaze's), or null if it has none.
+    /// </summary>
     public double? ExternalRating { get; set; }
 
     /// <summary>
@@ -51,17 +59,23 @@ public class Show
     /// </summary>
     public List<string> Nanogenres { get; set; } = [];
 
-    /// <summary>The provider's "similar shows", as provider ids.</summary>
+    /// <summary>
+    /// The provider's "similar shows", as provider ids.
+    /// </summary>
     public List<string> SimilarExternalIds { get; set; } = [];
 
-    /// <summary>The similar shows that exist in this catalog, resolved from <see cref="SimilarExternalIds"/>.</summary>
+    /// <summary>
+    /// The similar shows that exist in this catalog, resolved from <see cref="SimilarExternalIds"/>.
+    /// </summary>
     public List<Guid> SimilarShowIds { get; set; } = [];
 
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime LastSyncedAtUtc { get; set; }
 
-    /// <summary>When the sync worker should next refresh the show from the provider.</summary>
+    /// <summary>
+    /// When the sync worker should next refresh the show from the provider.
+    /// </summary>
     public DateTime NextRefreshAtUtc { get; set; }
 
     public List<Season> Seasons { get; set; } = [];
@@ -70,7 +84,9 @@ public class Show
 
     public List<CastMember> Cast { get; set; } = [];
 
-    /// <summary>Who made the show: its creators, developers and executive producers.</summary>
+    /// <summary>
+    /// Who made the show: its creators, developers and executive producers.
+    /// </summary>
     public List<ShowCreative> Creatives { get; set; } = [];
 
     /// <summary>
@@ -93,7 +109,9 @@ public class Nanogenre
 
     public required string Name { get; set; }
 
-    /// <summary>"cluster" (found by clustering) or "genres" (a small group sharing a genre pairing).</summary>
+    /// <summary>
+    /// "cluster" (found by clustering) or "genres" (a small group sharing a genre pairing).
+    /// </summary>
     public required string Source { get; set; }
 
     public int ShowCount { get; set; }
@@ -107,17 +125,23 @@ public class Nanogenre
 /// </summary>
 public class ShowEmbedding
 {
-    /// <summary>The vector column's size; the embedding model has to match it.</summary>
+    /// <summary>
+    /// The vector column's size; the embedding model has to match it.
+    /// </summary>
     public const int Dimensions = 384;
 
     public Guid ShowId { get; set; }
 
-    /// <summary>The embedding model that produced <see cref="Embedding"/>; vectors from different models can't be compared.</summary>
+    /// <summary>
+    /// The embedding model that produced <see cref="Embedding"/>; vectors from different models can't be compared.
+    /// </summary>
     public required string Model { get; set; }
 
     public required Vector Embedding { get; set; }
 
-    /// <summary>A hash of the text that was embedded, so a refresh that changes nothing doesn't re-embed.</summary>
+    /// <summary>
+    /// A hash of the text that was embedded, so a refresh that changes nothing doesn't re-embed.
+    /// </summary>
     public required string SourceHash { get; set; }
 
     public DateTime EmbeddedAtUtc { get; set; }
@@ -154,15 +178,21 @@ public class Episode
 
     public string? Overview { get; set; }
 
-    /// <summary>Air time in UTC; null until scheduled.</summary>
+    /// <summary>
+    /// Air time in UTC; null until scheduled.
+    /// </summary>
     public DateTimeOffset? AirsAtUtc { get; set; }
 
     public int? RuntimeMinutes { get; set; }
 
-    /// <summary>The provider's average rating (0-10), or null if it has none (e.g. not aired yet).</summary>
+    /// <summary>
+    /// The provider's average rating (0-10), or null if it has none (e.g. not aired yet).
+    /// </summary>
     public double? ExternalRating { get; set; }
 
-    /// <summary>Set once EpisodeAired has been published, so it is sent only once.</summary>
+    /// <summary>
+    /// Set once EpisodeAired has been published, so it is sent only once.
+    /// </summary>
     public bool AiredPublished { get; set; }
 }
 
@@ -174,7 +204,9 @@ public class Person
 
     public string? PhotoUrl { get; set; }
 
-    /// <summary>The provider's id for the person (TVmaze's), so two actors with the same name stay apart.</summary>
+    /// <summary>
+    /// The provider's id for the person (TVmaze's), so two actors with the same name stay apart.
+    /// </summary>
     public string? ExternalId { get; set; }
 
     public DateOnly? Birthday { get; set; }
@@ -183,25 +215,39 @@ public class Person
 
     public string? Gender { get; set; }
 
-    /// <summary>Country name, e.g. "United States".</summary>
+    /// <summary>
+    /// Country name, e.g. "United States".
+    /// </summary>
     public string? Country { get; set; }
 
-    /// <summary>Shows they're credited on behind the camera, across the provider (not just this catalog); null until looked up.</summary>
+    /// <summary>
+    /// Shows they're credited on behind the camera, across the provider (not just this catalog); null until looked up.
+    /// </summary>
     public int? CareerShows { get; set; }
 
-    /// <summary>Shows they created or developed, across the provider.</summary>
+    /// <summary>
+    /// Shows they created or developed, across the provider.
+    /// </summary>
     public int? CareerCreated { get; set; }
 
-    /// <summary>Shows they were an executive producer on, across the provider.</summary>
+    /// <summary>
+    /// Shows they were an executive producer on, across the provider.
+    /// </summary>
     public int? CareerExecutiveProduced { get; set; }
 
-    /// <summary>Their best-known shows behind the camera, most popular first (titles; many aren't in this catalog).</summary>
+    /// <summary>
+    /// Their best-known shows behind the camera, most popular first (titles; many aren't in this catalog).
+    /// </summary>
     public List<string> CareerNotableShows { get; set; } = [];
 
-    /// <summary>When the career figures were last fetched from the provider.</summary>
+    /// <summary>
+    /// When the career figures were last fetched from the provider.
+    /// </summary>
     public DateTime? CareerRefreshedAtUtc { get; set; }
 
-    /// <summary>When <see cref="PersonCastCredit"/>s were last fetched for them (actors in catalog shows only).</summary>
+    /// <summary>
+    /// When <see cref="PersonCastCredit"/>s were last fetched for them (actors in catalog shows only).
+    /// </summary>
     public DateTime? CastCreditsRefreshedAtUtc { get; set; }
 }
 
@@ -213,10 +259,14 @@ public class PersonCastCredit
 {
     public Guid PersonId { get; set; }
 
-    /// <summary>The provider's id for the show.</summary>
+    /// <summary>
+    /// The provider's id for the show.
+    /// </summary>
     public required string ShowExternalId { get; set; }
 
-    /// <summary>The catalog's id, when the show was in the catalog at the last refresh.</summary>
+    /// <summary>
+    /// The catalog's id, when the show was in the catalog at the last refresh.
+    /// </summary>
     public Guid? ShowId { get; set; }
 
     public required string Title { get; set; }
@@ -227,12 +277,16 @@ public class PersonCastCredit
 
     public DateOnly? Premiered { get; set; }
 
-    /// <summary>The provider's popularity (TVmaze's weight, 0-100).</summary>
+    /// <summary>
+    /// The provider's popularity (TVmaze's weight, 0-100).
+    /// </summary>
     public double Popularity { get; set; }
 
     public double? Rating { get; set; }
 
-    /// <summary>The character, or several joined with " / ".</summary>
+    /// <summary>
+    /// The character, or several joined with " / ".
+    /// </summary>
     public string? Character { get; set; }
 
     public bool Voice { get; set; }
@@ -246,15 +300,21 @@ public class ShowQuoteSource
 {
     public Guid ShowId { get; set; }
 
-    /// <summary>The page's title on en.wikiquote.org ("Breaking Bad"), or null when the show has none.</summary>
+    /// <summary>
+    /// The page's title on en.wikiquote.org ("Breaking Bad"), or null when the show has none.
+    /// </summary>
     public string? Page { get; set; }
 
     public DateTime CheckedAtUtc { get; set; }
 
-    /// <summary>When the page and its season pages were last read; null until the first time.</summary>
+    /// <summary>
+    /// When the page and its season pages were last read; null until the first time.
+    /// </summary>
     public DateTime? FetchedAtUtc { get; set; }
 
-    /// <summary>A page's address on Wikiquote, or its raw wikitext's.</summary>
+    /// <summary>
+    /// A page's address on Wikiquote, or its raw wikitext's.
+    /// </summary>
     public static string PageUrl(string page, bool raw = false)
     {
         var title = Uri.EscapeDataString(page.Replace(' ', '_')).Replace("%28", "(").Replace("%29", ")");
@@ -272,15 +332,21 @@ public class Quote
 
     public Guid ShowId { get; set; }
 
-    /// <summary>The episode's numbers as Wikiquote heads it ("[1.01]"); both null for a line about the whole show.</summary>
+    /// <summary>
+    /// The episode's numbers as Wikiquote heads it ("[1.01]"); both null for a line about the whole show.
+    /// </summary>
     public int? SeasonNumber { get; set; }
 
     public int? EpisodeNumber { get; set; }
 
-    /// <summary>Order on the page, so an episode's lines read as Wikiquote lists them.</summary>
+    /// <summary>
+    /// Order on the page, so an episode's lines read as Wikiquote lists them.
+    /// </summary>
     public int Position { get; set; }
 
-    /// <summary>Who says each line, matching <see cref="Lines"/> by index; empty for a stage direction or narration.</summary>
+    /// <summary>
+    /// Who says each line, matching <see cref="Lines"/> by index; empty for a stage direction or narration.
+    /// </summary>
     public List<string> Speakers { get; set; } = [];
 
     public List<string> Lines { get; set; } = [];
@@ -295,15 +361,21 @@ public class ShowSetting
 {
     public Guid ShowId { get; set; }
 
-    /// <summary><see cref="ShowSettingKinds.Set"/> or <see cref="ShowSettingKinds.Filmed"/>; a city can be both.</summary>
+    /// <summary>
+    /// <see cref="ShowSettingKinds.Set"/> or <see cref="ShowSettingKinds.Filmed"/>; a city can be both.
+    /// </summary>
     public string Kind { get; set; } = ShowSettingKinds.Set;
 
-    /// <summary>The place's Wikidata item ("Q34804" for Albuquerque).</summary>
+    /// <summary>
+    /// The place's Wikidata item ("Q34804" for Albuquerque).
+    /// </summary>
     public required string PlaceId { get; set; }
 
     public required string Name { get; set; }
 
-    /// <summary>The place's country, when Wikidata gives one in English.</summary>
+    /// <summary>
+    /// The place's country, when Wikidata gives one in English.
+    /// </summary>
     public string? Country { get; set; }
 
     public double Latitude { get; set; }
@@ -317,7 +389,9 @@ public static class ShowSettingKinds
     public const string Filmed = "filmed";
 }
 
-/// <summary>When a show's settings were last looked up on Wikidata, found or not.</summary>
+/// <summary>
+/// When a show's settings were last looked up on Wikidata, found or not.
+/// </summary>
 public class ShowSettingLookup
 {
     public Guid ShowId { get; set; }
@@ -334,7 +408,9 @@ public class ShowNamesake
 {
     public Guid ShowId { get; set; }
 
-    /// <summary>The other show's provider id.</summary>
+    /// <summary>
+    /// The other show's provider id.
+    /// </summary>
     public required string ExternalId { get; set; }
 
     public required string Title { get; set; }
@@ -347,12 +423,16 @@ public class ShowNamesake
 
     public string? Network { get; set; }
 
-    /// <summary>The network's country code ("GB", "US").</summary>
+    /// <summary>
+    /// The network's country code ("GB", "US").
+    /// </summary>
     public string? Country { get; set; }
 
     public string? Language { get; set; }
 
-    /// <summary>The provider's type, as a kind keyword ("scripted", "reality").</summary>
+    /// <summary>
+    /// The provider's type, as a kind keyword ("scripted", "reality").
+    /// </summary>
     public string? Kind { get; set; }
 
     public double Popularity { get; set; }
@@ -360,18 +440,24 @@ public class ShowNamesake
     public double? Rating { get; set; }
 }
 
-/// <summary>When a show's namesakes were last looked up, found or not.</summary>
+/// <summary>
+/// When a show's namesakes were last looked up, found or not.
+/// </summary>
 public class ShowNamesakeLookup
 {
     public Guid ShowId { get; set; }
 
     public DateTime CheckedAtUtc { get; set; }
 
-    /// <summary>The network's country code of the catalog show itself, which the catalog doesn't otherwise keep.</summary>
+    /// <summary>
+    /// The network's country code of the catalog show itself, which the catalog doesn't otherwise keep.
+    /// </summary>
     public string? Country { get; set; }
 }
 
-/// <summary>A person who made a show, with their roles on it.</summary>
+/// <summary>
+/// A person who made a show, with their roles on it.
+/// </summary>
 public class ShowCreative
 {
     public Guid ShowId { get; set; }
@@ -380,10 +466,14 @@ public class ShowCreative
 
     public Person Person { get; set; } = null!;
 
-    /// <summary>"Creator", "Developer" and/or "Executive Producer".</summary>
+    /// <summary>
+    /// "Creator", "Developer" and/or "Executive Producer".
+    /// </summary>
     public List<string> Roles { get; set; } = [];
 
-    /// <summary>Creators and developers first, as the provider lists them.</summary>
+    /// <summary>
+    /// Creators and developers first, as the provider lists them.
+    /// </summary>
     public int Order { get; set; }
 }
 
@@ -420,7 +510,9 @@ public class WatchProvider
 
     public Guid ShowId { get; set; }
 
-    /// <summary>ISO 3166-1 country code.</summary>
+    /// <summary>
+    /// ISO 3166-1 country code.
+    /// </summary>
     public required string Region { get; set; }
 
     public required string ProviderName { get; set; }
@@ -436,15 +528,21 @@ public class WatchProvider
 /// </summary>
 public class CatalogOverride
 {
-    /// <summary>The correction's id in Ratings.API; set by the app.</summary>
+    /// <summary>
+    /// The correction's id in Ratings.API; set by the app.
+    /// </summary>
     public Guid Id { get; set; }
 
     public Guid ShowId { get; set; }
 
-    /// <summary>Null for a show field.</summary>
+    /// <summary>
+    /// Null for a show field.
+    /// </summary>
     public Guid? EpisodeId { get; set; }
 
-    /// <summary>One of <see cref="CatalogOverrideFields"/>.</summary>
+    /// <summary>
+    /// One of <see cref="CatalogOverrideFields"/>.
+    /// </summary>
     public required string Field { get; set; }
 
     public required string Value { get; set; }
@@ -452,27 +550,41 @@ public class CatalogOverride
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>The fields a correction or saved research can override, and how each value is written.</summary>
+/// <summary>
+/// The fields a correction or saved research can override, and how each value is written.
+/// </summary>
 public static class CatalogOverrideFields
 {
-    /// <summary>The show's summary (plain text).</summary>
+    /// <summary>
+    /// The show's summary (plain text).
+    /// </summary>
     public const string ShowSummary = "show-summary";
 
-    /// <summary>The show's network or streaming service, up to 128 characters.</summary>
+    /// <summary>
+    /// The show's network or streaming service, up to 128 characters.
+    /// </summary>
     public const string ShowNetwork = "show-network";
 
-    /// <summary>The show's premiere date, yyyy-MM-dd.</summary>
+    /// <summary>
+    /// The show's premiere date, yyyy-MM-dd.
+    /// </summary>
     public const string ShowPremiered = "show-premiered";
 
     public const string EpisodeTitle = "episode-title";
 
-    /// <summary>The episode's summary (plain text).</summary>
+    /// <summary>
+    /// The episode's summary (plain text).
+    /// </summary>
     public const string EpisodeSummary = "episode-summary";
 
-    /// <summary>yyyy-MM-dd; the provider's time of day is kept (UTC midnight when it has none).</summary>
+    /// <summary>
+    /// yyyy-MM-dd; the provider's time of day is kept (UTC midnight when it has none).
+    /// </summary>
     public const string EpisodeAirDate = "episode-airdate";
 
-    /// <summary>Whole minutes, 1-600.</summary>
+    /// <summary>
+    /// Whole minutes, 1-600.
+    /// </summary>
     public const string EpisodeRuntime = "episode-runtime";
 
     public static readonly IReadOnlySet<string> ShowFields = new HashSet<string> { ShowSummary, ShowNetwork, ShowPremiered };

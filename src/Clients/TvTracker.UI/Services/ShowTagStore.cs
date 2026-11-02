@@ -9,7 +9,9 @@ namespace TvTracker.UI.Services;
 /// </summary>
 public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
 {
-    /// <summary>Tags shown on a card, in this order of preference; at most <see cref="MaxPerCard"/>.</summary>
+    /// <summary>
+    /// Tags shown on a card, in this order of preference; at most <see cref="MaxPerCard"/>.
+    /// </summary>
     private static readonly string[] CardPriority =
         ["fan-favorite", "prolific-creator", "weekend-binge", "bingeable", "drops-at-once", "limited-series", "long-running", "quick-episodes"];
 
@@ -22,10 +24,14 @@ public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
     private readonly Lock _lock = new();
     private Task? _flush;
 
-    /// <summary>Raised when tags arrive; cards re-render then.</summary>
+    /// <summary>
+    /// Raised when tags arrive; cards re-render then.
+    /// </summary>
     public event Action? Changed;
 
-    /// <summary>The tags to show on a card, or none (not signed in, not loaded yet, or the show has none).</summary>
+    /// <summary>
+    /// The tags to show on a card, or none (not signed in, not loaded yet, or the show has none).
+    /// </summary>
     /// <param name="preferred">A tag key to put first when the show has it, e.g. the tag search results are filtered by.</param>
     public IReadOnlyList<ShowTag> ForCard(Guid showId, string? preferred = null)
     {
@@ -47,7 +53,9 @@ public sealed class ShowTagStore(AnalyticsClient analytics, UserSession session)
         }
     }
 
-    /// <summary>Asks for a show's tags; they arrive with the rest of the page's in one request.</summary>
+    /// <summary>
+    /// Asks for a show's tags; they arrive with the rest of the page's in one request.
+    /// </summary>
     public void Request(Guid showId)
     {
         lock (_lock)

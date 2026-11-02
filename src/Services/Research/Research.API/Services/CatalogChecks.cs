@@ -38,7 +38,9 @@ namespace Research.API.Services;
 /// </summary>
 public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time, ILogger<CatalogChecks> logger) : BackgroundService
 {
-    /// <summary>How many of the catalog's most popular shows are checked (and listed in the queue).</summary>
+    /// <summary>
+    /// How many of the catalog's most popular shows are checked (and listed in the queue).
+    /// </summary>
     public const int Popular = 300;
 
     private const int BatchSize = 100;
@@ -207,7 +209,9 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             shows.Count, wikidata.Count, checks.Count, shelf.Count);
     }
 
-    /// <summary>A batch's query, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.</summary>
+    /// <summary>
+    /// A batch's query, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.
+    /// </summary>
     private async Task<T> WithRetryAsync<T>(int shows, Func<Task<T>> query, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
@@ -240,7 +244,9 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         return found;
     }
 
-    /// <summary>A SPARQL query over a batch of TVmaze ids (<c>{IDS}</c>), its result rows.</summary>
+    /// <summary>
+    /// A SPARQL query over a batch of TVmaze ids (<c>{IDS}</c>), its result rows.
+    /// </summary>
     private static async Task<List<JsonElement>> SparqlAsync(string sparql, IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));
@@ -285,7 +291,9 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         return found;
     }
 
-    /// <summary>The earliest of Wikidata's starts ("2012-10-01T00:00:00Z@10|…"), with its precision.</summary>
+    /// <summary>
+    /// The earliest of Wikidata's starts ("2012-10-01T00:00:00Z@10|…"), with its precision.
+    /// </summary>
     private static WikidataDate? Earliest(string? starts) =>
         (starts ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries)
             .Select(s => s.Split('@'))
@@ -295,7 +303,9 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
             .OrderBy(d => d.Date)
             .FirstOrDefault();
 
-    /// <summary>The same start at Wikidata's precision: within a day, the same month, or the same year.</summary>
+    /// <summary>
+    /// The same start at Wikidata's precision: within a day, the same month, or the same year.
+    /// </summary>
     internal static bool SameStart(WikidataDate wikidata, DateOnly? catalog) => catalog is { } aired && wikidata.Precision switch
     {
         >= 11 => Math.Abs(aired.DayNumber - wikidata.Date.DayNumber) <= 1,

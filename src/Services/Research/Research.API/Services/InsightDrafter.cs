@@ -18,7 +18,9 @@ namespace Research.API.Services;
 /// </summary>
 public sealed partial class InsightDrafter(IConfiguration config, ILogger<InsightDrafter> logger)
 {
-    /// <summary>Characters of each source the model reads; small models lose the thread in long prompts.</summary>
+    /// <summary>
+    /// Characters of each source the model reads; small models lose the thread in long prompts.
+    /// </summary>
     private const int PerSource = 1500;
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(10) };

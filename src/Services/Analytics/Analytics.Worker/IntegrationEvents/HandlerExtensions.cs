@@ -31,6 +31,8 @@ public static class HandlerExtensions
             await transaction.CommitAsync(ct);
         });
 
-    /// <summary>The usual inbox name: the handler class and the event type.</summary>
+    /// <summary>
+    /// The usual inbox name: the handler class and the event type.
+    /// </summary>
     public static string HandlerName<THandler>(IntegrationEvent e) => $"{typeof(THandler).Name}.{e.GetType().Name}";
 }

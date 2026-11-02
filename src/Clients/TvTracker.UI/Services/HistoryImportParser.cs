@@ -6,7 +6,9 @@ using System.Text.RegularExpressions;
 
 namespace TvTracker.UI.Services;
 
-/// <summary>A show in an export, keyed by its TheTVDB id when the export has one, else its normalised title.</summary>
+/// <summary>
+/// A show in an export, keyed by its TheTVDB id when the export has one, else its normalised title.
+/// </summary>
 public sealed record ParsedShow(string Key, string? TvdbId, string Title, int? Year);
 
 /// <param name="WatchedAtUtc">The watch's time; null when the export gives none (such a watch is marked at import time).</param>
@@ -226,7 +228,9 @@ public static partial class HistoryImportParser
             files, skipped, dated.FirstOrDefault()?.WatchedAtUtc, dated.LastOrDefault()?.WatchedAtUtc, all.Count - dated.Count);
     }
 
-    /// <summary>Account files in a TV Time archive that an importer has no business opening.</summary>
+    /// <summary>
+    /// Account files in a TV Time archive that an importer has no business opening.
+    /// </summary>
     private static bool IsPrivate(string name)
     {
         var lower = name.ToLowerInvariant();
@@ -271,7 +275,9 @@ public static partial class HistoryImportParser
     private static int? YearOf(string? value) =>
         value is { Length: >= 4 } && int.TryParse(value[..4], out var y) && y is > 1900 and < 2100 ? y : null;
 
-    /// <summary>ISO with a zone as given; "yyyy-MM-dd HH:mm:ss" and "yyyy-MM-dd" in <paramref name="zone"/>; "0001-01-01" and blanks as none.</summary>
+    /// <summary>
+    /// ISO with a zone as given; "yyyy-MM-dd HH:mm:ss" and "yyyy-MM-dd" in <paramref name="zone"/>; "0001-01-01" and blanks as none.
+    /// </summary>
     internal static DateTimeOffset? ParseDate(string? value, TimeZoneInfo zone)
     {
         if (string.IsNullOrWhiteSpace(value) || value.StartsWith("0001", StringComparison.Ordinal)) return null;
@@ -297,7 +303,9 @@ public static partial class HistoryImportParser
     internal static string Normalise(string title) =>
         string.Join(' ', NotWord().Replace(title.Replace("&", " and ").ToLowerInvariant(), " ").Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-    /// <summary>A small RFC 4180 reader: quoted fields, doubled quotes, newlines inside quotes.</summary>
+    /// <summary>
+    /// A small RFC 4180 reader: quoted fields, doubled quotes, newlines inside quotes.
+    /// </summary>
     private static IEnumerable<List<string>> Csv(TextReader reader)
     {
         var row = new List<string>();

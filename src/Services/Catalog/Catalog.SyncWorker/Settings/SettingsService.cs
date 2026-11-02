@@ -79,7 +79,9 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
         }
     }
 
-    /// <summary>One batch of due shows: their settings replaced, and their lookup stamped. Returns how many were due.</summary>
+    /// <summary>
+    /// One batch of due shows: their settings replaced, and their lookup stamped. Returns how many were due.
+    /// </summary>
     private async Task<int> LookUpAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -122,7 +124,9 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
         return due.Count;
     }
 
-    /// <summary>Each show's places, one row per place (its first coordinates and country when Wikidata has several).</summary>
+    /// <summary>
+    /// Each show's places, one row per place (its first coordinates and country when Wikidata has several).
+    /// </summary>
     private static async Task<List<Place>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));

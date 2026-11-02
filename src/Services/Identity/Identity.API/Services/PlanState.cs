@@ -56,7 +56,9 @@ public static class PlanState
         }
     }
 
-    /// <summary>The members of a family, for recomputing them when its owner's plan or account changes.</summary>
+    /// <summary>
+    /// The members of a family, for recomputing them when its owner's plan or account changes.
+    /// </summary>
     public static Task<List<string>> MembersOfAsync(IdentityContext db, string ownerUserId, CancellationToken ct) =>
         db.FamilyMembers.Where(m => m.OwnerUserId == ownerUserId).Select(m => m.UserId).ToListAsync(ct);
 }

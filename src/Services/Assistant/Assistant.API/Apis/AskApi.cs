@@ -15,7 +15,9 @@ public record AskDto(Guid Id, string Question, Guid? PreviousId, string Status, 
 /// <param name="Available">Whether a model server and the MCP gateway are configured.</param>
 public record AboutDto(bool Available, string Model, int PerHour);
 
-/// <summary>"Ask the app": questions about shows, answered by the local model with the app's MCP tools. Signed in only.</summary>
+/// <summary>
+/// "Ask the app": questions about shows, answered by the local model with the app's MCP tools. Signed in only.
+/// </summary>
 public static class AskApi
 {
     public const int MinLength = 3;

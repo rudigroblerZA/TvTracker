@@ -59,7 +59,9 @@ else
         }
     }
 
-    /// <summary>The prefix with an ellipsis: "The One…", "What If…" (not "What If......"), "Mr. …" (not "Mr…").</summary>
+    /// <summary>
+    /// The prefix with an ellipsis: "The One…", "What If…" (not "What If......"), "Mr. …" (not "Mr…").
+    /// </summary>
     private static string Opening(string prefix) =>
         prefix.EndsWith("...") ? prefix[..^3] + "…"
         : prefix.EndsWith('…') ? prefix

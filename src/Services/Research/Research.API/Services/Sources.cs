@@ -22,7 +22,9 @@ public static class ExternalSources
     };
 }
 
-/// <summary>What one source said: its text, and the facts it offers.</summary>
+/// <summary>
+/// What one source said: its text, and the facts it offers.
+/// </summary>
 public sealed record FoundSource(string Kind, string Url, string Title, string Excerpt, IReadOnlyList<KeyValuePair<string, string>> Facts);
 
 /// <summary>
@@ -204,7 +206,9 @@ public sealed partial class WikimediaSource(ILogger<WikimediaSource> logger)
         return null;
     }
 
-    /// <summary>The article's introduction as plain text, or null when the MediaWiki API refuses (it rate-limits shared addresses).</summary>
+    /// <summary>
+    /// The article's introduction as plain text, or null when the MediaWiki API refuses (it rate-limits shared addresses).
+    /// </summary>
     private async Task<string?> IntroAsync(string title, CancellationToken ct)
     {
         try

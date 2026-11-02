@@ -47,7 +47,9 @@ public static class RecommendationsApi
         return TypedResults.Ok(similar);
     }
 
-    /// <summary>Shows made like this one but about something else; empty when the show has no DNA yet.</summary>
+    /// <summary>
+    /// Shows made like this one but about something else; empty when the show has no DNA yet.
+    /// </summary>
     private static async Task<Ok<List<DnaTwinDto>>> GetDnaTwinsAsync(
         Guid showId, RecommendationEngine engine, RecommendationsContext db, HybridCache cache, int limit = 6, CancellationToken ct = default)
     {

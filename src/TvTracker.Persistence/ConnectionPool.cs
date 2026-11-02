@@ -23,10 +23,14 @@ public static class ConnectionPool
 {
     public const int MaxPoolSize = 8;
 
-    /// <summary>Seconds an idle connection stays in the pool; Npgsql's default is 300.</summary>
+    /// <summary>
+    /// Seconds an idle connection stays in the pool; Npgsql's default is 300.
+    /// </summary>
     public const int IdleLifetimeSeconds = 60;
 
-    /// <summary>The connection string with the pool limits added, unless it already sets them.</summary>
+    /// <summary>
+    /// The connection string with the pool limits added, unless it already sets them.
+    /// </summary>
     public static string? Limit(string? connectionString)
     {
         if (string.IsNullOrEmpty(connectionString))

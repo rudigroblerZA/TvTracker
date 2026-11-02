@@ -53,7 +53,9 @@ else
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    /// <summary>The most awarded, less what the user has started (any episode watched); followed but unstarted stays.</summary>
+    /// <summary>
+    /// The most awarded, less what the user has started (any episode watched); followed but unstarted stays.
+    /// </summary>
     private async Task LoadAsync()
     {
         error = null;

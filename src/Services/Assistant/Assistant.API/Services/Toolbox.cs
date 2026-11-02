@@ -6,11 +6,15 @@ using ModelContextProtocol.Protocol;
 
 namespace Assistant.API.Services;
 
-/// <summary>A show a tool result named, for linking it in the answer.</summary>
+/// <summary>
+/// A show a tool result named, for linking it in the answer.
+/// </summary>
 public record ShowRef(Guid Id, string Title);
 
-/// <summary>A tool's answer: compact text for the model, the shows it named, and every id in it (for checking the ids
-/// the model passes to later calls).</summary>
+/// <summary>
+/// A tool's answer: compact text for the model, the shows it named, and every id in it (for checking the ids
+/// the model passes to later calls).
+/// </summary>
 public record ToolOutput(string Text, IReadOnlyList<ShowRef> Shows, bool IsError, IReadOnlyCollection<Guid>? Ids = null);
 
 /// <summary>
@@ -79,7 +83,9 @@ public sealed class Toolbox(IConfiguration config, IHttpClientFactory httpFactor
         }
     }
 
-    /// <summary>The result without ids, nulls and empty values, cut to size, and the shows it named.</summary>
+    /// <summary>
+    /// The result without ids, nulls and empty values, cut to size, and the shows it named.
+    /// </summary>
     internal static ToolOutput Compact(string text)
     {
         JsonNode? node;

@@ -45,7 +45,9 @@ public sealed partial class Moderation(IConfiguration config)
         return Link().IsMatch(text) ? TextVerdict.Held : TextVerdict.Ok;
     }
 
-    /// <summary>Comments, insights and corrections the user posted in the last hour reached <see cref="PostsPerHour"/>.</summary>
+    /// <summary>
+    /// Comments, insights and corrections the user posted in the last hour reached <see cref="PostsPerHour"/>.
+    /// </summary>
     public static async Task<bool> TooManyPostsAsync(RatingsContext db, string userId, DateTime nowUtc, CancellationToken ct)
     {
         var since = nowUtc.AddHours(-1);

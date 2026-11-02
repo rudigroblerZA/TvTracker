@@ -17,14 +17,20 @@ public class NotificationPreferences
     public bool WebPushEnabled { get; set; } = true;
     public bool EmailEnabled { get; set; }
 
-    /// <summary>From the user's profile (UserProfileUpdated) or token.</summary>
+    /// <summary>
+    /// From the user's profile (UserProfileUpdated) or token.
+    /// </summary>
     public string? Email { get; set; }
 
-    /// <summary>Alerts are held during quiet hours (in the user's timezone) and sent when they end.</summary>
+    /// <summary>
+    /// Alerts are held during quiet hours (in the user's timezone) and sent when they end.
+    /// </summary>
     public TimeOnly? QuietHoursStart { get; set; }
     public TimeOnly? QuietHoursEnd { get; set; }
 
-    /// <summary>IANA timezone id, from the user's profile.</summary>
+    /// <summary>
+    /// IANA timezone id, from the user's profile.
+    /// </summary>
     public string TimeZone { get; set; } = "UTC";
 
     /// <summary>
@@ -33,13 +39,19 @@ public class NotificationPreferences
     /// </summary>
     public bool WeeklyDigest { get; set; }
 
-    /// <summary>The day the digest goes out, in the user's time zone.</summary>
+    /// <summary>
+    /// The day the digest goes out, in the user's time zone.
+    /// </summary>
     public DayOfWeek DigestDay { get; set; } = DayOfWeek.Sunday;
 
-    /// <summary>The hour (0-23) it goes out from, in the user's time zone.</summary>
+    /// <summary>
+    /// The hour (0-23) it goes out from, in the user's time zone.
+    /// </summary>
     public int DigestHour { get; set; } = 9;
 
-    /// <summary>When the last digest was sent; one a week at most.</summary>
+    /// <summary>
+    /// When the last digest was sent; one a week at most.
+    /// </summary>
     public DateTime? LastDigestAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
@@ -65,10 +77,14 @@ public class Device
     public required string UserId { get; set; }
     public DevicePlatform Platform { get; set; }
 
-    /// <summary>FCM or APNs token (Android / iOS), or the push service endpoint (web).</summary>
+    /// <summary>
+    /// FCM or APNs token (Android / iOS), or the push service endpoint (web).
+    /// </summary>
     public required string Token { get; set; }
 
-    /// <summary>Web push subscription keys.</summary>
+    /// <summary>
+    /// Web push subscription keys.
+    /// </summary>
     public string? P256dh { get; set; }
     public string? Auth { get; set; }
 
@@ -76,7 +92,9 @@ public class Device
     public DateTime LastSeenAtUtc { get; set; }
 }
 
-/// <summary>Local copy of who follows which show (from ShowFollowed / ShowUnfollowed).</summary>
+/// <summary>
+/// Local copy of who follows which show (from ShowFollowed / ShowUnfollowed).
+/// </summary>
 public class Follower
 {
     public required string UserId { get; set; }
@@ -100,13 +118,17 @@ public class InboxItem
     public required string Title { get; set; }
     public required string Body { get; set; }
 
-    /// <summary>In-app link, e.g. "/shows/{id}".</summary>
+    /// <summary>
+    /// In-app link, e.g. "/shows/{id}".
+    /// </summary>
     public string? Link { get; set; }
 
     public Guid ShowId { get; set; }
     public Guid? EpisodeId { get; set; }
 
-    /// <summary>The event that caused this notification; unique per user, so a redelivered event never notifies twice.</summary>
+    /// <summary>
+    /// The event that caused this notification; unique per user, so a redelivered event never notifies twice.
+    /// </summary>
     public Guid SourceEventId { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
@@ -128,7 +150,9 @@ public enum DeliveryStatus
     Skipped
 }
 
-/// <summary>One notification to send on one channel; the delivery worker processes these as a queue.</summary>
+/// <summary>
+/// One notification to send on one channel; the delivery worker processes these as a queue.
+/// </summary>
 public class Delivery
 {
     public Guid Id { get; set; }

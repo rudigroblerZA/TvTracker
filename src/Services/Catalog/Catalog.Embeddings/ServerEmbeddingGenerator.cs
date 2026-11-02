@@ -5,7 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Catalog.Embeddings;
 
-/// <summary>Something that can get its model ready at startup, rather than on the first request.</summary>
+/// <summary>
+/// Something that can get its model ready at startup, rather than on the first request.
+/// </summary>
 internal interface IWarmUp
 {
     Task WarmUpAsync(CancellationToken ct);
@@ -158,7 +160,9 @@ public sealed class ServerEmbeddingGenerator(EmbeddingModel spec, TimeProvider t
         }
     }
 
-    /// <summary>The vector at the model's length (shortened when it may be), scaled to unit length.</summary>
+    /// <summary>
+    /// The vector at the model's length (shortened when it may be), scaled to unit length.
+    /// </summary>
     private float[] Fit(float[] vector)
     {
         if (vector.Length != spec.Dimensions)

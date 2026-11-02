@@ -16,7 +16,9 @@ public record PersonDto(string UserId, string DisplayName, int Followers, int Fo
 public record MySocialDto(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following, bool Private = false,
     int Requests = 0);
 
-/// <summary>Either setting may be left out (null) to keep it as it is.</summary>
+/// <summary>
+/// Either setting may be left out (null) to keep it as it is.
+/// </summary>
 public record SocialSettings(bool? ShareActivity, bool? Private = null);
 
 /// <param name="CanSee">False for a private profile the caller isn't an approved follower of: only the name shows.</param>
@@ -39,7 +41,9 @@ public record FeedDto(IReadOnlyList<FeedItemDto> Items, DateTime? NextBefore);
 public record FeedItemDto(Guid Id, string UserId, string DisplayName, string Kind, Guid ShowId, string? ShowTitle, string? PosterUrl,
     int Episodes, EpisodeCodeDto? First, EpisodeCodeDto? Last, int? Stars, DateTime OccurredAtUtc);
 
-/// <summary>Numbers only: a follower may not have seen the episode, so titles stay out of the feed.</summary>
+/// <summary>
+/// Numbers only: a follower may not have seen the episode, so titles stay out of the feed.
+/// </summary>
 public record EpisodeCodeDto(int SeasonNumber, int EpisodeNumber);
 
 public record SharedListSummaryDto(Guid ListId, string Name, string? Description, int Shows, DateTime UpdatedAtUtc);
@@ -95,7 +99,9 @@ public static class SocialApi
             await db.Follows.CountAsync(f => f.FolloweeId == me.UserId && !f.Approved, ct)));
     }
 
-    /// <summary>Making a profile public approves every waiting request: nothing is left to approve.</summary>
+    /// <summary>
+    /// Making a profile public approves every waiting request: nothing is left to approve.
+    /// </summary>
     private static async Task<Ok<SocialSettings>> UpdateSettingsAsync(
         SocialSettings settings, ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
@@ -136,7 +142,9 @@ public static class SocialApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>The newest activity of the people the caller follows and can see; page backwards with <paramref name="before"/>.</summary>
+    /// <summary>
+    /// The newest activity of the people the caller follows and can see; page backwards with <paramref name="before"/>.
+    /// </summary>
     private static async Task<Ok<FeedDto>> GetFeedAsync(
         ClaimsPrincipal user, SocialContext db, DateTime? before = null, CancellationToken ct = default)
     {
@@ -152,7 +160,9 @@ public static class SocialApi
         return TypedResults.Ok(new FeedDto(await ToDtosAsync(db, page, ct), items.Count > FeedPage ? page[^1].OccurredAtUtc : null));
     }
 
-    /// <summary>By display name. Private profiles are found (by name only); blocked people aren't, either way round.</summary>
+    /// <summary>
+    /// By display name. Private profiles are found (by name only); blocked people aren't, either way round.
+    /// </summary>
     private static async Task<Results<Ok<List<PersonDto>>, ValidationProblem>> SearchAsync(
         ClaimsPrincipal user, SocialContext db, string q = "", CancellationToken ct = default)
     {
@@ -174,7 +184,9 @@ public static class SocialApi
         return TypedResults.Ok(await PeopleAsync(db, me, ids, ct));
     }
 
-    /// <summary>404 for someone blocked either way, as if they didn't exist.</summary>
+    /// <summary>
+    /// 404 for someone blocked either way, as if they didn't exist.
+    /// </summary>
     private static async Task<Results<Ok<PersonPageDto>, NotFound>> GetPersonAsync(
         string userId, ClaimsPrincipal user, SocialContext db, CancellationToken ct)
     {
@@ -197,7 +209,9 @@ public static class SocialApi
         return TypedResults.Ok(new PersonPageDto(person, access.Activity, await ToDtosAsync(db, activity, ct), access.Profile, lists));
     }
 
-    /// <summary>Following a private profile makes a request. Someone blocked either way can't follow (404, as if absent).</summary>
+    /// <summary>
+    /// Following a private profile makes a request. Someone blocked either way can't follow (404, as if absent).
+    /// </summary>
     private static async Task<Results<Ok<FollowStateDto>, NotFound, ValidationProblem>> FollowAsync(
         string userId, ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
@@ -224,7 +238,9 @@ public static class SocialApi
         return TypedResults.Ok(new FollowStateDto(follow.Approved, !follow.Approved));
     }
 
-    /// <summary>Also withdraws a request that's still waiting.</summary>
+    /// <summary>
+    /// Also withdraws a request that's still waiting.
+    /// </summary>
     private static async Task<NoContent> UnfollowAsync(string userId, ClaimsPrincipal user, SocialContext db, CancellationToken ct)
     {
         var me = UserId(user);
@@ -232,7 +248,9 @@ public static class SocialApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>Blocking ends any follow between the two, either way, and requests too.</summary>
+    /// <summary>
+    /// Blocking ends any follow between the two, either way, and requests too.
+    /// </summary>
     private static async Task<Results<NoContent, NotFound, ValidationProblem>> BlockAsync(
         string userId, ClaimsPrincipal user, SocialContext db, TimeProvider time, CancellationToken ct)
     {
@@ -275,7 +293,9 @@ public static class SocialApi
     private static Task<Results<Ok<List<PersonDto>>, NotFound>> GetFollowingAsync(string userId, ClaimsPrincipal user, SocialContext db, CancellationToken ct) =>
         ConnectionsAsync(userId, user, db, followers: false, ct);
 
-    /// <summary>Approved follows only. A private profile's connections are for its approved followers.</summary>
+    /// <summary>
+    /// Approved follows only. A private profile's connections are for its approved followers.
+    /// </summary>
     private static async Task<Results<Ok<List<PersonDto>>, NotFound>> ConnectionsAsync(
         string userId, ClaimsPrincipal user, SocialContext db, bool followers, CancellationToken ct)
     {
@@ -316,7 +336,9 @@ public static class SocialApi
             list.UpdatedAtUtc));
     }
 
-    /// <summary>For Identity's data export: the caller's settings, follows, requests, blocks and activity.</summary>
+    /// <summary>
+    /// For Identity's data export: the caller's settings, follows, requests, blocks and activity.
+    /// </summary>
     private static async Task<Ok<object>> ExportAsync(ClaimsPrincipal user, SocialContext db, CancellationToken ct)
     {
         var me = UserId(user);
@@ -331,7 +353,9 @@ public static class SocialApi
         });
     }
 
-    /// <summary>People in the order of <paramref name="ids"/>, with follow counts and how they relate to the caller.</summary>
+    /// <summary>
+    /// People in the order of <paramref name="ids"/>, with follow counts and how they relate to the caller.
+    /// </summary>
     /// <param name="includeBlocked">Keep people blocked either way (the caller's own block list); others drop them.</param>
     internal static async Task<List<PersonDto>> PeopleAsync(SocialContext db, string me, List<string> ids, CancellationToken ct, bool includeBlocked = false)
     {

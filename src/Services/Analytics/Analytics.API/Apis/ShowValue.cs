@@ -10,16 +10,24 @@ namespace Analytics.API.Apis;
 /// </summary>
 internal static class ShowValue
 {
-    /// <summary>Shows without a provider rating count as a typical show.</summary>
+    /// <summary>
+    /// Shows without a provider rating count as a typical show.
+    /// </summary>
     public const double UnratedValue = 7.0;
 
-    /// <summary>All of a show's genres liked adds half this; none of them takes half away.</summary>
+    /// <summary>
+    /// All of a show's genres liked adds half this; none of them takes half away.
+    /// </summary>
     private const double TasteWeight = 0.6;
 
-    /// <summary>A turn this far in (or further) is worth warning about.</summary>
+    /// <summary>
+    /// A turn this far in (or further) is worth warning about.
+    /// </summary>
     public const int SlowStartMinutes = 180;
 
-    /// <summary>A show watched this far (of what's aired) counts as one the user liked.</summary>
+    /// <summary>
+    /// A show watched this far (of what's aired) counts as one the user liked.
+    /// </summary>
     private const double FinishedShare = 0.8;
 
     /// <param name="Landing">The <see cref="LandingVerdicts"/> verdict, for ended shows that have one.</param>
@@ -131,10 +139,14 @@ internal static class ShowValue
             r => (r.Count, r.Known == 0 ? 0 : (int)Math.Round(r.Sum + (r.Count - r.Known) * (double)r.Sum / r.Known)));
     }
 
-    /// <summary>The shows' insights documents, keyed by show.</summary>
+    /// <summary>
+    /// The shows' insights documents, keyed by show.
+    /// </summary>
     internal static Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct) =>
         ShowDocuments.LoadAsync(db, showIds, ct);
 
-    /// <summary>"45 min", "3 h": hours rounded once past two.</summary>
+    /// <summary>
+    /// "45 min", "3 h": hours rounded once past two.
+    /// </summary>
     internal static string Hours(int minutes) => minutes < 120 ? $"{minutes} min" : $"{Math.Round(minutes / 60.0):N0} h";
 }

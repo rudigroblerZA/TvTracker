@@ -19,7 +19,9 @@ public class MainActivity : MauiAppCompatActivity
 {
 }
 
-/// <summary>Receives the Keycloak sign-in redirect (tvtracker://callback) for WebAuthenticator.</summary>
+/// <summary>
+/// Receives the Keycloak sign-in redirect (tvtracker://callback) for WebAuthenticator.
+/// </summary>
 [Activity(NoHistory = true, LaunchMode = LaunchMode.SingleTop, Exported = true)]
 [IntentFilter(new[] { Intent.ActionView },
     Categories = new[] { Intent.CategoryDefault, Intent.CategoryBrowsable },

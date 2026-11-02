@@ -97,13 +97,17 @@
         }
     }
 
-    /// <summary>"7 months ago", "a year ago", "2 years ago".</summary>
+    /// <summary>
+    /// "7 months ago", "a year ago", "2 years ago".
+    /// </summary>
     public static string Ago(int days) =>
         days >= 730 ? $"{days / 365} years ago"
         : days >= 365 ? "a year ago"
         : $"{Math.Max(1, days / 30)} months ago";
 
-    /// <summary>Why now: the show coming back, or how much is left to watch.</summary>
+    /// <summary>
+    /// Why now: the show coming back, or how much is left to watch.
+    /// </summary>
     private static string Context(Refresher r)
     {
         var left = r.Ahead.Episodes > 0

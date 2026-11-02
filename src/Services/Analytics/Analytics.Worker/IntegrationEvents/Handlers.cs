@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Analytics.Worker.IntegrationEvents;
 
-/// <summary>Keeps Analytics' copy of shows, episodes, announced seasons and cast current from the catalog.</summary>
+/// <summary>
+/// Keeps Analytics' copy of shows, episodes, announced seasons and cast current from the catalog.
+/// </summary>
 public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
@@ -42,7 +44,9 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
             }
         });
 
-    /// <summary>Each person's roles replace the ones held for them.</summary>
+    /// <summary>
+    /// Each person's roles replace the ones held for them.
+    /// </summary>
     public Task HandleAsync(PeopleCastCreditsUpdatedIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, async () =>
         {
@@ -190,7 +194,9 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
         db.HandleOnceAsync(e, HandlerExtensions.HandlerName<CatalogEventHandlers>(e), apply, ct);
 }
 
-/// <summary>Keeps each user's latest rating of shows and episodes. Only aggregates ever leave this service.</summary>
+/// <summary>
+/// Keeps each user's latest rating of shows and episodes. Only aggregates ever leave this service.
+/// </summary>
 public sealed class RatingEventHandlers(AnalyticsContext db) :
     IIntegrationEventHandler<ShowRatedIntegrationEvent>,
     IIntegrationEventHandler<ShowRatingRemovedIntegrationEvent>,
@@ -247,7 +253,9 @@ public sealed class RatingEventHandlers(AnalyticsContext db) :
         db.HandleOnceAsync(e, HandlerExtensions.HandlerName<RatingEventHandlers>(e), apply, ct);
 }
 
-/// <summary>Keeps each user's watched episodes and follows. Only aggregates ever leave this service.</summary>
+/// <summary>
+/// Keeps each user's watched episodes and follows. Only aggregates ever leave this service.
+/// </summary>
 public sealed class TrackingEventHandlers(AnalyticsContext db) :
     IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>,
     IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>,

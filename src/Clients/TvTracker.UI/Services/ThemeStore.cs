@@ -25,7 +25,9 @@ public sealed class ThemeStore(IPlatformServices platform, IJSRuntime js)
         }
     }
 
-    /// <summary>Raised when the choice changes, so the header toggle and Settings agree.</summary>
+    /// <summary>
+    /// Raised when the choice changes, so the header toggle and Settings agree.
+    /// </summary>
     public event Action? Changed;
 
     public async Task SetAsync(string? theme)
@@ -36,7 +38,9 @@ public sealed class ThemeStore(IPlatformServices platform, IJSRuntime js)
         Changed?.Invoke();
     }
 
-    /// <summary>The theme showing now, "light" or "dark": the chosen one, else the device's. Light if the page can't say.</summary>
+    /// <summary>
+    /// The theme showing now, "light" or "dark": the chosen one, else the device's. Light if the page can't say.
+    /// </summary>
     public async Task<string> EffectiveAsync()
     {
         try

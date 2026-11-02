@@ -6,13 +6,19 @@ using TvTracker;
 
 namespace Assistant.API.Services;
 
-/// <summary>A tool the model called, as the page shows it under "How I got this".</summary>
+/// <summary>
+/// A tool the model called, as the page shows it under "How I got this".
+/// </summary>
 public record ToolStep(string Tool, string Arguments, bool Failed);
 
-/// <summary>The outcome of one question: the answer and the shows it can link, or why there's none.</summary>
+/// <summary>
+/// The outcome of one question: the answer and the shows it can link, or why there's none.
+/// </summary>
 public record Answer(string? Text, IReadOnlyList<ShowRef> Shows, IReadOnlyList<ToolStep> Steps, string? Problem);
 
-/// <summary>An earlier question and answer in the same conversation, for follow-ups ("and which of those ended well?").</summary>
+/// <summary>
+/// An earlier question and answer in the same conversation, for follow-ups ("and which of those ended well?").
+/// </summary>
 public record Turn(string Question, string Answer, IReadOnlyList<ShowRef> Shows);
 
 /// <summary>
@@ -260,7 +266,9 @@ public sealed partial class AnswerLoop(IConfiguration config, Toolbox toolbox, B
     // Qwen3 thinks before answering by default, which costs minutes on a CPU; "/no_think" turns that off.
     private string NoThink => Model.Contains("qwen3", StringComparison.OrdinalIgnoreCase) ? " /no_think" : "";
 
-    /// <summary>The tool-named shows the answer mentions, in the order it mentions them; longer titles win overlaps.</summary>
+    /// <summary>
+    /// The tool-named shows the answer mentions, in the order it mentions them; longer titles win overlaps.
+    /// </summary>
     internal static IReadOnlyList<ShowRef> Mentioned(string answer, IEnumerable<ShowRef> named) =>
         named.DistinctBy(s => s.Id)
             .GroupBy(s => s.Title, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
@@ -270,7 +278,9 @@ public sealed partial class AnswerLoop(IConfiguration config, Toolbox toolbox, B
             .Select(x => x.Show)
             .ToList();
 
-    /// <summary>Where the title appears as whole words, so a show called "Lost" isn't found in "lostness".</summary>
+    /// <summary>
+    /// Where the title appears as whole words, so a show called "Lost" isn't found in "lostness".
+    /// </summary>
     private static int IndexOfWords(string text, string title)
     {
         for (var i = text.IndexOf(title, StringComparison.OrdinalIgnoreCase); i >= 0; i = text.IndexOf(title, i + 1, StringComparison.OrdinalIgnoreCase))

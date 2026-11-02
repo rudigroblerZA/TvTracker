@@ -153,7 +153,9 @@ public static class AtlasApi
         return new AtlasDto(yours, kind, showIds.Count, rows.Select(r => r.Id).Distinct().Count(), places, countries, standIns);
     }
 
-    /// <summary>The show's filming places far from every place it's set in, each with the nearest setting it plays.</summary>
+    /// <summary>
+    /// The show's filming places far from every place it's set in, each with the nearest setting it plays.
+    /// </summary>
     private static IEnumerable<(Row Filmed, string Plays)> StandIns(List<Row> set, List<Row> filmed)
     {
         var settings = set.Where(r => !IsCountry(r)).ToList();
@@ -171,10 +173,14 @@ public static class AtlasApi
         }
     }
 
-    /// <summary>The place is a whole country: Wikidata gives a country as its own country.</summary>
+    /// <summary>
+    /// The place is a whole country: Wikidata gives a country as its own country.
+    /// </summary>
     private static bool IsCountry(Row place) => place.Country == place.Name;
 
-    /// <summary>Great-circle distance.</summary>
+    /// <summary>
+    /// Great-circle distance.
+    /// </summary>
     private static double Kilometres(Row a, Row b)
     {
         static double Radians(double degrees) => degrees * Math.PI / 180;

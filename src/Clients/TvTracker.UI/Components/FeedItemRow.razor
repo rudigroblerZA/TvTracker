@@ -32,7 +32,9 @@
 @code {
     [Parameter, EditorRequired] public FeedItem Item { get; set; } = null!;
 
-    /// <summary>False on a person's own page, where "Sam" before every line is noise.</summary>
+    /// <summary>
+    /// False on a person's own page, where "Sam" before every line is noise.
+    /// </summary>
     [Parameter] public bool ShowName { get; set; } = true;
 
     private static string Verb(FeedItem item) => item.Kind switch

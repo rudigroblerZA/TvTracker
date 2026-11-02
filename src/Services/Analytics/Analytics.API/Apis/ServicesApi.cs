@@ -128,7 +128,9 @@ public static class ServicesApi
         return TypedResults.Ok(new MyServicesDto(plan, allowed, services));
     }
 
-    /// <summary>Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.</summary>
+    /// <summary>
+    /// Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.
+    /// </summary>
     private static async Task<Results<Ok<MyServicesDto>, ValidationProblem, ProblemHttpResult>> SetMineAsync(
         SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
     {
@@ -236,7 +238,9 @@ public static class ServicesApi
             NetworkServices.PricesAsOf));
     }
 
-    /// <summary>The caller's plan from Analytics' copy, and whether it allows services: always while <c>plans</c> is off (fail open).</summary>
+    /// <summary>
+    /// The caller's plan from Analytics' copy, and whether it allows services: always while <c>plans</c> is off (fail open).
+    /// </summary>
     private static async Task<(string Plan, bool Allowed)> PlanOfAsync(ClaimsPrincipal user, string userId, AnalyticsContext db,
         IFeatureClient flags, CancellationToken ct)
     {
@@ -245,7 +249,9 @@ public static class ServicesApi
         return (plan, !limited || Plans.Limits(plan).TrackServices);
     }
 
-    /// <summary>403 typed <c>plan-limit</c>, as Tracking answers, so clients offer the upgrade.</summary>
+    /// <summary>
+    /// 403 typed <c>plan-limit</c>, as Tracking answers, so clients offer the upgrade.
+    /// </summary>
     private static ProblemHttpResult PlanLimit(string plan) =>
         TypedResults.Problem($"Keeping your services is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} accounts can see the report cards' prices.",
             statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: "plan-limit");

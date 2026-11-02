@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Catalog.SyncWorker;
 
-/// <summary>Stores Analytics' show tags on the shows, for search's tag filter.</summary>
+/// <summary>
+/// Stores Analytics' show tags on the shows, for search's tag filter.
+/// </summary>
 public sealed class ShowTagsChangedHandler(CatalogContext db) : IIntegrationEventHandler<ShowTagsChangedIntegrationEvent>
 {
     public async Task HandleAsync(ShowTagsChangedIntegrationEvent @event, CancellationToken cancellationToken = default)

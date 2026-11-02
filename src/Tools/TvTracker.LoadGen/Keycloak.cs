@@ -4,7 +4,9 @@ using System.Text.Json.Serialization;
 
 namespace TvTracker.LoadGen;
 
-/// <summary>Raised for anything that should stop the tool with a message rather than a stack trace.</summary>
+/// <summary>
+/// Raised for anything that should stop the tool with a message rather than a stack trace.
+/// </summary>
 public sealed class CliException(string message) : Exception(message);
 
 /// <summary>
@@ -19,7 +21,9 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
 
     private string Base => baseUrl.TrimEnd('/');
 
-    /// <summary>Signs in a user; returns the access token and when to refresh it (at 80% of its life).</summary>
+    /// <summary>
+    /// Signs in a user; returns the access token and when to refresh it (at 80% of its life).
+    /// </summary>
     public async Task<(string Token, DateTimeOffset RefreshAt)> SignInAsync(string username, string password, CancellationToken ct)
     {
         using var response = await http.PostAsync($"{Base}/realms/{Realm}/protocol/openid-connect/token", new FormUrlEncodedContent(
@@ -33,7 +37,9 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
         return (token.AccessToken, DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn * 0.8));
     }
 
-    /// <summary>A master-realm admin token for the admin API.</summary>
+    /// <summary>
+    /// A master-realm admin token for the admin API.
+    /// </summary>
     public async Task<string> AdminTokenAsync(string username, string password, CancellationToken ct)
     {
         using var response = await http.PostAsync($"{Base}/realms/master/protocol/openid-connect/token", new FormUrlEncodedContent(
@@ -45,7 +51,9 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
         return (await response.Content.ReadFromJsonAsync<TokenResponse>(ct))!.AccessToken;
     }
 
-    /// <summary>Creates the load-test client unless it exists: public, password grant on, tokens for the services' audience.</summary>
+    /// <summary>
+    /// Creates the load-test client unless it exists: public, password grant on, tokens for the services' audience.
+    /// </summary>
     public async Task<bool> EnsureClientAsync(string adminToken, CancellationToken ct)
     {
         var existing = await AdminGetAsync<List<object>>(adminToken, $"clients?clientId={ClientId}", ct);
@@ -80,7 +88,9 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
         return true;
     }
 
-    /// <summary>Creates a user with a password unless one with that username exists. True when it created one.</summary>
+    /// <summary>
+    /// Creates a user with a password unless one with that username exists. True when it created one.
+    /// </summary>
     public async Task<bool> EnsureUserAsync(string adminToken, string username, string displayNumber, string password, CancellationToken ct)
     {
         var existing = await AdminGetAsync<List<object>>(adminToken, $"users?username={Uri.EscapeDataString(username)}&exact=true", ct);

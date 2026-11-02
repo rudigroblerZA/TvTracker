@@ -2,11 +2,15 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>A season's stats and how many of its aired episodes the provider rated.</summary>
+/// <summary>
+/// A season's stats and how many of its aired episodes the provider rated.
+/// </summary>
 /// <param name="RatedEpisodes">Aired episodes with a provider rating.</param>
 public record SeasonSummary(SeasonStats Stats, int RatedEpisodes)
 {
-    /// <summary>A season's rating counts for best/worst, trend, arc and finales only with at least this many rated episodes.</summary>
+    /// <summary>
+    /// A season's rating counts for best/worst, trend, arc and finales only with at least this many rated episodes.
+    /// </summary>
     public const int MinRatedEpisodes = 3;
 
     public bool RatingCounts => RatedEpisodes >= MinRatedEpisodes;
@@ -18,7 +22,9 @@ public record SeasonSummary(SeasonStats Stats, int RatedEpisodes)
 /// </summary>
 public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, List<EpisodeCopy> episodes, List<UserEpisodeWatch> watches)
 {
-    /// <summary>Shows need this many rated episodes before theirs can appear in the episode lists.</summary>
+    /// <summary>
+    /// Shows need this many rated episodes before theirs can appear in the episode lists.
+    /// </summary>
     public const int MinRatedEpisodesForLists = 5;
 
     /// <summary>
@@ -34,10 +40,14 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     public Guid ShowId => show.ShowId;
     public DateTimeOffset Now => sources.Now;
 
-    /// <summary>Every episode, including those still to air.</summary>
+    /// <summary>
+    /// Every episode, including those still to air.
+    /// </summary>
     public List<EpisodeCopy> Episodes => episodes;
 
-    /// <summary>Every aired episode, specials included (season 0).</summary>
+    /// <summary>
+    /// Every aired episode, specials included (season 0).
+    /// </summary>
     public List<EpisodeCopy> Aired { get; } = episodes.Where(e => e.AirsAtUtc <= sources.Now).ToList();
 
     /// <summary>
@@ -46,16 +56,24 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     /// </summary>
     public List<EpisodeCopy> RegularAired => field ??= Aired.Where(e => e.SeasonNumber > 0).ToList();
 
-    /// <summary>Aired episodes with a provider rating.</summary>
+    /// <summary>
+    /// Aired episodes with a provider rating.
+    /// </summary>
     public List<EpisodeCopy> RatedAired => field ??= Aired.Where(e => e.ExternalRating is not null).ToList();
 
-    /// <summary>Our users' watched marks on this show.</summary>
+    /// <summary>
+    /// Our users' watched marks on this show.
+    /// </summary>
     public List<UserEpisodeWatch> Watches => watches;
 
-    /// <summary>The provider's rating and our users' stars for the show.</summary>
+    /// <summary>
+    /// The provider's rating and our users' stars for the show.
+    /// </summary>
     public RatingPair Rating => field ??= InsightMath.Pair(show.ExternalRating, sources.ShowRatings.GetValueOrDefault(show.ShowId));
 
-    /// <summary>Every season, in order, with its stats.</summary>
+    /// <summary>
+    /// Every season, in order, with its stats.
+    /// </summary>
     public IReadOnlyList<SeasonSummary> Seasons => field ??= episodes
         .GroupBy(e => e.SeasonNumber)
         .OrderBy(g => g.Key)
@@ -78,7 +96,9 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
 
     public IReadOnlyList<SeasonStats> SeasonStats => field ??= Seasons.Select(s => s.Stats).ToList();
 
-    /// <summary>The regular seasons' stats (season 0 left out).</summary>
+    /// <summary>
+    /// The regular seasons' stats (season 0 left out).
+    /// </summary>
     public IReadOnlyList<SeasonStats> RegularSeasonStats => field ??= SeasonStats.Where(s => s.Number > 0).ToList();
 
     /// <summary>

@@ -45,7 +45,9 @@ public static class PlansApi
         return TypedResults.Ok(ToDto(profile));
     }
 
-    /// <summary>Users whose name or email contains <paramref name="q"/>, Plus users first; with no term, every Plus user.</summary>
+    /// <summary>
+    /// Users whose name or email contains <paramref name="q"/>, Plus users first; with no term, every Plus user.
+    /// </summary>
     private static async Task<Results<Ok<List<PlanUserDto>>, NotFound>> SearchUsersAsync(
         string? q, ClaimsPrincipal user, IConfiguration config, IdentityContext db, CancellationToken ct)
     {

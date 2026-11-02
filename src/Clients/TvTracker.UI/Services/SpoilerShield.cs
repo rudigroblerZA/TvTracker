@@ -11,10 +11,14 @@ public sealed class SpoilerShield(IPlatformServices platform, FeatureFlagStore f
 
     private Task<bool>? loading;
 
-    /// <summary>Raised when the setting changes, so hidden content shows or hides everywhere on the page.</summary>
+    /// <summary>
+    /// Raised when the setting changes, so hidden content shows or hides everywhere on the page.
+    /// </summary>
     public event Action? Changed;
 
-    /// <summary>Whether the shield is on; false while the feature flag is off. Loaded once per circuit or app session.</summary>
+    /// <summary>
+    /// Whether the shield is on; false while the feature flag is off. Loaded once per circuit or app session.
+    /// </summary>
     public Task<bool> IsOnAsync() => loading ??= LoadAsync();
 
     public async Task SetAsync(bool on)

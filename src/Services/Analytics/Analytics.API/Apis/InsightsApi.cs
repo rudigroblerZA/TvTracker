@@ -87,7 +87,9 @@ public static class InsightsApi
         return api;
     }
 
-    /// <summary>The stored document is returned as-is: it is already the <see cref="ShowInsights"/> JSON.</summary>
+    /// <summary>
+    /// The stored document is returned as-is: it is already the <see cref="ShowInsights"/> JSON.
+    /// </summary>
     private static async Task<Results<ContentHttpResult, NotFound>> GetShowInsightsAsync(Guid showId, AnalyticsContext db, CancellationToken ct)
     {
         var document = await db.ShowInsights.AsNoTracking()
@@ -170,7 +172,9 @@ public static class InsightsApi
         return document is null ? TypedResults.NotFound() : TypedResults.Text(document, "application/json");
     }
 
-    /// <summary>The stored document is returned as-is: it is already the <see cref="PersonInsights"/> JSON.</summary>
+    /// <summary>
+    /// The stored document is returned as-is: it is already the <see cref="PersonInsights"/> JSON.
+    /// </summary>
     private static async Task<Results<ContentHttpResult, NotFound>> GetPersonInsightsAsync(Guid personId, AnalyticsContext db, CancellationToken ct)
     {
         var document = await db.PersonInsights.AsNoTracking()

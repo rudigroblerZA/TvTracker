@@ -31,7 +31,9 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Creates a user with a password unless one with that username exists. Returns true when it created one.</summary>
+    /// <summary>
+    /// Creates a user with a password unless one with that username exists. Returns true when it created one.
+    /// </summary>
     public async Task<bool> EnsureUserAsync(string username, string password, string email, string firstName, string lastName,
         CancellationToken cancellationToken)
     {

@@ -303,7 +303,9 @@ else
 }
 
 @code {
-    /// <summary>The first streaming service with a link to the show's page or a search for it, for the button up top.</summary>
+    /// <summary>
+    /// The first streaming service with a link to the show's page or a search for it, for the button up top.
+    /// </summary>
     private WatchProvider? WatchNow => show?.WatchProviders.FirstOrDefault(p => p.Type is WatchProviderType.Stream or WatchProviderType.Free
         && p.Link is WatchLink.Title or WatchLink.Search);
 

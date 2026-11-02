@@ -9,7 +9,9 @@ namespace Catalog.SyncWorker.Providers;
 /// </summary>
 public interface ICatalogProvider
 {
-    /// <summary>Stored as <see cref="Show.Source"/>.</summary>
+    /// <summary>
+    /// Stored as <see cref="Show.Source"/>.
+    /// </summary>
     string Name { get; }
 
     /// <summary>
@@ -24,7 +26,9 @@ public interface ICatalogProvider
     /// </summary>
     Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default);
 
-    /// <summary>External ids of shows matching a title search, best match first.</summary>
+    /// <summary>
+    /// External ids of shows matching a title search, best match first.
+    /// </summary>
     Task<IReadOnlyList<string>> SearchShowIdsAsync(string query, int limit, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -39,10 +43,14 @@ public interface ICatalogProvider
     /// </summary>
     Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default);
 
-    /// <summary>Full details of one show, or null if the provider no longer has it.</summary>
+    /// <summary>
+    /// Full details of one show, or null if the provider no longer has it.
+    /// </summary>
     Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default);
 
-    /// <summary>A person's whole career behind the camera, from the provider; null when it has nothing for them.</summary>
+    /// <summary>
+    /// A person's whole career behind the camera, from the provider; null when it has nothing for them.
+    /// </summary>
     Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -78,7 +86,9 @@ public record ProviderShow(
     bool ImagesMissing = false,
     string? BannerUrl = null);
 
-/// <summary>Someone who made the show: its creators and executive producers.</summary>
+/// <summary>
+/// Someone who made the show: its creators and executive producers.
+/// </summary>
 /// <param name="Roles">"Creator", "Developer" and/or "Executive Producer".</param>
 public record ProviderCreative(string Name, string? PhotoUrl, IReadOnlyList<string> Roles, ProviderPerson? Person);
 

@@ -58,7 +58,9 @@ public static class NamesakesApi
 
     private sealed record CreditRow(Guid PersonId, string ShowExternalId, string? Character);
 
-    /// <summary>Everything, keyed by catalog show, plus the show rows the lists need.</summary>
+    /// <summary>
+    /// Everything, keyed by catalog show, plus the show rows the lists need.
+    /// </summary>
     private sealed record Index(Dictionary<Guid, ShowNamesakesDto> ByShow, List<IndexedShow> Shows);
 
     private sealed record IndexedShow(Guid Id, string Title, string? PosterUrl, int? Year, string ExternalId, double Popularity, string? Kind,

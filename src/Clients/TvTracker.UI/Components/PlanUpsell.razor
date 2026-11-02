@@ -12,7 +12,9 @@
 <p><a class="btn" href="settings/plan">@($"See {Plans.Name(Plan)}")</a></p>
 
 @code {
-    /// <summary>The plan's key ("plus", "family").</summary>
+    /// <summary>
+    /// The plan's key ("plus", "family").
+    /// </summary>
     [Parameter, EditorRequired] public string Plan { get; set; } = "";
 
     private List<PlanFeature>? features;

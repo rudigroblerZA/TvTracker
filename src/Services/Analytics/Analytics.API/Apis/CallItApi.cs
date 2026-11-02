@@ -7,7 +7,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
 
-/// <summary>A show's "Call it" panel: its next season to call, and the caller's calls on it.</summary>
+/// <summary>
+/// A show's "Call it" panel: its next season to call, and the caller's calls on it.
+/// </summary>
 /// <param name="SeasonNumber">The season open to a call; null for an ended show (only past calls then).</param>
 /// <param name="PremieresAtUtc">Its first dated episode, when one is listed.</param>
 /// <param name="Mine">The caller's call on that season.</param>
@@ -130,7 +132,9 @@ public static class CallItApi
         return TypedResults.Ok(new ShowCallDto(open.Number, open.PremieresAtUtc, call.Rating, model, crowd, past));
     }
 
-    /// <summary>Takes back a call on the open season; one on a season that has premiered stays.</summary>
+    /// <summary>
+    /// Takes back a call on the open season; one on a season that has premiered stays.
+    /// </summary>
     private static async Task<NoContent> DeleteAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
@@ -188,7 +192,9 @@ public static class CallItApi
 
     private static bool Running(ShowCopy show) => !show.HasEnded();
 
-    /// <summary>Everyone's average call on the season, with the privacy rule (5+ callers, the caller's own included).</summary>
+    /// <summary>
+    /// Everyone's average call on the season, with the privacy rule (5+ callers, the caller's own included).
+    /// </summary>
     private static async Task<CrowdCallDto?> CrowdAsync(AnalyticsContext db, Guid showId, int season, CancellationToken ct)
     {
         var everyone = await db.SeasonCalls.AsNoTracking().Where(c => c.ShowId == showId && c.SeasonNumber == season)
@@ -196,7 +202,9 @@ public static class CallItApi
         return everyone is { Count: >= InsightRules.MinUsersToShow } ? new CrowdCallDto(Math.Round(everyone.Average, 1), everyone.Count) : null;
     }
 
-    /// <summary>The season after the latest to air (the first, for a show yet to air), and its first dated episode.</summary>
+    /// <summary>
+    /// The season after the latest to air (the first, for a show yet to air), and its first dated episode.
+    /// </summary>
     private static async Task<(int Number, DateTimeOffset? PremieresAtUtc)> OpenSeasonAsync(AnalyticsContext db, Guid showId, DateTimeOffset now,
         CancellationToken ct)
     {
@@ -207,7 +215,9 @@ public static class CallItApi
         return (season + 1, premiere);
     }
 
-    /// <summary>Each season's first dated episode, for the given shows.</summary>
+    /// <summary>
+    /// Each season's first dated episode, for the given shows.
+    /// </summary>
     private static async Task<Dictionary<(Guid, int), DateTimeOffset?>> PremieresAsync(AnalyticsContext db, IReadOnlyCollection<Guid> showIds,
         DateTimeOffset now, CancellationToken ct) =>
         (await db.Episodes.AsNoTracking().Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc != null)
@@ -216,7 +226,9 @@ public static class CallItApi
             .ToListAsync(ct))
         .ToDictionary(g => (g.ShowId, g.SeasonNumber), g => (DateTimeOffset?)g.First);
 
-    /// <summary>The show document's rating forecast, when it's for this season.</summary>
+    /// <summary>
+    /// The show document's rating forecast, when it's for this season.
+    /// </summary>
     private static async Task<CallRangeDto?> ModelAsync(AnalyticsContext db, Guid showId, int season, CancellationToken ct)
     {
         return (await ShowDocuments.LoadAsync(db, showId, ct))?.Outlook?.NextSeasonRating is { } f && f.SeasonNumber == season
@@ -229,7 +241,9 @@ public static class CallItApi
             call.Actual is not null ? "scored" : premieres is { } p && p <= now ? "airing" : "open",
             Beat(call), premieres);
 
-    /// <summary>Whether the caller was closer to the actual rating than the model; null unscored, without a model, or tied.</summary>
+    /// <summary>
+    /// Whether the caller was closer to the actual rating than the model; null unscored, without a model, or tied.
+    /// </summary>
     private static bool? Beat(SeasonCall call)
     {
         if (call.Actual is not { } actual || call.ModelRating is not { } model)

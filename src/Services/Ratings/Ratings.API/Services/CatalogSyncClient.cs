@@ -4,7 +4,9 @@ namespace Ratings.API.Services;
 
 public enum OverrideOutcome { Applied, NotInCatalog, Invalid, Unavailable }
 
-/// <summary>The catalog sync worker's overrides API, which applies accepted corrections to the catalog.</summary>
+/// <summary>
+/// The catalog sync worker's overrides API, which applies accepted corrections to the catalog.
+/// </summary>
 public sealed class CatalogSyncClient(HttpClient http, ILogger<CatalogSyncClient> logger)
 {
     public async Task<(OverrideOutcome Outcome, string? Detail)> ApplyAsync(Guid id, Guid showId, Guid? episodeId, string field, string value,
@@ -28,7 +30,9 @@ public sealed class CatalogSyncClient(HttpClient http, ILogger<CatalogSyncClient
         }
     }
 
-    /// <summary>True when the override is gone (or never existed).</summary>
+    /// <summary>
+    /// True when the override is gone (or never existed).
+    /// </summary>
     public async Task<bool> RemoveAsync(Guid id, CancellationToken ct)
     {
         try

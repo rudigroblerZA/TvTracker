@@ -6,7 +6,9 @@ using TvTracker.UI.Services;
 
 namespace WebApp.Services;
 
-/// <summary>Reads the signed-in user's access token from the server-side token store.</summary>
+/// <summary>
+/// Reads the signed-in user's access token from the server-side token store.
+/// </summary>
 public sealed class WebAccessTokenProvider(AuthenticationStateProvider authState, ServerTokenStore tokens) : IAccessTokenProvider
 {
     public async Task<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default)
@@ -17,7 +19,9 @@ public sealed class WebAccessTokenProvider(AuthenticationStateProvider authState
     }
 }
 
-/// <summary>Sign-in and sign-out are full-page redirects through the account endpoints (see Program.cs).</summary>
+/// <summary>
+/// Sign-in and sign-out are full-page redirects through the account endpoints (see Program.cs).
+/// </summary>
 public sealed class WebAuthActions(NavigationManager navigation) : IAuthActions
 {
     public Task SignInAsync(string? returnUrl = null)
@@ -34,7 +38,9 @@ public sealed class WebAuthActions(NavigationManager navigation) : IAuthActions
     }
 }
 
-/// <summary>Browser features through wwwroot/js/tvtracker.js.</summary>
+/// <summary>
+/// Browser features through wwwroot/js/tvtracker.js.
+/// </summary>
 public sealed class WebPlatformServices(IJSRuntime js, NotificationsClient notifications, Branding brand, NavigationManager navigation)
     : IPlatformServices
 {

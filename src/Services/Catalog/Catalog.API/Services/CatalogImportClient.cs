@@ -14,7 +14,9 @@ public sealed class CatalogImportClient(HttpClient http, HybridCache cache, Sear
 {
     private static readonly TimeSpan ImportInterval = TimeSpan.FromHours(6);
 
-    /// <summary>Longest a search waits for imports; the matches still land in the catalog for the next search.</summary>
+    /// <summary>
+    /// Longest a search waits for imports; the matches still land in the catalog for the next search.
+    /// </summary>
     private static readonly TimeSpan MaxWait = TimeSpan.FromSeconds(10);
 
     public async Task ImportSearchMatchesAsync(string search, CancellationToken ct)

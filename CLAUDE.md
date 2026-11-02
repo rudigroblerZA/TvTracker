@@ -61,7 +61,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
   - Records for DTOs and events, primary constructors for services, file-scoped namespaces.
   - Package versions are central, in `Directory.Packages.props`.
 - **Comments:** XML doc comments explain behaviour and the why, in plain sentences (thresholds, privacy rules, provider
-  quirks). Match that density; don't narrate the obvious.
+  quirks). Match that density; don't narrate the obvious. A `<summary>` is always multiline: `/// <summary>` and
+  `/// </summary>` on lines of their own, even around one line of text.
 - **Events:**
   - Change a contract only by appending optional parameters.
   - Publish through the outbox in the same transaction as the change.

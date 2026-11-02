@@ -7,7 +7,9 @@ using Microsoft.ML.Tokenizers;
 
 namespace Catalog.Embeddings;
 
-/// <summary>Embedding settings; bound from the "Embeddings" configuration section.</summary>
+/// <summary>
+/// Embedding settings; bound from the "Embeddings" configuration section.
+/// </summary>
 public sealed class EmbeddingOptions
 {
     /// <summary>
@@ -29,18 +31,26 @@ public sealed class EmbeddingOptions
     public string? Endpoint { get; set; }
 }
 
-/// <summary>Whether text is a search term or a document (show text); some models embed the two differently.</summary>
+/// <summary>
+/// Whether text is a search term or a document (show text); some models embed the two differently.
+/// </summary>
 public static class EmbeddingInput
 {
-    /// <summary>The <see cref="EmbeddingGenerationOptions.AdditionalProperties"/> key; its value is <see cref="Query"/> or <see cref="Document"/>.</summary>
+    /// <summary>
+    /// The <see cref="EmbeddingGenerationOptions.AdditionalProperties"/> key; its value is <see cref="Query"/> or <see cref="Document"/>.
+    /// </summary>
     public const string Key = "input_type";
     public const string Query = "query";
     public const string Document = "document";
 
-    /// <summary>Options that mark the input as search terms. Without them, input is embedded as documents.</summary>
+    /// <summary>
+    /// Options that mark the input as search terms. Without them, input is embedded as documents.
+    /// </summary>
     public static EmbeddingGenerationOptions QueryOptions => new() { AdditionalProperties = new() { [Key] = Query } };
 
-    /// <summary>The model's prefix for this input: <see cref="EmbeddingModel.QueryPrefix"/> for search terms, else the document one.</summary>
+    /// <summary>
+    /// The model's prefix for this input: <see cref="EmbeddingModel.QueryPrefix"/> for search terms, else the document one.
+    /// </summary>
     internal static string PrefixFor(EmbeddingModel model, EmbeddingGenerationOptions? options) =>
         options?.AdditionalProperties?.TryGetValue(Key, out var input) == true && Equals(input, Query)
             ? model.QueryPrefix
@@ -69,7 +79,9 @@ public sealed class LocalEmbeddingGenerator(
 
     public EmbeddingGeneratorMetadata Metadata { get; } = new("onnxruntime", defaultModelId: spec.Id, defaultModelDimensions: spec.Dimensions);
 
-    /// <summary>Downloads (if needed) and loads the model now, rather than on the first request.</summary>
+    /// <summary>
+    /// Downloads (if needed) and loads the model now, rather than on the first request.
+    /// </summary>
     public async Task WarmUpAsync(CancellationToken ct)
     {
         try

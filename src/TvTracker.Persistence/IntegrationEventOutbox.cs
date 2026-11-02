@@ -13,10 +13,14 @@ public interface IIntegrationEventOutbox
     /// </summary>
     void Add(IntegrationEvent @event);
 
-    /// <summary>Publishes the events added through this instance. Call after SaveChanges.</summary>
+    /// <summary>
+    /// Publishes the events added through this instance. Call after SaveChanges.
+    /// </summary>
     Task PublishAddedAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Publishes any stored events that haven't been published yet (used by the background publisher).</summary>
+    /// <summary>
+    /// Publishes any stored events that haven't been published yet (used by the background publisher).
+    /// </summary>
     Task PublishPendingAsync(TimeSpan olderThan, CancellationToken cancellationToken = default);
 
     /// <summary>

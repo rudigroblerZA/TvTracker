@@ -201,13 +201,17 @@ public static class FlagsApi
             .ToList();
     }
 
-    /// <summary>The plans in a flag's metadata; null when it has none (every plan).</summary>
+    /// <summary>
+    /// The plans in a flag's metadata; null when it has none (every plan).
+    /// </summary>
     private static List<string>? PlansOf(JsonObject flag) =>
         flag["metadata"]?[TvTracker.FeatureFlags.PlansMetadata]?.GetValue<string>() is { Length: > 0 } plans
             ? plans.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList()
             : null;
 
-    /// <summary>The value of a flag's default variant; off when the flag is disabled.</summary>
+    /// <summary>
+    /// The value of a flag's default variant; off when the flag is disabled.
+    /// </summary>
     private static bool IsOn(JsonObject flag) =>
         flag["state"]?.GetValue<string>() != "DISABLED"
         && flag["defaultVariant"]?.GetValue<string>() is { } variant
@@ -224,7 +228,9 @@ public static class FlagsApi
         return document?["flags"]?.DeepClone().AsObject() ?? [];
     }
 
-    /// <summary>An app admin: a Keycloak username in <c>Admin:Users</c>. Plans use the same list.</summary>
+    /// <summary>
+    /// An app admin: a Keycloak username in <c>Admin:Users</c>. Plans use the same list.
+    /// </summary>
     internal static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) =>
         user.FindFirstValue("preferred_username") is { } name
         && (config.GetSection("Admin:Users").Get<string[]>() ?? []).Contains(name, StringComparer.OrdinalIgnoreCase);

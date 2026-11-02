@@ -28,7 +28,9 @@ public record AffiliateDayDto(DateOnly Day, int Clicks, int Conversions);
 
 public record AffiliateShowRowDto(Guid ShowId, string Title, int Clicks, int Conversions);
 
-/// <summary>A configured program as the report shows it: never its template or key.</summary>
+/// <summary>
+/// A configured program as the report shows it: never its template or key.
+/// </summary>
 public record AffiliateProgramDto(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid);
 
 /// <param name="Revenue">Commission reported in the window, per currency.</param>
@@ -167,7 +169,9 @@ public static class AffiliateApi
         return TypedResults.Ok("ok");
     }
 
-    /// <summary>The last <paramref name="days"/> days (UTC), for admins; anyone else gets 404, as with the flags page.</summary>
+    /// <summary>
+    /// The last <paramref name="days"/> days (UTC), for admins; anyone else gets 404, as with the flags page.
+    /// </summary>
     private static async Task<Results<Ok<AffiliateReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
         IOptionsMonitor<AffiliateOptions> options, TimeProvider time, int days = 30, CancellationToken ct = default)
     {

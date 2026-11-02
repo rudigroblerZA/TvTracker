@@ -28,7 +28,9 @@
 @code {
     [Parameter, EditorRequired] public WorthIt? WorthIt { get; set; }
 
-    /// <summary>The verdict in words; also the highlight card's headline.</summary>
+    /// <summary>
+    /// The verdict in words; also the highlight card's headline.
+    /// </summary>
     public static string Headline(string verdict) => verdict switch
     {
         "worth-it" => "Worth it",
@@ -37,7 +39,9 @@
         _ => "Hard to recommend"
     };
 
-    /// <summary>The highlight and panel tone: good, info, warn or bad.</summary>
+    /// <summary>
+    /// The highlight and panel tone: good, info, warn or bad.
+    /// </summary>
     public static string Tone(string verdict) => verdict switch
     {
         "worth-it" => "good",

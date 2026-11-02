@@ -15,7 +15,9 @@ public static class IdentitySettings
     public const string Realm = "tvtracker";
     public const string ApiAudience = "tvtracker-api";
 
-    /// <summary>Keycloak as seen from the Android emulator; tokens issued there carry this issuer.</summary>
+    /// <summary>
+    /// Keycloak as seen from the Android emulator; tokens issued there carry this issuer.
+    /// </summary>
     public const string AndroidEmulatorAuthority = "http://10.0.2.2:8080/realms/" + Realm;
 
     public static string GetAuthority(IConfiguration configuration)
@@ -53,7 +55,9 @@ public static class AuthenticationExtensions
         return builder;
     }
 
-    /// <summary>The Keycloak user id ("sub" claim). Throws if the user isn't signed in.</summary>
+    /// <summary>
+    /// The Keycloak user id ("sub" claim). Throws if the user isn't signed in.
+    /// </summary>
     public static string GetUserId(this ClaimsPrincipal user) =>
         user.FindFirstValue("sub") ?? throw new InvalidOperationException("The user has no 'sub' claim.");
 

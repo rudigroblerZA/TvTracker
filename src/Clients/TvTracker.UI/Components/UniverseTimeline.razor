@@ -102,7 +102,9 @@ else
     private string Width(DateTimeOffset from, DateTimeOffset to) =>
         Math.Max(0.35, 100.0 * (to - from).TotalDays / (end - start).TotalDays).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
-    /// <summary>Year labels, every 1, 2, 5 or 10 years so about eight fit.</summary>
+    /// <summary>
+    /// Year labels, every 1, 2, 5 or 10 years so about eight fit.
+    /// </summary>
     private IEnumerable<int> Ticks()
     {
         var years = end.Year - start.Year;
@@ -116,11 +118,15 @@ else
     private static bool IsOngoing(ShowSummary show, DateTimeOffset last) =>
         show.Status is not (ShowStatus.Ended or ShowStatus.Cancelled) && last >= Now.AddMonths(-18);
 
-    /// <summary>Its last episode, or a moment after today while it's still running.</summary>
+    /// <summary>
+    /// Its last episode, or a moment after today while it's still running.
+    /// </summary>
     private static DateTimeOffset RunsUntil(ShowSummary show, DateTimeOffset last) =>
         IsOngoing(show, last) && last < Now.AddDays(1) ? Now.AddDays(1) : last;
 
-    /// <summary>"2012–2023 · 11 seasons", or "2014– · 13 seasons" while it's running.</summary>
+    /// <summary>
+    /// "2012–2023 · 11 seasons", or "2014– · 13 seasons" while it's running.
+    /// </summary>
     private static string Span(UniverseShow item, DateTimeOffset first, DateTimeOffset last)
     {
         var count = item.Seasons!.Count;
@@ -128,7 +134,9 @@ else
         return $"{years} · {count} season{(count == 1 ? "" : "s")}";
     }
 
-    /// <summary>"2 years after Chicago Fire", "5 months after …", "the same month as …".</summary>
+    /// <summary>
+    /// "2 years after Chicago Fire", "5 months after …", "the same month as …".
+    /// </summary>
     private static string After(DateTimeOffset first, (UniverseShow Item, DateTimeOffset First, DateTimeOffset Last) origin)
     {
         var months = (first.Year - origin.First.Year) * 12 + first.Month - origin.First.Month;

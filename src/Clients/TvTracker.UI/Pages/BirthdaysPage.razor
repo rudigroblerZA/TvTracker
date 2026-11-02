@@ -90,7 +90,9 @@
         }
     }
 
-    /// <summary>Today in the profile's time zone when signed in, else the server's UTC date.</summary>
+    /// <summary>
+    /// Today in the profile's time zone when signed in, else the server's UTC date.
+    /// </summary>
     private DateOnly LocalToday()
     {
         var now = DateTimeOffset.UtcNow;
@@ -161,7 +163,9 @@
         (twins, month, dayOfMonth) = (null, 0, 0);
     }
 
-    /// <summary>"turns 40" today or ahead, "turned 54" for a day already past this year.</summary>
+    /// <summary>
+    /// "turns 40" today or ahead, "turned 54" for a day already past this year.
+    /// </summary>
     private string Age(Birthday p, DateOnly on) => p.Died is { } died
         ? $"born {p.Born.Year}, died {died.Year}; would have turned {p.Turns}"
         : $"{(on < today ? "turned" : "turns")} {p.Turns}{(p.Milestone ? ", a round one" : "")} · born {p.Born.Year}";

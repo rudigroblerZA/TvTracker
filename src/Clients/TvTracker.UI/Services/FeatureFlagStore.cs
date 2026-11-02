@@ -23,7 +23,9 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PlanCacheFor = TimeSpan.FromMinutes(1);
 
-    /// <summary>The plans an upgrade can be to, cheapest first.</summary>
+    /// <summary>
+    /// The plans an upgrade can be to, cheapest first.
+    /// </summary>
     private static readonly string[] Upgrades = [Plans.Plus, Plans.Family];
 
     private readonly ConcurrentDictionary<(string Flag, string? User, string? Plan), (bool Enabled, DateTimeOffset At)> cache = new();
@@ -74,7 +76,9 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         return planFeatures;
     }
 
-    /// <summary>Forgets every answer, so a flag changed on the flags page (or a new plan) shows here at once.</summary>
+    /// <summary>
+    /// Forgets every answer, so a flag changed on the flags page (or a new plan) shows here at once.
+    /// </summary>
     public void Clear()
     {
         cache.Clear();
@@ -98,7 +102,9 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         return enabled;
     }
 
-    /// <summary>The user's plan for the flag context: free when signed out, null while plans are off or unknown.</summary>
+    /// <summary>
+    /// The user's plan for the flag context: free when signed out, null while plans are off or unknown.
+    /// </summary>
     private async Task<string?> PlanAsync()
     {
         var user = (await authState.GetAuthenticationStateAsync()).User;
@@ -130,7 +136,9 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         return found;
     }
 
-    /// <summary>Every flag key in <see cref="FeatureFlags"/> (its string constants, less the ones that aren't flags).</summary>
+    /// <summary>
+    /// Every flag key in <see cref="FeatureFlags"/> (its string constants, less the ones that aren't flags).
+    /// </summary>
     private static readonly string[] FlagKeys = typeof(FeatureFlags).GetFields()
         .Where(f => f.IsLiteral && f.FieldType == typeof(string))
         .Select(f => (string)f.GetRawConstantValue()!)
@@ -138,8 +146,12 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         .ToArray();
 }
 
-/// <summary>A feature that's part of some plans only.</summary>
+/// <summary>
+/// A feature that's part of some plans only.
+/// </summary>
 public record PlanFeature(string Key, string Name, IReadOnlyList<string> Plans);
 
-/// <summary>Cascaded by <c>Feature ShowLocked</c> to content shown while its feature is locked to <paramref name="Plan"/>.</summary>
+/// <summary>
+/// Cascaded by <c>Feature ShowLocked</c> to content shown while its feature is locked to <paramref name="Plan"/>.
+/// </summary>
 public record FeatureLock(string Plan);

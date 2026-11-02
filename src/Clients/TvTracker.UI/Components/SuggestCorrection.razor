@@ -58,10 +58,14 @@
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
     [Parameter] public Guid? EpisodeId { get; set; }
 
-    /// <summary>The show and episode as shown here ("Severance · S01E03"), for the moderator.</summary>
+    /// <summary>
+    /// The show and episode as shown here ("Severance · S01E03"), for the moderator.
+    /// </summary>
     [Parameter] public string? Context { get; set; }
 
-    /// <summary>The values the page shows now, by field (episode-airdate as yyyy-MM-dd), for comparison and to start from.</summary>
+    /// <summary>
+    /// The values the page shows now, by field (episode-airdate as yyyy-MM-dd), for comparison and to start from.
+    /// </summary>
     [Parameter] public IReadOnlyDictionary<string, string?> Current { get; set; } = new Dictionary<string, string?>();
 
     private (string Key, string Label)[] Fields => EpisodeId is null
@@ -84,7 +88,9 @@
         value = Prefill(field);
     }
 
-    /// <summary>Starts from the current value, so a small fix is a small edit.</summary>
+    /// <summary>
+    /// Starts from the current value, so a small fix is a small edit.
+    /// </summary>
     private string? Prefill(string key) => key == "other" ? null : Current.GetValueOrDefault(key);
 
     private static string Shorten(string text) => text.Length > 200 ? text[..200] + "…" : text;

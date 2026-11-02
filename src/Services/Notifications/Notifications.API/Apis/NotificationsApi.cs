@@ -35,7 +35,9 @@ public record UpdatePreferencesRequest(
     DayOfWeek? DigestDay = null,
     int? DigestHour = null);
 
-/// <summary>A digest as it would go out now (see <see cref="WeeklyDigest"/>).</summary>
+/// <summary>
+/// A digest as it would go out now (see <see cref="WeeklyDigest"/>).
+/// </summary>
 public record DigestDto(string Subject, IReadOnlyList<DigestSection> Sections);
 
 public record ShowPreferenceDto(Guid ShowId, bool Muted);
@@ -146,7 +148,9 @@ public static class NotificationsApi
         return TypedResults.Ok(devices);
     }
 
-    /// <summary>Registers (or re-registers) a device. A token moves to the signed-in user if it was registered by someone else.</summary>
+    /// <summary>
+    /// Registers (or re-registers) a device. A token moves to the signed-in user if it was registered by someone else.
+    /// </summary>
     private static async Task<Results<Ok<DeviceDto>, ValidationProblem>> RegisterDeviceAsync(
         RegisterDeviceRequest request, ClaimsPrincipal user, NotificationsContext db, NotificationHubPush push, CancellationToken ct)
     {
@@ -275,7 +279,9 @@ public static class NotificationsApi
         new(p.NewEpisodes, p.NewSeasons, p.StatusChanges, p.PushEnabled, p.WebPushEnabled, p.EmailEnabled,
             p.Email, p.QuietHoursStart, p.QuietHoursEnd, p.TimeZone, p.WeeklyDigest, p.DigestDay, p.DigestHour);
 
-    /// <summary>This week's digest for the caller as it would go out now, whether or not they've turned it on.</summary>
+    /// <summary>
+    /// This week's digest for the caller as it would go out now, whether or not they've turned it on.
+    /// </summary>
     private static async Task<Ok<DigestDto>> PreviewDigestAsync(ClaimsPrincipal user, NotificationsContext db, WeeklyDigest digests,
         CancellationToken ct)
     {

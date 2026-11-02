@@ -196,7 +196,9 @@ public static class CatalogApi
         return TypedResults.Ok(trending);
     }
 
-    /// <summary>Summaries for a set of show ids (comma-separated), e.g. to render recommendations or lists.</summary>
+    /// <summary>
+    /// Summaries for a set of show ids (comma-separated), e.g. to render recommendations or lists.
+    /// </summary>
     private static async Task<Ok<List<ShowSummaryDto>>> GetShowsByIdsAsync(CatalogContext db, string ids, CancellationToken ct)
     {
         var showIds = ParseIds(ids);
@@ -310,7 +312,9 @@ public static class CatalogApi
             show.ExternalId);
     }
 
-    /// <summary>The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.</summary>
+    /// <summary>
+    /// The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.
+    /// </summary>
     internal static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
         StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
         : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search
@@ -388,7 +392,9 @@ public static class CatalogApi
         return TypedResults.Ok(episode.ToDto(CatalogMappings.LabelFor(episode, season)));
     }
 
-    /// <summary>Episodes airing between <paramref name="from"/> and <paramref name="to"/> (UTC), optionally for given shows.</summary>
+    /// <summary>
+    /// Episodes airing between <paramref name="from"/> and <paramref name="to"/> (UTC), optionally for given shows.
+    /// </summary>
     private static async Task<Results<Ok<List<ScheduleItemDto>>, BadRequest<string>>> GetScheduleAsync(
         CatalogContext db, DateTimeOffset from, DateTimeOffset to, string? showIds, CancellationToken ct)
     {

@@ -21,7 +21,9 @@ public record DnaTwin(Guid ShowId, double Similarity, IReadOnlyList<string> Shar
 /// </summary>
 public sealed class RecommendationEngine(RecommendationsContext db)
 {
-    /// <summary>Shows similar to <paramref name="showId"/>, best first.</summary>
+    /// <summary>
+    /// Shows similar to <paramref name="showId"/>, best first.
+    /// </summary>
     public async Task<List<ScoredShow>> GetSimilarAsync(Guid showId, int limit, CancellationToken ct)
     {
         var target = await db.Shows.AsNoTracking().SingleOrDefaultAsync(s => s.ShowId == showId, ct);
@@ -86,16 +88,24 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             .ToList();
     }
 
-    /// <summary>A twin's DNA is at least this similar: about the closest tenth of pairs.</summary>
+    /// <summary>
+    /// A twin's DNA is at least this similar: about the closest tenth of pairs.
+    /// </summary>
     private const double TwinMinSimilarity = 0.85;
 
-    /// <summary>Twins share at least this many distinctive traits, so the likeness is in what sets the show apart.</summary>
+    /// <summary>
+    /// Twins share at least this many distinctive traits, so the likeness is in what sets the show apart.
+    /// </summary>
     private const int TwinMinSharedTraits = 2;
 
-    /// <summary>Genre overlap (Jaccard) above this, and it's a show like this one, not a twin about something else.</summary>
+    /// <summary>
+    /// Genre overlap (Jaccard) above this, and it's a show like this one, not a twin about something else.
+    /// </summary>
     private const double TwinMaxGenreOverlap = 0.34;
 
-    /// <summary>Personalised picks for a user, excluding shows they follow or dismissed.</summary>
+    /// <summary>
+    /// Personalised picks for a user, excluding shows they follow or dismissed.
+    /// </summary>
     public async Task<List<ScoredShow>> ComputeForUserAsync(string userId, int limit, CancellationToken ct)
     {
         var signals = await db.Signals.AsNoTracking().Where(s => s.UserId == userId).ToListAsync(ct);
@@ -189,7 +199,9 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         return scored.OrderByDescending(s => s.Score).Take(limit).ToList();
     }
 
-    /// <summary>For each candidate: how many other users who follow one of the user's shows also follow the candidate.</summary>
+    /// <summary>
+    /// For each candidate: how many other users who follow one of the user's shows also follow the candidate.
+    /// </summary>
     private async Task<Dictionary<Guid, int>> CoFollowCountsAsync(string userId, HashSet<Guid> myShows, List<Guid> candidateIds, CancellationToken ct)
     {
         if (myShows.Count == 0 || candidateIds.Count == 0)
@@ -239,7 +251,9 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     /// <param name="SharedNanogenre">The most specific nanogenre both shows are in ("Sports comedy"), the plainest reason there is.</param>
     private sealed record ShowMatch(double Score, bool DnaLed, string? SharedTraits, string? SharedNanogenre = null);
 
-    /// <summary>A show's DNA and nanogenres, by show.</summary>
+    /// <summary>
+    /// A show's DNA and nanogenres, by show.
+    /// </summary>
     private sealed record Extras(Dictionary<Guid, Dictionary<string, double>> Dna, Dictionary<Guid, List<string>> Nanogenres);
 
     /// <summary>
@@ -259,7 +273,9 @@ public sealed class RecommendationEngine(RecommendationsContext db)
 
     private const double UnknownAffinity = 0.5;
 
-    /// <summary>A reason names the DNA from this affinity, when the shows also share a distinctive trait.</summary>
+    /// <summary>
+    /// A reason names the DNA from this affinity, when the shows also share a distinctive trait.
+    /// </summary>
     private const double DnaReasonAffinity = 0.6;
 
 
@@ -319,7 +335,9 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             .Select(t => t.Label!)
             .ToList();
 
-    /// <summary>"a sports comedy", "an animated family comedy".</summary>
+    /// <summary>
+    /// "a sports comedy", "an animated family comedy".
+    /// </summary>
     private static string Article(string name) => "aeiouAEIOU".Contains(name[0]) ? "an" : "a";
 
 

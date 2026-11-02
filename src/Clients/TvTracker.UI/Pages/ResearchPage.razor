@@ -197,11 +197,15 @@
         public string Mode { get; set; } = "none";
         public int Option { get; set; }
 
-        /// <summary>The picked option's value, to find it again when the options change.</summary>
+        /// <summary>
+        /// The picked option's value, to find it again when the options change.
+        /// </summary>
         public string? Value { get; set; }
         public string Custom { get; set; } = "";
 
-        /// <summary>Picked by the moderator rather than defaulted; only these survive a reload.</summary>
+        /// <summary>
+        /// Picked by the moderator rather than defaulted; only these survive a reload.
+        /// </summary>
         public bool Chosen { get; set; }
     }
 
@@ -234,7 +238,9 @@
         }
     }
 
-    /// <summary>Takes a fresh workspace, keeping the moderator's choices and edits unless asked to reset them.</summary>
+    /// <summary>
+    /// Takes a fresh workspace, keeping the moderator's choices and edits unless asked to reset them.
+    /// </summary>
     private void Apply(ResearchWorkspace? next, bool resetChoices)
     {
         var previous = choices;
@@ -380,7 +386,9 @@
         }
     }
 
-    /// <summary>While the model drafts in the background, checks every 4 s; the draft lands in the editor when it's done.</summary>
+    /// <summary>
+    /// While the model drafts in the background, checks every 4 s; the draft lands in the editor when it's done.
+    /// </summary>
     private void SchedulePoll()
     {
         poll?.Dispose();

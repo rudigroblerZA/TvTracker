@@ -3,7 +3,9 @@ using Recommendations.API.Data;
 
 namespace Recommendations.API.Services;
 
-/// <summary>Rebuilds "for you" lists for users whose signals changed, so requests only read pre-computed rows.</summary>
+/// <summary>
+/// Rebuilds "for you" lists for users whose signals changed, so requests only read pre-computed rows.
+/// </summary>
 public sealed class RecommendationRefresher(IServiceScopeFactory scopeFactory, ILogger<RecommendationRefresher> logger) : BackgroundService
 {
     public const int ListSize = 30;
@@ -44,7 +46,9 @@ public sealed class RecommendationRefresher(IServiceScopeFactory scopeFactory, I
     }
 }
 
-/// <summary>Reads, rebuilds and invalidates pre-computed recommendation lists.</summary>
+/// <summary>
+/// Reads, rebuilds and invalidates pre-computed recommendation lists.
+/// </summary>
 public sealed class RecommendationStore(RecommendationsContext db, RecommendationEngine engine, TimeProvider time)
 {
     public async Task<List<UserRecommendation>> GetOrBuildAsync(string userId, CancellationToken ct)
@@ -79,7 +83,9 @@ public sealed class RecommendationStore(RecommendationsContext db, Recommendatio
         return rows;
     }
 
-    /// <summary>Flags the user for a background rebuild. Call before SaveChanges.</summary>
+    /// <summary>
+    /// Flags the user for a background rebuild. Call before SaveChanges.
+    /// </summary>
     public async Task MarkDirtyAsync(string userId, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;

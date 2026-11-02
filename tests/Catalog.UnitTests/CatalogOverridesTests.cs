@@ -5,7 +5,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Accepted corrections and saved research, applied over the provider's show (see CONTEXT.md, corrections).</summary>
+/// <summary>
+/// Accepted corrections and saved research, applied over the provider's show (see CONTEXT.md, corrections).
+/// </summary>
 public class CatalogOverridesTests
 {
     [Theory]

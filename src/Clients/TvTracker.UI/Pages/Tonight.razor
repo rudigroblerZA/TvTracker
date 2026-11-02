@@ -192,7 +192,9 @@
     [SupplyParameterFromQuery(Name = "mood")] public string? Mood { get; set; }
     [SupplyParameterFromQuery(Name = "one")] public bool? One { get; set; }
 
-    /// <summary>Tonight for two: the user id of the person watching with the user.</summary>
+    /// <summary>
+    /// Tonight for two: the user id of the person watching with the user.
+    /// </summary>
     [SupplyParameterFromQuery(Name = "with")] public string? With { get; set; }
 
     private static readonly (int Value, string Label)[] Times = [(30, "30 min"), (60, "1 h"), (90, "1½ h"), (120, "2 h"), (180, "3 h")];
@@ -269,7 +271,9 @@
         }
     }
 
-    /// <summary>The user's own queue from Tracking, or the shared one from Social when planning with someone.</summary>
+    /// <summary>
+    /// The user's own queue from Tracking, or the shared one from Social when planning with someone.
+    /// </summary>
     private async Task<List<TonightShow>> LoadQueueAsync()
     {
         loadedWith = With;
@@ -318,7 +322,9 @@
         }
     }
 
-    /// <summary>Why a shared show is in the plan, when it isn't the mood: where the two of them are in it.</summary>
+    /// <summary>
+    /// Why a shared show is in the plan, when it isn't the mood: where the two of them are in it.
+    /// </summary>
     private string WhyTogether(TonightShow show)
     {
         var name = partner?.DisplayName ?? "they";

@@ -69,7 +69,9 @@ public static class CommunityApi
         corrections.MapGet("/me/corrections", GetMyCorrectionsAsync);
     }
 
-    /// <summary>Refuses text with a blocked term; null when it may be posted (perhaps held for review).</summary>
+    /// <summary>
+    /// Refuses text with a blocked term; null when it may be posted (perhaps held for review).
+    /// </summary>
     public static ValidationProblem? CheckPost(string text, Moderation moderation) =>
         moderation.Check(text) == TextVerdict.Rejected
             ? TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["That contains words that aren't allowed here."] })
@@ -296,7 +298,9 @@ public static class CommunityApi
         return TypedResults.Ok(mine.Select(ToDto).ToList());
     }
 
-    /// <summary>The same rules the catalog sync worker applies, checked here so the suggester hears about them.</summary>
+    /// <summary>
+    /// The same rules the catalog sync worker applies, checked here so the suggester hears about them.
+    /// </summary>
     public static string? ValidateCorrection(string field, Guid? episodeId, string value) => field switch
     {
         _ when !CorrectionFields.Contains(field) => $"Use one of: {string.Join(", ", CorrectionFields)}.",

@@ -5,18 +5,26 @@ using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Catalog.API.Services;
 
-/// <summary>A character the same actor plays in two shows.</summary>
+/// <summary>
+/// A character the same actor plays in two shows.
+/// </summary>
 public sealed record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
-/// <summary>Two shows linked by the characters they share, by belonging to the same named franchise, or both.</summary>
+/// <summary>
+/// Two shows linked by the characters they share, by belonging to the same named franchise, or both.
+/// </summary>
 /// <param name="SameFranchise">Named as one franchise ("NCIS: Sydney" and "NCIS", or "Chicago Fire" and "Chicago Med"
 /// with the same makers); see <see cref="Universes.SameFranchise"/>.</param>
 public sealed record UniverseLink(Guid A, Guid B, IReadOnlyList<SharedCharacter> Characters, bool SameFranchise = false);
 
-/// <summary>Shows connected by shared characters (directly or through each other), and the links between them.</summary>
+/// <summary>
+/// Shows connected by shared characters (directly or through each other), and the links between them.
+/// </summary>
 public sealed record Universe(IReadOnlyList<Guid> Shows, IReadOnlyList<UniverseLink> Links);
 
-/// <summary>Every universe in the catalog, and which universe each show is in.</summary>
+/// <summary>
+/// Every universe in the catalog, and which universe each show is in.
+/// </summary>
 public sealed record UniverseMap(IReadOnlyList<Universe> Universes, IReadOnlyDictionary<Guid, int> UniverseOfShow);
 
 /// <summary>
@@ -158,7 +166,9 @@ public sealed partial class Universes(IServiceScopeFactory scopeFactory, HybridC
         return new UniverseMap(universes, index);
     }
 
-    /// <summary>A show title's first word, ignoring a leading article: franchise names start alike.</summary>
+    /// <summary>
+    /// A show title's first word, ignoring a leading article: franchise names start alike.
+    /// </summary>
     private static string? FranchiseWord(string title) =>
         Words().Matches(title.ToLowerInvariant()).Select(m => m.Value).FirstOrDefault(w => w is not ("the" or "a" or "an"));
 

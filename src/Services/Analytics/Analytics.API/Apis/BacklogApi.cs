@@ -36,13 +36,19 @@ public record BacklogShowDto(Guid ShowId, string Title, string? PosterUrl, int E
 /// </summary>
 public static class BacklogApi
 {
-    /// <summary>Shows this long or longer are "long": worth it, but the essential cut is offered.</summary>
+    /// <summary>
+    /// Shows this long or longer are "long": worth it, but the essential cut is offered.
+    /// </summary>
     public const int LongMinutes = 40 * 60;
 
-    /// <summary>Below this value, a show is "let it go".</summary>
+    /// <summary>
+    /// Below this value, a show is "let it go".
+    /// </summary>
     private const double LetGoBelow = 7.0;
 
-    /// <summary>A show that ends badly is still worth starting from this value.</summary>
+    /// <summary>
+    /// A show that ends badly is still worth starting from this value.
+    /// </summary>
     private const double EndsBadlyBelow = 8.0;
 
     private const int StartNext = 3;
@@ -104,7 +110,9 @@ public static class BacklogApi
 
     private static readonly string[] Order = ["start-next", "worth-it", "long", "ends-badly", "let-it-go"];
 
-    /// <summary>The "lean" essential cut's running time; null when the show can't be cut or it saves nothing.</summary>
+    /// <summary>
+    /// The "lean" essential cut's running time; null when the show can't be cut or it saves nothing.
+    /// </summary>
     private static int? CutMinutes(ShowLoad load, DateTimeOffset now)
     {
         var aired = load.Aired;

@@ -59,7 +59,9 @@ public static class StreaksApi
 
     internal sealed record Aired(Guid EpisodeId, Guid ShowId, int Season, int Episode, DateTimeOffset AirsAtUtc);
 
-    /// <summary>One show's kept-up record: the current and longest runs, the episodes that end them, and what's still due.</summary>
+    /// <summary>
+    /// One show's kept-up record: the current and longest runs, the episodes that end them, and what's still due.
+    /// </summary>
     /// <param name="Due">Aired episodes still inside their window, with their deadlines, oldest first.</param>
     internal sealed record KeptUpRun(int Current, int Longest, Aired? Latest, Aired? LongestEnd, IReadOnlyList<(Aired Episode, DateTimeOffset Deadline)> Due);
 
@@ -159,7 +161,9 @@ public static class StreaksApi
         return new KeptUpRun(current, longest, latest, longestEnd, states.Where(s => s.Kept is null).Select(s => (s.Episode, s.Deadline)).ToList());
     }
 
-    /// <summary>The Monday a date's week starts on.</summary>
+    /// <summary>
+    /// The Monday a date's week starts on.
+    /// </summary>
     internal static DateOnly WeekStart(DateOnly day) => day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
 
     /// <summary>

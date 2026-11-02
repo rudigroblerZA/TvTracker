@@ -159,7 +159,9 @@ public static class TvClockApi
             labels, peak, periods, weekend, Sittings(watches, id => shows.TryGetValue(id, out var s) ? (s.Title, s.PosterUrl) : null), top));
     }
 
-    /// <summary>Marks in a row grouped into sittings, and what they add up to.</summary>
+    /// <summary>
+    /// Marks in a row grouped into sittings, and what they add up to.
+    /// </summary>
     private static SittingsDto? Sittings(List<Watch> watches, Func<Guid, (string Title, string? PosterUrl)?> showOf)
     {
         var sittings = new List<List<Watch>>();
@@ -189,7 +191,9 @@ public static class TvClockApi
                 longest.Select(w => w.ShowId).Distinct().Count()));
     }
 
-    /// <summary>0 Monday to 6 Sunday.</summary>
+    /// <summary>
+    /// 0 Monday to 6 Sunday.
+    /// </summary>
     private static int Weekday(DateTime local) => ((int)local.DayOfWeek + 6) % 7;
 
     private static string PartOf(int hour) => hour switch

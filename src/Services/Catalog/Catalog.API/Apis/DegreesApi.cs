@@ -55,7 +55,9 @@ public static class DegreesApi
             links.Count(l => l.To.ShowId is null)));
     }
 
-    /// <summary>Two popular catalog shows with a chain between them, at least two degrees apart so it takes some thought.</summary>
+    /// <summary>
+    /// Two popular catalog shows with a chain between them, at least two degrees apart so it takes some thought.
+    /// </summary>
     private static async Task<Results<Ok<DegreesChallengeDto>, NoContent>> GetChallengeAsync(DegreesGraph graph, CatalogContext db, CancellationToken ct)
     {
         var map = await graph.GetAsync(ct);

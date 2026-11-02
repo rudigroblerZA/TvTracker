@@ -49,7 +49,9 @@ public record OpsWikimedia(int QuoteShowsChecked, int QuotePages, int QuoteShows
     DateTime? LastQuotesReadAtUtc, int TvMazeShows, int SettingsLookedUp, int ShowsSet, int ShowsFilmed, int Places,
     DateTime? LastSettingsAtUtc);
 
-/// <summary>Values that replace the provider's (accepted corrections and saved research), by field.</summary>
+/// <summary>
+/// Values that replace the provider's (accepted corrections and saved research), by field.
+/// </summary>
 public record OpsOverrides(int Count, int Shows, IReadOnlyDictionary<string, int> ByField);
 
 /// <summary>
@@ -62,7 +64,9 @@ public record OpsOverrides(int Count, int Shows, IReadOnlyDictionary<string, int
 public record OpsDataQuality(int AiredEpisodes, int Rated, int WithoutRuntime, int PlaceholderTitles, int DuplicateNumbers,
     int SeasonsWithGaps, int ShowsWithoutGenres, int ShowsWithoutEpisodes);
 
-/// <summary>The sync worker's slow background fetches from the provider, and how far through they are.</summary>
+/// <summary>
+/// The sync worker's slow background fetches from the provider, and how far through they are.
+/// </summary>
 /// <param name="Actors">People in a catalog show's cast with a provider id: the ones the cast-credit backfill fetches.</param>
 /// <param name="ActorsWithCredits">Of those, fetched within the month (the reunion radar's data).</param>
 /// <param name="ShowsWithCrew">Shows whose creators and producers have been imported.</param>
@@ -73,7 +77,9 @@ public record OpsBackfills(int Actors, int ActorsWithCredits, int ProviderCastCr
 /// <param name="Clusters">Found by clustering; the rest are small genre pairings.</param>
 public record OpsNanogenres(int Count, int Clusters, int ShowsCovered, DateTime? ComputedAtUtc, IReadOnlyList<OpsNamedCount> Largest);
 
-/// <summary>Null until the universe map has been built (it's cached for 30 minutes).</summary>
+/// <summary>
+/// Null until the universe map has been built (it's cached for 30 minutes).
+/// </summary>
 /// <param name="Characters">Characters the same actor plays in two or more catalog shows: the character trails within
 /// the catalog (a trail also reaches shows outside it).</param>
 public record OpsUniverses(int Count, int ShowsCovered, IReadOnlyList<OpsNamedCount> Largest, int Characters = 0);
@@ -245,7 +251,9 @@ public static class OpsApi
             await db.People.CountAsync(p => p.CareerRefreshedAtUtc != null, ct));
     }
 
-    /// <summary>The universe map's size and largest universes; null if it can't be built right now.</summary>
+    /// <summary>
+    /// The universe map's size and largest universes; null if it can't be built right now.
+    /// </summary>
     private static async Task<OpsUniverses?> GetUniversesAsync(CatalogContext db, Universes universes, CancellationToken ct)
     {
         var map = await universes.GetAsync(ct);
@@ -266,7 +274,9 @@ public static class OpsApi
             TrailCharacters(map));
     }
 
-    /// <summary>Distinct characters on the map's links: per actor, names that are the same character count once.</summary>
+    /// <summary>
+    /// Distinct characters on the map's links: per actor, names that are the same character count once.
+    /// </summary>
     private static int TrailCharacters(UniverseMap map) =>
         map.Universes.SelectMany(u => u.Links).SelectMany(l => l.Characters)
             .GroupBy(c => c.PersonId)
@@ -279,7 +289,9 @@ public static class OpsApi
                 return distinct;
             }).Count);
 
-    /// <summary>Every flag in <see cref="FeatureFlags"/>, as flagd answers for a signed-out caller.</summary>
+    /// <summary>
+    /// Every flag in <see cref="FeatureFlags"/>, as flagd answers for a signed-out caller.
+    /// </summary>
     private static async Task<List<OpsFlag>> GetFlagsAsync(IFeatureClient features, CancellationToken ct)
     {
         var keys = typeof(FeatureFlags).GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -294,7 +306,9 @@ public static class OpsApi
         return flags;
     }
 
-    /// <summary>The JSON another service returns, or null when it's down, slow, or has nothing (404).</summary>
+    /// <summary>
+    /// The JSON another service returns, or null when it's down, slow, or has nothing (404).
+    /// </summary>
     private static async Task<JsonElement?> FetchAsync(
         IHttpClientFactory httpFactory, string client, string path, ILogger logger, CancellationToken ct)
     {

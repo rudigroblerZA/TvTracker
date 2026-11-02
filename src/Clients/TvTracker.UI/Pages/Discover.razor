@@ -160,7 +160,9 @@
         ("great-endings", "Great endings", "Finished shows that stick the landing: a strong finale, and a final season that holds up.", FeatureFlags.Endings)
     ];
 
-    /// <summary>The lists shown: until the flags are known, only those behind none.</summary>
+    /// <summary>
+    /// The lists shown: until the flags are known, only those behind none.
+    /// </summary>
     private (string Key, string Label, string Description, string? Flag)[] visible = Lists.Where(l => l.Flag is null).ToArray();
 
     private string list = Lists[0].Key;

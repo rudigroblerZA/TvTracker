@@ -2,7 +2,9 @@ using Analytics.Worker.Insights;
 
 namespace Analytics.UnitTests;
 
-/// <summary>Next season's rating and premiere (see CONTEXT.md, Forecasts).</summary>
+/// <summary>
+/// Next season's rating and premiere (see CONTEXT.md, Forecasts).
+/// </summary>
 public class ForecastTests
 {
     private static readonly Guid Show = Guid.NewGuid();
@@ -59,7 +61,9 @@ public class ForecastTests
 
     private static List<SeasonRecord> Rated(params double[] ratings) => ratings.Select((r, i) => Season(i + 1, r)).ToList();
 
-    /// <summary>Seasons of 70 days with the given waits between them.</summary>
+    /// <summary>
+    /// Seasons of 70 days with the given waits between them.
+    /// </summary>
     private static List<SeasonRecord> Waits(params int[] waits)
     {
         var seasons = new List<SeasonRecord> { Season(1, 8.0, Start) };

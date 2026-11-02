@@ -174,7 +174,9 @@
         await Task.WhenAll(LoadVerdictsAsync(), LoadPremieresAsync(), LoadTopEpisodesAsync());
     }
 
-    /// <summary>Optional: hidden when the season-verdict flag is off (404) or the call fails.</summary>
+    /// <summary>
+    /// Optional: hidden when the season-verdict flag is off (404) or the call fails.
+    /// </summary>
     private async Task LoadVerdictsAsync()
     {
         try

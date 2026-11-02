@@ -17,17 +17,23 @@ namespace Analytics.Worker.Insights;
 /// </summary>
 public sealed class WorthItInsight : IShowInsight
 {
-    /// <summary>Without this many rated episodes, the rating says too little about the hours to score them.</summary>
+    /// <summary>
+    /// Without this many rated episodes, the rating says too little about the hours to score them.
+    /// </summary>
     private const int MinRatedEpisodes = 5;
 
-    /// <summary>A turn this far in costs <see cref="SlowStartPoints"/>; past <see cref="VerySlowStartMinutes"/>, twice that.</summary>
+    /// <summary>
+    /// A turn this far in costs <see cref="SlowStartPoints"/>; past <see cref="VerySlowStartMinutes"/>, twice that.
+    /// </summary>
     private const int SlowStartMinutes = 180;
 
     private const int VerySlowStartMinutes = 600;
     private const double SlowStartPoints = -0.15;
     private const double GoodStartPoints = 0.1;
 
-    /// <summary>A decline costs this times the share of the running time from the season it sets in.</summary>
+    /// <summary>
+    /// A decline costs this times the share of the running time from the season it sets in.
+    /// </summary>
     private const double DeclinePoints = -0.6;
 
     private const double RollercoasterPoints = -0.15;
@@ -90,7 +96,9 @@ public sealed class WorthItInsight : IShowInsight
             !show.Show.HasEnded());
     }
 
-    /// <summary>The ending's points, as the backlog and time off weigh it (Analytics.API's ShowValue).</summary>
+    /// <summary>
+    /// The ending's points, as the backlog and time off weigh it (Analytics.API's ShowValue).
+    /// </summary>
     private static (double Points, string Text)? Ending(string verdict) => verdict switch
     {
         LandingVerdicts.Sticks => (0.3, "Sticks the landing"),

@@ -36,7 +36,9 @@ public static class MilestonesApi
     private const int MaxRows = 40;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(1);
 
-    /// <summary>The episode numbers that count as milestones.</summary>
+    /// <summary>
+    /// The episode numbers that count as milestones.
+    /// </summary>
     public static readonly int[] Milestones = [100, 150, 200, 250, 300, 400, 500, 600, 700, 750, 800, 900, 1000];
 
     private sealed record Row(Guid ShowId, int Number, int SeasonNumber, int EpisodeNumber, DateTimeOffset AirsAtUtc);

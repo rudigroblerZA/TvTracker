@@ -6,7 +6,9 @@ namespace Tracking.API.Apis;
 
 public static class ExportApi
 {
-    /// <summary>The user's tracking data, collected by Identity.API's account export.</summary>
+    /// <summary>
+    /// The user's tracking data, collected by Identity.API's account export.
+    /// </summary>
     public static IEndpointRouteBuilder MapExportApi(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, TrackingContext db, CancellationToken ct) =>

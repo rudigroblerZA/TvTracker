@@ -2,7 +2,9 @@ using Catalog.SyncWorker.Quotes;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Memorable lines from Wikiquote's wikitext (see CONTEXT.md, Memorable lines).</summary>
+/// <summary>
+/// Memorable lines from Wikiquote's wikitext (see CONTEXT.md, Memorable lines).
+/// </summary>
 public class WikiquoteParserTests
 {
     private const string Page = """

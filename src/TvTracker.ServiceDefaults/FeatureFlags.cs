@@ -93,13 +93,19 @@ public static class FeatureFlags
     /// </summary>
     public const string PlanAttribute = "plan";
 
-    /// <summary>The free plan's key, which signed-out callers are on.</summary>
+    /// <summary>
+    /// The free plan's key, which signed-out callers are on.
+    /// </summary>
     public const string FreePlan = "free";
 
-    /// <summary>The flag metadata key listing a flag's plans, comma-separated ("plus,family"); absent = every plan.</summary>
+    /// <summary>
+    /// The flag metadata key listing a flag's plans, comma-separated ("plus,family"); absent = every plan.
+    /// </summary>
     public const string PlansMetadata = "plans";
 
-    /// <summary>The flag metadata key with a feature's short name, for the plan page ("Essential cut").</summary>
+    /// <summary>
+    /// The flag metadata key with a feature's short name, for the plan page ("Essential cut").
+    /// </summary>
     public const string NameMetadata = "name";
 
     /// <summary>

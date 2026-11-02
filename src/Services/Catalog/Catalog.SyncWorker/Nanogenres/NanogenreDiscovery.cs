@@ -41,13 +41,19 @@ public static partial class NanogenreDiscovery
     public const int MinPairSize = 2;
     public const int MaxPairSize = 15;
 
-    /// <summary>A name's genre pairing must cover at least this share of a group.</summary>
+    /// <summary>
+    /// A name's genre pairing must cover at least this share of a group.
+    /// </summary>
     private const double NameCover = 0.6;
 
-    /// <summary>The model the cut was tuned with has MaxDistance 0.38; distances from other models are scaled to it.</summary>
+    /// <summary>
+    /// The model the cut was tuned with has MaxDistance 0.38; distances from other models are scaled to it.
+    /// </summary>
     private const double ReferenceMaxDistance = 0.38;
 
-    /// <summary>The provider's specific genres, as they read before a base: "sports comedy", "spy thriller".</summary>
+    /// <summary>
+    /// The provider's specific genres, as they read before a base: "sports comedy", "spy thriller".
+    /// </summary>
     private static readonly Dictionary<string, string> Modifiers = new()
     {
         ["Legal"] = "legal", ["Medical"] = "medical", ["Crime"] = "crime", ["Science-Fiction"] = "sci-fi", ["Fantasy"] = "fantasy",
@@ -165,7 +171,9 @@ public static partial class NanogenreDiscovery
         return names;
     }
 
-    /// <summary>Every (specific genre, base) pairing in the catalog, with the shows that have it.</summary>
+    /// <summary>
+    /// Every (specific genre, base) pairing in the catalog, with the shows that have it.
+    /// </summary>
     private static Dictionary<(string Modifier, string Base), HashSet<int>> Pairings(IReadOnlyList<NanogenreShow> shows, string?[] kinds)
     {
         var pairings = new Dictionary<(string, string), HashSet<int>>();
@@ -192,7 +200,9 @@ public static partial class NanogenreDiscovery
         return pairings;
     }
 
-    /// <summary>What kind of show it is at heart: the noun a nanogenre's name ends with.</summary>
+    /// <summary>
+    /// What kind of show it is at heart: the noun a nanogenre's name ends with.
+    /// </summary>
     private static string? BaseOf(IReadOnlyList<string> genres, string? kind) =>
         genres.Contains("Anime") ? "anime"
         : kind switch
@@ -298,7 +308,9 @@ public static partial class NanogenreDiscovery
         return Enumerable.Range(0, n).GroupBy(Find).Select(g => g.Select(i => members[i]).ToList()).ToList();
     }
 
-    /// <summary>Each show's genres and type as a unit vector, so two shows of the same kind score 1.</summary>
+    /// <summary>
+    /// Each show's genres and type as a unit vector, so two shows of the same kind score 1.
+    /// </summary>
     private static float[][] GenreFeatures(IReadOnlyList<NanogenreShow> shows, string?[] kinds)
     {
         var axes = shows.SelectMany(s => s.Genres).Concat(kinds.OfType<string>().Select(k => $"kind:{k}")).Distinct().ToList();

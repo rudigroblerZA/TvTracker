@@ -20,7 +20,9 @@ public class EpisodeRating
     public DateTime RatedAtUtc { get; set; }
 }
 
-/// <summary>A post people can flag and moderators can hide: a comment or a community insight.</summary>
+/// <summary>
+/// A post people can flag and moderators can hide: a comment or a community insight.
+/// </summary>
 public interface IModeratedPost
 {
     string UserId { get; }
@@ -37,40 +39,58 @@ public class Comment : IModeratedPost
     public required string DisplayName { get; set; }
     public required string Text { get; set; }
 
-    /// <summary>The author says the comment contains spoilers; it stays hidden until the reader opts in.</summary>
+    /// <summary>
+    /// The author says the comment contains spoilers; it stays hidden until the reader opts in.
+    /// </summary>
     public bool IsSpoiler { get; set; }
 
-    /// <summary>Why only its author sees it; null when everyone does. One of <see cref="HiddenReasons"/>.</summary>
+    /// <summary>
+    /// Why only its author sees it; null when everyone does. One of <see cref="HiddenReasons"/>.
+    /// </summary>
     public string? HiddenReason { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>Why a comment or community insight is hidden from everyone but its author.</summary>
+/// <summary>
+/// Why a comment or community insight is hidden from everyone but its author.
+/// </summary>
 public static class HiddenReasons
 {
-    /// <summary>Enough readers flagged it; it waits for a moderator.</summary>
+    /// <summary>
+    /// Enough readers flagged it; it waits for a moderator.
+    /// </summary>
     public const string Flags = "flags";
 
-    /// <summary>Held for review when posted (it had a link); it waits for a moderator.</summary>
+    /// <summary>
+    /// Held for review when posted (it had a link); it waits for a moderator.
+    /// </summary>
     public const string Held = "held";
 
-    /// <summary>A moderator removed it.</summary>
+    /// <summary>
+    /// A moderator removed it.
+    /// </summary>
     public const string Moderator = "moderator";
 }
 
-/// <summary>Someone reporting a comment or community insight. Resolved once a moderator restores or removes it.</summary>
+/// <summary>
+/// Someone reporting a comment or community insight. Resolved once a moderator restores or removes it.
+/// </summary>
 public class ContentFlag
 {
     public Guid Id { get; set; }
 
-    /// <summary>"comment" or "insight".</summary>
+    /// <summary>
+    /// "comment" or "insight".
+    /// </summary>
     public required string TargetKind { get; set; }
 
     public Guid TargetId { get; set; }
     public required string UserId { get; set; }
 
-    /// <summary>spoiler, abuse, spam, off-topic or wrong.</summary>
+    /// <summary>
+    /// spoiler, abuse, spam, off-topic or wrong.
+    /// </summary>
     public required string Reason { get; set; }
 
     public string? Note { get; set; }
@@ -87,7 +107,9 @@ public class CommunityInsight : IModeratedPost
     public Guid Id { get; set; }
     public Guid ShowId { get; set; }
 
-    /// <summary>Null for the show as a whole.</summary>
+    /// <summary>
+    /// Null for the show as a whole.
+    /// </summary>
     public Guid? EpisodeId { get; set; }
 
     public required string UserId { get; set; }
@@ -95,7 +117,9 @@ public class CommunityInsight : IModeratedPost
     public required string Text { get; set; }
     public bool IsSpoiler { get; set; }
 
-    /// <summary>As for comments: one of <see cref="HiddenReasons"/>, or null.</summary>
+    /// <summary>
+    /// As for comments: one of <see cref="HiddenReasons"/>, or null.
+    /// </summary>
     public string? HiddenReason { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
@@ -118,22 +142,30 @@ public class Correction
     public Guid ShowId { get; set; }
     public Guid? EpisodeId { get; set; }
 
-    /// <summary>show-summary, episode-title, episode-summary, episode-airdate, episode-runtime, or other (not applied).</summary>
+    /// <summary>
+    /// show-summary, episode-title, episode-summary, episode-airdate, episode-runtime, or other (not applied).
+    /// </summary>
     public required string Field { get; set; }
 
-    /// <summary>What the page showed when it was suggested, so the moderator sees both.</summary>
+    /// <summary>
+    /// What the page showed when it was suggested, so the moderator sees both.
+    /// </summary>
     public string? CurrentValue { get; set; }
 
     public required string SuggestedValue { get; set; }
     public string? Note { get; set; }
 
-    /// <summary>The show and episode as the suggester saw them ("Severance · S01E03"), for the queue.</summary>
+    /// <summary>
+    /// The show and episode as the suggester saw them ("Severance · S01E03"), for the queue.
+    /// </summary>
     public string? Context { get; set; }
 
     public required string UserId { get; set; }
     public required string DisplayName { get; set; }
 
-    /// <summary>pending, accepted, rejected or reverted.</summary>
+    /// <summary>
+    /// pending, accepted, rejected or reverted.
+    /// </summary>
     public required string Status { get; set; }
 
     public string? ReviewedBy { get; set; }
@@ -141,17 +173,23 @@ public class Correction
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>What a moderator did, for the log on the moderation page.</summary>
+/// <summary>
+/// What a moderator did, for the log on the moderation page.
+/// </summary>
 public class ModerationAction
 {
     public Guid Id { get; set; }
     public required string ModeratorId { get; set; }
     public required string ModeratorName { get; set; }
 
-    /// <summary>restore, remove, accept, reject or revert.</summary>
+    /// <summary>
+    /// restore, remove, accept, reject or revert.
+    /// </summary>
     public required string Action { get; set; }
 
-    /// <summary>"comment", "insight" or "correction".</summary>
+    /// <summary>
+    /// "comment", "insight" or "correction".
+    /// </summary>
     public required string TargetKind { get; set; }
 
     public Guid TargetId { get; set; }
@@ -167,21 +205,31 @@ public class Reaction
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>Local copy of watched episodes (from EpisodeWatched), used to decide whether to show comments.</summary>
-/// <summary>An episode the user has watched, from Tracking's events and daily snapshot.</summary>
+/// <summary>
+/// Local copy of watched episodes (from EpisodeWatched), used to decide whether to show comments.
+/// </summary>
+/// <summary>
+/// An episode the user has watched, from Tracking's events and daily snapshot.
+/// </summary>
 public class WatchedEpisodeCopy
 {
     public required string UserId { get; set; }
     public Guid EpisodeId { get; set; }
 
-    /// <summary>Null for rows from before it was kept, until Tracking's next snapshot fills it in.</summary>
+    /// <summary>
+    /// Null for rows from before it was kept, until Tracking's next snapshot fills it in.
+    /// </summary>
     public Guid? ShowId { get; set; }
 
-    /// <summary>When this copy heard of it, so a snapshot read earlier doesn't remove it.</summary>
+    /// <summary>
+    /// When this copy heard of it, so a snapshot read earlier doesn't remove it.
+    /// </summary>
     public DateTime RecordedAtUtc { get; set; }
 }
 
-/// <summary>One "which was better?" answer between two episodes of a show the user watched (episode duels).</summary>
+/// <summary>
+/// One "which was better?" answer between two episodes of a show the user watched (episode duels).
+/// </summary>
 public class EpisodeDuel
 {
     public Guid Id { get; set; }

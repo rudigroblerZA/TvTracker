@@ -87,7 +87,9 @@ public static partial class ResearchApi
         api.MapPost("/{showId:guid}/save", SaveAsync);
     }
 
-    /// <summary>The trusted record: the latest saved version. Public, like the show page it's on.</summary>
+    /// <summary>
+    /// The trusted record: the latest saved version. Public, like the show page it's on.
+    /// </summary>
     private static async Task<Results<Ok<SavedResearchDto>, NotFound>> GetSavedAsync(Guid showId, ResearchContext db, CancellationToken ct) =>
         await LatestAsync(db, showId, ct) is { } saved ? TypedResults.Ok(ToDto(saved)) : TypedResults.NotFound();
 
@@ -214,7 +216,9 @@ public static partial class ResearchApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>Starts a draft in the background; 202, and the workspace says it's drafting until it's done.</summary>
+    /// <summary>
+    /// Starts a draft in the background; 202, and the workspace says it's drafting until it's done.
+    /// </summary>
     private static async Task<Results<Accepted, NotFound, ValidationProblem>> DraftAsync(
         Guid showId, ClaimsPrincipal user, Researchers researchers, ResearchContext db, DraftQueue drafts, TimeProvider time, CancellationToken ct)
     {
@@ -241,7 +245,9 @@ public static partial class ResearchApi
         return TypedResults.Accepted((string?)null);
     }
 
-    /// <summary>Keeps the moderator's edits to the draft between sessions.</summary>
+    /// <summary>
+    /// Keeps the moderator's edits to the draft between sessions.
+    /// </summary>
     private static async Task<Results<NoContent, NotFound>> KeepDraftAsync(
         Guid showId, DraftRequest request, ClaimsPrincipal user, Researchers researchers, ResearchContext db, TimeProvider time, CancellationToken ct)
     {
@@ -400,7 +406,9 @@ public static partial class ResearchApi
             facts, saved is null ? null : ToDto(saved), versions, notes, drafter.Model, tmdb.Configured);
     }
 
-    /// <summary>Included sources numbered as drafts and saves cite them: Wikidata, Wikipedia, TMDB, then pages by when added.</summary>
+    /// <summary>
+    /// Included sources numbered as drafts and saves cite them: Wikidata, Wikipedia, TMDB, then pages by when added.
+    /// </summary>
     private static List<(int Number, ResearchSource Source)> Number(IEnumerable<ResearchSource> sources) =>
         sources.Where(s => s.Included)
             .OrderBy(s => Array.IndexOf(KindOrder, s.Kind)).ThenBy(s => s.RetrievedAtUtc)

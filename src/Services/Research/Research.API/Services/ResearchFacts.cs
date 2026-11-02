@@ -34,7 +34,9 @@ public static class ResearchFacts
 
     public static readonly IReadOnlyDictionary<string, FactDefinition> ByKey = All.ToDictionary(f => f.Key);
 
-    /// <summary>The catalog's own value for a fact, from the show as Catalog.API serves it, or null.</summary>
+    /// <summary>
+    /// The catalog's own value for a fact, from the show as Catalog.API serves it, or null.
+    /// </summary>
     public static string? FromCatalog(string key, CatalogShow show) => key switch
     {
         "summary" => show.Overview,
@@ -47,7 +49,9 @@ public static class ResearchFacts
         _ => null
     };
 
-    /// <summary>Checks a value; returns the problem, or null when it's fine.</summary>
+    /// <summary>
+    /// Checks a value; returns the problem, or null when it's fine.
+    /// </summary>
     public static string? Validate(string key, string value)
     {
         if (!ByKey.TryGetValue(key, out var fact))

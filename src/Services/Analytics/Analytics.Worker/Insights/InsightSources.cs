@@ -10,7 +10,9 @@ namespace Analytics.Worker.Insights;
 /// </summary>
 public sealed class InsightSources
 {
-    /// <summary>The run's clock: what has aired, what's upcoming, and how recent a follow or watch is.</summary>
+    /// <summary>
+    /// The run's clock: what has aired, what's upcoming, and how recent a follow or watch is.
+    /// </summary>
     public required DateTimeOffset Now { get; init; }
 
     public DateTime ComputedAtUtc => Now.UtcDateTime;
@@ -20,10 +22,14 @@ public sealed class InsightSources
     public required List<CastCopy> Cast { get; init; }
     public required ILookup<Guid, CastCopy> CastByShow { get; init; }
 
-    /// <summary>Credits by <see cref="PersonKey"/>.</summary>
+    /// <summary>
+    /// Credits by <see cref="PersonKey"/>.
+    /// </summary>
     public required ILookup<string, CastCopy> CastByPerson { get; init; }
 
-    /// <summary>Credits by the provider's character id.</summary>
+    /// <summary>
+    /// Credits by the provider's character id.
+    /// </summary>
     public required ILookup<string, CastCopy> CastByCharacter { get; init; }
 
     /// <summary>
@@ -32,15 +38,21 @@ public sealed class InsightSources
     /// </summary>
     public required Dictionary<Guid, (CreativeCopy Creative, PersonCareerCopy Career)> ProlificMakerByShow { get; init; }
 
-    /// <summary>Everyone credited as making a show (creators, developers, executive producers).</summary>
+    /// <summary>
+    /// Everyone credited as making a show (creators, developers, executive producers).
+    /// </summary>
     public required List<CreativeCopy> Creatives { get; init; }
 
-    /// <summary>Our users' episode stars, summed and counted per episode, before the privacy rule (see <see cref="ShowInsightContext.OurEpisodeRatings"/>).</summary>
+    /// <summary>
+    /// Our users' episode stars, summed and counted per episode, before the privacy rule (see <see cref="ShowInsightContext.OurEpisodeRatings"/>).
+    /// </summary>
     public required Dictionary<Guid, (int Sum, int Count)> EpisodeRatings { get; init; }
 
     public required Dictionary<Guid, (int Sum, int Count)> ShowRatings { get; init; }
 
-    /// <summary>How many of our users gave each show each number of stars.</summary>
+    /// <summary>
+    /// How many of our users gave each show each number of stars.
+    /// </summary>
     public required ILookup<Guid, (int Stars, int Count)> ShowStarCounts { get; init; }
 
     public required ILookup<Guid, AnnouncedSeason> AnnouncedSeasons { get; init; }
@@ -51,7 +63,9 @@ public sealed class InsightSources
     /// </summary>
     public required ILookup<Guid, SeasonRecord> SeasonHistory { get; init; }
 
-    /// <summary>The forecast models, trained on <see cref="SeasonHistory"/> on first use in a run.</summary>
+    /// <summary>
+    /// The forecast models, trained on <see cref="SeasonHistory"/> on first use in a run.
+    /// </summary>
     public ForecastModels Forecasts => field ??= ForecastModels.Train(this);
 
     public required ILookup<Guid, DateTime> FollowDates { get; init; }
@@ -121,7 +135,9 @@ public sealed class InsightSources
         };
     }
 
-    /// <summary>The shows' episodes and our users' watches, as one context per show, in the order given.</summary>
+    /// <summary>
+    /// The shows' episodes and our users' watches, as one context per show, in the order given.
+    /// </summary>
     public async Task<List<ShowInsightContext>> LoadShowsAsync(AnalyticsContext db, IReadOnlyList<Guid> ids, CancellationToken ct)
     {
         var episodes = (await db.Episodes.AsNoTracking().Where(e => ids.Contains(e.ShowId)).ToListAsync(ct)).ToLookup(e => e.ShowId);
@@ -146,6 +162,8 @@ public sealed class InsightSources
 /// <param name="Rating">The provider's average for its aired episodes; null with fewer than <see cref="SeasonSummary.MinRatedEpisodes"/> rated.</param>
 public record SeasonRecord(Guid ShowId, int Number, int Episodes, int Aired, DateTimeOffset? First, DateTimeOffset? LastAired, double? Rating)
 {
-    /// <summary>Every episode has aired.</summary>
+    /// <summary>
+    /// Every episode has aired.
+    /// </summary>
     public bool Complete => Aired > 0 && Aired == Episodes;
 }

@@ -85,7 +85,9 @@
         }
     }
 
-    /// <summary>The paid plans, which a feature is made part of from here.</summary>
+    /// <summary>
+    /// The paid plans, which a feature is made part of from here.
+    /// </summary>
     private static readonly string[] Paid = [Plans.Plus, Plans.Family];
 
     private async Task SetAsync(FeatureFlagSetting flag, bool? on, IReadOnlyList<string>? plans = null)

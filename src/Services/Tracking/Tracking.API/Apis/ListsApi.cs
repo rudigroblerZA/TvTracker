@@ -66,7 +66,9 @@ public static class ListsApi
         return TypedResults.Ok(lists);
     }
 
-    /// <summary>What the caller's plan allows, as the list endpoints enforce it, and how many lists they have.</summary>
+    /// <summary>
+    /// What the caller's plan allows, as the list endpoints enforce it, and how many lists they have.
+    /// </summary>
     private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -240,7 +242,9 @@ public static class ListsApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>Tells Social about a shared list's new state, or that it stopped being shared. Needs the list's items loaded.</summary>
+    /// <summary>
+    /// Tells Social about a shared list's new state, or that it stopped being shared. Needs the list's items loaded.
+    /// </summary>
     private static void Announce(UserList list, IIntegrationEventOutbox outbox, bool wasShared)
     {
         var at = new DateTimeOffset(list.UpdatedAtUtc, TimeSpan.Zero);
@@ -280,7 +284,9 @@ public static class ListsApi
         return errors.Count == 0 ? null : errors;
     }
 
-    /// <summary>Gives the list a link, or returns the one it has.</summary>
+    /// <summary>
+    /// Gives the list a link, or returns the one it has.
+    /// </summary>
     private static async Task<Results<Ok<ListLinkDto>, NotFound, ProblemHttpResult>> CreateLinkAsync(
         Guid id, ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
     {
@@ -301,7 +307,9 @@ public static class ListsApi
         return TypedResults.Ok(new ListLinkDto(list.LinkToken));
     }
 
-    /// <summary>Turns the link off: it stops working at once, and a new one gets a different address.</summary>
+    /// <summary>
+    /// Turns the link off: it stops working at once, and a new one gets a different address.
+    /// </summary>
     private static async Task<Results<NoContent, NotFound>> DeleteLinkAsync(Guid id, ClaimsPrincipal user, TrackingContext db, CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct);
@@ -346,7 +354,9 @@ public static class ListsApi
         return (plan, on ? Plans.Limits(plan) : null);
     }
 
-    /// <summary>403 with the reason, typed so clients can tell a plan limit from other refusals and offer the upgrade.</summary>
+    /// <summary>
+    /// 403 with the reason, typed so clients can tell a plan limit from other refusals and offer the upgrade.
+    /// </summary>
     private static ProblemHttpResult PlanLimit(string detail) =>
         TypedResults.Problem(detail, statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: PlanLimitProblem);
 

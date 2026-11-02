@@ -39,10 +39,14 @@ public record TimeMachineShowDto(Guid ShowId, string Title, string? PosterUrl, i
 /// </summary>
 public static class TimeMachineApi
 {
-    /// <summary>Days either side of the date that count as its week.</summary>
+    /// <summary>
+    /// Days either side of the date that count as its week.
+    /// </summary>
     private const int HalfWeek = 3;
 
-    /// <summary>One date's "on air then": shows with an episode within this many days either side.</summary>
+    /// <summary>
+    /// One date's "on air then": shows with an episode within this many days either side.
+    /// </summary>
     private const int OnAirDays = 7;
 
     private const int MaxMilestones = 12;
@@ -57,7 +61,9 @@ public static class TimeMachineApi
 
     private static readonly DateOnly Earliest = new(1950, 1, 1);
 
-    /// <summary>The key carries the day and time zone, so a day's answer can stay the day.</summary>
+    /// <summary>
+    /// The key carries the day and time zone, so a day's answer can stay the day.
+    /// </summary>
     private static readonly HybridCacheEntryOptions CacheFor = new() { Expiration = TimeSpan.FromHours(24), LocalCacheExpiration = TimeSpan.FromHours(24) };
 
     public static void MapTimeMachineApi(this RouteGroupBuilder api) =>
@@ -179,10 +185,14 @@ public static class TimeMachineApi
             .ToListAsync(ct);
     }
 
-    /// <summary>The same month and day in <paramref name="year"/>; 29 February becomes the 28th in other years.</summary>
+    /// <summary>
+    /// The same month and day in <paramref name="year"/>; 29 February becomes the 28th in other years.
+    /// </summary>
     private static DateOnly SameDay(DateOnly day, int year) => new(year, day.Month, Math.Min(day.Day, DateTime.DaysInMonth(year, day.Month)));
 
-    /// <summary>Midnight starting <paramref name="day"/> in <paramref name="zone"/>, as UTC (or the first valid time after it).</summary>
+    /// <summary>
+    /// Midnight starting <paramref name="day"/> in <paramref name="zone"/>, as UTC (or the first valid time after it).
+    /// </summary>
     private static DateTime StartOfDayUtc(DateOnly day, TimeZoneInfo zone)
     {
         var local = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
@@ -193,7 +203,9 @@ public static class TimeMachineApi
         return TimeZoneInfo.ConvertTimeToUtc(local, zone);
     }
 
-    /// <summary>The middle day of the week an episode fell in.</summary>
+    /// <summary>
+    /// The middle day of the week an episode fell in.
+    /// </summary>
     private static DateOnly WeekOf(EpisodeCopy episode, TimeZoneInfo zone, List<DateOnly> middles)
     {
         var aired = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(episode.AirsAtUtc!.Value, zone).DateTime);

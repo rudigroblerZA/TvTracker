@@ -20,7 +20,9 @@ public record FamilyDto(string Role, bool Active, string? OwnerName, IReadOnlyLi
 /// <param name="UserId">For the owner, to remove them; null for members, who see only names.</param>
 public record FamilyMemberDto(string? UserId, string DisplayName, DateTime JoinedAtUtc);
 
-/// <summary>What an invite link shows before joining.</summary>
+/// <summary>
+/// What an invite link shows before joining.
+/// </summary>
 public record FamilyInviteDto(string OwnerName, int SeatsLeft, bool Active);
 
 public record JoinFamilyRequest(string Token);
@@ -58,7 +60,9 @@ public static class FamilyApi
     private static async Task<Ok<FamilyDto>> GetMineAsync(ClaimsPrincipal user, IdentityContext db, CancellationToken ct) =>
         TypedResults.Ok(await FamilyOfAsync(db, user.GetUserId(), ct));
 
-    /// <summary>Turns invites on for the owner of a family plan, or returns the link they have.</summary>
+    /// <summary>
+    /// Turns invites on for the owner of a family plan, or returns the link they have.
+    /// </summary>
     private static async Task<Results<Ok<FamilyInviteLinkDto>, ProblemHttpResult>> CreateInviteAsync(
         ClaimsPrincipal user, IdentityContext db, TimeProvider time, CancellationToken ct)
     {
@@ -85,7 +89,9 @@ public static class FamilyApi
         return TypedResults.Ok(new FamilyInviteLinkDto(family.InviteToken));
     }
 
-    /// <summary>Stops the invite link working; members stay.</summary>
+    /// <summary>
+    /// Stops the invite link working; members stay.
+    /// </summary>
     private static async Task<NoContent> DeleteInviteAsync(ClaimsPrincipal user, IdentityContext db, CancellationToken ct)
     {
         if (await db.Families.FindAsync([user.GetUserId()], ct) is { } family)
@@ -126,7 +132,9 @@ public static class FamilyApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>Who invited you and whether there's room, for the page an invite link opens.</summary>
+    /// <summary>
+    /// Who invited you and whether there's room, for the page an invite link opens.
+    /// </summary>
     private static async Task<Results<Ok<FamilyInviteDto>, NotFound>> GetInviteAsync(string token, IdentityContext db, CancellationToken ct)
     {
         if (await FindByTokenAsync(db, token, ct) is not { } found)

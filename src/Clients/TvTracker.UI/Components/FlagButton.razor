@@ -35,12 +35,16 @@ else
     private static readonly (string Value, string Label)[] Reasons =
         [("spoiler", "Spoiler"), ("abuse", "Abusive"), ("spam", "Spam"), ("off-topic", "Off-topic"), ("wrong", "Wrong or misleading")];
 
-    /// <summary>"comment" or "insight".</summary>
+    /// <summary>
+    /// "comment" or "insight".
+    /// </summary>
     [Parameter, EditorRequired] public string Kind { get; set; } = "";
     [Parameter, EditorRequired] public Guid Id { get; set; }
     [Parameter] public bool Flagged { get; set; }
 
-    /// <summary>Called once flagged, with whether flags have now hidden it or made it a spoiler.</summary>
+    /// <summary>
+    /// Called once flagged, with whether flags have now hidden it or made it a spoiler.
+    /// </summary>
     [Parameter] public EventCallback<FlagResult> OnFlagged { get; set; }
 
     private bool open;

@@ -62,7 +62,9 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
         }
     }
 
-    /// <summary>Null when Keycloak doesn't know the client or its secret (401, or 400 invalid_client).</summary>
+    /// <summary>
+    /// Null when Keycloak doesn't know the client or its secret (401, or 400 invalid_client).
+    /// </summary>
     private async Task<TokenResponse?> RequestAsync(CancellationToken ct)
     {
         using var response = await http.PostAsync($"{BaseUrl}/realms/{IdentitySettings.Realm}/protocol/openid-connect/token",
@@ -80,7 +82,9 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
         return await response.Content.ReadFromJsonAsync<TokenResponse>(ct);
     }
 
-    /// <summary>Creates the client unless it exists. True when it created it.</summary>
+    /// <summary>
+    /// Creates the client unless it exists. True when it created it.
+    /// </summary>
     private async Task<bool> EnsureClientAsync(CancellationToken ct)
     {
         if (config["Keycloak:AdminUsername"] is not { Length: > 0 } username || config["Keycloak:AdminPassword"] is not { Length: > 0 } password)
@@ -111,7 +115,9 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
         return true;
     }
 
-    /// <summary>Confidential, client credentials only, with the same audience mapper as the app's clients.</summary>
+    /// <summary>
+    /// Confidential, client credentials only, with the same audience mapper as the app's clients.
+    /// </summary>
     private static object ClientDefinition(string clientId, string secret) => new
     {
         clientId,
@@ -145,7 +151,9 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
         [property: JsonPropertyName("expires_in")] int ExpiresIn);
 }
 
-/// <summary>Adds the service token to Analytics.API calls.</summary>
+/// <summary>
+/// Adds the service token to Analytics.API calls.
+/// </summary>
 public sealed class ServiceTokenHandler(ServiceToken token) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

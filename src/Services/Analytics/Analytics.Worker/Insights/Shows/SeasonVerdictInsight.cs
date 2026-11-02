@@ -22,13 +22,19 @@ public sealed class SeasonVerdictInsight : IShowInsight
 {
     private static readonly TimeSpan MinQuiet = TimeSpan.FromDays(7);
 
-    /// <summary>Seasons longer than this are daily shows' (talk, news, soaps), whose "season" is a year of episodes.</summary>
+    /// <summary>
+    /// Seasons longer than this are daily shows' (talk, news, soaps), whose "season" is a year of episodes.
+    /// </summary>
     private const int MaxEpisodes = 60;
 
-    /// <summary>A season this far above or below the others' median, or a finale this far from its season, is called so.</summary>
+    /// <summary>
+    /// A season this far above or below the others' median, or a finale this far from its season, is called so.
+    /// </summary>
     private const double Margin = 0.3;
 
-    /// <summary>"Best yet" and "weakest yet" need this many other seasons; against one, it's only above or below.</summary>
+    /// <summary>
+    /// "Best yet" and "weakest yet" need this many other seasons; against one, it's only above or below.
+    /// </summary>
     private const int MinComparedForRecord = 2;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights) =>

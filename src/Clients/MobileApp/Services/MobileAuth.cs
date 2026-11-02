@@ -12,7 +12,9 @@ using OidcBrowser = IdentityModel.OidcClient.Browser.IBrowser;
 
 namespace TvTracker.Mobile.Services;
 
-/// <summary>Opens the sign-in page in the system browser and returns the redirect (tvtracker://callback?...).</summary>
+/// <summary>
+/// Opens the sign-in page in the system browser and returns the redirect (tvtracker://callback?...).
+/// </summary>
 public sealed class MauiAuthBrowser : OidcBrowser
 {
     public async Task<BrowserResult> InvokeAsync(BrowserOptions options, CancellationToken cancellationToken = default)
@@ -137,7 +139,9 @@ public sealed class MobileAuthService
         }
     }
 
-    /// <summary>The signed-in user from the stored id token (no network call).</summary>
+    /// <summary>
+    /// The signed-in user from the stored id token (no network call).
+    /// </summary>
     public async Task<ClaimsPrincipal> GetUserAsync()
     {
         var tokens = await LoadAsync();

@@ -13,7 +13,9 @@ namespace Tracking.API.Services;
 public sealed class ActivitySnapshotPublisher(IServiceScopeFactory scopes, TimeProvider time, ILogger<ActivitySnapshotPublisher> logger)
     : BackgroundService
 {
-    /// <summary>Lets consumers bind their queues after a joint start.</summary>
+    /// <summary>
+    /// Lets consumers bind their queues after a joint start.
+    /// </summary>
     private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(2);
 
     private static readonly TimeSpan Interval = TimeSpan.FromDays(1);

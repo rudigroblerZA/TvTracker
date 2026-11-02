@@ -64,7 +64,9 @@ public static class EpisodeGridApi
         return grid is null ? TypedResults.NotFound() : TypedResults.Ok(grid);
     }
 
-    /// <summary>The grid, or null when there's nothing to chart: too few rated episodes, or a daily show.</summary>
+    /// <summary>
+    /// The grid, or null when there's nothing to chart: too few rated episodes, or a daily show.
+    /// </summary>
     internal static EpisodeGridDto? Build(Guid showId, List<GridCellDto> cells)
     {
         var rated = cells.Where(c => c.Rating is not null).ToList();

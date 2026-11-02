@@ -66,16 +66,24 @@ public static class WorthItFactors
 
 public static class WorthItVerdicts
 {
-    /// <summary>Score 75 and up.</summary>
+    /// <summary>
+    /// Score 75 and up.
+    /// </summary>
     public const string WorthIt = "worth-it";
 
-    /// <summary>50-74.</summary>
+    /// <summary>
+    /// 50-74.
+    /// </summary>
     public const string Mostly = "mostly";
 
-    /// <summary>30-49.</summary>
+    /// <summary>
+    /// 30-49.
+    /// </summary>
     public const string Mixed = "mixed";
 
-    /// <summary>Under 30.</summary>
+    /// <summary>
+    /// Under 30.
+    /// </summary>
     public const string HardToRecommend = "hard-to-recommend";
 }
 
@@ -121,10 +129,14 @@ public record SeasonVerdict(int Number, int Episodes, DateTime FinaleAiredAtUtc,
     double? OthersMedian, int SeasonsCompared, int SeasonsHigher, int SeasonsLower, double? FinaleRating, string? Finale,
     int? Started, int? Finished, DateTime ReadyAtUtc)
 {
-    /// <summary>A verdict is given from this long after the finale…</summary>
+    /// <summary>
+    /// A verdict is given from this long after the finale…
+    /// </summary>
     public static readonly TimeSpan From = TimeSpan.FromDays(3);
 
-    /// <summary>…until this long after it; readers of stored documents check it too, in case the pipeline stalls.</summary>
+    /// <summary>
+    /// …until this long after it; readers of stored documents check it too, in case the pipeline stalls.
+    /// </summary>
     public static readonly TimeSpan Until = TimeSpan.FromDays(45);
 }
 
@@ -153,22 +165,34 @@ public record Landing(string Verdict, double FinaleRating, double ShowMedian, do
 
 public static class LandingVerdicts
 {
-    /// <summary>A strong finale, and a final season that holds up.</summary>
+    /// <summary>
+    /// A strong finale, and a final season that holds up.
+    /// </summary>
     public const string Sticks = "sticks";
 
-    /// <summary>A strong finale after one of its weakest seasons (The Office).</summary>
+    /// <summary>
+    /// A strong finale after one of its weakest seasons (The Office).
+    /// </summary>
     public const string GreatFinale = "great-finale";
 
-    /// <summary>The final season holds up, but the finale rates well below the show (Seinfeld).</summary>
+    /// <summary>
+    /// The final season holds up, but the finale rates well below the show (Seinfeld).
+    /// </summary>
     public const string FinaleLetsDown = "finale-lets-down";
 
-    /// <summary>A weak finale at the end of one of its weakest seasons (Game of Thrones, Dexter).</summary>
+    /// <summary>
+    /// A weak finale at the end of one of its weakest seasons (Game of Thrones, Dexter).
+    /// </summary>
     public const string Fizzles = "fizzles";
 
-    /// <summary>Finale and final season rate about as the rest did (Breaking Bad, Friends).</summary>
+    /// <summary>
+    /// Finale and final season rate about as the rest did (Breaking Bad, Friends).
+    /// </summary>
     public const string AsItRan = "as-it-ran";
 
-    /// <summary>A finale in line with the show, at the end of one of its weakest seasons.</summary>
+    /// <summary>
+    /// A finale in line with the show, at the end of one of its weakest seasons.
+    /// </summary>
     public const string WeakerLastSeason = "weaker-last-season";
 }
 
@@ -195,19 +219,25 @@ public record GetsGoodTurn(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, 
 /// </summary>
 public record Outlook(RatingForecast? NextSeasonRating, RenewalOutlook? Renewal, PremiereForecast? NextSeason);
 
-/// <summary>The next season's average episode rating on the provider.</summary>
+/// <summary>
+/// The next season's average episode rating on the provider.
+/// </summary>
 /// <param name="Low">With <paramref name="High"/>, the 80% range: in backtests, 8 in 10 forecasts like it landed inside.</param>
 /// <param name="Backtested">How many past seasons the model was checked against.</param>
 public record RatingForecast(int SeasonNumber, double Rating, double Low, double High, int Backtested);
 
-/// <summary>How often comparable shows came back after the season this show is on: a weak signal, stated as such.</summary>
+/// <summary>
+/// How often comparable shows came back after the season this show is on: a weak signal, stated as such.
+/// </summary>
 /// <param name="Share">Comparable shows that got another season, 0-1.</param>
 /// <param name="Comparable">How many seasons of comparable shows it's based on.</param>
 /// <param name="Basis">What made them comparable, e.g. "rated 8-8.5 after their second season, since 2020".</param>
 /// <param name="Overall">The share for every show in the catalog, for comparison.</param>
 public record RenewalOutlook(int AfterSeason, double Share, int Comparable, string Basis, double Overall);
 
-/// <summary>When the next season is likely to start, from the show's own waits between seasons.</summary>
+/// <summary>
+/// When the next season is likely to start, from the show's own waits between seasons.
+/// </summary>
 /// <param name="Earliest">With <paramref name="Latest"/>, the 80% range from backtests.</param>
 /// <param name="Overdue">Already past <paramref name="Latest"/>: a longer wait than 9 in 10 comparable ones.</param>
 public record PremiereForecast(int SeasonNumber, DateOnly Likely, DateOnly Earliest, DateOnly Latest, bool Overdue, int Backtested);
@@ -227,7 +257,9 @@ public record DnaTrait(string Key, double Value, string? Label, string Detail);
 /// <param name="Detail">The facts behind it, e.g. "8 episodes a season · all 34 in 33 h".</param>
 public record ShowTag(string Key, string Label, string Detail);
 
-/// <summary>The tags Analytics gives shows, and the rules behind them.</summary>
+/// <summary>
+/// The tags Analytics gives shows, and the rules behind them.
+/// </summary>
 public static class ShowTags
 {
     /// <summary>
@@ -242,19 +274,29 @@ public static class ShowTags
     /// </summary>
     public const string Bingeable = "bingeable";
 
-    /// <summary>Everything aired fits in <see cref="WeekendBingeMaxMinutes"/>, with nothing left to air.</summary>
+    /// <summary>
+    /// Everything aired fits in <see cref="WeekendBingeMaxMinutes"/>, with nothing left to air.
+    /// </summary>
     public const string WeekendBinge = "weekend-binge";
 
-    /// <summary>Our users average at least <see cref="FanFavoriteMinStars"/> (from the minimum number of ratings), or the provider rates it at least <see cref="FanFavoriteMinExternal"/>.</summary>
+    /// <summary>
+    /// Our users average at least <see cref="FanFavoriteMinStars"/> (from the minimum number of ratings), or the provider rates it at least <see cref="FanFavoriteMinExternal"/>.
+    /// </summary>
     public const string FanFavorite = "fan-favorite";
 
-    /// <summary>One season, and the show has ended.</summary>
+    /// <summary>
+    /// One season, and the show has ended.
+    /// </summary>
     public const string LimitedSeries = "limited-series";
 
-    /// <summary>Typical episode at most <see cref="QuickEpisodeMaxMinutes"/> minutes.</summary>
+    /// <summary>
+    /// Typical episode at most <see cref="QuickEpisodeMaxMinutes"/> minutes.
+    /// </summary>
     public const string QuickEpisodes = "quick-episodes";
 
-    /// <summary>At least <see cref="LongRunningMinSeasons"/> seasons.</summary>
+    /// <summary>
+    /// At least <see cref="LongRunningMinSeasons"/> seasons.
+    /// </summary>
     public const string LongRunning = "long-running";
 
     /// <summary>
@@ -272,7 +314,9 @@ public static class ShowTags
     public const int QuickEpisodeMaxMinutes = 30;
     public const int LongRunningMinSeasons = 10;
 
-    /// <summary>Same threshold as the catalog's "prolific" on show and person pages.</summary>
+    /// <summary>
+    /// Same threshold as the catalog's "prolific" on show and person pages.
+    /// </summary>
     public const int ProlificMinShows = 10;
 }
 
@@ -355,7 +399,9 @@ public record RunFacts(
     DateTimeOffset? LastAiredUtc,
     SeasonBreak? LongestBreak);
 
-/// <summary>The gap between the last episode of one season and the first of the next.</summary>
+/// <summary>
+/// The gap between the last episode of one season and the first of the next.
+/// </summary>
 public record SeasonBreak(int AfterSeason, int BeforeSeason, int Days);
 
 /// <param name="DaysSincePreviousSeason">Days from the previous season's last episode to the premiere.</param>
@@ -367,7 +413,9 @@ public record Premiere(
     int CatchUpEpisodes,
     int CatchUpRuntimeMinutes);
 
-/// <summary>An actor (or character) this show shares with another show in the catalog.</summary>
+/// <summary>
+/// An actor (or character) this show shares with another show in the catalog.
+/// </summary>
 /// <param name="SameCharacter">True when the provider lists the same character in both, not just the same actor.</param>
 /// <param name="PersonId">The catalog's id for the person, for linking to their page; null when not known yet.</param>
 public record SharedCast(
@@ -382,13 +430,19 @@ public record SharedCast(
 
 public static class InsightRules
 {
-    /// <summary>Our users' averages are hidden until this many ratings back them, so no one's rating can be singled out.</summary>
+    /// <summary>
+    /// Our users' averages are hidden until this many ratings back them, so no one's rating can be singled out.
+    /// </summary>
     public const int MinRatingsToShow = 5;
 
-    /// <summary>Viewing and follow figures need this many users behind them, for the same reason.</summary>
+    /// <summary>
+    /// Viewing and follow figures need this many users behind them, for the same reason.
+    /// </summary>
     public const int MinUsersToShow = 5;
 
-    /// <summary>A viewer counts as having stopped after this many days without watching the show.</summary>
+    /// <summary>
+    /// A viewer counts as having stopped after this many days without watching the show.
+    /// </summary>
     public const int StoppedAfterDays = 30;
 
     /// <summary>
@@ -399,44 +453,70 @@ public static class InsightRules
 
     public const double RollercoasterSpread = 0.6;
 
-    /// <summary>Consistency needs this many rated episodes.</summary>
+    /// <summary>
+    /// Consistency needs this many rated episodes.
+    /// </summary>
     public const int MinRatedEpisodesForConsistency = 20;
 
-    /// <summary>A season counts as a decline from the peak when it's at least this far below it (0-10 scale).</summary>
+    /// <summary>
+    /// A season counts as a decline from the peak when it's at least this far below it (0-10 scale).
+    /// </summary>
     public const double DeclineMargin = 0.3;
 }
 
-/// <summary>The discovery lists Analytics keeps, by their API names.</summary>
+/// <summary>
+/// The discovery lists Analytics keeps, by their API names.
+/// </summary>
 public static class DiscoveryLists
 {
-    /// <summary>Highly rated shows that aren't among the most popular, and that few of our users follow yet.</summary>
+    /// <summary>
+    /// Highly rated shows that aren't among the most popular, and that few of our users follow yet.
+    /// </summary>
     public const string HiddenGems = "hidden-gems";
 
-    /// <summary>Well-rated shows whose episodes vary least.</summary>
+    /// <summary>
+    /// Well-rated shows whose episodes vary least.
+    /// </summary>
     public const string MostConsistent = "most-consistent";
 
-    /// <summary>Well-rated shows whose episodes vary most.</summary>
+    /// <summary>
+    /// Well-rated shows whose episodes vary most.
+    /// </summary>
     public const string Rollercoasters = "rollercoasters";
 
-    /// <summary>Season finales, ranked like top episodes.</summary>
+    /// <summary>
+    /// Season finales, ranked like top episodes.
+    /// </summary>
     public const string BestFinales = "best-finales";
 
-    /// <summary>Shows tagged <see cref="ShowTags.Bingeable"/>, best rated first.</summary>
+    /// <summary>
+    /// Shows tagged <see cref="ShowTags.Bingeable"/>, best rated first.
+    /// </summary>
     public const string Bingeable = "bingeable";
 
-    /// <summary>Shows tagged <see cref="ShowTags.WeekendBinge"/>, best rated first.</summary>
+    /// <summary>
+    /// Shows tagged <see cref="ShowTags.WeekendBinge"/>, best rated first.
+    /// </summary>
     public const string WeekendBinges = "weekend-binges";
 
-    /// <summary>Shows tagged <see cref="ShowTags.FanFavorite"/>: our users' favourites first, then the provider's.</summary>
+    /// <summary>
+    /// Shows tagged <see cref="ShowTags.FanFavorite"/>: our users' favourites first, then the provider's.
+    /// </summary>
     public const string FanFavorites = "fan-favorites";
 
-    /// <summary>Well-rated slow starters (<see cref="GetsGoodTurn"/>) that get much better, most popular first.</summary>
+    /// <summary>
+    /// Well-rated slow starters (<see cref="GetsGoodTurn"/>) that get much better, most popular first.
+    /// </summary>
     public const string WorthTheWait = "worth-the-wait";
 
-    /// <summary>Well-rated ended shows that stick the landing (<see cref="LandingVerdicts.Sticks"/>), most popular first.</summary>
+    /// <summary>
+    /// Well-rated ended shows that stick the landing (<see cref="LandingVerdicts.Sticks"/>), most popular first.
+    /// </summary>
     public const string GreatEndings = "great-endings";
 
-    /// <summary>Shows by their <see cref="WorthIt"/> score, most popular first among equals.</summary>
+    /// <summary>
+    /// Shows by their <see cref="WorthIt"/> score, most popular first among equals.
+    /// </summary>
     public const string WorthYourTime = "worth-your-time";
 
     public static readonly IReadOnlyList<string> All =
@@ -444,7 +524,9 @@ public static class DiscoveryLists
             WorthYourTime];
 }
 
-/// <summary>Everything Analytics knows about one actor, from the catalog shows they're credited in.</summary>
+/// <summary>
+/// Everything Analytics knows about one actor, from the catalog shows they're credited in.
+/// </summary>
 /// <param name="AverageShowRating">The provider's ratings of their shows, averaged; null when none are rated.</param>
 /// <param name="FirstYear">The year the earliest of their shows first aired.</param>
 /// <param name="LastYear">The year the latest episode of their shows aired.</param>
@@ -534,12 +616,18 @@ public record NetworkShow(Guid ShowId, string Title, string? PosterUrl, double? 
 
 public static class NetworkReports
 {
-    /// <summary>The baseline row's name: every show in the catalog.</summary>
+    /// <summary>
+    /// The baseline row's name: every show in the catalog.
+    /// </summary>
     public const string Catalog = "*";
 
-    /// <summary>A network needs this many catalog shows for a report card.</summary>
+    /// <summary>
+    /// A network needs this many catalog shows for a report card.
+    /// </summary>
     public const int MinShows = 5;
 
-    /// <summary>A share (endings, renewals) or the median wait needs this many shows, seasons or waits behind it.</summary>
+    /// <summary>
+    /// A share (endings, renewals) or the median wait needs this many shows, seasons or waits behind it.
+    /// </summary>
     public const int MinJudged = 3;
 }

@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Recommendations.API.Data;
 
-/// <summary>What Recommendations knows about a show, from ShowAdded/ShowUpdated.</summary>
+/// <summary>
+/// What Recommendations knows about a show, from ShowAdded/ShowUpdated.
+/// </summary>
 public class ShowFeatures
 {
     public Guid ShowId { get; set; }
@@ -17,14 +19,18 @@ public class ShowFeatures
     public List<string> Keywords { get; set; } = [];
     public List<string> CastNames { get; set; } = [];
 
-    /// <summary>The catalog provider's "similar shows", most similar first.</summary>
+    /// <summary>
+    /// The catalog provider's "similar shows", most similar first.
+    /// </summary>
     public List<Guid> SimilarShowIds { get; set; } = [];
 
     public double Popularity { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }
 
-/// <summary>One user's relationship with one show: follow, episodes watched, rating.</summary>
+/// <summary>
+/// One user's relationship with one show: follow, episodes watched, rating.
+/// </summary>
 public class UserShowSignal
 {
     public required string UserId { get; set; }
@@ -42,7 +48,9 @@ public class Dismissal
     public DateTime DismissedAtUtc { get; set; }
 }
 
-/// <summary>Pre-computed "for you" list, rebuilt in the background when the user's signals change.</summary>
+/// <summary>
+/// Pre-computed "for you" list, rebuilt in the background when the user's signals change.
+/// </summary>
 public class UserRecommendation
 {
     public required string UserId { get; set; }
@@ -53,7 +61,9 @@ public class UserRecommendation
     public DateTime ComputedAtUtc { get; set; }
 }
 
-/// <summary>Users whose recommendations need rebuilding.</summary>
+/// <summary>
+/// Users whose recommendations need rebuilding.
+/// </summary>
 public class DirtyUser
 {
     public required string UserId { get; set; }
@@ -71,7 +81,9 @@ public class ShowDna
     public DateTime UpdatedAtUtc { get; set; }
 }
 
-/// <summary>A show's nanogenres from the catalog ("Sports comedy"), most specific first. Kept apart, like DNA, since it can arrive first.</summary>
+/// <summary>
+/// A show's nanogenres from the catalog ("Sports comedy"), most specific first. Kept apart, like DNA, since it can arrive first.
+/// </summary>
 public class ShowNanogenres
 {
     public Guid ShowId { get; set; }
@@ -87,7 +99,9 @@ public class UserPlanCopy
     public required string UserId { get; set; }
     public required string Plan { get; set; }
 
-    /// <summary>When Identity set it; an older event is ignored, since events can arrive out of order.</summary>
+    /// <summary>
+    /// When Identity set it; an older event is ignored, since events can arrive out of order.
+    /// </summary>
     public DateTimeOffset ChangedAtUtc { get; set; }
 }
 

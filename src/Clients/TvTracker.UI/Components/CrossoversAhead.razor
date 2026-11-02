@@ -71,7 +71,9 @@
         }
     }
 
-    /// <summary>Aired episodes not yet watched: what stands between the user and the crossover.</summary>
+    /// <summary>
+    /// Aired episodes not yet watched: what stands between the user and the crossover.
+    /// </summary>
     private static int Unwatched(ShowProgress p) => Math.Max(0, p.AiredCount - p.WatchedCount);
 
     private static string Behind(Item item, Guid showId) => item.Progress.GetValueOrDefault(showId) switch

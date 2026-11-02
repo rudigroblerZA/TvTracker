@@ -5,7 +5,9 @@ using static Catalog.UnitTests.CatalogOverridesTests;
 
 namespace Catalog.UnitTests;
 
-/// <summary>A show the provider still calls running after four quiet years is presumed ended (see CONTEXT.md, Presumed ended).</summary>
+/// <summary>
+/// A show the provider still calls running after four quiet years is presumed ended (see CONTEXT.md, Presumed ended).
+/// </summary>
 public class StatusOfTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

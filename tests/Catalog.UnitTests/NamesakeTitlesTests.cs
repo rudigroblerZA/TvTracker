@@ -2,7 +2,9 @@ using Catalog.SyncWorker.Namesakes;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Same name, and history imports, compare titles by <see cref="NamesakeTitles.Key"/>.</summary>
+/// <summary>
+/// Same name, and history imports, compare titles by <see cref="NamesakeTitles.Key"/>.
+/// </summary>
 public class NamesakeTitlesTests
 {
     [Theory]
