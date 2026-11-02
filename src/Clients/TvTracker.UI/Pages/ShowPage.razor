@@ -5,6 +5,8 @@
 @inject RecommendationsClient Recommendations
 @inject NotificationsClient Notifications
 @inject UserSession Session
+@inject FeatureFlagStore Flags
+@inject IPlatformServices Platform
 
 <PageTitle>@(show?.Title ?? "Show") · @Brand.AppName</PageTitle>
 
@@ -70,7 +72,7 @@ else
             {
                 <Feature Flag="@FeatureFlags.WatchNow">
                     <p class="watch-now">
-                        <a class="btn" href="@now.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(now)</a>
+                        <a class="btn" href="@WatchHref(now, "watch-now")" target="_blank" rel="noopener noreferrer nofollow">@WatchLabel(now)</a>
                     </p>
                 </Feature>
             }
@@ -253,7 +255,7 @@ else
                     <li>
                         @if (!string.IsNullOrEmpty(provider.Url))
                         {
-                            <a href="@provider.Url" target="_blank" rel="noopener noreferrer">@WatchLabel(provider)</a>
+                            <a href="@WatchHref(provider, "where-to-watch")" target="_blank" rel="noopener noreferrer nofollow">@WatchLabel(provider)</a>
                         }
                         else
                         {
@@ -305,6 +307,15 @@ else
     private WatchProvider? WatchNow => show?.WatchProviders.FirstOrDefault(p => p.Type is WatchProviderType.Stream or WatchProviderType.Free
         && p.Link is WatchLink.Title or WatchLink.Search);
 
+    /// <summary>
+    /// With affiliate links on, the web app's <c>/go</c> redirect, which counts the click and sends the viewer on (through an
+    /// affiliate program when one covers the service); the provider's own link otherwise. The web app's address on the phone
+    /// too, so the click opens in the browser and is counted there.
+    /// </summary>
+    private string? WatchHref(WatchProvider provider, string surface) =>
+        !tracked || show is null ? provider.Url
+        : $"{Platform.PublicWebAddress}go/{show.Id}?provider={Uri.EscapeDataString(provider.ProviderName)}&type={(int)provider.Type}&region={Uri.EscapeDataString(show.Region)}&surface={surface}";
+
     private static string WatchLabel(WatchProvider provider) => provider.Link switch
     {
         WatchLink.Title => $"▶ Watch on {provider.ProviderName}",
@@ -328,6 +339,7 @@ else
     private int? openSeason;
     private string? error;
     private string? notice;
+    private bool tracked;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
@@ -339,6 +351,7 @@ else
         try
         {
             await Session.EnsureLoadedAsync();
+            tracked = await Flags.IsEnabledAsync(FeatureFlags.Affiliates);
             show = await Catalog.GetShowAsync(Id, Session.Region);
             notFound = show is null;
             if (show is null)

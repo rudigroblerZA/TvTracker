@@ -65,6 +65,12 @@
     <PackageVersion Include="OpenFeature.Providers.Flagd" Version="0.8.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
   <ItemGroup Label="Tools">
     <PackageVersion Include="System.CommandLine" Version="2.0.13" />
   </ItemGroup>

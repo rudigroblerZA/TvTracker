@@ -62,6 +62,9 @@ builder.Services.AddSingleton<Universes>();
 builder.Services.AddSingleton<DegreesGraph>();
 builder.Services.AddSingleton<Crossovers>();
 
+// Affiliate programs (none by default); read on each click, so an edited appsettings file applies without a restart.
+builder.Services.Configure<AffiliateOptions>(builder.Configuration.GetSection("Affiliates"));
+
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
 builder.AddRabbitMQEventBus("eventbus");
 builder.Services.AddHostedService<CrossoverAlerts>();

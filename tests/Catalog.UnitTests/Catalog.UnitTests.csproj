@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of the catalog's pure rules: title keys, character and franchise matching, crossovers, Wikiquote
+       parsing, overrides, where-to-watch links and the presumed-ended status. No database or network. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.API\Catalog.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
+  </ItemGroup>
+
+</Project>

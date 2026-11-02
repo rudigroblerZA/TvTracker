@@ -57,7 +57,11 @@ public static class StreaksApi
     public static void MapStreaksApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/streaks", GetAsync).RequireFeature(FeatureFlags.Streaks);
 
-    private sealed record Aired(Guid EpisodeId, Guid ShowId, int Season, int Episode, DateTimeOffset AirsAtUtc);
+    internal sealed record Aired(Guid EpisodeId, Guid ShowId, int Season, int Episode, DateTimeOffset AirsAtUtc);
+
+    /// <summary>One show's kept-up record: the current and longest runs, the episodes that end them, and what's still due.</summary>
+    /// <param name="Due">Aired episodes still inside their window, with their deadlines, oldest first.</param>
+    internal sealed record KeptUpRun(int Current, int Longest, Aired? Latest, Aired? LongestEnd, IReadOnlyList<(Aired Episode, DateTimeOffset Deadline)> Due);
 
     /// <param name="tz">The caller's time zone (IANA id, from their profile); UTC when missing or unknown.</param>
     private static async Task<Ok<StreaksDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, string? tz = null,
@@ -94,41 +98,16 @@ public static class StreaksApi
         KeptUpDto? best = null;
         foreach (var show in aired.GroupBy(e => e.ShowId))
         {
-            // Kept (true), missed (false) or still due (null), oldest first, from the first kept one on.
-            var states = show.OrderBy(e => e.AirsAtUtc).ThenBy(e => e.Season).ThenBy(e => e.Episode)
-                .Select(e =>
-                {
-                    var deadline = e.AirsAtUtc.AddDays(KeptUpDays);
-                    bool? kept = watchedAt.TryGetValue(e.EpisodeId, out var w) ? w >= e.AirsAtUtc - Early && w <= deadline
-                        : deadline > now ? null : false;
-                    return (Episode: e, Kept: kept, Deadline: deadline);
-                })
-                .SkipWhile(s => s.Kept != true)
-                .ToList();
-            var decided = states.Where(s => s.Kept is not null).ToList();
-
-            int longest = 0, run = 0;
-            Aired? longestEnd = null;
-            foreach (var s in decided)
+            var run = KeptUp(show, watchedAt, now);
+            if (run.Current >= MinKeptUp)
             {
-                run = s.Kept == true ? run + 1 : 0;
-                if (run > longest)
-                {
-                    (longest, longestEnd) = (run, s.Episode);
-                }
+                keptUp.Add(new KeptUpDto(show.Key, "", null, run.Current, run.Longest, run.Latest!.Season, run.Latest.Episode));
+                due.AddRange(run.Due.Select(d => new StreakDueDto(show.Key, "", null, d.Episode.Season, d.Episode.Episode,
+                    DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(d.Deadline, zone).DateTime), run.Current)));
             }
-            var current = decided.AsEnumerable().Reverse().TakeWhile(s => s.Kept == true).Count();
-
-            if (current >= MinKeptUp)
+            if (run.Longest >= MinKeptUp && (best is null || run.Longest > best.Longest))
             {
-                var latest = decided.Last(s => s.Kept == true).Episode;
-                keptUp.Add(new KeptUpDto(show.Key, "", null, current, longest, latest.Season, latest.Episode));
-                due.AddRange(states.Where(s => s.Kept is null).Select(s => new StreakDueDto(show.Key, "", null,
-                    s.Episode.Season, s.Episode.Episode, DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(s.Deadline, zone).DateTime), current)));
-            }
-            if (longest >= MinKeptUp && (best is null || longest > best.Longest))
-            {
-                best = new KeptUpDto(show.Key, "", null, current, longest, longestEnd!.Season, longestEnd.Episode);
+                best = new KeptUpDto(show.Key, "", null, run.Current, run.Longest, run.LongestEnd!.Season, run.LongestEnd.Episode);
             }
         }
 
@@ -146,14 +125,48 @@ public static class StreaksApi
             best is not null && shows.ContainsKey(best.ShowId) ? Name(best) : null));
     }
 
+    /// <summary>
+    /// One show's aired regular episodes, each kept (watched within <see cref="KeptUpDays"/> of airing, or up to a day
+    /// before), missed, or still due, in air order from the first kept one on: episodes before it don't break anything.
+    /// </summary>
+    internal static KeptUpRun KeptUp(IEnumerable<Aired> episodes, IReadOnlyDictionary<Guid, DateTimeOffset> watchedAt, DateTimeOffset now)
+    {
+        // Kept (true), missed (false) or still due (null).
+        var states = episodes.OrderBy(e => e.AirsAtUtc).ThenBy(e => e.Season).ThenBy(e => e.Episode)
+            .Select(e =>
+            {
+                var deadline = e.AirsAtUtc.AddDays(KeptUpDays);
+                bool? kept = watchedAt.TryGetValue(e.EpisodeId, out var w) ? w >= e.AirsAtUtc - Early && w <= deadline
+                    : deadline > now ? null : false;
+                return (Episode: e, Kept: kept, Deadline: deadline);
+            })
+            .SkipWhile(s => s.Kept != true)
+            .ToList();
+        var decided = states.Where(s => s.Kept is not null).ToList();
+
+        int longest = 0, run = 0;
+        Aired? longestEnd = null;
+        foreach (var s in decided)
+        {
+            run = s.Kept == true ? run + 1 : 0;
+            if (run > longest)
+            {
+                (longest, longestEnd) = (run, s.Episode);
+            }
+        }
+        var current = decided.AsEnumerable().Reverse().TakeWhile(s => s.Kept == true).Count();
+        var latest = current > 0 ? decided[^1].Episode : null;
+        return new KeptUpRun(current, longest, latest, longestEnd, states.Where(s => s.Kept is null).Select(s => (s.Episode, s.Deadline)).ToList());
+    }
+
     /// <summary>The Monday a date's week starts on.</summary>
-    private static DateOnly WeekStart(DateOnly day) => day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
+    internal static DateOnly WeekStart(DateOnly day) => day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
 
     /// <summary>
     /// The current and longest runs of consecutive units (days, or weeks by their Monday) in <paramref name="dates"/>; the
     /// current one ends on <paramref name="now"/>'s unit or the one before.
     /// </summary>
-    private static StreakDto Runs(List<DateOnly> dates, Func<DateOnly, int> unit, int now)
+    internal static StreakDto Runs(List<DateOnly> dates, Func<DateOnly, int> unit, int now)
     {
         var ordered = dates.OrderBy(unit).ToList();
         int longest = 0, run = 0;

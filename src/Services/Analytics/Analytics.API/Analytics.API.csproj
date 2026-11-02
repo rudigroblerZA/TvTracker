@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Analytics.Data\Analytics.Data.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Analytics.UnitTests" />
+  </ItemGroup>
+
 </Project>

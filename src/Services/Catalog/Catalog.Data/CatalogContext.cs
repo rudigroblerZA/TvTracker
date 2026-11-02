@@ -22,6 +22,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<ShowSettingLookup> SettingLookups => Set<ShowSettingLookup>();
     public DbSet<ShowNamesake> Namesakes => Set<ShowNamesake>();
     public DbSet<ShowNamesakeLookup> NamesakeLookups => Set<ShowNamesakeLookup>();
+    public DbSet<OutboundClick> OutboundClicks => Set<OutboundClick>();
+    public DbSet<AffiliateConversion> AffiliateConversions => Set<AffiliateConversion>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -196,6 +198,33 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasIndex(w => new { w.ShowId, w.Region });
             entity.Property(w => w.Region).HasMaxLength(2);
             entity.Property(w => w.ProviderName).HasMaxLength(128);
+        });
+
+        // Written by Catalog.API (affiliate links), the one place it writes: clicks aren't shows, so the sync worker stays
+        // the only writer of the catalog itself.
+        modelBuilder.Entity<OutboundClick>(entity =>
+        {
+            entity.Property(c => c.Id).ValueGeneratedNever();
+            entity.ToTable("outbound_clicks");
+            entity.HasIndex(c => c.ClickedAtUtc);
+            entity.Property(c => c.Service).HasMaxLength(128);
+            entity.Property(c => c.Region).HasMaxLength(2);
+            entity.Property(c => c.Surface).HasMaxLength(32);
+            entity.Property(c => c.Plan).HasMaxLength(16);
+            entity.Property(c => c.Program).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<AffiliateConversion>(entity =>
+        {
+            entity.Property(c => c.Id).ValueGeneratedNever();
+            entity.ToTable("affiliate_conversions");
+            entity.HasOne<OutboundClick>().WithMany().HasForeignKey(c => c.ClickId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(c => new { c.Program, c.TransactionId }).IsUnique();
+            entity.HasIndex(c => c.ReceivedAtUtc);
+            entity.Property(c => c.Program).HasMaxLength(64);
+            entity.Property(c => c.TransactionId).HasMaxLength(128);
+            entity.Property(c => c.Amount).HasPrecision(12, 2);
+            entity.Property(c => c.Currency).HasMaxLength(3);
         });
 
         modelBuilder.HasPostgresExtension("vector");

@@ -252,6 +252,8 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .plain-list li { padding: 4px 0; }
 .table { border-collapse: collapse; width: 100%; max-width: 520px; }
 .table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.table.wide { max-width: none; }
+.table-scroll { overflow-x: auto; display: grid; gap: 16px; }
 
 /* Insights */
 

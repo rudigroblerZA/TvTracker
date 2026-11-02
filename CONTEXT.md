@@ -1218,6 +1218,34 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Logos:** the favicon client has ServiceDefaults' retries removed (one try each, as Research's sources), and a fetch
   that missed any logo is cached 15 minutes rather than the week.
 
+## Affiliate links
+
+- **Measured before monetised** (a decision): every where-to-watch click is counted, whether or not a program covers the
+  service, so the clicks each service gets are known before there's a deal to negotiate. Programs (`Affiliates:Programs`
+  in Catalog.API, read through `IOptionsMonitor` on each click) only change where a counted click goes.
+- **Through the web app** (`/go/{showId}` in WebApp's Program.cs): the browser can't reach Catalog.API, and the show page's
+  links stay ordinary links (new tab, middle-click), which a click-then-navigate in Blazor wouldn't (popup blockers). The
+  web app forwards the user's token (for the plan) and the browser's address (for the rate limit) to `POST /outbound`, and
+  redirects to its answer, http or https only; on any failure it goes back to the show page. The phone links to the web
+  app's address too (`IPlatformServices.PublicWebAddress`), so its clicks open in the browser, counted as signed out.
+- **Only stored links:** `/outbound` takes a show, provider, type, region and surface, finds the listing and builds the same
+  link as the show page (`CatalogApi.WatchLinkFor`), so no address in a request is ever redirected to.
+- **Catalog.API writes here** (`outbound_clicks`, `affiliate_conversions`, migration `AffiliateClicks`): clicks aren't
+  shows, so the sync worker stays the only writer of the catalog, as Analytics.API writes only `user_services`.
+- **Nothing about who:** a click has no user id, address or browser, only the plan ("signed-out", a plan, or "unknown"
+  while plans don't apply), so there's nothing to export or delete with an account. The click id is the network's sub-id.
+- **Postbacks** (`/affiliates/postback/{program}`, public through the BFF's `/catalog/**`): the program's key compared in
+  constant time; an unknown program, wrong key or a click that didn't go through that program is 404, so the address
+  reveals nothing. One conversion per program and transaction (unique index; a concurrent duplicate is caught), the
+  amount in the program's currency, a postback in another currency refused. Not behind the flag, so turning links off
+  doesn't lose sales already made.
+- **Report** (`AffiliateReport.Build`, admins in `Admin:Users`, which the AppHost now gives Catalog.API): clicks grouped in SQL
+  by day, show, service, program, surface and plan, then summed in memory with the window's conversions, attributed to
+  their click's service, show, surface and plan and counted on the day they were reported. Per-click figures only for
+  rows with a program; a service with clicks and none is listed as worth a deal.
+- **Bots:** `/go` is a GET, so a crawler following links would count. The links are `rel="nofollow"` and the outbound call is
+  rate limited like search, but nothing filters bots yet (BACKLOG F2).
+
 ## Bring your history
 
 - **Why first** (from the competitor analysis): the plan's first segment is former TV Time users, every rival built a TV
@@ -1452,9 +1480,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Cleanup through account deletion:** deleting Keycloak users alone would leave their follows, ratings and so on in
   every service; Identity.API's account deletion removes them everywhere.
 
+## Tests
+
+- **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`, xUnit v3): no database,
+  network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
+  and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
+  `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
+- **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
+  overrides, where-to-watch links, HTML stripping and the presumed-ended status; Analytics' copy rules, streaks, the
+  essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages.
+- **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
+  `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
+- **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
+  Sydney" ~ "NCIS", a weekly finale needing twice its gap of quiet), so the documented rule and the code can't drift.
+
 ## Known gaps
 
-- There are no tests and no CI.
+- There's no CI, and only Catalog and Analytics have tests.
 - There's no dead-letter queue.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - Development secrets are in `AppHost.cs` and the realm file.

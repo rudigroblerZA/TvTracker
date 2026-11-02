@@ -162,6 +162,10 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<HistoryResolveResult?> ResolveHistoryAsync(IReadOnlyList<HistoryShowRequest> shows, CancellationToken ct = default) =>
         SendAsync<HistoryResolveResult>(ApiClients.Catalog, HttpMethod.Post, "api/v1/history/resolve", new { shows }, ct);
 
+    /// <summary>Affiliate links' report for the last <paramref name="days"/> days; null for anyone but an admin, or with the flag off.</summary>
+    public Task<AffiliateReport?> GetAffiliateReportAsync(int days, CancellationToken ct = default) =>
+        GetAsync<AffiliateReport>(ApiClients.Catalog, $"api/v1/affiliates/report?days={days}", ct);
+
     /// <summary>Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.</summary>
     public Task<ShowNamesakes?> GetNamesakesAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowNamesakes>(ApiClients.Catalog, $"api/v1/shows/{showId}/namesakes", ct, cacheForOffline: true);

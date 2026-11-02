@@ -1102,3 +1102,25 @@ public record HistoryResolveResult(IReadOnlyList<HistoryShow> Shows);
 public record ImportedWatch(Guid EpisodeId, DateTimeOffset WatchedAtUtc);
 
 public record ImportWatchesResult(int Added);
+
+/// <summary>Affiliate links: where Catalog.API says to send a where-to-watch click (the web app's <c>/go</c> redirect).</summary>
+public record OutboundLink(string Url, Guid ClickId, string? Program);
+
+/// <summary>Affiliate links, measured, for admins: clicks, conversions and commission over a window of days.</summary>
+public record AffiliateReport(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<Money> Revenue,
+    IReadOnlyList<AffiliateServiceRow> Services, IReadOnlyList<AffiliateBreakdown> Surfaces, IReadOnlyList<AffiliateBreakdown> Plans,
+    IReadOnlyList<AffiliateDay> Days, IReadOnlyList<AffiliateShowRow> Shows, IReadOnlyList<AffiliateProgramInfo> Programs);
+
+public record Money(string Currency, decimal Amount);
+
+/// <param name="Program">Null for a service with no program: clicks it would be worth.</param>
+public record AffiliateServiceRow(string Service, string? Program, int Clicks, int Conversions, decimal Revenue, string? Currency,
+    decimal? EarningsPerClick, double? ConversionRate);
+
+public record AffiliateBreakdown(string Key, int Clicks, int Conversions);
+
+public record AffiliateDay(DateOnly Day, int Clicks, int Conversions);
+
+public record AffiliateShowRow(Guid ShowId, string Title, int Clicks, int Conversions);
+
+public record AffiliateProgramInfo(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid);

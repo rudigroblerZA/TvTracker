@@ -469,6 +469,40 @@ addresses count as the show's page (`netflix.com/title/…`, not `netflix.com/br
 API's `watchProviders[].link` says which (`WatchLink`: site, search or title). Shows pick up their links on their next
 refresh. The button is behind the `watch-now` flag.
 
+**Affiliate links, measured** (`affiliates` flag): with the flag on, the "Watch on" button and the Where to watch links go
+through the web app's `/go/{showId}` redirect, which asks Catalog.API to count the click and sends the viewer on, in a
+new tab, to the same link the page lists. When an affiliate program covers the service and region, the link is the
+program's tracked link with a click id the network reports back with each sale. A service with no program gets its
+plain link and is still counted, so the report shows what each service's traffic would bring a deal. On the phone the
+link opens the web app's address in the browser and is counted there, as a signed-out click.
+
+- **The report** (`/settings/affiliates`, Settings → Admin, admins only): clicks out, the share through a program, sales
+  and their rate, commission per currency and per click, by day, service, link (button or list), the viewer's plan
+  (signed out, free, plus, family), and the shows sending the most. Services with clicks and no program are named as
+  worth a deal.
+- **Programs** go in Catalog.API's configuration, under `Affiliates:Programs`; the file is re-read on change, so no restart:
+
+  ```json
+  "Affiliates": {
+    "Programs": [
+      {
+        "Name": "netflix-us", "Services": [ "Netflix" ], "Regions": [ "US" ], "Currency": "USD",
+        "Template": "https://network.example/c/123?u={url}&subId1={click}",
+        "PostbackKey": "a long random secret"
+      }
+    ]
+  }
+  ```
+
+  `{url}` is the service's link (escaped) and `{click}` the click id. A template that isn't an https address, or a
+  program without a name, service or three-letter currency, isn't used, and the report says so.
+- **Sales** come from the network's server-to-server postback, to the mobile gateway's public address:
+  `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
+  key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
+  counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
+- **Privacy:** a click keeps the show, service, link, region, where it was clicked and the plan, never who clicked:
+  no user id, address or browser. Nothing about clicks is in the data export or needs deleting with an account.
+
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
 neither keeps the plain poster layout. An image that fails to load falls back to the next. Shows imported earlier
@@ -484,6 +518,17 @@ Useful local addresses:
 | RabbitMQ management | link on the Aspire dashboard |
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
 | DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
+
+### Unit tests
+
+Catalog and Analytics have unit tests of their rules (title matching, crossovers, Wikiquote parsing, overrides, streaks,
+the essential cut, forecasts, and the worker's gets-good, landing and season-verdict stages). They need no database,
+network or running AppHost:
+
+```bash
+dotnet test tests/Catalog.UnitTests
+dotnet test tests/Analytics.UnitTests
+```
 
 ### Backing up development data
 
@@ -653,6 +698,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
+| `affiliates` | Where-to-watch links through the counted `/go` redirect, `/settings/affiliates` and its Settings link, and the outbound and report endpoints (not postbacks) |
 | `crossover-alerts` | Crossover notifications, "Crossover ahead" on Up Next, and the crossovers endpoints |
 | `weekly-digest` | The weekly digest email, its Settings section and preview |
 | `taste-twins` | `/taste-twins`, its For you link, and its endpoint |

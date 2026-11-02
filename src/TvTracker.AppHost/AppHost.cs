@@ -237,6 +237,8 @@ foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:B
 foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildren())
 {
     identityApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
+    // ...and the affiliate report (Catalog.API).
+    catalogApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
 }
 identityApi
     .WithEnvironment("Admin__Account__Username", "admin")

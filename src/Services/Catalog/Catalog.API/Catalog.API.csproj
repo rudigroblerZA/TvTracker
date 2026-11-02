@@ -20,4 +20,8 @@
     <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Catalog.UnitTests" />
+  </ItemGroup>
+
 </Project>
