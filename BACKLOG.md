@@ -40,21 +40,17 @@ So the rest of the list reads in proportion:
 
 **P1 · M**
 
-- **Why:** there are no tests and no CI (CONTEXT.md, Known gaps). Every rule since the start has been checked by hand
-  against a running AppHost. The last two reviews (season verdict, Ask) found real defects that a unit test would have
-  caught.
+- **Why:** only Catalog and Analytics have unit tests (CONTEXT.md, Tests), and nothing runs them on a pull request. The
+  last two reviews (season verdict, Ask) found real defects that a unit test would have caught.
 - **What:**
   - A GitHub Actions workflow that builds `src/TvTracker.AppHost` and `src/Tools/Catalog.ImportCli` and runs `dotnet test`
     on pull requests. The MAUI app needs its workload, so it's Q3.
-  - A test project per service, starting with the pure logic that's easiest to get wrong:
-    - **Analytics insights**, with a fixed clock and hand-built `ShowInsightContext`s: `SeasonVerdictInsight` (when a
-      season is over, verdict ladder), `LandingInsight`, `GetsGoodInsight`, `ForecastModels`, `DnaInsight` anchors.
-    - **Planners:** `TonightPlanner` (knapsack, mix cap, overrun), the catch-up planner's week split.
+  - Tests for the rest of the pure logic that's easiest to get wrong:
+    - **Analytics:** `DnaInsight` anchors, the renewal cohorts, the catch-up planner's week split.
+    - **Planners:** `TonightPlanner` (knapsack, mix cap, overrun), in TvTracker.UI.
     - **Ask's guards:** `AnswerLoop`'s `Missing`, `NotAllowed` and `UnknownId`, and `Toolbox.Compact`.
-    - **Catalog:** Universes' character matching and franchise names, `CatalogSynchronizer.StatusOf` (presumed
-      ended), `Text` / HTML stripping.
     - **Ratings:** `Moderation` (blocked terms, links held, hourly limits).
-  - Add the test command to CLAUDE.md's Commands.
+    - **UI:** `HistoryImportParser` on the TV Time, Trakt and generic fixtures.
 - **Done when:** the workflow runs on every PR and blocks merging when red, and each area above has tests for its
   documented rules (the ones CONTEXT.md lists with examples).
 

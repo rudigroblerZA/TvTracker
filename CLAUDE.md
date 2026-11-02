@@ -33,6 +33,10 @@ dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --o
 scripts/backup.sh
 scripts/restore.sh backups/<timestamp>
 
+# Unit tests (Catalog and Analytics; no database, network or AppHost needed)
+dotnet test tests/Catalog.UnitTests
+dotnet test tests/Analytics.UnitTests
+
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
 
@@ -44,8 +48,9 @@ dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
 ```
 
-There are no tests or CI. Verify changes by building, then running the AppHost and checking endpoints, the
-database or the UI. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
+Unit tests cover Catalog's and Analytics' pure rules (`tests/`); there's no CI, and the other services have none yet.
+Run the tests, then verify changes by building, running the AppHost and checking endpoints, the database or the UI.
+A rule documented in CONTEXT.md with examples gets a test with those examples. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
 Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not needed.
 
 ## Conventions

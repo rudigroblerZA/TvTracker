@@ -485,6 +485,17 @@ Useful local addresses:
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
 | DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
+### Unit tests
+
+Catalog and Analytics have unit tests of their rules (title matching, crossovers, Wikiquote parsing, overrides, streaks,
+the essential cut, forecasts, and the worker's gets-good, landing and season-verdict stages). They need no database,
+network or running AppHost:
+
+```bash
+dotnet test tests/Catalog.UnitTests
+dotnet test tests/Analytics.UnitTests
+```
+
 ### Backing up development data
 
 `scripts/backup.sh` saves every Postgres database (`pg_dump`, one file each) and Keycloak's `tvtracker` realm with its

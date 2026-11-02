@@ -199,9 +199,8 @@ public sealed class CatalogSynchronizer(
     /// season, which therefore doesn't count as coming. A scheduled episode, a TBA one, or a dated season brings the
     /// show back to airing on its next refresh.
     /// </summary>
-    private ShowStatus StatusOf(ProviderShow p)
+    internal static ShowStatus StatusOf(ProviderShow p, DateTimeOffset now)
     {
-        var now = time.GetUtcNow();
         if (p.Status != ShowStatus.Airing
             || p.Episodes.Any(e => e.AirsAtUtc is null || e.AirsAtUtc > now)
             || p.Seasons.Any(s => s.PremieresAtUtc > now))
@@ -428,7 +427,7 @@ public sealed class CatalogSynchronizer(
         show.ExternalRating = p.Rating;
         show.SimilarExternalIds = p.SimilarExternalIds.ToList();
         show.SimilarShowIds = await ResolveSimilarAsync(p.SimilarExternalIds, ct);
-        show.Status = StatusOf(p);
+        show.Status = StatusOf(p, time.GetUtcNow());
 
         if (!p.CastMissing)
         {

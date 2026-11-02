@@ -37,6 +37,10 @@
     <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
     <Project Path="src/Services/Assistant/Assistant.API/Assistant.API.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
+    <Project Path="tests/Analytics.UnitTests/Analytics.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Tools/">
     <Project Path="src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" />
     <Project Path="src/Tools/TvTracker.LoadGen/TvTracker.LoadGen.csproj" />

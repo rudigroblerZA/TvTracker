@@ -504,7 +504,7 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
-    private static string? StripHtml(string? html)
+    internal static string? StripHtml(string? html)
     {
         if (string.IsNullOrWhiteSpace(html))
         {

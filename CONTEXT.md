@@ -1452,9 +1452,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Cleanup through account deletion:** deleting Keycloak users alone would leave their follows, ratings and so on in
   every service; Identity.API's account deletion removes them everywhere.
 
+## Tests
+
+- **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`, xUnit v3): no database,
+  network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
+  and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
+  `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
+- **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
+  overrides, where-to-watch links, HTML stripping and the presumed-ended status; Analytics' copy rules, streaks, the
+  essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages.
+- **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
+  `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
+- **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
+  Sydney" ~ "NCIS", a weekly finale needing twice its gap of quiet), so the documented rule and the code can't drift.
+
 ## Known gaps
 
-- There are no tests and no CI.
+- There's no CI, and only Catalog and Analytics have tests.
 - There's no dead-letter queue.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - Development secrets are in `AppHost.cs` and the realm file.
