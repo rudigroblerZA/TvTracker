@@ -1,3 +1,4 @@
+using Catalog.SyncWorker.Providers;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -24,10 +25,22 @@ public static class ImportApi
         api.MapPost("/search", ImportSearchResultsAsync);
 
         // Bring your history: the shows in someone's export, found by TheTVDB id or title and imported when missing.
+        // Someone is watching a progress bar, so its calls go first.
         api.MapPost("/resolve", async (ResolveShowsRequest request, HistoryResolver resolver, IHostApplicationLifetime lifetime) =>
-            request.Shows is { Count: > 0 and <= HistoryImports.MaxShows }
-                ? Results.Ok(await resolver.ResolveAsync(request, lifetime.ApplicationStopping))
-                : Results.Problem($"Give 1 to {HistoryImports.MaxShows} shows.", statusCode: StatusCodes.Status400BadRequest));
+        {
+            if (request.Shows is not { Count: > 0 and <= HistoryImports.MaxShows })
+            {
+                return Results.Problem($"Give 1 to {HistoryImports.MaxShows} shows.", statusCode: StatusCodes.Status400BadRequest);
+            }
+            using var caller = TvMazeCaller.Begin("history-import", TvMazeLane.Interactive);
+            return Results.Ok(await resolver.ResolveAsync(request, lifetime.ApplicationStopping));
+        });
+
+        // The TVmaze budget over the last hour, by caller, for /ops; 404 with the mock provider, which calls nothing.
+        api.MapGet("/tvmaze", (IServiceProvider services) =>
+            services.GetService<TvMazeUsage>() is { } usage && services.GetService<TvMazeRateLimiter>() is { } limiter
+                ? Results.Ok(usage.Report(limiter.Waiting))
+                : Results.NotFound());
 
         // Used by a service that starts after shows were imported (Analytics on first start) to build its copy.
         api.MapPost("/replay", Replay);
@@ -83,7 +96,9 @@ public static class ImportApi
             return TypedResults.BadRequest();
         }
 
-        // Not the request's token: if the caller stops waiting, finish anyway so the next search finds the shows.
+        // Not the request's token: if the caller stops waiting, finish anyway so the next search finds the shows. A search
+        // is waiting on it, so its calls go first.
+        using var caller = TvMazeCaller.Begin("search-import", TvMazeLane.Interactive);
         var imported = await synchronizer.ImportSearchResultsAsync(query, SearchImportLimit, lifetime.ApplicationStopping);
         return TypedResults.Ok(new SearchImportResult(imported));
     }

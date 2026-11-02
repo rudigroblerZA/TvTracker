@@ -121,7 +121,8 @@ public sealed class CatalogSynchronizer(
     }
 
     /// <summary>
-    /// Refreshes shows whose refresh time has come (airing shows daily, ended shows weekly, followed shows promptly).
+    /// Refreshes shows whose refresh time has come: shows the provider changed (<see cref="ProviderChanges"/>), followed
+    /// shows promptly, and the rest on <see cref="NextRefresh"/>'s schedule.
     /// </summary>
     public async Task<int> RefreshDueAsync(CancellationToken ct)
     {
@@ -221,6 +222,24 @@ public sealed class CatalogSynchronizer(
         var last = p.Episodes.Max(e => e.AirsAtUtc);
         return last < now.AddYears(-PresumedEndedAfterYears) ? ShowStatus.Ended : p.Status;
     }
+
+    /// <summary>
+    /// When to look at a show again if the provider's update list doesn't say it changed first (<see cref="ProviderChanges"/>):
+    /// a safety net, since the list catches every change to a show or its episodes.
+    /// <list type="bullet">
+    /// <item><b>Just aired</b> (an episode in the last <see cref="SettlingDays"/> days): every <see cref="SettlingRefreshDays"/>
+    /// days, since episode ratings come from viewers' votes after airing and may not mark the show changed.</item>
+    /// <item><b>Running:</b> weekly. <b>Ended or cancelled:</b> monthly.</item>
+    /// </list>
+    /// It was daily and weekly before the update list: about 590 of 887 shows a day, when 76 had changed.
+    /// </summary>
+    internal static DateTime NextRefresh(ShowStatus status, IEnumerable<DateTimeOffset?> airTimes, DateTime nowUtc) =>
+        status is ShowStatus.Ended or ShowStatus.Cancelled ? nowUtc.AddDays(30)
+        : airTimes.Any(a => a is { } at && at.UtcDateTime <= nowUtc && at.UtcDateTime > nowUtc.AddDays(-SettlingDays)) ? nowUtc.AddDays(SettlingRefreshDays)
+        : nowUtc.AddDays(7);
+
+    private const int SettlingDays = 14;
+    private const int SettlingRefreshDays = 3;
 
     /// <summary>
     /// Stores an accepted correction and applies it now, publishing the episode's change like a refresh would.
@@ -567,9 +586,7 @@ public sealed class CatalogSynchronizer(
         }
 
         show.LastSyncedAtUtc = nowUtc;
-        show.NextRefreshAtUtc = show.Status is ShowStatus.Ended or ShowStatus.Cancelled
-            ? nowUtc.AddDays(7)
-            : nowUtc.AddDays(1);
+        show.NextRefreshAtUtc = NextRefresh(show.Status, p.Episodes.Select(e => e.AirsAtUtc), nowUtc);
 
         await db.SaveChangesAsync(ct);
         await outbox.PublishAddedAsync(ct);

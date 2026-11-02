@@ -32,9 +32,11 @@ When everything is running, open the `webapp` link and sign in:
 
 The catalog is filled from **[TVmaze](https://www.tvmaze.com/api)** (free, no API key). Every hour the sync worker imports the 40 most
 popular shows airing today: the US and GB broadcast schedules plus streaming, without news, talk, sports and daily soaps.
-The catalog grows as the schedule changes. Imported shows are refreshed daily (ended shows weekly), and a show
-is refreshed promptly when someone follows it. The first sync takes a minute or two, because calls are throttled to stay under
-TVmaze's limit of 20 calls every 10 seconds. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
+The catalog grows as the schedule changes. Imported shows are refreshed when TVmaze says they changed (its update
+list, read hourly), and a show is refreshed promptly when someone follows it; otherwise every 3 days while an episode
+has just aired, weekly while running, and monthly once ended. The first sync takes a minute or two, because calls are
+throttled to stay under TVmaze's limit of 20 calls every 10 seconds, and searches and history imports go ahead of the
+background jobs. Settings are under `TvMaze` in `Catalog.SyncWorker/appsettings.json`.
 
 TVmaze still calls some long-finished shows "Running" (Girls, Peaky Blinders). A show with nothing aired for 4 years and
 nothing scheduled is shown as ended until a new episode is scheduled. Users' follows, watches and ratings are re-sent
@@ -645,6 +647,10 @@ what Open WebUI uses.
 http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
 - **Catalog:** what it holds (shows by status, episodes, people and credits), and the semantic index (current, stale, missing).
 - **Sync:** shows due for refresh and when the last sync ran.
+- **TVmaze budget, last hour:** calls against what the limiter allows, 429s, calls waiting now for people and in the
+  background, and per caller (search import, history import, refresh, cast credits, …) its calls and how long they
+  waited for a permit. The same figures go to the Aspire dashboard as the `TvTracker.Catalog.TvMaze` meter
+  (`tvmaze.calls` by caller, lane and status; `tvmaze.permit.wait`).
 - **Analytics:** insights computed and when, counts of users, ratings, watches and follows, top episodes, upcoming premieres
   and the shows with the most shared cast.
 - **Backfills:** cast credits fetched this month (the reunion radar's data), shows with their makers, and careers.
@@ -927,7 +933,7 @@ How events flow:
       executive producers aren't listed.
     - **Data:** the sync worker imports creators, developers and executive producers with each show, from
       `/shows/{id}/crew`. That's a separate request, because TVmaze's crew embed can return 502 when the rest works. A
-      failed crew call doesn't stop the import; the creatives are filled in within the hour. Every minute it also fetches 30 people's careers from `/people/{id}/crewcredits`, refreshed monthly: every
+      failed crew call doesn't stop the import; the creatives are filled in within the hour. Every minute it also fetches 30 people's careers from `/people/{id}/crewcredits`, refreshed when TVmaze says the person changed (else every 120 days): every
       creator, and anyone credited on two or more catalog shows. Shows imported before this are backfilled at 30 a minute.
     - **Person pages:** they show the same career line and a "Made" row.
   - **Person page — actor insights:** their shows' average rating, best-rated show, the years their shows aired,
@@ -1203,7 +1209,8 @@ How events flow:
     - **Not reunions:** spin-offs and revivals (any of them playing the same character: those are Universes),
       shows you already follow, rated or watched, and roles as themselves.
     - **Data:** the sync worker fetches each catalog actor's roles from `/people/{id}/castcredits?embed=show`, 30
-      people a minute, leads of popular shows first, refreshed monthly. Until everyone is fetched, the page says how
+      people a minute, leads of popular shows first, refreshed when TVmaze says they changed (else every 120 days). Until
+      everyone is fetched, the page says how
       many of your shows' actors are still to come.
     - **API:** `GET /api/v1/me/reunions` on Analytics.API, signed in, computed on request from your own data.
   - **Does it stick the landing?** (ended shows' pages, signed in; spoiler-free): the finale and final season against

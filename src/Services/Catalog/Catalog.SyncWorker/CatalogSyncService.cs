@@ -1,10 +1,13 @@
+using Catalog.SyncWorker.Providers;
 namespace Catalog.SyncWorker;
 
 /// <summary>
 /// Every minute: publish EpisodeAired for episodes that just aired.
-/// Every hour (and at startup): import featured shows, refresh shows that are due, resolve similar shows.
+/// Every hour (and at startup): mark what the provider changed as due (<see cref="ProviderChanges"/>), import featured
+/// shows, refresh shows that are due, resolve similar shows.
 /// </summary>
-public sealed class CatalogSyncService(IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<CatalogSyncService> logger) : BackgroundService
+public sealed class CatalogSyncService(IServiceScopeFactory scopeFactory, ProviderChanges changes, TimeProvider time, ILogger<CatalogSyncService> logger)
+    : BackgroundService
 {
     private static readonly TimeSpan Tick = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan SyncInterval = TimeSpan.FromHours(1);
@@ -21,10 +24,26 @@ public sealed class CatalogSyncService(IServiceScopeFactory scopeFactory, TimePr
                 var now = time.GetUtcNow();
                 if (lastSync is null || now - lastSync >= SyncInterval)
                 {
+                    // What the provider changed is due now; failing to read its list only leaves the schedule to it.
+                    try
+                    {
+                        await changes.MarkAsync(stoppingToken);
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        logger.LogWarning(ex, "Couldn't read the provider's update lists; refreshing on schedule");
+                    }
                     await RunAsync(async s =>
                     {
-                        var imported = await s.ImportFeaturedAsync(stoppingToken);
-                        var refreshed = await s.RefreshDueAsync(stoppingToken);
+                        int imported, refreshed;
+                        using (TvMazeCaller.Begin("featured-import", TvMazeLane.Background))
+                        {
+                            imported = await s.ImportFeaturedAsync(stoppingToken);
+                        }
+                        using (TvMazeCaller.Begin("refresh", TvMazeLane.Background))
+                        {
+                            refreshed = await s.RefreshDueAsync(stoppingToken);
+                        }
                         var similar = await s.ResolveSimilarShowsAsync(stoppingToken);
                         logger.LogInformation("Catalog sync: {Imported} imported, {Refreshed} refreshed, {Similar} similar lists updated",
                             imported, refreshed, similar);

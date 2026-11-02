@@ -82,6 +82,7 @@
     <div class="panel"><h2>Genres</h2><div id="genres"></div></div>
     <div class="panel"><h2>Bulk import</h2><div id="bulk"></div></div>
   </section>
+  <section class="panel"><h2>TVmaze budget, last hour</h2><div id="tvmaze"></div></section>
   <section class="panel"><h2>Data quality</h2><ul class="rows" id="quality"></ul>
     <div class="muted small" style="margin-top:8px">Gaps are mostly TVmaze's own: daily, reality and anime shows go unrated and untitled. Users' follows, watches and ratings are re-sent daily by Tracking and Ratings, so copies that missed an event repair themselves.</div></section>
   <section class="panel"><h2>Feature flags</h2><div class="flags" id="flags"></div>
@@ -115,7 +116,7 @@ const tile = (label, value, detail = "", extra = "") =>
 const meter = parts => `<div class="meter">${parts.map(([v, total, color]) => `<span style="width:${pct(v, total)}%;background:${color}"></span>`).join("")}</div>`;
 
 function render(data) {
-  const c = data.catalog, a = data.analytics, b = data.bulkImport, r = data.research, ix = c.semanticIndex;
+  const c = data.catalog, a = data.analytics, b = data.bulkImport, r = data.research, t = data.tvMaze, ix = c.semanticIndex;
   const o = c.overrides;
   const bf = c.backfills, ng = c.nanogenres, u = c.universes, w = c.wikimedia;
   const unavailable = empty("Analytics.API unavailable");
@@ -218,6 +219,18 @@ function render(data) {
   $("genres").innerHTML = c.topGenres.length ? c.topGenres.map(g => `
     <div class="barrow"><span class="clip">${esc(g.genre)}</span><span class="bar" style="width:${pct(g.shows, most)}%"></span><span class="num small muted">${n(g.shows)}</span></div>`).join("")
     : `<div class="muted">No genres yet</div>`;
+
+  // Calls per caller against the hour's ceiling (the limiter's permits per 10 s, for 360 windows), people's calls first.
+  const ceiling = t ? t.permitsPerWindow * 360 : 1;
+  $("tvmaze").innerHTML = !t ? `<div class="muted">No TVmaze figures (the sync worker is down, or runs on the mock provider).</div>` : `
+    ${meter([[t.calls, ceiling, "var(--accent)"]])}
+    <div class="small num">${n(t.calls)} calls of ${n(ceiling)} the limiter allows · ${n(t.tooMany)} answered 429 ·
+      waiting now: ${n(t.waitingInteractive)} for people, ${n(t.waitingBackground)} background (background stops at ${t.backgroundPermits} of ${t.permitsPerWindow} per 10 s)</div>
+    <ul class="rows">${t.callers.length ? t.callers.map(x => `
+      <li><div class="grow clip">${esc(x.caller)} <span class="badge ${x.lane === "interactive" ? "good" : ""}">${esc(x.lane)}</span></div>
+        <span class="num">${n(x.calls)} calls</span>
+        <span class="num small muted">waited ${n(x.averageWaitMs)} ms avg, ${n(x.maxWaitMs)} max${x.tooMany ? ` · ${n(x.tooMany)} × 429` : ""}${x.failed ? ` · ${n(x.failed)} failed` : ""}</span></li>`).join("")
+      : `<li class="muted">No calls in the last hour</li>`}</ul>`;
 
   $("bulk").innerHTML = !b ? `<div class="muted">No bulk import since the sync worker started (or it's down). Start one with <code>tvtracker-import</code>.</div>` : `
     <div><span class="badge ${b.state === "running" ? "warn" : b.state === "completed" ? "good" : ""}">${esc(b.state)}</span>

@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using System.Threading.RateLimiting;
 using Catalog.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
@@ -127,6 +126,32 @@ public sealed partial class TvMazeCatalogProvider(
             .Select(s => s.Id.ToString())
             .ToList();
     }
+
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default) =>
+        ChangedAsync("shows", within, cancellationToken);
+
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedPeopleAsync(TimeSpan within, CancellationToken cancellationToken = default) =>
+        ChangedAsync("people", within, cancellationToken);
+
+    /// <summary>
+    /// TVmaze's update lists (<c>/updates/shows</c>, <c>/updates/people</c>): every id changed in the last day, week or
+    /// month with a Unix time, in one call (about 31 KB of shows and 125 KB of people for a week).
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, DateTimeOffset>?> ChangedAsync(string kind, TimeSpan within, CancellationToken cancellationToken)
+    {
+        if (UpdatesSince(within) is not { } since)
+        {
+            return null;
+        }
+        var changed = await http.GetFromJsonAsync<Dictionary<string, long>>($"updates/{kind}?since={since}", cancellationToken) ?? [];
+        return changed.ToDictionary(c => c.Key, c => DateTimeOffset.FromUnixTimeSeconds(c.Value));
+    }
+
+    /// <summary>
+    /// The shortest of TVmaze's update windows (day, week, month) that covers <paramref name="within"/>; null past a month.
+    /// </summary>
+    internal static string? UpdatesSince(TimeSpan within) =>
+        within <= TimeSpan.FromDays(1) ? "day" : within <= TimeSpan.FromDays(7) ? "week" : within <= TimeSpan.FromDays(30) ? "month" : null;
 
     public async Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default)
     {
@@ -549,21 +574,6 @@ public sealed partial class TvMazeCatalogProvider(
 }
 
 /// <summary>
-/// Spaces TVmaze calls to stay under its limit of 20 calls every 10 seconds.
-/// </summary>
-public sealed class TvMazeRateLimitHandler(TvMazeRateLimiter limiter) : DelegatingHandler
-{
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        using var lease = await limiter.Limiter.AcquireAsync(1, cancellationToken);
-        return await base.SendAsync(request, cancellationToken);
-    }
-}
-
-/// <summary>
-/// Singleton holder so every handler instance shares one budget.
-/// </summary>
-/// <summary>
 /// Remembers that TVmaze's embedded show requests are failing, so imports use the separate requests for
 /// <see cref="Duration"/> instead of each first waiting out the retries of a request that's going to fail.
 /// </summary>
@@ -578,21 +588,6 @@ public sealed class TvMazeEmbedOutage(TimeProvider time)
     public bool IsActive => time.GetUtcNow() < Until;
 
     public void Report() => Interlocked.Exchange(ref _untilTicks, (time.GetUtcNow() + Duration).UtcTicks);
-}
-
-public sealed class TvMazeRateLimiter : IDisposable
-{
-    public RateLimiter Limiter { get; } = new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
-    {
-        PermitLimit = 18,
-        Window = TimeSpan.FromSeconds(10),
-        SegmentsPerWindow = 5,
-        QueueLimit = int.MaxValue,
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        AutoReplenishment = true
-    });
-
-    public void Dispose() => Limiter.Dispose();
 }
 
 // TVmaze response shapes (only the fields the catalog uses).

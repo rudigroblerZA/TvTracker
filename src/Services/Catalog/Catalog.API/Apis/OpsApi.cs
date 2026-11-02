@@ -10,8 +10,9 @@ using TvTracker;
 namespace Catalog.API.Apis;
 
 /// <param name="Research">Research.API's counts; null when it's down or the research flag is off.</param>
+/// <param name="TvMaze">The sync worker's TVmaze calls over the last hour, by caller; null when it's down or on the mock provider.</param>
 public record OpsStats(DateTime GeneratedAtUtc, CatalogOpsStats Catalog, JsonElement? Analytics, JsonElement? BulkImport,
-    JsonElement? Research = null);
+    JsonElement? Research = null, JsonElement? TvMaze = null);
 
 public record CatalogOpsStats(
     int Shows,
@@ -123,9 +124,10 @@ public static class OpsApi
         var analytics = FetchAsync(httpFactory, "analytics", "api/v1/ops/stats", logger, ct);
         var bulkImport = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/bulk/current", logger, ct);
         var research = FetchAsync(httpFactory, "research", "api/v1/ops/stats", logger, ct);
+        var tvmaze = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/tvmaze", logger, ct);
         var catalog = await GetCatalogStatsAsync(db, model.Id, universes, features, now, ct);
 
-        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research);
+        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research, await tvmaze);
     }
 
     private static async Task<CatalogOpsStats> GetCatalogStatsAsync(

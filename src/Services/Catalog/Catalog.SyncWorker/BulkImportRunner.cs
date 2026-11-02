@@ -94,6 +94,7 @@ public sealed class BulkImportRunner(
     private async Task RunAsync(Job job, BulkImportRequest request)
     {
         var ct = job.Cancellation.Token;
+        using var caller = TvMazeCaller.Begin("bulk-import", TvMazeLane.Background);
         try
         {
             await using (var scope = scopeFactory.CreateAsyncScope())
