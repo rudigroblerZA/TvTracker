@@ -47,6 +47,7 @@ public static class CatalogApi
         api.MapFarFromHomeApi();
         api.MapHistoryImportApi();
         api.MapAffiliateApi();
+        api.MapMakersApi();
         api.MapCharacterApi();
         api.MapCrossoverApi();
         api.MapShowFactsApi();

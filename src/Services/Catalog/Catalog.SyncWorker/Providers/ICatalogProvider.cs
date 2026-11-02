@@ -108,7 +108,17 @@ public record ProviderCreative(string Name, string? PhotoUrl, IReadOnlyList<stri
 /// <param name="Created">Shows they created or developed.</param>
 /// <param name="ExecutiveProduced">Shows they were an executive producer on.</param>
 /// <param name="NotableShows">Their best-known shows (the provider's most popular), at most 10.</param>
-public record ProviderCareer(int Shows, int Created, int ExecutiveProduced, IReadOnlyList<string> NotableShows);
+/// <param name="Made">The shows they created or developed, across the provider (From the makers); null when not fetched.</param>
+public record ProviderCareer(int Shows, int Created, int ExecutiveProduced, IReadOnlyList<string> NotableShows,
+    IReadOnlyList<ProviderMadeShow>? Made = null);
+
+/// <summary>
+/// A show someone created or developed, as the provider lists it with their crew credits.
+/// </summary>
+/// <param name="Roles">"Creator" and/or "Developer".</param>
+/// <param name="Kind">The provider's type, lower case ("scripted", "animation", "reality", …).</param>
+public record ProviderMadeShow(string ShowExternalId, string Title, string? PosterUrl, DateOnly? Premiered, DateOnly? Ended,
+    ShowStatus Status, double? Rating, double Popularity, string? Kind, IReadOnlyList<string> Roles);
 
 /// <param name="Character">The character, or several joined with " / " when they play more than one.</param>
 public record ProviderActingRole(

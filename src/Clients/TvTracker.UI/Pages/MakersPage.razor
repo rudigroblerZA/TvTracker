@@ -1,0 +1,131 @@
+@page "/makers"
+@attribute [RequiresFeature(FeatureFlags.MakersForYou)]
+@inject AnalyticsClient Analytics
+@inject CatalogClient Catalog
+
+<PageTitle>From the makers you love · @Brand.AppName</PageTitle>
+
+<p><a href="for-you">← For you</a></p>
+<h1>From the makers you love</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">The people who created the shows you love, and what else they've made: what's new or coming, and what you haven't seen yet.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (result is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Looking up who made your favourites…</p>
+            }
+        }
+        else if (result.LovedShows == 0)
+        {
+            <p class="notice">Rate shows 4 or 5 stars, or follow them, and this finds the people who made them.</p>
+        }
+        else
+        {
+            @if (result.MakersPending > 0)
+            {
+                <p class="notice small">@($"Still looking up what {result.MakersPending} of these makers have made. More will turn up as they're found.")</p>
+            }
+
+            @if (result.Makers.Count == 0)
+            {
+                <p class="muted">@($"TVmaze credits no creator or developer on your {result.LovedShows} favourite shows yet.")</p>
+            }
+            else
+            {
+                <section aria-labelledby="your-makers">
+                    <h2 id="your-makers">Your makers</h2>
+                    <ul class="your-makers">
+                        @foreach (var maker in result.Makers)
+                        {
+                            <li @key="maker.PersonId">
+                                <a href="people/@maker.PersonId" class="strong">@maker.Name</a>
+                                <div class="muted small">
+                                    <span>@("Made ")</span>
+                                    @for (var i = 0; i < maker.LovedShows.Count; i++)
+                                    {
+                                        var show = maker.LovedShows[i];
+                                        <a href="shows/@show.Id">@show.Title</a>@(i < maker.LovedShows.Count - 1 ? ", " : "")
+                                    }
+                                    <span>@(maker.Pending ? " · their other shows aren't in yet" : maker.OtherShows > 0 ? $" · {maker.OtherShows} more you haven't seen" : " · nothing else you haven't seen")</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (result.New.Count > 0)
+            {
+                <section aria-labelledby="makers-new">
+                    <h2 id="makers-new">New and coming</h2>
+                    <ul class="made-shows">
+                        @foreach (var pick in result.New)
+                        {
+                            <MadeShowCard Show="pick.Show" @key="pick.Show.ExternalId">@By(pick)</MadeShowCard>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @if (result.Picks.Count > 0)
+            {
+                <section aria-labelledby="makers-picks">
+                    <h2 id="makers-picks">You haven't seen these</h2>
+                    <ul class="made-shows">
+                        @foreach (var pick in result.Picks)
+                        {
+                            <MadeShowCard Show="pick.Show" @key="pick.Show.ExternalId">@By(pick)</MadeShowCard>
+                        }
+                    </ul>
+                </section>
+            }
+            else if (result.New.Count == 0 && result.Makers.Count > 0)
+            {
+                <p class="muted">You've seen everything your makers have made, as far as TVmaze knows.</p>
+            }
+
+            <p class="muted small">Shows created or developed by the makers of your 4- and 5-star shows and the ones you follow, as TVmaze credits them. Shows you already rate, follow or watch are left out.</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to see what the makers of your favourite shows have made." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private MakersForYou? result;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // The catalog knows who made what, Analytics what you love; the page joins them, and neither stores the other's data.
+            var loved = await Analytics.GetLovedShowsAsync() ?? new LovedShows([], []);
+            result = loved.Loved.Count == 0 ? new MakersForYou(0, 0, [], [], []) : await Catalog.GetMakersForYouAsync(loved);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static RenderFragment By(MakerPick pick) => __builder =>
+    {
+        <div class="small">
+            @for (var i = 0; i < pick.By.Count; i++)
+            {
+                var by = pick.By[i];
+                <span>@(i == 0 ? "By " : ", ")</span><a href="people/@by.PersonId">@by.Name</a><span class="muted">@($" ({by.Because.Title})")</span>
+            }
+        </div>
+    };
+}

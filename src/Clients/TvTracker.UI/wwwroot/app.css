@@ -856,6 +856,10 @@ h1:focus, h2:focus { outline: none; }
 .afterwards li { display: flex; gap: 10px; align-items: flex-start; }
 .afterwards .roles { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .afterwards .roles a, .afterwards .roles .role { display: inline-flex; align-items: baseline; gap: 4px; }
+.made-shows { list-style: none; padding: 0; margin: 8px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.made-show { display: flex; gap: 10px; align-items: flex-start; }
+.makers-person { margin: 12px 0; }
+.your-makers { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .afterwards-biggest { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 8px 0; }
 
 /* Memorable lines */

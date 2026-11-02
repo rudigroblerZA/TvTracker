@@ -1,0 +1,51 @@
+@inject CatalogClient Catalog
+
+@* From the same creators: the other shows by this show's creators and developers, newest first. *@
+@if (makers is { Makers.Count: > 0 } m && m.Makers.Any(x => x.Shows.Count > 0 || x.CreditsPending))
+{
+    <section aria-labelledby="makers-title">
+        <h2 id="makers-title">From the same creators</h2>
+        @foreach (var maker in m.Makers.Where(x => x.Shows.Count > 0 || x.CreditsPending))
+        {
+            <div class="makers-person" @key="maker.PersonId">
+                <div>
+                    <a href="people/@maker.PersonId" class="strong">@maker.Name</a>
+                    <span class="muted small">@($" · {string.Join(" and ", maker.Roles.Select(r => r.ToLowerInvariant()))}")</span>
+                </div>
+                @if (maker.Shows.Count == 0)
+                {
+                    <p class="muted small">Their other shows aren't in yet.</p>
+                }
+                else
+                {
+                    <ul class="made-shows">
+                        @foreach (var show in maker.Shows)
+                        {
+                            <MadeShowCard Show="show" @key="show.ExternalId" />
+                        }
+                    </ul>
+                }
+            </div>
+        }
+        <p class="muted small">Shows they created or developed, as TVmaze credits them; executive producers aren't counted.</p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+
+    private ShowMakers? makers;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            makers = await Catalog.GetMakersAsync(ShowId);
+        }
+        catch (HttpRequestException)
+        {
+            // Extra: the show page works without it.
+            makers = null;
+        }
+    }
+}

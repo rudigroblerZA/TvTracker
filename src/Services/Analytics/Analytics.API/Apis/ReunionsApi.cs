@@ -55,18 +55,7 @@ public static partial class ReunionsApi
     private static async Task<Ok<ReunionRadarDto>> GetRadarAsync(
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
-        var userId = user.GetUserId();
-        var stars = await db.ShowRatings.AsNoTracking().Where(r => r.UserId == userId).ToDictionaryAsync(r => r.ShowId, r => r.Stars, ct);
-        var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
-        var watched = await db.Watches.AsNoTracking().Where(w => w.UserId == userId)
-            .GroupBy(w => w.ShowId).Select(g => new { ShowId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(w => w.ShowId, w => w.Count, ct);
-
-        var known = stars.Keys.Concat(followed).Concat(watched.Keys).ToHashSet();
-        var loved = known
-            .Select(id => (ShowId: id, Weight: LoveWeight(stars.GetValueOrDefault(id), followed.Contains(id), watched.GetValueOrDefault(id))))
-            .Where(x => x.Weight > 0)
-            .ToDictionary(x => x.ShowId, x => x.Weight);
+        var (known, loved) = await LoveAsync(db, user.GetUserId(), ct);
         var lovedIds = loved.Keys.ToList();
 
         var shows = await db.Shows.AsNoTracking().Where(s => lovedIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
@@ -127,10 +116,31 @@ public static partial class ReunionsApi
     }
 
     /// <summary>
+    /// The shows the user knows (rated, followed or watched) and, among them, the ones they love with their weights
+    /// (<see cref="LoveWeight"/>). Shared with From the makers, so "loved" means the same in both.
+    /// </summary>
+    internal static async Task<(HashSet<Guid> Known, Dictionary<Guid, double> Loved)> LoveAsync(AnalyticsContext db, string userId,
+        CancellationToken ct)
+    {
+        var stars = await db.ShowRatings.AsNoTracking().Where(r => r.UserId == userId).ToDictionaryAsync(r => r.ShowId, r => r.Stars, ct);
+        var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
+        var watched = await db.Watches.AsNoTracking().Where(w => w.UserId == userId)
+            .GroupBy(w => w.ShowId).Select(g => new { ShowId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(w => w.ShowId, w => w.Count, ct);
+
+        var known = stars.Keys.Concat(followed).Concat(watched.Keys).ToHashSet();
+        var loved = known
+            .Select(id => (ShowId: id, Weight: LoveWeight(stars.GetValueOrDefault(id), followed.Contains(id), watched.GetValueOrDefault(id))))
+            .Where(x => x.Weight > 0)
+            .ToDictionary(x => x.ShowId, x => x.Weight);
+        return (known, loved);
+    }
+
+    /// <summary>
     /// How much a show counts as loved: 5 stars 1, 4 stars 0.8, followed or watched (at least
     /// <see cref="MinWatchedEpisodes"/> episodes) and unrated 0.5; 3 stars or fewer, not at all.
     /// </summary>
-    private static double LoveWeight(int stars, bool followed, int watchedEpisodes) => stars switch
+    internal static double LoveWeight(int stars, bool followed, int watchedEpisodes) => stars switch
     {
         5 => 1,
         4 => 0.8,

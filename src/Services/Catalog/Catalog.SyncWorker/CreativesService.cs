@@ -110,9 +110,18 @@ public sealed class CreativesService(
             .Take(PeoplePerRound)
             .ToListAsync(ct);
 
+        var personIds = due.Select(p => p.Id).ToList();
+        var madeBefore = (await db.MadeShows.Where(m => personIds.Contains(m.PersonId)).ToListAsync(ct)).ToLookup(m => m.PersonId);
         foreach (var person in due)
         {
             var career = await provider.GetCareerAsync(person.ExternalId!, ct);
+            // The shows they created or developed come with the same call (From the makers); each fetch replaces them.
+            db.MadeShows.RemoveRange(madeBefore[person.Id]);
+            db.MadeShows.AddRange((career?.Made ?? []).Select(m => new PersonMadeShow
+            {
+                PersonId = person.Id, ShowExternalId = m.ShowExternalId, Title = m.Title, PosterUrl = m.PosterUrl, Premiered = m.Premiered,
+                Ended = m.Ended, Status = m.Status, Rating = m.Rating, Popularity = m.Popularity, Kind = m.Kind, Roles = m.Roles.ToList()
+            }));
             person.CareerShows = career?.Shows;
             person.CareerCreated = career?.Created;
             person.CareerExecutiveProduced = career?.ExecutiveProduced;

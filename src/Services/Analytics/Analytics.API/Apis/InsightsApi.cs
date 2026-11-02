@@ -63,6 +63,7 @@ public static class InsightsApi
         api.MapTasteApi();
         api.MapEssentialCutApi();
         api.MapReunionsApi();
+        api.MapLovedShowsApi();
         api.MapTasteTwinsApi();
         api.MapFinishOutlookApi();
         api.MapTimeMachineApi();
