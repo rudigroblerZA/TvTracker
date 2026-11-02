@@ -12,8 +12,9 @@ namespace Catalog.API.Apis;
 /// <param name="Status">Upcoming with no <paramref name="From"/> is in development: the provider keeps abandoned projects
 /// that way for years, so it isn't counted as new or coming.</param>
 /// <param name="New">Premiered within the last year, or dated and still to come.</param>
+/// <param name="Kind">The provider's kind ("scripted", "talk show", …), when known: picks keep to story kinds.</param>
 public record MadeShowDto(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? From, int? To, ShowStatus Status,
-    double? Rating, double Popularity, bool New);
+    double? Rating, double Popularity, bool New, string? Kind = null);
 
 /// <param name="Roles">What they were on this show: "Creator" and/or "Developer".</param>
 /// <param name="CreditsPending">Their credits haven't been fetched yet, so their other shows are unknown for now.</param>
@@ -65,6 +66,12 @@ public static class MakersApi
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(1);
     private static readonly string[] MakerRoles = ["Creator", "Developer"];
 
+    /// <summary>
+    /// A credit that makes someone a maker, in SQL (the sync worker's due query says the same inside a subquery).
+    /// </summary>
+    private static readonly System.Linq.Expressions.Expression<Func<ShowCreative, bool>> IsMaker =
+        c => c.Roles.Contains("Creator") || c.Roles.Contains("Developer");
+
     public static void MapMakersApi(this RouteGroupBuilder api)
     {
         api.MapGet("/shows/{id:guid}/makers", GetShowAsync).RequireFeature(FeatureFlags.Makers);
@@ -91,15 +98,15 @@ public static class MakersApi
         }
 
         var makers = await db.Creatives.AsNoTracking()
-            .Where(c => c.ShowId == id && (c.Roles.Contains("Creator") || c.Roles.Contains("Developer")))
+            .Where(c => c.ShowId == id).Where(IsMaker)
             .OrderBy(c => c.Order)
-            .Select(c => new { c.PersonId, c.Roles, c.Person.Name, c.Person.PhotoUrl, c.Person.CareerRefreshedAtUtc })
+            .Select(c => new { c.PersonId, c.Roles, c.Person.Name, c.Person.PhotoUrl, c.Person.ExternalId, c.Person.CareerRefreshedAtUtc })
             .ToListAsync(ct);
         var made = await MadeAsync(db, makers.Select(m => m.PersonId).ToList(), ct);
         var catalogIds = await CatalogIdsAsync(db, made.SelectMany(m => m).Select(m => (show.Source, m.ShowExternalId)), ct);
 
         return new ShowMakersDto(id, makers.Select(m => new MakerDto(m.PersonId, m.Name, m.PhotoUrl, m.Roles.Intersect(MakerRoles).ToList(),
-                m.CareerRefreshedAtUtc is null,
+                Pending(m.ExternalId, m.CareerRefreshedAtUtc),
                 made[m.PersonId].Where(s => s.ShowExternalId != show.ExternalId)
                     .Select(s => ToDto(s, show.Source, catalogIds, now))
                     .OrderBy(MakersRanking.Order).ThenBy(MakersRanking.OrderYear)
@@ -123,10 +130,11 @@ public static class MakersApi
         var loved = request.Loved.OrderByDescending(l => l.Weight).Take(MaxLoved).ToList();
         var lovedIds = loved.Select(l => l.ShowId).Distinct().ToList();
         var shows = await db.Shows.AsNoTracking().Where(s => lovedIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.Title, s.Source })
             .ToDictionaryAsync(s => s.Id, s => new { s.Title, s.Source }, ct);
         var credits = await db.Creatives.AsNoTracking()
-            .Where(c => lovedIds.Contains(c.ShowId) && (c.Roles.Contains("Creator") || c.Roles.Contains("Developer")))
-            .Select(c => new { c.ShowId, c.PersonId, c.Person.Name, c.Person.PhotoUrl, c.Person.CareerRefreshedAtUtc })
+            .Where(c => lovedIds.Contains(c.ShowId)).Where(IsMaker)
+            .Select(c => new { c.ShowId, c.PersonId, c.Person.Name, c.Person.PhotoUrl, c.Person.ExternalId, c.Person.CareerRefreshedAtUtc })
             .ToListAsync(ct);
         var made = await MadeAsync(db, credits.Select(c => c.PersonId).Distinct().ToList(), ct);
         // A maker's credits come from the provider of the show they're credited on.
@@ -135,7 +143,7 @@ public static class MakersApi
         var now = time.GetUtcNow();
 
         var makers = credits.GroupBy(c => c.PersonId)
-            .Select(g => new MakersRanking.Maker(g.Key, g.First().Name, g.First().PhotoUrl, g.First().CareerRefreshedAtUtc is null,
+            .Select(g => new MakersRanking.Maker(g.Key, g.First().Name, g.First().PhotoUrl, Pending(g.First().ExternalId, g.First().CareerRefreshedAtUtc),
                 g.Select(c => c.ShowId).Distinct().ToList(), made[g.Key].Select(s => ToDto(s, sources[g.Key], catalogIds, now)).ToList()))
             .ToList();
         return TypedResults.Ok(MakersRanking.Build(loved, request.Known.ToHashSet(), shows.ToDictionary(s => s.Key, s => s.Value.Title), makers));
@@ -160,10 +168,24 @@ public static class MakersApi
             .ToDictionary(s => (s.Source, s.ExternalId), s => s.Id);
     }
 
-    private static MadeShowDto ToDto(PersonMadeShow s, string source, IReadOnlyDictionary<(string, string), Guid> catalogIds, DateTimeOffset now) =>
-        new(catalogIds.TryGetValue((source, s.ShowExternalId), out var showId) ? showId : null, s.ShowExternalId, s.Title, s.PosterUrl,
-            s.Premiered?.Year, s.Ended?.Year, s.Status, s.Rating, s.Popularity,
-            s.Status == ShowStatus.Upcoming ? s.Premiered is not null : s.Premiered >= DateOnly.FromDateTime(now.UtcDateTime.AddYears(-1)));
+    /// <summary>
+    /// Credits are pending until fetched; a person without a provider id is never fetched, so theirs aren't pending, just absent.
+    /// </summary>
+    private static bool Pending(string? externalId, DateTime? careerRefreshedAtUtc) => externalId is not null && careerRefreshedAtUtc is null;
+
+    /// <summary>
+    /// The stored status is the provider's when the credits were fetched, up to 120 days ago, so an upcoming show whose
+    /// premiere has passed reads as airing now; the fetch's clock doesn't decide what's "coming". New is premiered within
+    /// a year, or dated and still to come; an undated project in development is neither.
+    /// </summary>
+    internal static MadeShowDto ToDto(PersonMadeShow s, string source, IReadOnlyDictionary<(string, string), Guid> catalogIds, DateTimeOffset now)
+    {
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var status = s.Status == ShowStatus.Upcoming && s.Premiered <= today ? ShowStatus.Airing : s.Status;
+        return new(catalogIds.TryGetValue((source, s.ShowExternalId), out var showId) ? showId : null, s.ShowExternalId, s.Title, s.PosterUrl,
+            s.Premiered?.Year, s.Ended?.Year, status, s.Rating, s.Popularity,
+            status == ShowStatus.Upcoming ? s.Premiered is not null : s.Premiered >= today.AddYears(-1), s.Kind);
+    }
 }
 
 /// <summary>
@@ -173,8 +195,9 @@ public static class MakersApi
 /// two favourites counts more than someone behind one.</item>
 /// <item><b>A pick's score</b> is its makers' love (summed, when two of them made it) × its rating / 10, an unrated show
 /// counting as <see cref="UnratedRating"/>, so the score reads as "how much of your love, how good".</item>
-/// <item><b>Left out:</b> the caller's known shows (rated, followed, watched), the loved shows themselves, and undated
-/// projects in development.</item>
+/// <item><b>Left out:</b> the caller's known shows (rated, followed, watched), the loved shows themselves, undated
+/// projects in development, and credits of a known kind that isn't a story (<see cref="ShowRules.StoryKinds"/>): a
+/// creator's talk show or panel show isn't what loving their drama asks for. A show page still lists them.</item>
 /// </list>
 /// </summary>
 internal static class MakersRanking
@@ -210,8 +233,9 @@ internal static class MakersRanking
             .Select(id => new ShowRefDto(id, titles.GetValueOrDefault(id) ?? ""))
             .First();
 
-        // Undated projects in development can't be watched, so they're neither picks nor counted as other shows.
-        bool Unknown(MadeShowDto s) => Order(s) != 2 && (s.ShowId is not { } id || !known.Contains(id) && !weights.ContainsKey(id));
+        // Undated projects in development can't be watched, and non-story kinds aren't picks, so neither counts as other shows.
+        bool Unknown(MadeShowDto s) => Order(s) != 2 && (s.Kind is null || ShowRules.StoryKinds.Contains(s.Kind))
+            && (s.ShowId is not { } id || !known.Contains(id) && !weights.ContainsKey(id));
 
         var candidates = makers
             .SelectMany(m => m.Made.Where(Unknown).Select(s => (Maker: m, Show: s)))

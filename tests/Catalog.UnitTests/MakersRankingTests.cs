@@ -1,4 +1,5 @@
 using Catalog.API.Apis;
+using Catalog.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;
@@ -104,6 +105,44 @@ public class MakersRankingTests
         var ordered = shows.OrderBy(MakersRanking.Order).ThenBy(MakersRanking.OrderYear).Select(s => s.ExternalId);
 
         Assert.Equal(["2027", "2029", "newer", "old", "pitch"], ordered);
+    }
+
+    [Fact]
+    public void A_creators_talk_show_is_not_a_pick_for_loving_their_drama()
+    {
+        var makers = new[]
+        {
+            Maker(Gilligan, "Vince Gilligan", [BreakingBad], Made("drama", null, 8, from: 2015) with { Kind = "scripted" },
+                Made("talk", null, 8, from: 2016) with { Kind = "talk show" }, Made("unknown", null, 8, from: 2017))
+        };
+
+        var result = MakersRanking.Build([new(BreakingBad, 1)], new HashSet<Guid>(), Titles, makers);
+
+        Assert.Equal(["drama", "unknown"], result.Picks.Select(p => p.Show.ExternalId).Order());
+        Assert.Equal(2, result.Makers[0].OtherShows);
+    }
+
+    /// <summary>
+    /// The stored status is the provider's at fetch time, so what's "coming" and "new" is decided against today's date.
+    /// </summary>
+    [Theory]
+    [InlineData("2026-11-07", ShowStatus.Upcoming, "2026-11-01", ShowStatus.Upcoming, true)]
+    [InlineData("2026-11-07", ShowStatus.Upcoming, "2027-02-01", ShowStatus.Airing, true)]
+    [InlineData("2026-11-07", ShowStatus.Upcoming, "2027-11-08", ShowStatus.Airing, false)]
+    [InlineData("2025-11-02", ShowStatus.Airing, "2026-11-02", ShowStatus.Airing, true)]
+    [InlineData("2025-11-01", ShowStatus.Airing, "2026-11-02", ShowStatus.Airing, false)]
+    [InlineData(null, ShowStatus.Upcoming, "2026-11-02", ShowStatus.Upcoming, false)]
+    public void Coming_and_new_are_read_against_today(string? premiered, ShowStatus stored, string today, ShowStatus status, bool isNew)
+    {
+        var made = new PersonMadeShow
+        {
+            PersonId = Gilligan, ShowExternalId = "x", Title = "x", Status = stored,
+            Premiered = premiered is null ? null : DateOnly.Parse(premiered)
+        };
+
+        var dto = MakersApi.ToDto(made, "tvmaze", new Dictionary<(string, string), Guid>(), DateTimeOffset.Parse(today + "T12:00:00Z"));
+
+        Assert.Equal((status, isNew), (dto.Status, dto.New));
     }
 
     private static MadeShowDto Coming(string externalId, int? from) =>

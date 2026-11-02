@@ -1281,7 +1281,7 @@ public record AffiliateProgramInfo(string Name, IReadOnlyList<string> Services, 
 /// From the makers: a show someone created or developed (in the catalog or not).
 /// </summary>
 public record MadeShow(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? From, int? To, ShowStatus Status,
-    double? Rating, double Popularity, bool New);
+    double? Rating, double Popularity, bool New, string? Kind = null);
 
 /// <param name="CreditsPending">Their credits aren't fetched yet.</param>
 public record Maker(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, bool CreditsPending, IReadOnlyList<MadeShow> Shows);

@@ -901,6 +901,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   page sends at most 300 loved shows, the most loved, so a long imported history is cut rather than refused.
 - **In development, undated:** TVmaze keeps abandoned projects "In Development" with no premiere for years, so such a
   show is neither new, coming nor a pick; a show page lists it last, as in development.
+- **Status read against today:** the stored status is the provider's when the credits were fetched, up to 120 days
+  before, so an upcoming show whose premiere has passed reads as airing (Pluribus would have read "Coming" until
+  February). Tested in `MakersRankingTests` with a fixed date.
+- **Story kinds only in picks:** a credit of a known kind outside `ShowRules.StoryKinds` (a creator's talk show) is not
+  a pick; the show page still lists it. `PersonMadeShow.Kind` is stored for this.
+- **Pending needs a provider id:** a person without one is never fetched, so their credits are absent, not pending.
 - **Credits kept on a miss:** a career fetch that fails is retried in an hour without holding up the round (the
   migration made every career due at once), and one that comes back with no shows keeps the stored ones.
 
