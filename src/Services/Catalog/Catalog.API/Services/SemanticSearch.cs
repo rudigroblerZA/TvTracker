@@ -14,7 +14,9 @@ namespace Catalog.API.Services;
 public sealed class SemanticSearch(
     IEmbeddingGenerator<string, Embedding<float>> generator, EmbeddingModel model, ILogger<SemanticSearch> logger)
 {
-    /// <summary>How many similar shows search adds at most.</summary>
+    /// <summary>
+    /// How many similar shows search adds at most.
+    /// </summary>
     public const int MaxResults = 30;
 
     // Shorter terms (and typos of them) don't carry enough meaning to compare.

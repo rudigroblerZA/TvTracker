@@ -48,7 +48,9 @@ public static class DnaTraits
 
     public static readonly IReadOnlyDictionary<string, DnaTraitDefinition> ByKey = All.ToDictionary(t => t.Key);
 
-    /// <summary>Two shows are compared only when they share at least this many traits.</summary>
+    /// <summary>
+    /// Two shows are compared only when they share at least this many traits.
+    /// </summary>
     public const int MinSharedTraits = 5;
 
     /// <summary>
@@ -66,7 +68,9 @@ public static class DnaTraits
         return shared.Sum(k => ByKey[k].Weight * (1 - Math.Abs(a[k] - b[k]))) / shared.Sum(k => ByKey[k].Weight);
     }
 
-    /// <summary>A trait is distinctive when it's at least this far from the typical show's.</summary>
+    /// <summary>
+    /// A trait is distinctive when it's at least this far from the typical show's.
+    /// </summary>
     public const double MinDistinctiveness = 0.25;
 
     /// <summary>
@@ -78,7 +82,9 @@ public static class DnaTraits
             ? Math.Abs(value - trait.Typical)
             : 0;
 
-    /// <summary>The trait's plain-language end for a value, or null in the middle (0.3-0.7), where neither describes it.</summary>
+    /// <summary>
+    /// The trait's plain-language end for a value, or null in the middle (0.3-0.7), where neither describes it.
+    /// </summary>
     public static string? LabelFor(string key, double value) =>
         !ByKey.TryGetValue(key, out var trait) ? null : value <= 0.3 ? trait.Low : value >= 0.7 ? trait.High : null;
 }

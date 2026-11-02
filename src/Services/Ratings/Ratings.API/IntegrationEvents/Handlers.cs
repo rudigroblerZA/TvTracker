@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Ratings.API.IntegrationEvents;
 
-/// <summary>Records watched episodes so comments can stay hidden until the reader has watched, and for episode duels.</summary>
+/// <summary>
+/// Records watched episodes so comments can stay hidden until the reader has watched, and for episode duels.
+/// </summary>
 public sealed class EpisodeWatchedHandler(RatingsContext db, TimeProvider time) : IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>
 {
     public async Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct)

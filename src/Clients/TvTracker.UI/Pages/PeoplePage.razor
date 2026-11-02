@@ -156,7 +156,9 @@
         await RunAsync(() => Social.UnblockAsync(person.UserId));
     }
 
-    /// <summary>Does the change, then reloads the lists so counts and sections are current.</summary>
+    /// <summary>
+    /// Does the change, then reloads the lists so counts and sections are current.
+    /// </summary>
     private async Task RunAsync(Func<Task> change)
     {
         try

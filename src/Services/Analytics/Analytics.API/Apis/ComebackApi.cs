@@ -50,22 +50,32 @@ public record ComebackTurnDto(int SeasonNumber, int EpisodeNumber, int EpisodesA
 /// </summary>
 public static class ComebackApi
 {
-    /// <summary>The stretch before stopping: this many rated episodes.</summary>
+    /// <summary>
+    /// The stretch before stopping: this many rated episodes.
+    /// </summary>
     public const int Window = 10;
 
-    /// <summary>A part needs this many rated episodes to be compared.</summary>
+    /// <summary>
+    /// A part needs this many rated episodes to be compared.
+    /// </summary>
     private const int MinRated = 3;
 
-    /// <summary>A difference this big (0-10 scale) is better or worse; less is more of the same.</summary>
+    /// <summary>
+    /// A difference this big (0-10 scale) is better or worse; less is more of the same.
+    /// </summary>
     private const double Margin = 0.3;
 
-    /// <summary>A difference of at least <see cref="Margin"/>, allowing for floating point (8.1 − 7.8 is 0.2999…).</summary>
+    /// <summary>
+    /// A difference of at least <see cref="Margin"/>, allowing for floating point (8.1 − 7.8 is 0.2999…).
+    /// </summary>
     private static bool Reaches(double difference) => difference >= Margin - 1e-9;
 
     public static void MapComebackApi(this RouteGroupBuilder api) =>
         api.MapGet("/shows/{showId:guid}/comeback", GetOneAsync).RequireFeature(FeatureFlags.WorthGoingBack);
 
-    /// <summary>204 unless the user dropped the show.</summary>
+    /// <summary>
+    /// 204 unless the user dropped the show.
+    /// </summary>
     private static async Task<Results<Ok<ComebackDto>, NoContent>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
@@ -74,7 +84,9 @@ public static class ComebackApi
         return load is not null && Build(load, now) is { } comeback ? TypedResults.Ok(comeback) : TypedResults.NoContent();
     }
 
-    /// <summary>Every show the user dropped, most recently dropped first.</summary>
+    /// <summary>
+    /// Every show the user dropped, most recently dropped first.
+    /// </summary>
     internal static async Task<List<ComebackDto>> AllAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
     {
         var cutoff = now.UtcDateTime.AddDays(-InsightRules.StoppedAfterDays);

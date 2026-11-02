@@ -16,7 +16,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
     public Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>(BuildCatalog().Select(s => s.ExternalId).ToList());
 
-    /// <summary>The invented shows have no crew, so there are no careers to look up.</summary>
+    /// <summary>
+    /// The invented shows have no crew, so there are no careers to look up.
+    /// </summary>
     public Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default) =>
         Task.FromResult<ProviderCareer?>(null);
 

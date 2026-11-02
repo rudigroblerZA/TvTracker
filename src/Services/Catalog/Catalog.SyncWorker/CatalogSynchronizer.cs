@@ -22,10 +22,14 @@ public sealed class CatalogSynchronizer(
 {
     private const int RefreshBatchSize = 50;
 
-    /// <summary>A show the provider calls airing, with nothing aired for this long and nothing coming, is presumed ended.</summary>
+    /// <summary>
+    /// A show the provider calls airing, with nothing aired for this long and nothing coming, is presumed ended.
+    /// </summary>
     private const int PresumedEndedAfterYears = 4;
 
-    /// <summary>Imports featured shows that aren't in the catalog yet.</summary>
+    /// <summary>
+    /// Imports featured shows that aren't in the catalog yet.
+    /// </summary>
     public async Task<int> ImportFeaturedAsync(CancellationToken ct)
     {
         var externalIds = await provider.GetFeaturedShowIdsAsync(ct);
@@ -70,10 +74,14 @@ public sealed class CatalogSynchronizer(
         return imported;
     }
 
-    /// <summary>Applies the provider's current details of a show already fetched (e.g. to backfill new fields).</summary>
+    /// <summary>
+    /// Applies the provider's current details of a show already fetched (e.g. to backfill new fields).
+    /// </summary>
     public Task RefreshAsync(ProviderShow show, CancellationToken ct) => SyncShowAsync(show, ct);
 
-    /// <summary>Imports one show by the provider's id, unless the catalog already has it.</summary>
+    /// <summary>
+    /// Imports one show by the provider's id, unless the catalog already has it.
+    /// </summary>
     public async Task<ImportResult> ImportShowAsync(string externalId, CancellationToken ct) =>
         await db.Shows.Where(s => s.Source == provider.Name && s.ExternalId == externalId).Select(s => s.Title).FirstOrDefaultAsync(ct) is { } title
             ? new ImportResult(ImportOutcome.AlreadyInCatalog, title)
@@ -112,7 +120,9 @@ public sealed class CatalogSynchronizer(
         return await db.Shows.AnyAsync(s => s.Source == provider.Name && s.ExternalId == externalId, ct);
     }
 
-    /// <summary>Refreshes shows whose refresh time has come (airing shows daily, ended shows weekly, followed shows promptly).</summary>
+    /// <summary>
+    /// Refreshes shows whose refresh time has come (airing shows daily, ended shows weekly, followed shows promptly).
+    /// </summary>
     public async Task<int> RefreshDueAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -249,7 +259,9 @@ public sealed class CatalogSynchronizer(
         return true;
     }
 
-    /// <summary>Removes a correction; the show's next refresh (due now) brings the provider's value back.</summary>
+    /// <summary>
+    /// Removes a correction; the show's next refresh (due now) brings the provider's value back.
+    /// </summary>
     public async Task<bool> RemoveOverrideAsync(Guid id, CancellationToken ct)
     {
         if (await db.Overrides.FindAsync([id], ct) is not { } o)
@@ -262,7 +274,9 @@ public sealed class CatalogSynchronizer(
         return true;
     }
 
-    /// <summary>Publishes EpisodeAired for episodes whose air time has passed.</summary>
+    /// <summary>
+    /// Publishes EpisodeAired for episodes whose air time has passed.
+    /// </summary>
     public async Task<int> PublishAiredEpisodesAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
@@ -351,7 +365,9 @@ public sealed class CatalogSynchronizer(
         return ids.Count;
     }
 
-    /// <summary>Moves a show to the front of the refresh queue (used when someone follows it).</summary>
+    /// <summary>
+    /// Moves a show to the front of the refresh queue (used when someone follows it).
+    /// </summary>
     public Task MarkForRefreshAsync(Guid showId, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -568,7 +584,9 @@ public sealed class CatalogSynchronizer(
             show.Title, show.ExternalId, isNew, showEvents.Count + events.Count);
     }
 
-    /// <summary>Updates the cast in place. Returns true if it changed.</summary>
+    /// <summary>
+    /// Updates the cast in place. Returns true if it changed.
+    /// </summary>
     private async Task<bool> SyncCastAsync(Show show, IReadOnlyList<ProviderCastMember> cast, CancellationToken ct)
     {
         var changed = false;
@@ -758,7 +776,9 @@ public sealed class CatalogSynchronizer(
             .ToList();
     }
 
-    /// <summary>ShowAdded from stored data (after the cast is synced, so credits carry person ids); also used for a replay.</summary>
+    /// <summary>
+    /// ShowAdded from stored data (after the cast is synced, so credits carry person ids); also used for a replay.
+    /// </summary>
     private static ShowAddedIntegrationEvent ShowAdded(Show s)
     {
         var cast = s.Cast.OrderBy(c => c.Order).ToList();
@@ -767,11 +787,15 @@ public sealed class CatalogSynchronizer(
             CreativeCredits(s), s.Network, NetworkKnown: true);
     }
 
-    /// <summary>The show's creatives for events (empty, not null, when it has none or they're still to be backfilled).</summary>
+    /// <summary>
+    /// The show's creatives for events (empty, not null, when it has none or they're still to be backfilled).
+    /// </summary>
     private static List<CreativeCredit> CreativeCredits(Show s) =>
         s.Creatives.OrderBy(c => c.Order).Select(c => new CreativeCredit(c.PersonId, c.Person.Name, c.Roles)).ToList();
 
-    /// <summary>Career figures of people with them, for consumers that rate who made a show.</summary>
+    /// <summary>
+    /// Career figures of people with them, for consumers that rate who made a show.
+    /// </summary>
     internal static List<PeopleCareersUpdatedIntegrationEvent> CareerEvents(IEnumerable<Person> people) => people
         .Where(p => p.CareerShows is not null)
         .Select(p => new PersonCareer(p.Id, p.Name, p.CareerShows!.Value, p.CareerCreated ?? 0, p.CareerExecutiveProduced ?? 0))
@@ -779,7 +803,9 @@ public sealed class CatalogSynchronizer(
         .Select(chunk => new PeopleCareersUpdatedIntegrationEvent(chunk))
         .ToList();
 
-    /// <summary>People's roles across the provider; send at most <see cref="PeopleCastCreditsUpdatedIntegrationEvent.MaxPeople"/> at a time.</summary>
+    /// <summary>
+    /// People's roles across the provider; send at most <see cref="PeopleCastCreditsUpdatedIntegrationEvent.MaxPeople"/> at a time.
+    /// </summary>
     internal static PeopleCastCreditsUpdatedIntegrationEvent CastCreditsEvent(IEnumerable<(Person Person, IEnumerable<PersonCastCredit> Credits)> people) =>
         new(people
             .Select(p => new PersonCastCredits(p.Person.Id, p.Person.Name, p.Credits
@@ -809,6 +835,8 @@ public enum ImportOutcome
     Imported,
     AlreadyInCatalog,
 
-    /// <summary>The provider has no show with that id.</summary>
+    /// <summary>
+    /// The provider has no show with that id.
+    /// </summary>
     NotFound
 }

@@ -37,7 +37,9 @@ public sealed class ServerTokenStore(
 
     public Task RemoveAsync(string userId, CancellationToken ct = default) => cache.RemoveAsync(Key(userId), ct);
 
-    /// <summary>Returns a non-expired access token, refreshing it if needed; null if the session can't be renewed.</summary>
+    /// <summary>
+    /// Returns a non-expired access token, refreshing it if needed; null if the session can't be renewed.
+    /// </summary>
     public async Task<string?> GetValidAccessTokenAsync(string userId, CancellationToken ct = default)
     {
         var tokens = await GetAsync(userId, ct);

@@ -59,7 +59,9 @@ public static partial class TitleFormulasApi
     private const int ListSize = 30;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
-    /// <summary>Articles in the languages the catalog has most: an opening article alone is no phrase.</summary>
+    /// <summary>
+    /// Articles in the languages the catalog has most: an opening article alone is no phrase.
+    /// </summary>
     private static readonly HashSet<string> Articles = ["the", "a", "an", "die", "der", "das", "le", "la", "les", "el", "los", "las", "il", "het", "de"];
 
     private static readonly HashSet<string> NumberedWords =
@@ -74,12 +76,16 @@ public static partial class TitleFormulasApi
 
     private sealed record TitleRow(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title);
 
-    /// <summary>A title split into words: <paramref name="Keys"/> for matching, <paramref name="Raw"/> as written, aligned.</summary>
+    /// <summary>
+    /// A title split into words: <paramref name="Keys"/> for matching, <paramref name="Raw"/> as written, aligned.
+    /// </summary>
     private sealed record Tokens(string[] Keys, string[] Raw);
 
     private sealed record ShowRow(Guid Id, string Title, string? PosterUrl, double Popularity, bool Story);
 
-    /// <summary>Every formula by show id, so a show page's lookup isn't a scan.</summary>
+    /// <summary>
+    /// Every formula by show id, so a show page's lookup isn't a scan.
+    /// </summary>
     private sealed record AllFormulas(Dictionary<Guid, TitleFormulaDto> Shows, List<ShowRow> Titles);
 
     public static void MapTitleFormulasApi(this RouteGroupBuilder api)
@@ -129,7 +135,9 @@ public static partial class TitleFormulasApi
             return new AllFormulas(formulas, titles);
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
-    /// <summary>A show's formula, or null when its titles don't follow one.</summary>
+    /// <summary>
+    /// A show's formula, or null when its titles don't follow one.
+    /// </summary>
     private static TitleFormulaDto? Find(Guid showId, List<TitleRow> rows)
     {
         // Titles that are only punctuation have no words: they're no more a title than a blank one.
@@ -208,11 +216,15 @@ public static partial class TitleFormulasApi
         return new Tokens([.. keys], [.. raw]);
     }
 
-    /// <summary>Digits, Roman numerals or number words, hyphenated ones too ("twenty-one").</summary>
+    /// <summary>
+    /// Digits, Roman numerals or number words, hyphenated ones too ("twenty-one").
+    /// </summary>
     private static bool IsNumber(string word) =>
         Digits().IsMatch(word) || Roman().IsMatch(word) || word.Split('-').All(NumberWords.Contains);
 
-    /// <summary>TVmaze's stand-ins for a missing title.</summary>
+    /// <summary>
+    /// TVmaze's stand-ins for a missing title.
+    /// </summary>
     [GeneratedRegex(@"^((episode|chapter|part|folge|capítulo|episodio|épisode|odcinek|aflevering|jakso|avsnitt)\s*#?\s*[\d.]+|tba|tbd|untitled.*|episode\s+#?[\d]+\.[\d]+)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex Placeholder();

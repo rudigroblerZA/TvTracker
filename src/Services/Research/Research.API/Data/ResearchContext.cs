@@ -3,20 +3,28 @@ using TvTracker.Persistence;
 
 namespace Research.API.Data;
 
-/// <summary>A show being researched: the working state between saves.</summary>
+/// <summary>
+/// A show being researched: the working state between saves.
+/// </summary>
 public class Dossier
 {
     public Guid ShowId { get; set; }
 
     public required string ShowTitle { get; set; }
 
-    /// <summary>The insight as last drafted or edited, before it's saved.</summary>
+    /// <summary>
+    /// The insight as last drafted or edited, before it's saved.
+    /// </summary>
     public string? Draft { get; set; }
 
-    /// <summary>Set while the model drafts in the background (minutes on a CPU); cleared when it's done.</summary>
+    /// <summary>
+    /// Set while the model drafts in the background (minutes on a CPU); cleared when it's done.
+    /// </summary>
     public DateTime? DraftingSinceUtc { get; set; }
 
-    /// <summary>Why the last draft failed, until the next one starts.</summary>
+    /// <summary>
+    /// Why the last draft failed, until the next one starts.
+    /// </summary>
     public string? DraftProblem { get; set; }
 
     public DateTime? GatheredAtUtc { get; set; }
@@ -24,25 +32,35 @@ public class Dossier
     public DateTime UpdatedAtUtc { get; set; }
 }
 
-/// <summary>Something read for the research: a Wikidata item, a Wikipedia article, a TMDB record or a page a researcher added.</summary>
+/// <summary>
+/// Something read for the research: a Wikidata item, a Wikipedia article, a TMDB record or a page a researcher added.
+/// </summary>
 public class ResearchSource
 {
-    /// <summary>Set by the app.</summary>
+    /// <summary>
+    /// Set by the app.
+    /// </summary>
     public Guid Id { get; set; }
 
     public Guid ShowId { get; set; }
 
-    /// <summary>One of <see cref="SourceKinds"/>.</summary>
+    /// <summary>
+    /// One of <see cref="SourceKinds"/>.
+    /// </summary>
     public required string Kind { get; set; }
 
     public required string Url { get; set; }
 
     public required string Title { get; set; }
 
-    /// <summary>The text read from it, at most <see cref="MaxExcerpt"/> characters: what the model drafts from.</summary>
+    /// <summary>
+    /// The text read from it, at most <see cref="MaxExcerpt"/> characters: what the model drafts from.
+    /// </summary>
     public required string Excerpt { get; set; }
 
-    /// <summary>Left out of drafts and saves while false, without losing it.</summary>
+    /// <summary>
+    /// Left out of drafts and saves while false, without losing it.
+    /// </summary>
     public bool Included { get; set; } = true;
 
     public DateTime RetrievedAtUtc { get; set; }
@@ -50,17 +68,23 @@ public class ResearchSource
     public const int MaxExcerpt = 6000;
 }
 
-/// <summary>A value a source offers for a fact; the researcher picks one per fact when saving.</summary>
+/// <summary>
+/// A value a source offers for a fact; the researcher picks one per fact when saving.
+/// </summary>
 public class FactCandidate
 {
-    /// <summary>Set by the app.</summary>
+    /// <summary>
+    /// Set by the app.
+    /// </summary>
     public Guid Id { get; set; }
 
     public Guid ShowId { get; set; }
 
     public Guid SourceId { get; set; }
 
-    /// <summary>One of <see cref="ResearchFacts"/>' keys.</summary>
+    /// <summary>
+    /// One of <see cref="ResearchFacts"/>' keys.
+    /// </summary>
     public required string Key { get; set; }
 
     public required string Value { get; set; }
@@ -72,7 +96,9 @@ public class FactCandidate
 /// </summary>
 public class SavedResearch
 {
-    /// <summary>Set by the app.</summary>
+    /// <summary>
+    /// Set by the app.
+    /// </summary>
     public Guid Id { get; set; }
 
     public Guid ShowId { get; set; }
@@ -81,15 +107,21 @@ public class SavedResearch
 
     public required string Insight { get; set; }
 
-    /// <summary>JSON: the chosen facts (<c>SavedFact[]</c>).</summary>
+    /// <summary>
+    /// JSON: the chosen facts (<c>SavedFact[]</c>).
+    /// </summary>
     public required string Facts { get; set; }
 
-    /// <summary>JSON: the sources as they were when saved, numbered as the insight cites them (<c>SavedSource[]</c>).</summary>
+    /// <summary>
+    /// JSON: the sources as they were when saved, numbered as the insight cites them (<c>SavedSource[]</c>).
+    /// </summary>
     public required string Sources { get; set; }
 
     public DateTime SavedAtUtc { get; set; }
 
-    /// <summary>Keycloak id of the moderator who saved it; cleared when their account is deleted.</summary>
+    /// <summary>
+    /// Keycloak id of the moderator who saved it; cleared when their account is deleted.
+    /// </summary>
     public string? SavedById { get; set; }
 
     public required string SavedByName { get; set; }
@@ -101,7 +133,9 @@ public class SavedResearch
 /// </summary>
 public class EpisodeNote
 {
-    /// <summary>The catalog's episode id; one note per episode.</summary>
+    /// <summary>
+    /// The catalog's episode id; one note per episode.
+    /// </summary>
     public Guid EpisodeId { get; set; }
 
     public Guid ShowId { get; set; }
@@ -118,7 +152,9 @@ public class EpisodeNote
 
     public DateTime NotedAtUtc { get; set; }
 
-    /// <summary>Keycloak id of the moderator who wrote it; cleared when their account is deleted.</summary>
+    /// <summary>
+    /// Keycloak id of the moderator who wrote it; cleared when their account is deleted.
+    /// </summary>
     public string? NotedById { get; set; }
 
     public required string NotedByName { get; set; }
@@ -134,19 +170,25 @@ public class CatalogCheck
 {
     public Guid ShowId { get; set; }
 
-    /// <summary>"network", "premiered" or "episodes".</summary>
+    /// <summary>
+    /// "network", "premiered" or "episodes".
+    /// </summary>
     public required string Field { get; set; }
 
     public required string ShowTitle { get; set; }
 
-    /// <summary>The catalog's value; null when it has none.</summary>
+    /// <summary>
+    /// The catalog's value; null when it has none.
+    /// </summary>
     public string? CatalogValue { get; set; }
 
     public required string WikidataValue { get; set; }
 
     public required string WikidataUrl { get; set; }
 
-    /// <summary>The show's place among the catalog's most popular, 1 first.</summary>
+    /// <summary>
+    /// The show's place among the catalog's most popular, 1 first.
+    /// </summary>
     public int Rank { get; set; }
 
     public DateTime CheckedAtUtc { get; set; }
@@ -165,10 +207,14 @@ public class ShowAward
 
     public string? PosterUrl { get; set; }
 
-    /// <summary>Award statements on the show's Wikidata item: wins, by award and category.</summary>
+    /// <summary>
+    /// Award statements on the show's Wikidata item: wins, by award and category.
+    /// </summary>
     public int Wins { get; set; }
 
-    /// <summary>Grouped by award, most won first ("Primetime Emmy Award × 6, Golden Globe Award").</summary>
+    /// <summary>
+    /// Grouped by award, most won first ("Primetime Emmy Award × 6, Golden Globe Award").
+    /// </summary>
     public required string Summary { get; set; }
 
     public required string WikidataUrl { get; set; }
@@ -183,7 +229,9 @@ public static class SourceKinds
     public const string Tmdb = "tmdb";
     public const string Url = "url";
 
-    /// <summary>Kinds a gather replaces; pages added by hand stay.</summary>
+    /// <summary>
+    /// Kinds a gather replaces; pages added by hand stay.
+    /// </summary>
     public static readonly IReadOnlySet<string> Gathered = new HashSet<string> { Wikidata, Wikipedia, Tmdb };
 }
 

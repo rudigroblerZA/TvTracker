@@ -157,7 +157,9 @@ public static class ModerationApi
         return TypedResults.Ok(CommunityApi.ToDto(correction));
     }
 
-    /// <summary>Undoes an accepted correction: the provider's value comes back on the show's next refresh.</summary>
+    /// <summary>
+    /// Undoes an accepted correction: the provider's value comes back on the show's next refresh.
+    /// </summary>
     private static async Task<Results<Ok<CorrectionDto>, NotFound, ProblemHttpResult>> RevertAsync(
         Guid id, ClaimsPrincipal user, RatingsContext db, Moderation moderation, CatalogSyncClient sync, CancellationToken ct)
     {

@@ -154,7 +154,9 @@ else
     private bool notFound;
     private bool watched;
 
-    /// <summary>The spoiler shield is on and the user hasn't watched this: the tab title shows only the episode code.</summary>
+    /// <summary>
+    /// The spoiler shield is on and the user hasn't watched this: the tab title shows only the episode code.
+    /// </summary>
     private bool hideTitle => shieldOn && !watched;
     private bool shieldOn;
     private bool aired;
@@ -163,8 +165,10 @@ else
     private Reactions? reactions;
     private CommentsPage? comments;
 
-    /// <summary>What the page shows, for "Suggest a correction" (the air date as the profile's calendar would show it is
-    /// close enough; the moderator sees both values).</summary>
+    /// <summary>
+    /// What the page shows, for "Suggest a correction" (the air date as the profile's calendar would show it is
+    /// close enough; the moderator sees both values).
+    /// </summary>
     private Dictionary<string, string?> CorrectionValues => episode is null ? [] : new()
     {
         ["episode-title"] = episode.Title,

@@ -19,7 +19,9 @@ public sealed class NanogenreService(
     private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
     private static readonly TimeSpan FullSendInterval = TimeSpan.FromDays(1);
 
-    /// <summary>While fewer embedded shows than this, discovery waits this long and tries again.</summary>
+    /// <summary>
+    /// While fewer embedded shows than this, discovery waits this long and tries again.
+    /// </summary>
     private static readonly TimeSpan NotReadyRetry = TimeSpan.FromMinutes(15);
 
     /// <summary>

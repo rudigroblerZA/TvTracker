@@ -6,7 +6,9 @@ using TvTracker.Persistence;
 
 namespace Tracking.API.IntegrationEvents;
 
-/// <summary>Keeps Tracking's read copies of shows and episodes current.</summary>
+/// <summary>
+/// Keeps Tracking's read copies of shows and episodes current.
+/// </summary>
 public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
@@ -34,7 +36,9 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
     public Task HandleAsync(EpisodesScheduledIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, () => UpsertEpisodesAsync(e.ShowId, e.ShowTitle, e.Episodes, ct));
 
-    /// <summary>Per-episode event published before batching; handled so messages still pending at upgrade apply.</summary>
+    /// <summary>
+    /// Per-episode event published before batching; handled so messages still pending at upgrade apply.
+    /// </summary>
     public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, () => UpsertEpisodesAsync(e.ShowId, e.ShowTitle,
             [new ScheduledEpisode(e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes)], ct));
@@ -98,7 +102,9 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
     }
 }
 
-/// <summary>Deletes everything Tracking holds for a deleted user.</summary>
+/// <summary>
+/// Deletes everything Tracking holds for a deleted user.
+/// </summary>
 public sealed class UserDeletedHandler(TrackingContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)

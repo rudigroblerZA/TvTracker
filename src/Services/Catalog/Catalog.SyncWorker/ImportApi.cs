@@ -12,7 +12,9 @@ public record ReplayResult(bool Started);
 
 public static class ImportApi
 {
-    /// <summary>How many of the provider's best matches a search may import.</summary>
+    /// <summary>
+    /// How many of the provider's best matches a search may import.
+    /// </summary>
     private const int SearchImportLimit = 5;
 
     public static RouteGroupBuilder MapImportApi(this IEndpointRouteBuilder app)
@@ -42,7 +44,9 @@ public static class ImportApi
         return api;
     }
 
-    /// <summary>202 with the new job, 409 with the running one if a job is already running, 400 for a bad request.</summary>
+    /// <summary>
+    /// 202 with the new job, 409 with the running one if a job is already running, 400 for a bad request.
+    /// </summary>
     private static IResult StartBulkImport(BulkImportRequest request, BulkImportRunner runner)
     {
         var titles = request.Titles?.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -64,7 +68,9 @@ public static class ImportApi
             : Results.Conflict(status);
     }
 
-    /// <summary>Starts the replay in the background and answers straight away (202), so a client retry can't start another.</summary>
+    /// <summary>
+    /// Starts the replay in the background and answers straight away (202), so a client retry can't start another.
+    /// </summary>
     private static Accepted<ReplayResult> Replay(CatalogReplayRunner runner) =>
         TypedResults.Accepted((string?)null, new ReplayResult(runner.TryStart()));
 

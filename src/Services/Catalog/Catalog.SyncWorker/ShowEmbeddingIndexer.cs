@@ -54,7 +54,9 @@ public sealed class ShowEmbeddingIndexer(
         }
     }
 
-    /// <summary>Embeds one batch of shows that need it and returns how many it looked at (0 when all are current).</summary>
+    /// <summary>
+    /// Embeds one batch of shows that need it and returns how many it looked at (0 when all are current).
+    /// </summary>
     private async Task<int> IndexBatchAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -107,7 +109,9 @@ public sealed class ShowEmbeddingIndexer(
         return shows.Count;
     }
 
-    /// <summary>What a show's vector represents: what people would describe when looking for it.</summary>
+    /// <summary>
+    /// What a show's vector represents: what people would describe when looking for it.
+    /// </summary>
     internal static string EmbeddingText(string title, IReadOnlyList<string> genres, string? network, string? overview)
     {
         var text = new StringBuilder(title).Append('.');

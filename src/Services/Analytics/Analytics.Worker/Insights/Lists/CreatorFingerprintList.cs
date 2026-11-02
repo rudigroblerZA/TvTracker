@@ -13,10 +13,14 @@ public sealed class CreatorFingerprintList : IListInsight
 {
     private const int MinShows = 2;
 
-    /// <summary>A signature trait is distinctive on average, and at least this share of their shows lean that way.</summary>
+    /// <summary>
+    /// A signature trait is distinctive on average, and at least this share of their shows lean that way.
+    /// </summary>
     private const double SignatureAgreement = 2.0 / 3;
 
-    /// <summary>Shows and creators match the fingerprint from this DNA similarity, the same bar as DNA twins.</summary>
+    /// <summary>
+    /// Shows and creators match the fingerprint from this DNA similarity, the same bar as DNA twins.
+    /// </summary>
     private const double MinSimilarity = 0.85;
 
     private const int MaxMatches = 8;
@@ -106,7 +110,9 @@ public sealed class CreatorFingerprintList : IListInsight
                 signature.OrderByDescending(s => s.Strength).Select(s => s.Trait).ToList());
         }
 
-        /// <summary>Traits where at least one of their shows is at each end: "Short episodes to hour-long episodes".</summary>
+        /// <summary>
+        /// Traits where at least one of their shows is at each end: "Short episodes to hour-long episodes".
+        /// </summary>
         private List<string> RangeOf(Fingerprint f) => DnaTraits.All
             .Where(t => f.Signature.All(s => s.Key != t.Key))
             .Select(t => (Trait: t, Labels: f.ShowIds.Where(id => dna[id].ContainsKey(t.Key)).Select(id => DnaTraits.LabelFor(t.Key, dna[id][t.Key])).ToHashSet()))
@@ -139,7 +145,9 @@ public sealed class CreatorFingerprintList : IListInsight
                 .ToList();
         }
 
-        /// <summary>Creators with a close fingerprint and a signature trait in common, who never made a show together.</summary>
+        /// <summary>
+        /// Creators with a close fingerprint and a signature trait in common, who never made a show together.
+        /// </summary>
         private List<KindredCreator> KindredOf(Fingerprint f, List<Fingerprint> all) => all
             .Where(o => o.PersonId != f.PersonId && !o.ShowIds.Intersect(f.ShowIds).Any())
             .Select(o => (Other: o, Similarity: DnaTraits.Similarity(f.Traits, o.Traits),

@@ -265,7 +265,9 @@
     private bool? shareActivity;
     private bool privateProfile;
 
-    /// <summary>Changes one Social setting (the other is null and kept), showing what the service saved.</summary>
+    /// <summary>
+    /// Changes one Social setting (the other is null and kept), showing what the service saved.
+    /// </summary>
     private async Task SetSocialAsync(bool? share, bool? isPrivate)
     {
         try
@@ -282,7 +284,9 @@
         }
     }
 
-    /// <summary>Optional: Settings works without Social (flag off, or the service down).</summary>
+    /// <summary>
+    /// Optional: Settings works without Social (flag off, or the service down).
+    /// </summary>
     private async Task LoadShareActivityAsync()
     {
         try

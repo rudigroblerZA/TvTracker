@@ -27,15 +27,21 @@ public record BulkImportStatus(
 
 public record BulkImportProblem(string Item, string Reason);
 
-/// <summary>The sync worker couldn't be reached or refused the request; the message is meant for the user.</summary>
+/// <summary>
+/// The sync worker couldn't be reached or refused the request; the message is meant for the user.
+/// </summary>
 public sealed class CliException(string message) : Exception(message);
 
-/// <summary>Calls the sync worker's internal bulk import endpoints (/api/v1/imports/bulk).</summary>
+/// <summary>
+/// Calls the sync worker's internal bulk import endpoints (/api/v1/imports/bulk).
+/// </summary>
 public sealed class SyncWorkerClient(Uri baseUrl) : IDisposable
 {
     private readonly HttpClient _http = new() { BaseAddress = baseUrl, Timeout = TimeSpan.FromSeconds(30) };
 
-    /// <summary>Starts a job. Returns the running job instead, with Started false, when one is already running.</summary>
+    /// <summary>
+    /// Starts a job. Returns the running job instead, with Started false, when one is already running.
+    /// </summary>
     public async Task<(bool Started, BulkImportStatus Status)> StartAsync(BulkImportRequest request, CancellationToken ct)
     {
         using var response = await SendAsync(() => _http.PostAsJsonAsync("api/v1/imports/bulk", request, ct));
@@ -52,7 +58,9 @@ public sealed class SyncWorkerClient(Uri baseUrl) : IDisposable
         return (response.StatusCode == HttpStatusCode.Accepted, status);
     }
 
-    /// <summary>The running or most recent job, or null when there hasn't been one since the worker started.</summary>
+    /// <summary>
+    /// The running or most recent job, or null when there hasn't been one since the worker started.
+    /// </summary>
     public async Task<BulkImportStatus?> GetCurrentAsync(CancellationToken ct)
     {
         using var response = await SendAsync(() => _http.GetAsync("api/v1/imports/bulk/current", ct));
@@ -68,7 +76,9 @@ public sealed class SyncWorkerClient(Uri baseUrl) : IDisposable
         return await response.Content.ReadFromJsonAsync<BulkImportStatus>(ct);
     }
 
-    /// <summary>False when the job isn't running any more.</summary>
+    /// <summary>
+    /// False when the job isn't running any more.
+    /// </summary>
     public async Task<bool> CancelAsync(Guid id, CancellationToken ct)
     {
         using var response = await SendAsync(() => _http.DeleteAsync($"api/v1/imports/bulk/{id}", ct));

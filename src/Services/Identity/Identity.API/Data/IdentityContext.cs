@@ -5,7 +5,9 @@ namespace Identity.API.Data;
 
 public class UserProfile
 {
-    /// <summary>Keycloak user id ("sub").</summary>
+    /// <summary>
+    /// Keycloak user id ("sub").
+    /// </summary>
     public required string UserId { get; set; }
 
     public required string DisplayName { get; set; }
@@ -14,18 +16,26 @@ public class UserProfile
 
     public string? AvatarUrl { get; set; }
 
-    /// <summary>IANA timezone id, e.g. "Africa/Johannesburg". Clients convert UTC air times with it.</summary>
+    /// <summary>
+    /// IANA timezone id, e.g. "Africa/Johannesburg". Clients convert UTC air times with it.
+    /// </summary>
     public string TimeZone { get; set; } = "UTC";
 
-    /// <summary>ISO 3166-1 country code; drives where-to-watch results.</summary>
+    /// <summary>
+    /// ISO 3166-1 country code; drives where-to-watch results.
+    /// </summary>
     public string Region { get; set; } = "US";
 
     public string Language { get; set; } = "en";
 
-    /// <summary>The plan this user pays for (<see cref="TvTracker.IntegrationEvents.Plans"/>); everyone starts free.</summary>
+    /// <summary>
+    /// The plan this user pays for (<see cref="TvTracker.IntegrationEvents.Plans"/>); everyone starts free.
+    /// </summary>
     public string Plan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
 
-    /// <summary>When <see cref="Plan"/> was last set; null while it never has.</summary>
+    /// <summary>
+    /// When <see cref="Plan"/> was last set; null while it never has.
+    /// </summary>
     public DateTime? PlanChangedAtUtc { get; set; }
 
     /// <summary>
@@ -34,7 +44,9 @@ public class UserProfile
     /// </summary>
     public string EffectivePlan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
 
-    /// <summary>When <see cref="EffectivePlan"/> last changed; null while it never has.</summary>
+    /// <summary>
+    /// When <see cref="EffectivePlan"/> last changed; null while it never has.
+    /// </summary>
     public DateTime? EffectivePlanChangedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
@@ -42,18 +54,24 @@ public class UserProfile
     public DateTime UpdatedAtUtc { get; set; }
 }
 
-/// <summary>A family plan's group, one per owner. Members get the family plan while the owner pays for it.</summary>
+/// <summary>
+/// A family plan's group, one per owner. Members get the family plan while the owner pays for it.
+/// </summary>
 public class Family
 {
     public required string OwnerUserId { get; set; }
 
-    /// <summary>The secret in the invite link (<c>/family/join/{token}</c>); null while invites are off.</summary>
+    /// <summary>
+    /// The secret in the invite link (<c>/family/join/{token}</c>); null while invites are off.
+    /// </summary>
     public string? InviteToken { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>Someone in a family; a person is in at most one.</summary>
+/// <summary>
+/// Someone in a family; a person is in at most one.
+/// </summary>
 public class FamilyMember
 {
     public required string UserId { get; set; }

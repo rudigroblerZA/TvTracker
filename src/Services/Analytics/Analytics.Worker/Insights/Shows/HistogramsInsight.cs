@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Our users' star ratings of the show (from the minimum number of ratings) and the provider's episode ratings.</summary>
+/// <summary>
+/// Our users' star ratings of the show (from the minimum number of ratings) and the provider's episode ratings.
+/// </summary>
 public sealed class HistogramsInsight : IShowInsight
 {
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)

@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Analytics.API.Apis;
 
-/// <summary>Counts only: how many users rated, watched or followed, never who.</summary>
+/// <summary>
+/// Counts only: how many users rated, watched or followed, never who.
+/// </summary>
 public record AnalyticsOpsStats(
     int Shows,
     int ShowsWithInsights,
@@ -21,7 +23,9 @@ public record AnalyticsOpsStats(
     IReadOnlyList<OpsWorthTheWait> WorthTheWait,
     int Episodes);
 
-/// <summary>How many shows each part of the insights covers, and the other computed tables.</summary>
+/// <summary>
+/// How many shows each part of the insights covers, and the other computed tables.
+/// </summary>
 /// <param name="GetsGoodTurns">Slow starters with a turn ("gets good at S01E06").</param>
 /// <param name="GoodFromTheStart">Shows whose first episodes already rate as well as the rest.</param>
 /// <param name="Forecasts">Running shows with at least one forecast (rating, renewal or timing).</param>

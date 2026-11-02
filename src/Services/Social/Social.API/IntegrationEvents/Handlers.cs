@@ -64,7 +64,9 @@ public sealed class CatalogEventHandlers(SocialContext db) :
     }
 }
 
-/// <summary>Keeps users' display names from Identity, and forgets a deleted user entirely.</summary>
+/// <summary>
+/// Keeps users' display names from Identity, and forgets a deleted user entirely.
+/// </summary>
 public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
     IIntegrationEventHandler<UserRegisteredIntegrationEvent>,
     IIntegrationEventHandler<UserProfileUpdatedIntegrationEvent>,
@@ -92,7 +94,9 @@ public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
         await db.Plans.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 
-    /// <summary>Names arrive in any order (a snapshot can follow an update), and the latest content wins either way.</summary>
+    /// <summary>
+    /// Names arrive in any order (a snapshot can follow an update), and the latest content wins either way.
+    /// </summary>
     private async Task SetNameAsync(string userId, string displayName, CancellationToken ct)
     {
         var profile = await db.Profiles.FindAsync([userId], ct);
@@ -121,10 +125,14 @@ public sealed class ActivityEventHandlers(SocialContext db) :
     IIntegrationEventHandler<ShowRatedIntegrationEvent>,
     IIntegrationEventHandler<ShowRatingRemovedIntegrationEvent>
 {
-    /// <summary>Episodes of one show watched within this of the last are added to the same item.</summary>
+    /// <summary>
+    /// Episodes of one show watched within this of the last are added to the same item.
+    /// </summary>
     public static readonly TimeSpan SessionGap = TimeSpan.FromHours(6);
 
-    /// <summary>Rating a show again within this replaces the rating in the feed rather than adding another.</summary>
+    /// <summary>
+    /// Rating a show again within this replaces the rating in the feed rather than adding another.
+    /// </summary>
     private static readonly TimeSpan RerateWindow = TimeSpan.FromDays(1);
 
     public Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct) =>
@@ -179,7 +187,9 @@ public sealed class ActivityEventHandlers(SocialContext db) :
             return Task.CompletedTask;
         });
 
-    /// <summary>A follow that comes with a watch of the same show (watching follows it) is left to the watch.</summary>
+    /// <summary>
+    /// A follow that comes with a watch of the same show (watching follows it) is left to the watch.
+    /// </summary>
     public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
         HandleOnceAsync(e, ct, async () =>
         {
@@ -305,7 +315,9 @@ public sealed class UserStateHandlers(SocialContext db) :
             }
         }, ct);
 
-    /// <summary>Ratings carry no time here, so a rating changed after the snapshot can be undone until the next one.</summary>
+    /// <summary>
+    /// Ratings carry no time here, so a rating changed after the snapshot can be undone until the next one.
+    /// </summary>
     public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct) =>
         db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
         {
@@ -355,7 +367,9 @@ public sealed class SharedListHandlers(SocialContext db) :
         db.HandleOnceAsync(e, nameof(SharedListHandlers), () =>
             db.SharedLists.Where(l => l.ListId == e.ListId && l.UpdatedAtUtc <= e.UpdatedAtUtc.UtcDateTime).ExecuteDeleteAsync(ct), ct);
 
-    /// <summary>Snapshots from before list sharing carry no lists (null), and change nothing.</summary>
+    /// <summary>
+    /// Snapshots from before list sharing carry no lists (null), and change nothing.
+    /// </summary>
     public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
         db.HandleOnceAsync(e, nameof(SharedListHandlers), async () =>
         {
@@ -396,7 +410,9 @@ public sealed class SharedListHandlers(SocialContext db) :
 
 internal static class InboxExtensions
 {
-    /// <summary>The inbox: applies an event once per handler class, then saves the change and the mark together.</summary>
+    /// <summary>
+    /// The inbox: applies an event once per handler class, then saves the change and the mark together.
+    /// </summary>
     public static async Task HandleOnceAsync(this SocialContext db, IntegrationEvent e, string handlerClass, Func<Task> apply, CancellationToken ct)
     {
         var handler = $"{handlerClass}.{e.GetType().Name}";

@@ -24,9 +24,13 @@
 @code {
     [Parameter, EditorRequired] public GetsGood? GetsGood { get; set; }
 
-    /// <summary>Where our viewers most often stop, to say when that's before the turn.</summary>
+    /// <summary>
+    /// Where our viewers most often stop, to say when that's before the turn.
+    /// </summary>
     [Parameter] public DropOff? DropOff { get; set; }
 
-    /// <summary>The episodes the user has watched, for the spoiler shield.</summary>
+    /// <summary>
+    /// The episodes the user has watched, for the spoiler shield.
+    /// </summary>
     [Parameter] public IReadOnlySet<Guid>? Watched { get; set; }
 }

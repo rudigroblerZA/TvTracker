@@ -47,10 +47,14 @@
     [Parameter] public ShowSummary? Selected { get; set; }
     [Parameter] public EventCallback<ShowSummary?> SelectedChanged { get; set; }
 
-    /// <summary>A show not to suggest (the one picked in the other picker).</summary>
+    /// <summary>
+    /// A show not to suggest (the one picked in the other picker).
+    /// </summary>
     [Parameter] public Guid? Exclude { get; set; }
 
-    /// <summary>Shows not to suggest, when several are picked elsewhere (a mixtape's other slots).</summary>
+    /// <summary>
+    /// Shows not to suggest, when several are picked elsewhere (a mixtape's other slots).
+    /// </summary>
     [Parameter] public IReadOnlyCollection<Guid>? ExcludeAll { get; set; }
 
     private string? term;

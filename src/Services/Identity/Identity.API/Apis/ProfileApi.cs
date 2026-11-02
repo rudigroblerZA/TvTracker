@@ -28,7 +28,9 @@ public record UpdateProfileRequest(
 
 public static class ProfileApi
 {
-    /// <summary>Services that hold per-user data and expose GET api/v1/me/export.</summary>
+    /// <summary>
+    /// Services that hold per-user data and expose GET api/v1/me/export.
+    /// </summary>
     private static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social", "analytics"];
 
     public static RouteGroupBuilder MapProfileApi(this IEndpointRouteBuilder app)
@@ -43,7 +45,9 @@ public static class ProfileApi
         return api;
     }
 
-    /// <summary>Returns the profile, creating it from the token's claims on first sign-in.</summary>
+    /// <summary>
+    /// Returns the profile, creating it from the token's claims on first sign-in.
+    /// </summary>
     private static async Task<Ok<ProfileDto>> GetProfileAsync(
         ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
     {

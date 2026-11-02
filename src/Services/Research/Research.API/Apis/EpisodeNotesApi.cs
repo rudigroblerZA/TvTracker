@@ -106,7 +106,9 @@ public static class EpisodeNotesApi
         return TypedResults.NoContent();
     }
 
-    /// <summary>Saves the change with an event carrying the show's notes as they'll be after it.</summary>
+    /// <summary>
+    /// Saves the change with an event carrying the show's notes as they'll be after it.
+    /// </summary>
     private static async Task SaveAndPublishAsync(ResearchContext db, IIntegrationEventOutbox outbox, Guid showId, TimeProvider time,
         CancellationToken ct)
     {

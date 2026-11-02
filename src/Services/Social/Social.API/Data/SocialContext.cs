@@ -3,16 +3,22 @@ using TvTracker.Persistence;
 
 namespace Social.API.Data;
 
-/// <summary>A user as others see them here: a name from Identity, and whether they share what they watch.</summary>
+/// <summary>
+/// A user as others see them here: a name from Identity, and whether they share what they watch.
+/// </summary>
 public class Profile
 {
     public required string UserId { get; set; }
     public required string DisplayName { get; set; }
 
-    /// <summary>Whether the people who can see this user see their activity. On unless they turn it off.</summary>
+    /// <summary>
+    /// Whether the people who can see this user see their activity. On unless they turn it off.
+    /// </summary>
     public bool ShareActivity { get; set; } = true;
 
-    /// <summary>Followers need approving: until then a request is pending, and only approved followers see anything.</summary>
+    /// <summary>
+    /// Followers need approving: until then a request is pending, and only approved followers see anything.
+    /// </summary>
     public bool Private { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
@@ -28,11 +34,15 @@ public class UserFollow
     public required string FolloweeId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
-    /// <summary>False while it's a request to a private profile.</summary>
+    /// <summary>
+    /// False while it's a request to a private profile.
+    /// </summary>
     public bool Approved { get; set; } = true;
 }
 
-/// <summary>A block. Either way round, the two don't see each other: not in search, pages, lists or anywhere else.</summary>
+/// <summary>
+/// A block. Either way round, the two don't see each other: not in search, pages, lists or anywhere else.
+/// </summary>
 public class UserBlock
 {
     public required string BlockerId { get; set; }
@@ -40,7 +50,9 @@ public class UserBlock
     public DateTime CreatedAtUtc { get; set; }
 }
 
-/// <summary>A user's relation to a show, from Tracking's and Ratings' events and snapshots: followed, rated.</summary>
+/// <summary>
+/// A user's relation to a show, from Tracking's and Ratings' events and snapshots: followed, rated.
+/// </summary>
 public class UserShow
 {
     public required string UserId { get; set; }
@@ -48,11 +60,15 @@ public class UserShow
     public bool Followed { get; set; }
     public DateTime? FollowedAtUtc { get; set; }
 
-    /// <summary>Their show rating, 1-5.</summary>
+    /// <summary>
+    /// Their show rating, 1-5.
+    /// </summary>
     public int? Stars { get; set; }
 }
 
-/// <summary>A watched episode, from Tracking's events and snapshots: where people are up to in a show.</summary>
+/// <summary>
+/// A watched episode, from Tracking's events and snapshots: where people are up to in a show.
+/// </summary>
 public class UserWatch
 {
     public required string UserId { get; set; }
@@ -61,7 +77,9 @@ public class UserWatch
     public DateTime WatchedAtUtc { get; set; }
 }
 
-/// <summary>A list its owner shares, copied from Tracking. Who can see it follows Social's rules (blocks, private profiles).</summary>
+/// <summary>
+/// A list its owner shares, copied from Tracking. Who can see it follows Social's rules (blocks, private profiles).
+/// </summary>
 public class SharedList
 {
     public Guid ListId { get; set; }
@@ -81,15 +99,21 @@ public class Activity
     public Guid Id { get; set; }
     public required string UserId { get; set; }
 
-    /// <summary>One of <see cref="ActivityKinds"/>.</summary>
+    /// <summary>
+    /// One of <see cref="ActivityKinds"/>.
+    /// </summary>
     public required string Kind { get; set; }
 
     public Guid ShowId { get; set; }
 
-    /// <summary>For "watched": the episodes, in the order they were marked.</summary>
+    /// <summary>
+    /// For "watched": the episodes, in the order they were marked.
+    /// </summary>
     public List<Guid> EpisodeIds { get; set; } = [];
 
-    /// <summary>For "rated": the stars, 1-5.</summary>
+    /// <summary>
+    /// For "rated": the stars, 1-5.
+    /// </summary>
     public int? Stars { get; set; }
 
     public DateTime OccurredAtUtc { get; set; }
@@ -103,7 +127,9 @@ public static class ActivityKinds
     public const string Rated = "rated";
 }
 
-/// <summary>The catalog's show title and poster, for rendering the feed.</summary>
+/// <summary>
+/// The catalog's show title and poster, for rendering the feed.
+/// </summary>
 public class ShowCopy
 {
     public Guid ShowId { get; set; }
@@ -111,7 +137,9 @@ public class ShowCopy
     public string? PosterUrl { get; set; }
 }
 
-/// <summary>An episode's numbers, for "S02E03" in the feed. Titles aren't kept: a follower may not have seen it yet.</summary>
+/// <summary>
+/// An episode's numbers, for "S02E03" in the feed. Titles aren't kept: a follower may not have seen it yet.
+/// </summary>
 public class EpisodeCopy
 {
     public Guid EpisodeId { get; set; }
@@ -119,10 +147,14 @@ public class EpisodeCopy
     public int SeasonNumber { get; set; }
     public int EpisodeNumber { get; set; }
 
-    /// <summary>For counting what's aired when comparing progress.</summary>
+    /// <summary>
+    /// For counting what's aired when comparing progress.
+    /// </summary>
     public DateTimeOffset? AirsAtUtc { get; set; }
 
-    /// <summary>For planning an evening for two; null when the provider has none.</summary>
+    /// <summary>
+    /// For planning an evening for two; null when the provider has none.
+    /// </summary>
     public int? RuntimeMinutes { get; set; }
 }
 
@@ -135,7 +167,9 @@ public class UserPlanCopy
     public required string UserId { get; set; }
     public required string Plan { get; set; }
 
-    /// <summary>When Identity set it; an older event is ignored, since events can arrive out of order.</summary>
+    /// <summary>
+    /// When Identity set it; an older event is ignored, since events can arrive out of order.
+    /// </summary>
     public DateTimeOffset ChangedAtUtc { get; set; }
 }
 

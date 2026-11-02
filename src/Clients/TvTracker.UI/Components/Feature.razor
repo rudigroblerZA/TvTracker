@@ -21,17 +21,23 @@ else if (enabled == false)
 }
 
 @code {
-    /// <summary>One of <see cref="FeatureFlags"/>.</summary>
+    /// <summary>
+    /// One of <see cref="FeatureFlags"/>.
+    /// </summary>
     [Parameter, EditorRequired] public string Flag { get; set; } = "";
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     [Parameter] public RenderFragment? Off { get; set; }
 
-    /// <summary>Shown while the feature is off because of the user's plan; given the plan's key that would turn it on.</summary>
+    /// <summary>
+    /// Shown while the feature is off because of the user's plan; given the plan's key that would turn it on.
+    /// </summary>
     [Parameter] public RenderFragment<string>? Locked { get; set; }
 
-    /// <summary>Show the content anyway while it's locked to a plan, with a <see cref="FeatureLock"/> cascaded to it.</summary>
+    /// <summary>
+    /// Show the content anyway while it's locked to a plan, with a <see cref="FeatureLock"/> cascaded to it.
+    /// </summary>
     [Parameter] public bool ShowLocked { get; set; }
 
     private bool? enabled;

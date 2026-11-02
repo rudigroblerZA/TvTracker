@@ -181,7 +181,9 @@ public static class TonightPlanner
         return MoodWeight * fit + (1 - MoodWeight) * continuity;
     }
 
-    /// <summary>1 for a show watched in the last two weeks, down to 0.3 for one only on the watchlist.</summary>
+    /// <summary>
+    /// 1 for a show watched in the last two weeks, down to 0.3 for one only on the watchlist.
+    /// </summary>
     private static double Continuity(TonightShow show, DateTimeOffset now)
     {
         if (show.Status == WatchStatus.PlanToWatch || show.LastWatchedAtUtc is null)

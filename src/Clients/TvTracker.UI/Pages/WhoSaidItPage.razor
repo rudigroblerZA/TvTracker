@@ -73,7 +73,9 @@ else
 }
 
 @code {
-    /// <summary>Shows whose watched episodes are sent, most recently followed first; one progress call each.</summary>
+    /// <summary>
+    /// Shows whose watched episodes are sent, most recently followed first; one progress call each.
+    /// </summary>
     private const int MaxShows = 20;
 
     private WhoSaidItRound? round;
@@ -101,7 +103,9 @@ else
         }
     }
 
-    /// <summary>The watched episodes of the shows the user has started; the catalog never sees watches otherwise.</summary>
+    /// <summary>
+    /// The watched episodes of the shows the user has started; the catalog never sees watches otherwise.
+    /// </summary>
     private async Task<IReadOnlyList<Guid>> WatchedAsync()
     {
         var follows = await Tracking.GetFollowsAsync() ?? [];

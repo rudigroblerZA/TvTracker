@@ -3,7 +3,9 @@ using static Analytics.API.Apis.StreaksApi;
 
 namespace Analytics.UnitTests;
 
-/// <summary>Streaks: days and weeks in a row, and shows kept up with as they air (see CONTEXT.md, Streaks).</summary>
+/// <summary>
+/// Streaks: days and weeks in a row, and shows kept up with as they air (see CONTEXT.md, Streaks).
+/// </summary>
 public class StreaksTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

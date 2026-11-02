@@ -3,7 +3,9 @@ using TvTracker.UI.Models;
 
 namespace TvTracker.UI.Components;
 
-/// <summary>The words for a season verdict, shared by the show page's highlight and Insights' list.</summary>
+/// <summary>
+/// The words for a season verdict, shared by the show page's highlight and Insights' list.
+/// </summary>
 public static class SeasonVerdictText
 {
     public static string Headline(SeasonVerdict v) => v.Verdict switch
@@ -17,7 +19,9 @@ public static class SeasonVerdictText
         _ => $"Rated {Format.Rating(v.Rating)}"
     };
 
-    /// <summary>"good" for its best or better seasons, "warn" for weaker ones, else "info".</summary>
+    /// <summary>
+    /// "good" for its best or better seasons, "warn" for weaker ones, else "info".
+    /// </summary>
     public static string Tone(SeasonVerdict v) => v.Verdict switch
     {
         SeasonVerdicts.BestYet or SeasonVerdicts.Above => "good",
@@ -25,7 +29,9 @@ public static class SeasonVerdictText
         _ => "info"
     };
 
-    /// <summary>"Rated 8.6 · others 8.1 · finale a high point · 12 of 20 here finished it"</summary>
+    /// <summary>
+    /// "Rated 8.6 · others 8.1 · finale a high point · 12 of 20 here finished it"
+    /// </summary>
     public static string Details(SeasonVerdict v)
     {
         var parts = new List<string> { $"Rated {Format.Rating(v.Rating)}" };

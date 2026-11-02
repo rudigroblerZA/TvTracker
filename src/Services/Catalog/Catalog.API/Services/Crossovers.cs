@@ -7,11 +7,15 @@ using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Catalog.API.Services;
 
-/// <summary>One show's episode in a crossover event.</summary>
+/// <summary>
+/// One show's episode in a crossover event.
+/// </summary>
 public sealed record CrossoverPart(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
     string Title, DateTimeOffset AirsAtUtc);
 
-/// <summary>A crossover event across a universe's shows, its parts in air order.</summary>
+/// <summary>
+/// A crossover event across a universe's shows, its parts in air order.
+/// </summary>
 /// <param name="Id">Stable for the event (its universe, name and year), so an alert for it is sent once.</param>
 /// <param name="UniverseId">The universe's hub show, which addresses it.</param>
 public sealed record Crossover(Guid Id, string Name, Guid UniverseId, string UniverseName, IReadOnlyList<CrossoverPart> Parts)
@@ -27,10 +31,14 @@ public sealed record Crossover(Guid Id, string Name, Guid UniverseId, string Uni
 /// </summary>
 public sealed partial class Crossovers(Universes universes, IServiceScopeFactory scopeFactory, HybridCache cache, TimeProvider time)
 {
-    /// <summary>A crossover event's parts air within a week of each other, usually the same night.</summary>
+    /// <summary>
+    /// A crossover event's parts air within a week of each other, usually the same night.
+    /// </summary>
     public static readonly TimeSpan Window = TimeSpan.FromDays(7);
 
-    /// <summary>How far ahead <see cref="UpcomingAsync"/> looks.</summary>
+    /// <summary>
+    /// How far ahead <see cref="UpcomingAsync"/> looks.
+    /// </summary>
     public static readonly TimeSpan Horizon = TimeSpan.FromDays(30);
 
     private static readonly TimeSpan CacheFor = TimeSpan.FromMinutes(30);
@@ -113,7 +121,9 @@ public sealed partial class Crossovers(Universes universes, IServiceScopeFactory
         return labels;
     }
 
-    /// <summary>The labelled episodes grouped into events: the same name, each part within the window of the one before.</summary>
+    /// <summary>
+    /// The labelled episodes grouped into events: the same name, each part within the window of the one before.
+    /// </summary>
     private static IEnumerable<List<int>> Groups(string?[] labels, List<DateTimeOffset> airs)
     {
         var open = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
@@ -140,7 +150,9 @@ public sealed partial class Crossovers(Universes universes, IServiceScopeFactory
         }
     }
 
-    /// <summary>A stable id from the universe, the event's name and its year (first 16 bytes of a SHA-256, version 8).</summary>
+    /// <summary>
+    /// A stable id from the universe, the event's name and its year (first 16 bytes of a SHA-256, version 8).
+    /// </summary>
     private static Guid IdOf(Guid universe, string name, int year)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"crossover:{universe}:{Key(name) ?? name}:{year}"))[..16];
@@ -149,7 +161,9 @@ public sealed partial class Crossovers(Universes universes, IServiceScopeFactory
         return new Guid(bytes, bigEndian: true);
     }
 
-    /// <summary>The title without its part marker: "Infection" for "Infection, Part II" or "Sister City (Part I)".</summary>
+    /// <summary>
+    /// The title without its part marker: "Infection" for "Infection, Part II" or "Sister City (Part I)".
+    /// </summary>
     private static string TrimPart(string title) => PartMarker().Replace(title, "").Trim();
 
     /// <summary>

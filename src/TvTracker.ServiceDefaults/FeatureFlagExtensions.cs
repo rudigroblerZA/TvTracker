@@ -10,7 +10,9 @@ using TvTracker;
 
 namespace Microsoft.Extensions.Hosting;
 
-/// <summary>OpenFeature feature flags, served by flagd (see <see cref="FeatureFlags"/>).</summary>
+/// <summary>
+/// OpenFeature feature flags, served by flagd (see <see cref="FeatureFlags"/>).
+/// </summary>
 public static class FeatureFlagExtensions
 {
     /// <summary>
@@ -67,7 +69,9 @@ public static class FeatureFlagExtensions
             return enabled ? await next(context) : TypedResults.NotFound();
         });
 
-    /// <summary>Uses <typeparamref name="T"/> (a lookup in the service's own copy of plans) as the caller's plan for flags.</summary>
+    /// <summary>
+    /// Uses <typeparamref name="T"/> (a lookup in the service's own copy of plans) as the caller's plan for flags.
+    /// </summary>
     public static IServiceCollection AddUserPlans<T>(this IServiceCollection services) where T : class, IUserPlans
     {
         services.AddMemoryCache();

@@ -14,7 +14,9 @@ public record SendResult(bool Success, string? Error = null)
     public static readonly SendResult Ok = new(true);
 }
 
-/// <summary>Sends one delivery on one channel.</summary>
+/// <summary>
+/// Sends one delivery on one channel.
+/// </summary>
 public interface IChannelSender
 {
     DeliveryChannel Channel { get; }
@@ -119,13 +121,17 @@ public sealed class WebPushOptions
     public string? PublicKey { get; set; }
     public string? PrivateKey { get; set; }
 
-    /// <summary>"mailto:" address or site URL identifying the sender to push services.</summary>
+    /// <summary>
+    /// "mailto:" address or site URL identifying the sender to push services.
+    /// </summary>
     public string Subject { get; set; } = "mailto:admin@tvtracker.local";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(PublicKey) && !string.IsNullOrWhiteSpace(PrivateKey);
 }
 
-/// <summary>Browser push (VAPID). Subscriptions the push service reports as gone are removed.</summary>
+/// <summary>
+/// Browser push (VAPID). Subscriptions the push service reports as gone are removed.
+/// </summary>
 public sealed class WebPushSender(NotificationsContext db, IConfiguration configuration, ILogger<WebPushSender> logger) : IChannelSender
 {
     private readonly WebPushOptions _options = configuration.GetSection("WebPush").Get<WebPushOptions>() ?? new WebPushOptions();
@@ -178,7 +184,9 @@ public sealed class EmailOptions
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ConnectionString) && !string.IsNullOrWhiteSpace(SenderAddress);
 }
 
-/// <summary>Email through Azure Communication Services.</summary>
+/// <summary>
+/// Email through Azure Communication Services.
+/// </summary>
 public sealed class EmailSender(NotificationsContext db, IConfiguration configuration, ILogger<EmailSender> logger) : IChannelSender
 {
     private readonly EmailOptions _options = configuration.GetSection("Email").Get<EmailOptions>() ?? new EmailOptions();

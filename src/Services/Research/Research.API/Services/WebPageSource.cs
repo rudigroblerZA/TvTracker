@@ -27,7 +27,9 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
         DefaultRequestHeaders = { { "User-Agent", "TvTracker-research/1.0 (+https://github.com/rudigroblerZA/TvTracker)" } }
     };
 
-    /// <summary>The page as a source, or the reason it can't be added.</summary>
+    /// <summary>
+    /// The page as a source, or the reason it can't be added.
+    /// </summary>
     public async Task<(FoundSource? Source, string? Problem)> FetchAsync(string address, CancellationToken ct)
     {
         if (!Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri))
@@ -141,10 +143,14 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     }
 }
 
-/// <summary>Plain text from sources: HTML to readable text, whitespace, and length.</summary>
+/// <summary>
+/// Plain text from sources: HTML to readable text, whitespace, and length.
+/// </summary>
 public static partial class Text
 {
-    /// <summary>At most <paramref name="max"/> characters, cut at a space where there is one, with an ellipsis.</summary>
+    /// <summary>
+    /// At most <paramref name="max"/> characters, cut at a space where there is one, with an ellipsis.
+    /// </summary>
     public static string Clip(string text, int max)
     {
         if (text.Length <= max)
@@ -157,7 +163,9 @@ public static partial class Text
 
     public static string Collapse(string text) => Spaces().Replace(text, " ").Trim();
 
-    /// <summary>The page's title, and the text of its article or main element (else its body), without scripts and chrome.</summary>
+    /// <summary>
+    /// The page's title, and the text of its article or main element (else its body), without scripts and chrome.
+    /// </summary>
     public static (string? Title, string Text) FromHtml(string html)
     {
         var title = OgTitle().Match(html) is { Success: true } og ? og.Groups[1].Value : TitleTag().Match(html) is { Success: true } t ? t.Groups[1].Value : null;

@@ -13,13 +13,19 @@ public sealed class TvMazeOptions
 {
     public string BaseUrl { get; set; } = "https://api.tvmaze.com/";
 
-    /// <summary>Countries whose broadcast schedule for today supplies featured shows, alongside the streaming schedule.</summary>
+    /// <summary>
+    /// Countries whose broadcast schedule for today supplies featured shows, alongside the streaming schedule.
+    /// </summary>
     public List<string> FeaturedCountries { get; set; } = ["US", "GB"];
 
-    /// <summary>How many of today's most popular airing shows to import each sync.</summary>
+    /// <summary>
+    /// How many of today's most popular airing shows to import each sync.
+    /// </summary>
     public int FeaturedCount { get; set; } = 40;
 
-    /// <summary>Show types left out of the featured list (TVmaze's "type" field).</summary>
+    /// <summary>
+    /// Show types left out of the featured list (TVmaze's "type" field).
+    /// </summary>
     public List<string> ExcludedFeaturedTypes { get; set; } = ["News", "Talk Show", "Sports", "Award Show", "Panel Show"];
 
     /// <summary>
@@ -234,7 +240,9 @@ public sealed partial class TvMazeCatalogProvider(
         };
     }
 
-    /// <summary>The part, or null (logged) when TVmaze failed it with a server error.</summary>
+    /// <summary>
+    /// The part, or null (logged) when TVmaze failed it with a server error.
+    /// </summary>
     private async Task<T?> OptionalAsync<T>(Task<T?> part, string name, string externalId) where T : class
     {
         try
@@ -248,7 +256,9 @@ public sealed partial class TvMazeCatalogProvider(
         }
     }
 
-    /// <summary>The show at <paramref name="url"/>, or null when TVmaze doesn't have it.</summary>
+    /// <summary>
+    /// The show at <paramref name="url"/>, or null when TVmaze doesn't have it.
+    /// </summary>
     private async Task<TvMazeShow?> GetShowPartAsync(string url, string externalId, CancellationToken cancellationToken)
     {
         using var response = await http.GetAsync(url, cancellationToken);
@@ -412,7 +422,9 @@ public sealed partial class TvMazeCatalogProvider(
             .ToList();
     }
 
-    /// <summary>Whether one name contains the other, ignoring case and punctuation ("Max" and "HBO Max", "Apple TV+").</summary>
+    /// <summary>
+    /// Whether one name contains the other, ignoring case and punctuation ("Max" and "HBO Max", "Apple TV+").
+    /// </summary>
     private static bool SameName(string a, string b)
     {
         static string Letters(string name) => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
@@ -420,10 +432,14 @@ public sealed partial class TvMazeCatalogProvider(
         return x.Length > 0 && y.Length > 0 && (x.Contains(y) || y.Contains(x));
     }
 
-    /// <summary>The roles that say who made a show; TVmaze also lists writers, composers, casting and the like.</summary>
+    /// <summary>
+    /// The roles that say who made a show; TVmaze also lists writers, composers, casting and the like.
+    /// </summary>
     internal static readonly string[] CreativeRoles = ["Creator", "Developer", "Executive Producer"];
 
-    /// <summary>Creators and developers first, then executive producers, one entry per person.</summary>
+    /// <summary>
+    /// Creators and developers first, then executive producers, one entry per person.
+    /// </summary>
     private static List<ProviderCreative> Creatives(List<TvMazeCrewCredit> crew) => crew
         .Where(c => c.Person?.Name is not null && c.Type is not null && CreativeRoles.Contains(c.Type))
         .GroupBy(c => c.Person!.Id?.ToString() ?? c.Person.Name!)
@@ -437,7 +453,9 @@ public sealed partial class TvMazeCatalogProvider(
         .OrderBy(c => c.Roles.Contains("Executive Producer") && c.Roles.Count == 1)
         .ToList();
 
-    /// <summary>One call: the person's crew credits with each show embedded (for its name and popularity).</summary>
+    /// <summary>
+    /// One call: the person's crew credits with each show embedded (for its name and popularity).
+    /// </summary>
     public async Task<ProviderCareer?> GetCareerAsync(string personExternalId, CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync($"people/{Uri.EscapeDataString(personExternalId)}/crewcredits?embed=show", cancellationToken);
@@ -530,7 +548,9 @@ public sealed partial class TvMazeCatalogProvider(
     private static partial Regex Whitespace();
 }
 
-/// <summary>Spaces TVmaze calls to stay under its limit of 20 calls every 10 seconds.</summary>
+/// <summary>
+/// Spaces TVmaze calls to stay under its limit of 20 calls every 10 seconds.
+/// </summary>
 public sealed class TvMazeRateLimitHandler(TvMazeRateLimiter limiter) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -540,7 +560,9 @@ public sealed class TvMazeRateLimitHandler(TvMazeRateLimiter limiter) : Delegati
     }
 }
 
-/// <summary>Singleton holder so every handler instance shares one budget.</summary>
+/// <summary>
+/// Singleton holder so every handler instance shares one budget.
+/// </summary>
 /// <summary>
 /// Remembers that TVmaze's embedded show requests are failing, so imports use the separate requests for
 /// <see cref="Duration"/> instead of each first waiting out the retries of a request that's going to fail.
@@ -577,10 +599,14 @@ public sealed class TvMazeRateLimiter : IDisposable
 
 internal sealed record TvMazeScheduleItem
 {
-    /// <summary>Set on the country schedule.</summary>
+    /// <summary>
+    /// Set on the country schedule.
+    /// </summary>
     public TvMazeShow? Show { get; init; }
 
-    /// <summary>Set on the web (streaming) schedule.</summary>
+    /// <summary>
+    /// Set on the web (streaming) schedule.
+    /// </summary>
     [JsonPropertyName("_embedded")]
     public TvMazeScheduleEmbedded? Embedded { get; init; }
 }
@@ -630,7 +656,9 @@ internal sealed record TvMazeEmbedded
     public List<TvMazeCastCredit> Cast { get; init; } = [];
     public List<TvMazeShowImage> Images { get; init; } = [];
 
-    /// <summary>Set when these were fetched separately and TVmaze failed them (not part of TVmaze's JSON).</summary>
+    /// <summary>
+    /// Set when these were fetched separately and TVmaze failed them (not part of TVmaze's JSON).
+    /// </summary>
     [JsonIgnore] public bool CastMissing { get; init; }
     [JsonIgnore] public bool ImagesMissing { get; init; }
 }
@@ -643,7 +671,9 @@ internal sealed record TvMazeCastCredit(TvMazePerson? Person, TvMazeCharacter? C
 
 internal sealed record TvMazeCrewCredit(string? Type, TvMazePerson? Person);
 
-/// <summary>An entry of /people/{id}/crewcredits?embed=show.</summary>
+/// <summary>
+/// An entry of /people/{id}/crewcredits?embed=show.
+/// </summary>
 internal sealed record TvMazeCrewCareerCredit
 {
     public string? Type { get; init; }
@@ -654,10 +684,14 @@ internal sealed record TvMazeCrewCareerCredit
 
 internal sealed record TvMazeCrewCareerEmbedded(TvMazeShow? Show);
 
-/// <summary>An entry of /people/{id}/castcredits?embed=show.</summary>
+/// <summary>
+/// An entry of /people/{id}/castcredits?embed=show.
+/// </summary>
 internal sealed record TvMazeCastCareerCredit
 {
-    /// <summary>Appearing as themselves (a host, a panellist, a documentary).</summary>
+    /// <summary>
+    /// Appearing as themselves (a host, a panellist, a documentary).
+    /// </summary>
     public bool Self { get; init; }
 
     public bool Voice { get; init; }

@@ -24,12 +24,16 @@ public static partial class WikiquoteParser
 {
     public const int MaxCharacters = 1200;
 
-    /// <summary>Season pages are fetched up to this many; a soap's page can link hundreds.</summary>
+    /// <summary>
+    /// Season pages are fetched up to this many; a soap's page can link hundreds.
+    /// </summary>
     public const int MaxSeasonPages = 40;
 
     private static readonly HashSet<string> ShowSections = new(StringComparer.OrdinalIgnoreCase) { "Dialogue", "Dialogues", "Dialog", "Quotes" };
 
-    /// <summary>The season pages a show's page links to, in the order it lists them.</summary>
+    /// <summary>
+    /// The season pages a show's page links to, in the order it lists them.
+    /// </summary>
     public static IReadOnlyList<string> SeasonPages(string wikitext, string page)
     {
         var name = Parenthetical().Replace(page.Replace('_', ' '), "").Trim();
@@ -151,7 +155,9 @@ public static partial class WikiquoteParser
         line.StartsWith("[[File:", StringComparison.OrdinalIgnoreCase) || line.StartsWith("[[Image:", StringComparison.OrdinalIgnoreCase)
         || line.StartsWith("{{") || line.StartsWith("{|") || line.StartsWith('|') || line.StartsWith('!') || line.StartsWith("__");
 
-    /// <summary>A line as (speaker, text), the speaker empty for a direction; null when nothing readable is left.</summary>
+    /// <summary>
+    /// A line as (speaker, text), the speaker empty for a direction; null when nothing readable is left.
+    /// </summary>
     private static (string Speaker, string Text)? Spoken(string line)
     {
         var speaker = "";
@@ -164,7 +170,9 @@ public static partial class WikiquoteParser
         return text.Length == 0 ? null : (speaker, text);
     }
 
-    /// <summary>Wikitext to plain text: links to their labels, templates, references, tags and quote marks out.</summary>
+    /// <summary>
+    /// Wikitext to plain text: links to their labels, templates, references, tags and quote marks out.
+    /// </summary>
     public static string Clean(string wikitext)
     {
         var text = Reference().Replace(wikitext, "");
@@ -191,7 +199,9 @@ public static partial class WikiquoteParser
     [GeneratedRegex(@"\[\s*(\d+)\s*\.\s*(\d+)")]
     private static partial Regex EpisodeNumbers();
 
-    /// <summary><c>'''Walter''':</c> or <c>'''Walter:'''</c> at the start of a line (a name may hold one quote mark).</summary>
+    /// <summary>
+    /// <c>'''Walter''':</c> or <c>'''Walter:'''</c> at the start of a line (a name may hold one quote mark).
+    /// </summary>
     [GeneratedRegex(@"^'''((?:(?!''').)+?)(?::'''|'''\s*:)\s*(.*)$")]
     private static partial Regex SpeakerFirst();
 

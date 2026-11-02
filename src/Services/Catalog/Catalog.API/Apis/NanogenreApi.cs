@@ -54,7 +54,9 @@ public static class NanogenreApi
 
     private sealed record NanogenrePoster(string Slug, string PosterUrl);
 
-    /// <summary>A nanogenre's shows, most popular first. 404 for a slug that's gone since the last discovery.</summary>
+    /// <summary>
+    /// A nanogenre's shows, most popular first. 404 for a slug that's gone since the last discovery.
+    /// </summary>
     private static async Task<Results<Ok<NanogenreDetailDto>, NotFound>> GetAsync(string slug, CatalogContext db, CancellationToken ct)
     {
         if (await db.Nanogenres.AsNoTracking().SingleOrDefaultAsync(n => n.Slug == slug, ct) is not { } nanogenre)
@@ -70,7 +72,9 @@ public static class NanogenreApi
         return TypedResults.Ok(new NanogenreDetailDto(nanogenre.Slug, nanogenre.Name, nanogenre.Source, shows.Select(s => s.ToSummary()).ToList()));
     }
 
-    /// <summary>Names for a show's nanogenre slugs, in the show's order; slugs without a nanogenre any more are skipped.</summary>
+    /// <summary>
+    /// Names for a show's nanogenre slugs, in the show's order; slugs without a nanogenre any more are skipped.
+    /// </summary>
     internal static async Task<List<NanogenreRefDto>> RefsAsync(CatalogContext db, List<string> slugs, CancellationToken ct)
     {
         if (slugs.Count == 0)

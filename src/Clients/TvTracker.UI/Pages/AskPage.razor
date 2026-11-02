@@ -174,7 +174,9 @@
         error = null;
     }
 
-    /// <summary>Checks every 2 s while the last question is being answered.</summary>
+    /// <summary>
+    /// Checks every 2 s while the last question is being answered.
+    /// </summary>
     private void SchedulePoll()
     {
         poll?.Dispose();
@@ -230,7 +232,9 @@
         return values.Length == 0 ? name : $"{name} ({values})";
     }
 
-    /// <summary>The call's argument values, without names or ids: "landman", "hidden-gems, drama".</summary>
+    /// <summary>
+    /// The call's argument values, without names or ids: "landman", "hidden-gems, drama".
+    /// </summary>
     private static string ArgumentValues(string json)
     {
         try
@@ -246,13 +250,17 @@
         }
     }
 
-    /// <summary>The answer's lines, without the Markdown emphasis small models add.</summary>
+    /// <summary>
+    /// The answer's lines, without the Markdown emphasis small models add.
+    /// </summary>
     private static IEnumerable<string> Lines(string answer) =>
         answer.Replace("**", "").Replace("__", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0);
 
     private sealed record Part(string Text, AssistantShow? Show);
 
-    /// <summary>The line split around show titles, each title linked to its show; longer titles first ("NCIS: Sydney" over "NCIS").</summary>
+    /// <summary>
+    /// The line split around show titles, each title linked to its show; longer titles first ("NCIS: Sydney" over "NCIS").
+    /// </summary>
     private static List<Part> Parts(string line, IReadOnlyList<AssistantShow> shows)
     {
         var parts = new List<Part>();
@@ -280,7 +288,9 @@
         return parts;
     }
 
-    /// <summary>Where the title appears as whole words, so a show called "Lost" doesn't link part of "lostness".</summary>
+    /// <summary>
+    /// Where the title appears as whole words, so a show called "Lost" doesn't link part of "lostness".
+    /// </summary>
     private static int IndexOfWords(string line, string title, int from)
     {
         for (var i = line.IndexOf(title, from, StringComparison.OrdinalIgnoreCase); i >= 0; i = line.IndexOf(title, i + 1, StringComparison.OrdinalIgnoreCase))

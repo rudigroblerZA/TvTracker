@@ -56,7 +56,9 @@ public static class AwardsApi
         ? new(a.ShowId, a.ShowTitle, a.PosterUrl, a.Wins, c.Summary, true, null)
         : new(a.ShowId, a.ShowTitle, a.PosterUrl, a.Wins, a.Summary, false, a.WikidataUrl);
 
-    /// <summary>The awards fact of each show's latest saved research, where it has one.</summary>
+    /// <summary>
+    /// The awards fact of each show's latest saved research, where it has one.
+    /// </summary>
     private static async Task<Dictionary<Guid, (string Title, string Summary)>> CheckedAsync(ResearchContext db, List<Guid> showIds,
         CancellationToken ct)
     {

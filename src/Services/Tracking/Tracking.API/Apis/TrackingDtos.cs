@@ -36,7 +36,9 @@ public record MarkWatchedRequest(
 
 public record MarkWatchedResult(int Added, IReadOnlyList<Guid> EpisodeIds);
 
-/// <summary>Watches from an export (Bring your history), each with the time it was watched.</summary>
+/// <summary>
+/// Watches from an export (Bring your history), each with the time it was watched.
+/// </summary>
 public record ImportWatchesRequest(IReadOnlyList<ImportedWatch> Watches)
 {
     public const int MaxWatches = 500;
@@ -113,7 +115,9 @@ public record ListItemDto(Guid ShowId, string? Title, string? PosterUrl, int Pos
 public record ListDetailDto(Guid Id, string Name, string? Description, IReadOnlyList<ListItemDto> Items, DateTime UpdatedAtUtc, bool Shared = false,
     string? LinkToken = null);
 
-/// <summary>A list as its link shows it: no owner, no ids beyond the shows'.</summary>
+/// <summary>
+/// A list as its link shows it: no owner, no ids beyond the shows'.
+/// </summary>
 public record LinkedListDto(string Name, string? Description, IReadOnlyList<LinkedListItemDto> Items, DateTime UpdatedAtUtc);
 
 public record LinkedListItemDto(Guid ShowId, string? Title, string? PosterUrl);
@@ -125,7 +129,9 @@ public static class TrackingMappings
     public static EpisodeRefDto ToRef(this EpisodeCopy e) =>
         new(e.EpisodeId, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.AirsAtUtc, e.RuntimeMinutes);
 
-    /// <summary>Season 0 is "specials" and doesn't count towards progress.</summary>
+    /// <summary>
+    /// Season 0 is "specials" and doesn't count towards progress.
+    /// </summary>
     public static bool CountsTowardsProgress(this EpisodeCopy e) => e.SeasonNumber > 0;
 
     public static IOrderedEnumerable<EpisodeCopy> InWatchOrder(this IEnumerable<EpisodeCopy> episodes) =>

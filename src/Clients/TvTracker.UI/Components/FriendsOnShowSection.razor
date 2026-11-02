@@ -49,7 +49,9 @@
         }
     }
 
-    /// <summary>"Finished", "Up to S03E04 · 28 of 62", "Following, not started".</summary>
+    /// <summary>
+    /// "Finished", "Up to S03E04 · 28 of 62", "Following, not started".
+    /// </summary>
     public static string Describe(PeerProgress progress, bool following) =>
         progress.Finished ? "Finished"
         : progress.Furthest is { } furthest ? $"Up to {Format.EpisodeCode(furthest.SeasonNumber, furthest.EpisodeNumber)} · {progress.Watched} of {progress.Aired}"

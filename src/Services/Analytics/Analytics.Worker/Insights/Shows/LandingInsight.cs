@@ -15,13 +15,19 @@ public sealed class LandingInsight : IShowInsight
     private const int MinRatedEpisodes = 10;
     private const double MinRatedShare = 0.6;
 
-    /// <summary>A finale this far above or below the show's median episode is strong or weak; nearer, it's in line.</summary>
+    /// <summary>
+    /// A finale this far above or below the show's median episode is strong or weak; nearer, it's in line.
+    /// </summary>
     private const double FinaleMargin = 0.3;
 
-    /// <summary>A final season this far below the median season is a weak one; at or above it, it holds up.</summary>
+    /// <summary>
+    /// A final season this far below the median season is a weak one; at or above it, it holds up.
+    /// </summary>
     private const double SeasonMargin = 0.3;
 
-    /// <summary>The final season is ranked only among this many seasons that count.</summary>
+    /// <summary>
+    /// The final season is ranked only among this many seasons that count.
+    /// </summary>
     private const int MinRankedSeasons = 3;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights) =>

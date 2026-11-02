@@ -13,10 +13,14 @@ namespace Catalog.API.Services;
 public sealed class CrossoverAlerts(Crossovers crossovers, IEventBus bus, TimeProvider time, ILogger<CrossoverAlerts> logger)
     : BackgroundService
 {
-    /// <summary>How far ahead followers hear of a crossover.</summary>
+    /// <summary>
+    /// How far ahead followers hear of a crossover.
+    /// </summary>
     public static readonly TimeSpan LeadTime = TimeSpan.FromDays(14);
 
-    /// <summary>Lets Notifications bind its queue after a joint start.</summary>
+    /// <summary>
+    /// Lets Notifications bind its queue after a joint start.
+    /// </summary>
     private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(2);
 
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);

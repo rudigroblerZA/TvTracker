@@ -26,14 +26,18 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<AtlasPlace> Places { get; set; } = [];
 
-    /// <summary>Filming places, drawn as rings over the dots; a show page passes these with its settings.</summary>
+    /// <summary>
+    /// Filming places, drawn as rings over the dots; a show page passes these with its settings.
+    /// </summary>
     [Parameter] public IReadOnlyList<AtlasPlace> Filmed { get; set; } = [];
 
     [Parameter] public string? Selected { get; set; }
 
     [Parameter] public EventCallback<string> OnSelect { get; set; }
 
-    /// <summary>Small, for a show page: zoomed to the show's places rather than the whole world.</summary>
+    /// <summary>
+    /// Small, for a show page: zoomed to the show's places rather than the whole world.
+    /// </summary>
     [Parameter] public bool Compact { get; set; }
 
     [Parameter] public string Label { get; set; } = "World map";

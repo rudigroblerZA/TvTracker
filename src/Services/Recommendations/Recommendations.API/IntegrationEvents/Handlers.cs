@@ -7,7 +7,9 @@ using TvTracker.Persistence;
 
 namespace Recommendations.API.IntegrationEvents;
 
-/// <summary>Keeps show features current from the catalog, and show DNA from Analytics.</summary>
+/// <summary>
+/// Keeps show features current from the catalog, and show DNA from Analytics.
+/// </summary>
 public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider time) :
     IIntegrationEventHandler<ShowAddedIntegrationEvent>,
     IIntegrationEventHandler<ShowUpdatedIntegrationEvent>,
@@ -50,7 +52,9 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Each show's traits replace the ones held; a show sent without traits has none any more.</summary>
+    /// <summary>
+    /// Each show's traits replace the ones held; a show sent without traits has none any more.
+    /// </summary>
     public async Task HandleAsync(ShowDnaChangedIntegrationEvent e, CancellationToken ct)
     {
         var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
@@ -96,7 +100,9 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
     public Task HandleAsync(ShowUpdatedIntegrationEvent e, CancellationToken ct) =>
         UpsertAsync(e, e.ShowId, e.Title, e.PosterUrl, e.Status, e.Genres, e.Keywords, e.CastNames, e.SimilarShowIds, e.Popularity, ct);
 
-    /// <summary>Any user's picks can depend on any show's DNA or nanogenres: rebuild every list that isn't already queued.</summary>
+    /// <summary>
+    /// Any user's picks can depend on any show's DNA or nanogenres: rebuild every list that isn't already queued.
+    /// </summary>
     private async Task MarkEveryoneDirtyAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
@@ -138,7 +144,9 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
     }
 }
 
-/// <summary>Updates a user's signals from follows, watches and ratings, and flags their list for a rebuild.</summary>
+/// <summary>
+/// Updates a user's signals from follows, watches and ratings, and flags their list for a rebuild.
+/// </summary>
 public sealed class UserSignalHandler(RecommendationsContext db, RecommendationStore store, TimeProvider time) :
     IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
     IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>,

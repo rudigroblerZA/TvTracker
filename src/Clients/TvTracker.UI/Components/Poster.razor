@@ -15,7 +15,9 @@ else
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public string? Url { get; set; }
 
-    /// <summary>"small", "medium" or "large".</summary>
+    /// <summary>
+    /// "small", "medium" or "large".
+    /// </summary>
     [Parameter] public string Size { get; set; } = "medium";
 
     private string Initials => string.Concat(Title.Split(' ', StringSplitOptions.RemoveEmptyEntries)

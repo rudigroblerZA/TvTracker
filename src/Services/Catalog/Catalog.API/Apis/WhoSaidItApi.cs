@@ -41,7 +41,9 @@ public static partial class WhoSaidItApi
     private const int MinLine = 20;
     private const int MaxLine = 200;
 
-    /// <summary>Lines a character needs in the allowed episodes to be an option or an answer.</summary>
+    /// <summary>
+    /// Lines a character needs in the allowed episodes to be an option or an answer.
+    /// </summary>
     private const int MinLines = 2;
 
     private sealed record Candidate(Guid ShowId, int Season, int Episode, string Speaker, string Line);
@@ -178,7 +180,9 @@ public static partial class WhoSaidItApi
         return questions;
     }
 
-    /// <summary>Each speaker as written, to the character it is: names whose words sit inside a fuller one's join it.</summary>
+    /// <summary>
+    /// Each speaker as written, to the character it is: names whose words sit inside a fuller one's join it.
+    /// </summary>
     private static Dictionary<string, string> Canonical(IEnumerable<string> speakers)
     {
         var counts = speakers.GroupBy(s => s).ToDictionary(g => g.Key, g => g.Count());
@@ -199,7 +203,9 @@ public static partial class WhoSaidItApi
     private static HashSet<string> Words(string name) =>
         Word().Matches(name).Select(m => m.Value.ToLowerInvariant()).ToHashSet();
 
-    /// <summary>The line says one of the character's name words (three letters or more).</summary>
+    /// <summary>
+    /// The line says one of the character's name words (three letters or more).
+    /// </summary>
     private static bool Names(string line, string character)
     {
         var said = Words(line);

@@ -24,7 +24,9 @@
 @code {
     [Parameter, EditorRequired] public FinishOutlook Outlook { get; set; } = null!;
 
-    /// <summary>"Hang on: it gets good in 2 episodes (1 h 30 min), at S01E06 “Hide and Seek”."</summary>
+    /// <summary>
+    /// "Hang on: it gets good in 2 episodes (1 h 30 min), at S01E06 “Hide and Seek”."
+    /// </summary>
     private string GetsGoodText(GetsGoodAhead ahead)
     {
         var where = $"{Format.EpisodeCode(ahead.SeasonNumber, ahead.EpisodeNumber)} “{ahead.Title}”";

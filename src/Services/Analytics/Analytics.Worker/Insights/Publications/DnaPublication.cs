@@ -5,7 +5,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Show DNA, for Recommendations (<see cref="ShowDnaChangedIntegrationEvent"/>). A show without DNA is sent with no traits.</summary>
+/// <summary>
+/// Show DNA, for Recommendations (<see cref="ShowDnaChangedIntegrationEvent"/>). A show without DNA is sent with no traits.
+/// </summary>
 public sealed class DnaPublication : IInsightPublication
 {
     public PublicationBuilder Begin(bool publishAll) => new Builder(publishAll);
@@ -17,7 +19,9 @@ public sealed class DnaPublication : IInsightPublication
         protected override ShowDnaValues ValueOf(ShowInsights insights) =>
             new(insights.ShowId, (insights.Dna?.Traits ?? []).ToDictionary(t => t.Key, t => t.Value));
 
-        /// <summary>Documents from before DNA have none; a show that now has DNA is then sent.</summary>
+        /// <summary>
+        /// Documents from before DNA have none; a show that now has DNA is then sent.
+        /// </summary>
         protected override ShowDnaValues PreviousValueOf(JsonElement document) =>
             new(Guid.Empty, document.TryGetProperty(InsightDocuments.Paths.Dna, out var dna) && dna.ValueKind == JsonValueKind.Object
                 ? dna.GetProperty(InsightDocuments.Paths.Traits).EnumerateArray().ToDictionary(t => t.GetProperty(InsightDocuments.Paths.Key).GetString()!, t => t.GetProperty(InsightDocuments.Paths.Value).GetDouble())

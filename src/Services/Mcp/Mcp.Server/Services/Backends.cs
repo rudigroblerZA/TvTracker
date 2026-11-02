@@ -56,7 +56,9 @@ public sealed class Backends(IHttpClientFactory factory)
     }
 }
 
-/// <summary>Turns what someone typed ("landman", or a show id) into a catalog show.</summary>
+/// <summary>
+/// Turns what someone typed ("landman", or a show id) into a catalog show.
+/// </summary>
 public sealed class ShowResolver(Backends backends)
 {
     public sealed record Show(Guid Id, string Title, int? Year);

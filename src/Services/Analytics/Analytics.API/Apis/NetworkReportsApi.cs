@@ -14,7 +14,9 @@ public static class NetworkReportsApi
     public static void MapNetworkReportsApi(this RouteGroupBuilder api) =>
         api.MapGet("/insights/networks", GetReportsAsync).RequireFeature(FeatureFlags.NetworkReports);
 
-    /// <summary><c>{ "baseline": NetworkReport | null, "networks": NetworkReport[] }</c>, the documents as stored.</summary>
+    /// <summary>
+    /// <c>{ "baseline": NetworkReport | null, "networks": NetworkReport[] }</c>, the documents as stored.
+    /// </summary>
     private static async Task<ContentHttpResult> GetReportsAsync(AnalyticsContext db, CancellationToken ct)
     {
         var rows = await db.NetworkReports.AsNoTracking()

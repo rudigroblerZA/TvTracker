@@ -13,10 +13,14 @@ namespace TvTracker.EventBus.RabbitMQ;
 
 public sealed class RabbitMQEventBusOptions
 {
-    /// <summary>Name of the connection string Aspire injects (the RabbitMQ resource name).</summary>
+    /// <summary>
+    /// Name of the connection string Aspire injects (the RabbitMQ resource name).
+    /// </summary>
     public string ConnectionName { get; set; } = "eventbus";
 
-    /// <summary>Queue for this service. Each service has its own queue bound to the events it subscribes to.</summary>
+    /// <summary>
+    /// Queue for this service. Each service has its own queue bound to the events it subscribes to.
+    /// </summary>
     public string SubscriptionClientName { get; set; } = "";
 
     public ushort PrefetchCount { get; set; } = 10;
@@ -39,7 +43,9 @@ public sealed class RabbitMQEventBus(
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Publishing channels kept open between publishes, at most this many.</summary>
+    /// <summary>
+    /// Publishing channels kept open between publishes, at most this many.
+    /// </summary>
     private const int MaxIdlePublishChannels = 8;
 
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
@@ -50,7 +56,9 @@ public sealed class RabbitMQEventBus(
     private IChannel? _consumerChannel;
     private Task? _consumerTask;
 
-    /// <summary>True once this service's queue is declared, bound and being consumed (or it has no subscriptions).</summary>
+    /// <summary>
+    /// True once this service's queue is declared, bound and being consumed (or it has no subscriptions).
+    /// </summary>
     public bool IsReady => subscriptionInfo.Value.EventTypes.Count == 0 || _consumerChannel is { IsOpen: true };
 
     public async Task PublishAsync(IntegrationEvent @event, CancellationToken cancellationToken = default)

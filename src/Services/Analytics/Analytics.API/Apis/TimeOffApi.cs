@@ -29,27 +29,41 @@ public static class TimeOffApi
     private const int MinHours = 2;
     private const int MaxHours = 200;
 
-    /// <summary>A single fit fills at least this share of the time, so a 20-hour holiday isn't offered a 2-hour show.</summary>
+    /// <summary>
+    /// A single fit fills at least this share of the time, so a 20-hour holiday isn't offered a 2-hour show.
+    /// </summary>
     private const double MinFill = 0.25;
 
-    /// <summary>Candidates for a mix, best first.</summary>
+    /// <summary>
+    /// Candidates for a mix, best first.
+    /// </summary>
     private const int MixCandidates = 30;
 
-    /// <summary>A mix replaces nothing unless it fills this share of the time.</summary>
+    /// <summary>
+    /// A mix replaces nothing unless it fills this share of the time.
+    /// </summary>
     private const double MinMixFill = 0.6;
 
     private const int MaxFits = 10;
 
-    /// <summary>Shows worth less than this aren't suggested at all.</summary>
+    /// <summary>
+    /// Shows worth less than this aren't suggested at all.
+    /// </summary>
     private const double MinValue = 7.3;
 
-    /// <summary>Shorter than this isn't a show to fill time off with.</summary>
+    /// <summary>
+    /// Shorter than this isn't a show to fill time off with.
+    /// </summary>
     private const int MinMinutes = 60;
 
-    /// <summary>A mix's score is Σ minutes × (value − this): a show at this value adds nothing by being longer.</summary>
+    /// <summary>
+    /// A mix's score is Σ minutes × (value − this): a show at this value adds nothing by being longer.
+    /// </summary>
     private const double MixValueFloor = 6.5;
 
-    /// <summary>The finished shows and what's known about their endings are the same for everyone; kept this long.</summary>
+    /// <summary>
+    /// The finished shows and what's known about their endings are the same for everyone; kept this long.
+    /// </summary>
     private static readonly HybridCacheEntryOptions ShelfCache = new() { Expiration = TimeSpan.FromHours(1), LocalCacheExpiration = TimeSpan.FromHours(1) };
 
     /// <summary>
@@ -101,7 +115,9 @@ public static class TimeOffApi
         return TypedResults.Ok(new TimeOffDto(budget, fits, Mix(candidates.Take(MixCandidates).ToList(), budget + overrun, fits)));
     }
 
-    /// <summary>Every ended show with a running time, and the parts of its document the assessment reads.</summary>
+    /// <summary>
+    /// Every ended show with a running time, and the parts of its document the assessment reads.
+    /// </summary>
     private static async Task<Shelf> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
     {
         var ended = await db.Shows.AsNoTracking().Where(s => s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled).ToListAsync(ct);

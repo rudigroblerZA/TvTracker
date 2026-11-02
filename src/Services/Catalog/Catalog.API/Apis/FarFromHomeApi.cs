@@ -55,7 +55,9 @@ public static class FarFromHomeApi
     private const int MaxRows = 40;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
-    /// <summary>TVmaze's country names where Wikidata's differ.</summary>
+    /// <summary>
+    /// TVmaze's country names where Wikidata's differ.
+    /// </summary>
     private static readonly Dictionary<string, string> Same = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Korea, Republic of"] = "South Korea",
@@ -86,7 +88,9 @@ public static class FarFromHomeApi
         ["Guernsey"] = "United Kingdom",
     };
 
-    /// <summary>Wikidata's names shown as people say them.</summary>
+    /// <summary>
+    /// Wikidata's names shown as people say them.
+    /// </summary>
     private static readonly Dictionary<string, string> Shown = new() { ["People's Republic of China"] = "China" };
 
     private sealed record CastRow(Guid ShowId, Guid PersonId, string Name, string? PhotoUrl, string? Character, int Order, string? Country);
@@ -108,10 +112,14 @@ public static class FarFromHomeApi
     private static async Task<Ok<FarFromHomeDto>> GetListsAsync(CatalogContext db, HybridCache cache, CancellationToken ct) =>
         TypedResults.Ok((await LoadAsync(db, cache, ct)).Lists);
 
-    /// <summary>A birthplace as Wikidata names countries.</summary>
+    /// <summary>
+    /// A birthplace as Wikidata names countries.
+    /// </summary>
     internal static string Country(string name) => Same.GetValueOrDefault(name, name);
 
-    /// <summary>The country a birthplace counts as, for comparing with a setting.</summary>
+    /// <summary>
+    /// The country a birthplace counts as, for comparing with a setting.
+    /// </summary>
     private static string CountsAs(string name) => Territories.GetValueOrDefault(Country(name), Country(name));
 
     private static string Show(string country) => Shown.GetValueOrDefault(country, country);

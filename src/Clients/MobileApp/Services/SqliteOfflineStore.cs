@@ -60,7 +60,9 @@ public sealed class SqliteOfflineStore : IOfflineStore
         await db.DeleteAsync(request);
     }
 
-    /// <summary>Clears cached data and pending changes (on sign-out).</summary>
+    /// <summary>
+    /// Clears cached data and pending changes (on sign-out).
+    /// </summary>
     public async Task ClearAsync()
     {
         var db = await _db.Value;

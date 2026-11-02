@@ -38,13 +38,17 @@ public record ProgressShowDto(Guid ShowId, string Title, string? PosterUrl, int 
 /// </summary>
 public static class TasteApi
 {
-    /// <summary>Average differences within this (0-10 scale) are "in line" with the provider.</summary>
+    /// <summary>
+    /// Average differences within this (0-10 scale) are "in line" with the provider.
+    /// </summary>
     public const double InLineMargin = 0.5;
 
     private const int MinComparedRatings = 3;
     private const int MinRatedPerGenre = 2;
 
-    /// <summary>A show rated this far (stars × 2 against 0-10) from the provider is listed as kinder or harsher.</summary>
+    /// <summary>
+    /// A show rated this far (stars × 2 against 0-10) from the provider is listed as kinder or harsher.
+    /// </summary>
     private const double ListedDifference = 1;
     private const int MaxListedShows = 3;
     private const int MaxGenres = 8;

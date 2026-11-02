@@ -2,7 +2,9 @@ using System.Security.Claims;
 
 namespace Research.API.Services;
 
-/// <summary>Who may research: the moderators, the same people as Ratings.API's (<c>Admin:Users</c> and <c>Moderation:Users</c>).</summary>
+/// <summary>
+/// Who may research: the moderators, the same people as Ratings.API's (<c>Admin:Users</c> and <c>Moderation:Users</c>).
+/// </summary>
 public sealed class Researchers(IConfiguration config)
 {
     public bool Allowed(ClaimsPrincipal user) =>

@@ -17,18 +17,26 @@ public sealed class GetsGoodInsight : IShowInsight
     private const int OpeningRun = 40;
     private const int OpeningEpisodes = 3;
 
-    /// <summary>Opening within this of the bar: good from the start.</summary>
+    /// <summary>
+    /// Opening within this of the bar: good from the start.
+    /// </summary>
     private const double StrongStartMargin = 0.1;
 
-    /// <summary>Opening this far below the bar, or further: a slow start. In between, nothing is said.</summary>
+    /// <summary>
+    /// Opening this far below the bar, or further: a slow start. In between, nothing is said.
+    /// </summary>
     private const double SlowStartMargin = 0.3;
 
     private const double StayMargin = 0.05;
 
-    /// <summary>The turn is looked for in the first this many rated episodes, and the first 60% of the opening run.</summary>
+    /// <summary>
+    /// The turn is looked for in the first this many rated episodes, and the first 60% of the opening run.
+    /// </summary>
     private const int MaxTurn = 25;
 
-    /// <summary>A turn is worth naming when the ten episodes from it beat the ones before by this much.</summary>
+    /// <summary>
+    /// A turn is worth naming when the ten episodes from it beat the ones before by this much.
+    /// </summary>
     private const double MinLift = 0.3;
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights) =>

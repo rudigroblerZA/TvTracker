@@ -15,7 +15,9 @@ public sealed record DigestLine(string Text, string? Link);
 
 public sealed record DigestSection(string Heading, IReadOnlyList<DigestLine> Lines);
 
-/// <summary>One user's week: what's coming on their shows, and what they were told since the last digest.</summary>
+/// <summary>
+/// One user's week: what's coming on their shows, and what they were told since the last digest.
+/// </summary>
 public sealed record Digest(string Subject, IReadOnlyList<DigestSection> Sections)
 {
     public bool IsEmpty => Sections.Count == 0;
@@ -43,12 +45,16 @@ public sealed record Digest(string Subject, IReadOnlyList<DigestSection> Section
     }
 }
 
-/// <summary>An episode from Catalog.API's schedule (the parts the digest uses).</summary>
+/// <summary>
+/// An episode from Catalog.API's schedule (the parts the digest uses).
+/// </summary>
 public sealed record ScheduledEpisode(Guid ShowId, string ShowTitle, ScheduleEpisode Episode);
 
 public sealed record ScheduleEpisode(int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset? AirsAtUtc);
 
-/// <summary>Reads the schedule from Catalog.API, as any client does.</summary>
+/// <summary>
+/// Reads the schedule from Catalog.API, as any client does.
+/// </summary>
 public sealed class CatalogSchedule(HttpClient http)
 {
     public async Task<List<ScheduledEpisode>> GetAsync(IReadOnlyCollection<Guid> showIds, DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
@@ -146,7 +152,9 @@ public sealed class WeeklyDigest(NotificationsContext db, CatalogSchedule schedu
 
 public sealed class DigestOptions
 {
-    /// <summary>The web app's address, for links in the email.</summary>
+    /// <summary>
+    /// The web app's address, for links in the email.
+    /// </summary>
     public string BaseUrl { get; set; } = "https://localhost:7120";
 }
 
@@ -224,7 +232,9 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
         }
     }
 
-    /// <summary>Their day, from their hour, in their time zone.</summary>
+    /// <summary>
+    /// Their day, from their hour, in their time zone.
+    /// </summary>
     internal static bool IsDue(NotificationPreferences prefs, DateTime nowUtc)
     {
         var tz = TimeZoneInfo.TryFindSystemTimeZoneById(prefs.TimeZone, out var found) ? found : TimeZoneInfo.Utc;

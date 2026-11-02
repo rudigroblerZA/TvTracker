@@ -120,7 +120,9 @@ else
 @code {
     [Parameter] public string? Key { get; set; }
 
-    /// <summary>Where a holiday episode sits for the user.</summary>
+    /// <summary>
+    /// Where a holiday episode sits for the user.
+    /// </summary>
     private enum Place { UpNext, Behind, NotStarted, Ahead, Watched }
 
     private sealed record MyEpisode(HolidayEpisode Episode, Place Place);
@@ -131,7 +133,9 @@ else
     private HashSet<Guid> followed = [];
     private string? error;
 
-    /// <summary>The best known, less the user's own shows, which are listed above.</summary>
+    /// <summary>
+    /// The best known, less the user's own shows, which are listed above.
+    /// </summary>
     private List<HolidayEpisode> Others => holiday?.Episodes.Where(e => !followed.Contains(e.ShowId)).ToList() ?? [];
 
     protected override Task OnParametersSetAsync() => LoadAsync();

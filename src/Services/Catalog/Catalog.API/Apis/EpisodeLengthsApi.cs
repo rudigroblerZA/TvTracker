@@ -50,7 +50,9 @@ public static class EpisodeLengthsApi
     public const int JumpMinutes = 10;
     private const int ListSize = 25;
 
-    /// <summary>The lists start from episodes at least this long: shorter ones are TVmaze's shorts and compilations.</summary>
+    /// <summary>
+    /// The lists start from episodes at least this long: shorter ones are TVmaze's shorts and compilations.
+    /// </summary>
     private const int ListMinMinutes = 15;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
@@ -58,7 +60,9 @@ public static class EpisodeLengthsApi
 
     private sealed record ShowRow(Guid Id, string Title, string? PosterUrl, double Popularity, bool Scripted);
 
-    /// <summary>Every show's lengths, cached as one entry (a few hundred shows).</summary>
+    /// <summary>
+    /// Every show's lengths, cached as one entry (a few hundred shows).
+    /// </summary>
     private sealed record AllLengths(List<EpisodeLengthsDto> Shows, List<ShowRow> Titles);
 
     public static void MapEpisodeLengthsApi(this RouteGroupBuilder api)
@@ -121,7 +125,9 @@ public static class EpisodeLengthsApi
             return new AllLengths(shows, titles);
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
-    /// <summary>A show's lengths, or null when fewer than two seasons count.</summary>
+    /// <summary>
+    /// A show's lengths, or null when fewer than two seasons count.
+    /// </summary>
     private static EpisodeLengthsDto? Build(Guid showId, List<SeasonRow> seasons)
     {
         var dtos = seasons.Select(r => new SeasonLengthDto(r.SeasonNumber, r.Episodes, (int)Math.Round(r.Median), r.Total, r.Timed >= MinEpisodes))

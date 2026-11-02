@@ -39,7 +39,9 @@ public class UserList
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
-    /// <summary>Shared lists are sent to Social, which shows them to the people who can see the owner.</summary>
+    /// <summary>
+    /// Shared lists are sent to Social, which shows them to the people who can see the owner.
+    /// </summary>
     public bool Shared { get; set; }
 
     /// <summary>
@@ -59,7 +61,9 @@ public class UserListItem
     public DateTime AddedAtUtc { get; set; }
 }
 
-/// <summary>Read copy of a show, kept current from Catalog events.</summary>
+/// <summary>
+/// Read copy of a show, kept current from Catalog events.
+/// </summary>
 public class ShowCopy
 {
     public Guid ShowId { get; set; }
@@ -70,7 +74,9 @@ public class ShowCopy
     public DateTime UpdatedAtUtc { get; set; }
 }
 
-/// <summary>Read copy of an episode, kept current from EpisodeScheduled events.</summary>
+/// <summary>
+/// Read copy of an episode, kept current from EpisodeScheduled events.
+/// </summary>
 public class EpisodeCopy
 {
     public Guid EpisodeId { get; set; }
@@ -91,7 +97,9 @@ public class UserPlanCopy
     public required string UserId { get; set; }
     public required string Plan { get; set; }
 
-    /// <summary>When Identity set it; an event older than this is ignored, since events can arrive out of order.</summary>
+    /// <summary>
+    /// When Identity set it; an event older than this is ignored, since events can arrive out of order.
+    /// </summary>
     public DateTimeOffset ChangedAtUtc { get; set; }
 }
 

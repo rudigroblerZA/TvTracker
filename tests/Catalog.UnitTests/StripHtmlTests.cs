@@ -2,7 +2,9 @@ using Catalog.SyncWorker.Providers;
 
 namespace Catalog.UnitTests;
 
-/// <summary>TVmaze summaries arrive as HTML, some escaped twice (see CONTEXT.md, Summaries).</summary>
+/// <summary>
+/// TVmaze summaries arrive as HTML, some escaped twice (see CONTEXT.md, Summaries).
+/// </summary>
 public class StripHtmlTests
 {
     [Theory]

@@ -7,20 +7,28 @@ public sealed record CatalogSeason(int Number, int EpisodeCount);
 
 public sealed record CatalogCreative(Guid PersonId, string Name, IReadOnlyList<string> Roles);
 
-/// <summary>The parts of Catalog.API's show detail research uses.</summary>
+/// <summary>
+/// The parts of Catalog.API's show detail research uses.
+/// </summary>
 public sealed record CatalogShow(Guid Id, string Title, string? Overview, DateOnly? FirstAirDate, string? Network,
     IReadOnlyList<CatalogSeason> Seasons, IReadOnlyList<CatalogCreative>? Creatives, string? Source, string? ExternalId);
 
 public sealed record CatalogEpisode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title);
 
-/// <summary>Catalog.API's facts about a popular show (<c>/api/v1/shows/facts</c>).</summary>
+/// <summary>
+/// Catalog.API's facts about a popular show (<c>/api/v1/shows/facts</c>).
+/// </summary>
 public sealed record CatalogShowFacts(Guid Id, string Title, string? PosterUrl, string Source, string ExternalId, string? Network,
     DateOnly? FirstAirDate, TvTracker.IntegrationEvents.ShowStatus Status, double Popularity, int AiredEpisodes);
 
-/// <summary>Reads shows from Catalog.API, as any client does.</summary>
+/// <summary>
+/// Reads shows from Catalog.API, as any client does.
+/// </summary>
 public sealed class CatalogReader(HttpClient http)
 {
-    /// <summary>The most popular shows, most popular first, with the facts the research queue checks.</summary>
+    /// <summary>
+    /// The most popular shows, most popular first, with the facts the research queue checks.
+    /// </summary>
     public async Task<List<CatalogShowFacts>> GetPopularFactsAsync(int limit, CancellationToken ct) =>
         await http.GetFromJsonAsync<List<CatalogShowFacts>>($"api/v1/shows/facts?limit={limit}", ct) ?? [];
 
@@ -86,7 +94,9 @@ public sealed class CatalogOverrides(HttpClient http, ILogger<CatalogOverrides> 
         }
     }
 
-    /// <summary>Lets the provider's value back (on the show's next refresh, due at once).</summary>
+    /// <summary>
+    /// Lets the provider's value back (on the show's next refresh, due at once).
+    /// </summary>
     public async Task<OverrideOutcome> RemoveAsync(Guid showId, string field, CancellationToken ct)
     {
         try

@@ -93,7 +93,9 @@
 @code {
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
 
-    /// <summary>The research's sources, offered as the note's source.</summary>
+    /// <summary>
+    /// The research's sources, offered as the note's source.
+    /// </summary>
     [Parameter] public IReadOnlyList<ResearchSourceItem> Sources { get; set; } = [];
 
     private List<EpisodeNote>? notes;

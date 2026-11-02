@@ -52,7 +52,9 @@
     private static string Summary(ShowCastOrigins o) =>
         $"Set in {Place(o.SetIn)}; {o.Elsewhere.Count} of the {o.Known} main cast members with a known birthplace were born elsewhere.";
 
-    /// <summary>"the United States", "the United Kingdom", but "Canada".</summary>
+    /// <summary>
+    /// "the United States", "the United Kingdom", but "Canada".
+    /// </summary>
     internal static string Place(string country) =>
         country.StartsWith("United ", StringComparison.Ordinal) || country.EndsWith(" Republic", StringComparison.Ordinal)
             || country is "Netherlands" or "Philippines" or "Bahamas" or "Isle of Man" ? $"the {country}" : country;

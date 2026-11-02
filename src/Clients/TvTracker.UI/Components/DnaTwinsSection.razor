@@ -40,7 +40,9 @@
         }
     }
 
-    /// <summary>"Drops all at once, big finales · but crime and mystery".</summary>
+    /// <summary>
+    /// "Drops all at once, big finales · but crime and mystery".
+    /// </summary>
     private static string Subtitle(DnaTwin twin)
     {
         var traits = string.Join(", ", twin.SharedTraits.Take(2).Select((t, i) => i == 0 ? t : t.ToLowerInvariant()));

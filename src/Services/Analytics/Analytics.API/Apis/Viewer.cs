@@ -23,7 +23,9 @@ public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int Lates
     public int Left => Aired - Watched;
 }
 
-/// <summary>What the on-request endpoints share about the caller: their progress, and the helpers that read it.</summary>
+/// <summary>
+/// What the on-request endpoints share about the caller: their progress, and the helpers that read it.
+/// </summary>
 public static class Viewer
 {
     /// <summary>
@@ -85,11 +87,15 @@ public static class Viewer
         return (turn, between.Count, between.Sum(minutes));
     }
 
-    /// <summary>Tonight's plan's overrun, shared by the features that fill a time budget: max(5 min, a twelfth).</summary>
+    /// <summary>
+    /// Tonight's plan's overrun, shared by the features that fill a time budget: max(5 min, a twelfth).
+    /// </summary>
     public static int Overrun(int budgetMinutes) => Math.Max(5, budgetMinutes / 12);
 }
 
-/// <summary>The stored show documents, read through the shared contract (<see cref="InsightDocuments"/>).</summary>
+/// <summary>
+/// The stored show documents, read through the shared contract (<see cref="InsightDocuments"/>).
+/// </summary>
 public static class ShowDocuments
 {
     public static async Task<Dictionary<Guid, ShowInsights>> LoadAsync(AnalyticsContext db, IReadOnlyCollection<Guid> showIds, CancellationToken ct)
@@ -107,7 +113,9 @@ public static class ShowDocuments
         (await LoadAsync(db, [showId], ct)).GetValueOrDefault(showId);
 }
 
-/// <summary>A show's next season premiere: a scheduled first episode or an announced season, whichever is sooner.</summary>
+/// <summary>
+/// A show's next season premiere: a scheduled first episode or an announced season, whichever is sooner.
+/// </summary>
 /// <param name="NewSeason">A season premiere (or an announced season), rather than the next episode of a season already airing.</param>
 public sealed record NextPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
 
@@ -159,7 +167,9 @@ public sealed class ShowLoad(ShowCopy show, List<EpisodeCopy> episodes, List<Use
 {
     public ShowCopy Show => show;
 
-    /// <summary>Regular episodes, aired or not, in season order.</summary>
+    /// <summary>
+    /// Regular episodes, aired or not, in season order.
+    /// </summary>
     public List<EpisodeCopy> Episodes => episodes;
 
     public List<EpisodeCopy> Aired { get; } = episodes.Where(e => e.AirsAtUtc <= now).ToList();
@@ -168,17 +178,23 @@ public sealed class ShowLoad(ShowCopy show, List<EpisodeCopy> episodes, List<Use
 
     public HashSet<Guid> Watched { get; } = watches.Select(w => w.EpisodeId).ToHashSet();
 
-    /// <summary>The viewer's own stars per episode.</summary>
+    /// <summary>
+    /// The viewer's own stars per episode.
+    /// </summary>
     public Dictionary<Guid, int> Stars => stars;
 
-    /// <summary>The essential cut's rating of an episode (see <see cref="EssentialCutApi.RatingsAsync"/>).</summary>
+    /// <summary>
+    /// The essential cut's rating of an episode (see <see cref="EssentialCutApi.RatingsAsync"/>).
+    /// </summary>
     public Func<EpisodeCopy, double?> Rating => rating;
 
     public Dictionary<Guid, EpisodeNoteCopy> Notes => notes;
 
     public ShowInsights? Insights => insights;
 
-    /// <summary>Episode runtimes, with missing ones as the show's typical one (see <see cref="EssentialCutApi.MinutesOf"/>).</summary>
+    /// <summary>
+    /// Episode runtimes, with missing ones as the show's typical one (see <see cref="EssentialCutApi.MinutesOf"/>).
+    /// </summary>
     public Func<EpisodeCopy, int> Minutes => field ??= EssentialCutApi.MinutesOf(Aired);
 }
 

@@ -10,7 +10,9 @@ using TvTracker.Persistence;
 
 namespace Notifications.API.IntegrationEvents;
 
-/// <summary>Catalog events that notify followers. Duplicates are ignored by the inbox's unique (user, event) index.</summary>
+/// <summary>
+/// Catalog events that notify followers. Duplicates are ignored by the inbox's unique (user, event) index.
+/// </summary>
 public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
     IIntegrationEventHandler<EpisodeAiredIntegrationEvent>,
     IIntegrationEventHandler<SeasonAnnouncedIntegrationEvent>,
@@ -84,7 +86,9 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>"Its best season yet, rated 8.6 against 8.1 for the others. The finale was a high point. 12 of 20 …"</summary>
+    /// <summary>
+    /// "Its best season yet, rated 8.6 against 8.1 for the others. The finale was a high point. 12 of 20 …"
+    /// </summary>
     internal static string SeasonVerdictText(SeasonVerdictIntegrationEvent e)
     {
         var rating = e.Rating.ToString("0.0", CultureInfo.InvariantCulture);
@@ -149,7 +153,9 @@ public sealed class CrossoverNotificationHandler(NotificationsContext db, Notifi
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>"Airs across Chicago Fire, Chicago Med and Chicago P.D., starting in 6 days."</summary>
+    /// <summary>
+    /// "Airs across Chicago Fire, Chicago Med and Chicago P.D., starting in 6 days."
+    /// </summary>
     internal static string CrossoverText(CrossoverScheduledIntegrationEvent e, DateTimeOffset now)
     {
         var shows = e.Parts.Select(p => p.ShowTitle).Distinct().ToList();
@@ -160,7 +166,9 @@ public sealed class CrossoverNotificationHandler(NotificationsContext db, Notifi
     }
 }
 
-/// <summary>Keeps the local follower list and user details current.</summary>
+/// <summary>
+/// Keeps the local follower list and user details current.
+/// </summary>
 public sealed class UserEventHandlers(NotificationsContext db, NotificationHubPush push, TimeProvider time) :
     IIntegrationEventHandler<ShowFollowedIntegrationEvent>,
     IIntegrationEventHandler<ShowUnfollowedIntegrationEvent>,

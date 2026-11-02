@@ -3,7 +3,9 @@ using Catalog.API.Services;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Affiliate links: which program covers a click, the link it becomes, and the report (see CONTEXT.md, Affiliate links).</summary>
+/// <summary>
+/// Affiliate links: which program covers a click, the link it becomes, and the report (see CONTEXT.md, Affiliate links).
+/// </summary>
 public class AffiliateTests
 {
     private static readonly AffiliateProgram Netflix = new()

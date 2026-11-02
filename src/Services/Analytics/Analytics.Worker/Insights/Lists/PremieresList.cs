@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>Seasons premiering within <see cref="PremiereWindowDays"/> days, from each show's <see cref="ShowInsights.NextPremiere"/>.</summary>
+/// <summary>
+/// Seasons premiering within <see cref="PremiereWindowDays"/> days, from each show's <see cref="ShowInsights.NextPremiere"/>.
+/// </summary>
 public sealed class PremieresList : IListInsight
 {
     private const int PremiereWindowDays = 90;

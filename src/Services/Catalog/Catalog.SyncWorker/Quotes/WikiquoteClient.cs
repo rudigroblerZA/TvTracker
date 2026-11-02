@@ -6,7 +6,9 @@ using Catalog.Data;
 
 namespace Catalog.SyncWorker.Quotes;
 
-/// <summary>Wikimedia answered 429; <see cref="RetryAfter"/> is how long it asked to wait, when it said.</summary>
+/// <summary>
+/// Wikimedia answered 429; <see cref="RetryAfter"/> is how long it asked to wait, when it said.
+/// </summary>
 public sealed class WikimediaBusyException(TimeSpan? retryAfter) : Exception("Wikimedia answered 429 Too Many Requests.")
 {
     public TimeSpan? RetryAfter { get; } = retryAfter;
@@ -37,7 +39,9 @@ public static partial class WikiquoteClient
         }
         """;
 
-    /// <summary>Each TVmaze id's Wikiquote page title ("Friends (TV series)"); ids without one are left out.</summary>
+    /// <summary>
+    /// Each TVmaze id's Wikiquote page title ("Friends (TV series)"); ids without one are left out.
+    /// </summary>
     public static async Task<Dictionary<string, string>> FindPagesAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));
@@ -63,7 +67,9 @@ public static partial class WikiquoteClient
         return pages;
     }
 
-    /// <summary>A page's wikitext, following one redirect; null when the page doesn't exist.</summary>
+    /// <summary>
+    /// A page's wikitext, following one redirect; null when the page doesn't exist.
+    /// </summary>
     public static async Task<string?> GetWikitextAsync(string page, CancellationToken ct)
     {
         for (var hop = 0; hop < 2; hop++)

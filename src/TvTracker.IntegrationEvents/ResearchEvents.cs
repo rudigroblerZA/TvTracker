@@ -22,10 +22,14 @@ public record EpisodeNoteItem(Guid ShowId, Guid EpisodeId, string Mark, string R
 
 public static class EpisodeMarks
 {
-    /// <summary>Kept by the essential cut whatever its rating.</summary>
+    /// <summary>
+    /// Kept by the essential cut whatever its rating.
+    /// </summary>
     public const string Essential = "essential";
 
-    /// <summary>Skipped by the essential cut; a season with one is cut by its notes alone.</summary>
+    /// <summary>
+    /// Skipped by the essential cut; a season with one is cut by its notes alone.
+    /// </summary>
     public const string Skippable = "skippable";
 
     public static bool IsValid(string mark) => mark is Essential or Skippable;

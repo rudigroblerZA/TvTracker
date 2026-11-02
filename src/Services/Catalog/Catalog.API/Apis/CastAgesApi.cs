@@ -145,7 +145,9 @@ public static class CastAgesApi
         return new CastAgesDto(showId, first, last, ended, median, dtos);
     }
 
-    /// <summary>Whole years from <paramref name="from"/> to <paramref name="to"/>, as a birthday counts them.</summary>
+    /// <summary>
+    /// Whole years from <paramref name="from"/> to <paramref name="to"/>, as a birthday counts them.
+    /// </summary>
     private static int Age(DateOnly from, DateOnly to) =>
         to.Year - from.Year - (to.Month < from.Month || to.Month == from.Month && to.Day < from.Day ? 1 : 0);
 }

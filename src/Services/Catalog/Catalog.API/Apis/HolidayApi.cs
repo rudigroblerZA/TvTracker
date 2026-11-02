@@ -81,7 +81,9 @@ public static class HolidayApi
             CancellationToken ct) => GetOneAsync(key, request.ShowIds ?? [], db, cache, time, ct)).RequireFeature(FeatureFlags.HolidayEpisodes);
     }
 
-    /// <summary>Every holiday, the next one first.</summary>
+    /// <summary>
+    /// Every holiday, the next one first.
+    /// </summary>
     private static Ok<List<HolidaySummaryDto>> GetAll(TimeProvider time)
     {
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
@@ -194,7 +196,9 @@ public static class HolidayApi
     private static bool StandsAlone(List<string> genres, List<string> keywords) =>
         keywords.Any(EpisodicKinds.Contains) || genres.Contains("Comedy") && !genres.Any(StoryGenres.Contains);
 
-    /// <summary>Whether it aired within the holiday's window, by its UTC date; the windows have a few days to spare.</summary>
+    /// <summary>
+    /// Whether it aired within the holiday's window, by its UTC date; the windows have a few days to spare.
+    /// </summary>
     private static bool InWindow(Holiday holiday, DateTimeOffset airsAtUtc)
     {
         var day = (airsAtUtc.UtcDateTime.Month, airsAtUtc.UtcDateTime.Day);

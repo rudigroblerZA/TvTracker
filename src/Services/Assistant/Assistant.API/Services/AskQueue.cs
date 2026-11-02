@@ -3,21 +3,27 @@ using System.Threading.Channels;
 
 namespace Assistant.API.Services;
 
-/// <summary>A question and, once it's answered, its answer. Kept in memory only.</summary>
+/// <summary>
+/// A question and, once it's answered, its answer. Kept in memory only.
+/// </summary>
 public sealed class Ask
 {
     public required Guid Id { get; init; }
     public required string UserId { get; init; }
     public required string Question { get; init; }
 
-    /// <summary>The question this one follows up, for the conversation so far.</summary>
+    /// <summary>
+    /// The question this one follows up, for the conversation so far.
+    /// </summary>
     public Guid? PreviousId { get; init; }
 
     public required DateTime AskedAtUtc { get; init; }
     public DateTime? StartedAtUtc { get; set; }
     public DateTime? FinishedAtUtc { get; set; }
 
-    /// <summary>Added to while the question is answered, and read by the page meanwhile.</summary>
+    /// <summary>
+    /// Added to while the question is answered, and read by the page meanwhile.
+    /// </summary>
     public ConcurrentQueue<ToolStep> Steps { get; } = new();
     public string? Answer { get; set; }
     public IReadOnlyList<ShowRef> Shows { get; set; } = [];
@@ -69,10 +75,14 @@ public sealed class AskQueue(AnswerLoop loop, TimeProvider time, ILogger<AskQueu
         return (ask, Refusal.None);
     }
 
-    /// <summary>The asker's own question; anyone else's reads as missing.</summary>
+    /// <summary>
+    /// The asker's own question; anyone else's reads as missing.
+    /// </summary>
     public Ask? Get(Guid id, string userId) => asks.TryGetValue(id, out var ask) && ask.UserId == userId ? ask : null;
 
-    /// <summary>Questions still waiting ahead of this one.</summary>
+    /// <summary>
+    /// Questions still waiting ahead of this one.
+    /// </summary>
     public int Ahead(Ask ask) => asks.Values.Count(a => a.StartedAtUtc is null && a.AskedAtUtc < ask.AskedAtUtc);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

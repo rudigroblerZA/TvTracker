@@ -3,7 +3,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Analytics.UnitTests;
 
-/// <summary>The readings every insight shares (see CONTEXT.md, Shared readings).</summary>
+/// <summary>
+/// The readings every insight shares (see CONTEXT.md, Shared readings).
+/// </summary>
 public class CopyRulesTests
 {
     private static readonly Guid ShowA = Guid.NewGuid(), ShowB = Guid.NewGuid();

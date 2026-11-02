@@ -9,12 +9,16 @@ public enum EventState
     PublishFailed = 2
 }
 
-/// <summary>An outgoing event stored in the same transaction as the data change that raised it.</summary>
+/// <summary>
+/// An outgoing event stored in the same transaction as the data change that raised it.
+/// </summary>
 public class IntegrationEventLogEntry
 {
     public Guid EventId { get; set; }
 
-    /// <summary>Assembly-qualified type name, used to deserialize the event for publishing.</summary>
+    /// <summary>
+    /// Assembly-qualified type name, used to deserialize the event for publishing.
+    /// </summary>
     public required string EventTypeName { get; set; }
 
     public required string Content { get; set; }
@@ -26,7 +30,9 @@ public class IntegrationEventLogEntry
     public int TimesSent { get; set; }
 }
 
-/// <summary>Records that a handler has processed an incoming event, so redeliveries are ignored.</summary>
+/// <summary>
+/// Records that a handler has processed an incoming event, so redeliveries are ignored.
+/// </summary>
 public class ProcessedIntegrationEvent
 {
     public Guid EventId { get; set; }
@@ -36,7 +42,9 @@ public class ProcessedIntegrationEvent
     public DateTime ProcessedAtUtc { get; set; }
 }
 
-/// <summary>Implemented by each service's DbContext to get the outbox and inbox tables.</summary>
+/// <summary>
+/// Implemented by each service's DbContext to get the outbox and inbox tables.
+/// </summary>
 public interface IIntegrationEventLogDbContext
 {
     DbSet<IntegrationEventLogEntry> IntegrationEventLogs { get; }
@@ -46,7 +54,9 @@ public interface IIntegrationEventLogDbContext
 
 public static class IntegrationEventLogModelBuilderExtensions
 {
-    /// <summary>Call from OnModelCreating to map the outbox and inbox tables.</summary>
+    /// <summary>
+    /// Call from OnModelCreating to map the outbox and inbox tables.
+    /// </summary>
     public static ModelBuilder UseIntegrationEventLogs(this ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<IntegrationEventLogEntry>(entity =>

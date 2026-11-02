@@ -25,7 +25,9 @@ public record PuzzleGuessRequest(Guid ShowId, int Attempt);
 /// <param name="Answer">Once the puzzle is over: solved, or out of guesses.</param>
 public record PuzzleGuessDto(bool Correct, PuzzleFeedbackDto Feedback, IReadOnlyList<PuzzleClueDto> Clues, PuzzleShowDto? Answer);
 
-/// <summary>How the guessed show compares with the answer, field by field.</summary>
+/// <summary>
+/// How the guessed show compares with the answer, field by field.
+/// </summary>
 /// <param name="Year">"same", or "later" / "earlier" when the answer premiered after / before the guess.</param>
 /// <param name="YearClose">Within <see cref="PuzzleApi.CloseYears"/> years.</param>
 /// <param name="Network">"same", "service" (a different network on the same streaming service) or "different".</param>
@@ -106,7 +108,9 @@ public static class PuzzleApi
 
     private static int NumberOf(DateOnly date) => date.DayNumber - FirstDay.DayNumber + 1;
 
-    /// <summary>What a show is, as the puzzle compares it.</summary>
+    /// <summary>
+    /// What a show is, as the puzzle compares it.
+    /// </summary>
     private sealed record PuzzleShow(Guid Id, string Title, string? PosterUrl, int? Year, string? Network, IReadOnlyList<string> Genres,
         string? Kind, int Seasons, ShowStatus Status, IReadOnlyList<(string Name, string? Character)> Cast)
     {
@@ -185,11 +189,15 @@ public static class PuzzleApi
             guess.Cast.Select(c => c.Name).Where(answerCast.Contains).Distinct().ToList());
     }
 
-    /// <summary>"same", <paramref name="above"/> when the answer's value is the larger, else <paramref name="below"/>.</summary>
+    /// <summary>
+    /// "same", <paramref name="above"/> when the answer's value is the larger, else <paramref name="below"/>.
+    /// </summary>
     private static string Relation(int? answer, int? guess, string above, string below) =>
         answer is not { } a || guess is not { } g ? "unknown" : a == g ? "same" : a > g ? above : below;
 
-    /// <summary>The clues unlocked after <paramref name="wrong"/> wrong guesses. Names that give the title away are skipped.</summary>
+    /// <summary>
+    /// The clues unlocked after <paramref name="wrong"/> wrong guesses. Names that give the title away are skipped.
+    /// </summary>
     private static List<PuzzleClueDto> CluesFor(PuzzleShow answer, int wrong)
     {
         var titleWords = Words(answer.Title);
@@ -221,7 +229,9 @@ public static class PuzzleApi
         return clues.Where(c => c.AfterWrong <= wrong).ToList();
     }
 
-    /// <summary>A text's words of four letters or more, for checking a clue doesn't contain the title.</summary>
+    /// <summary>
+    /// A text's words of four letters or more, for checking a clue doesn't contain the title.
+    /// </summary>
     private static HashSet<string> Words(string text) =>
         text.Split([' ', ':', '-', '\'', '.', ',', '!', '?', '&', '(', ')'], StringSplitOptions.RemoveEmptyEntries)
             .Where(w => w.Length >= 4).Select(w => w.ToLowerInvariant()).ToHashSet();

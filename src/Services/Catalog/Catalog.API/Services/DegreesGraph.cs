@@ -4,7 +4,9 @@ using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Catalog.API.Services;
 
-/// <summary>A show in the degrees graph; <paramref name="ShowId"/> is null for a show known only from a cast credit.</summary>
+/// <summary>
+/// A show in the degrees graph; <paramref name="ShowId"/> is null for a show known only from a cast credit.
+/// </summary>
 public record DegreesShow(string ExternalId, Guid? ShowId, string Title, string? PosterUrl, int? Year);
 
 public record DegreesPerson(Guid PersonId, string Name, string? PhotoUrl);
@@ -20,7 +22,9 @@ public record DegreesMap(DegreesShow[] Shows, DegreesPerson[] People, int[][] Pe
     public int IndexOfShow(Guid showId) => Array.FindIndex(Shows, s => s.ShowId == showId);
 }
 
-/// <summary>One link in a chain: <paramref name="Person"/> is in <paramref name="From"/> and <paramref name="To"/>.</summary>
+/// <summary>
+/// One link in a chain: <paramref name="Person"/> is in <paramref name="From"/> and <paramref name="To"/>.
+/// </summary>
 public record DegreesLink(DegreesPerson Person, DegreesShow From, string? CharacterInFrom, DegreesShow To, string? CharacterInTo);
 
 /// <summary>

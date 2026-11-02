@@ -8,7 +8,9 @@ namespace Microsoft.Extensions.Hosting;
 
 public static class PersistenceServiceCollectionExtensions
 {
-    /// <summary>Registers the outbox for <typeparamref name="TContext"/> and the background publisher that retries it.</summary>
+    /// <summary>
+    /// Registers the outbox for <typeparamref name="TContext"/> and the background publisher that retries it.
+    /// </summary>
     public static IServiceCollection AddIntegrationEventOutbox<TContext>(this IServiceCollection services)
         where TContext : DbContext, IIntegrationEventLogDbContext
     {
@@ -19,7 +21,9 @@ public static class PersistenceServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Creates or migrates the database schema at startup, then runs <paramref name="seed"/> if given.</summary>
+    /// <summary>
+    /// Creates or migrates the database schema at startup, then runs <paramref name="seed"/> if given.
+    /// </summary>
     /// <param name="baseline">
     /// For a context that moved from EnsureCreated to migrations: the name of its first migration, made from the same
     /// model, so existing databases are marked as having it instead of refusing to start.

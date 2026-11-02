@@ -27,7 +27,9 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int
 
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
-/// <summary>Shows linked by shared characters (see Catalog.API's Universes).</summary>
+/// <summary>
+/// Shows linked by shared characters (see Catalog.API's Universes).
+/// </summary>
 /// <param name="ToYear">The year of its last episode; null while any of its shows is still running.</param>
 public record UniverseSummary(Guid Id, string Name, int ShowCount, int CharacterCount, int? FromYear, int? ToYear, IReadOnlyList<ShowSummary> Posters);
 
@@ -45,7 +47,9 @@ public record UniverseLink(Guid A, Guid B, string Kind, IReadOnlyList<SharedChar
 
 public record SharedCharacter(Guid PersonId, string PersonName, string? PhotoUrl, string Character);
 
-/// <summary>A show in the user's queue for Tonight's plan (see Tracking.API's TonightApi): its next unwatched episodes.</summary>
+/// <summary>
+/// A show in the user's queue for Tonight's plan (see Tracking.API's TonightApi): its next unwatched episodes.
+/// </summary>
 public record TonightShow(Guid ShowId, string Title, string? PosterUrl, IReadOnlyList<string> Genres, WatchStatus Status,
     DateTime? LastWatchedAtUtc, int WatchedCount, IReadOnlyList<TonightEpisode> Episodes);
 
@@ -58,20 +62,26 @@ public record MoodResponse(bool Available, IReadOnlyList<MoodFit> Fits);
 
 public record MoodFit(Guid ShowId, double Fit, double Distance);
 
-/// <summary>A crossover event across a universe's shows (see Catalog.API's CrossoverApi); parts in air order.</summary>
+/// <summary>
+/// A crossover event across a universe's shows (see Catalog.API's CrossoverApi); parts in air order.
+/// </summary>
 public record Crossover(Guid Id, string Name, Guid UniverseId, string UniverseName, DateTimeOffset StartsAtUtc, IReadOnlyList<CrossoverPart> Parts);
 
 public record CrossoverPart(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
     string Title, DateTimeOffset AirsAtUtc);
 
-/// <summary>A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).</summary>
+/// <summary>
+/// A universe's episodes in air order, across its shows (see Catalog.API's UniverseApi).
+/// </summary>
 public record WatchOrder(Guid Id, string Name, IReadOnlyList<ShowSummary> Shows, IReadOnlyList<WatchOrderEpisode> Episodes, int Undated);
 
 /// <param name="Crossover">The crossover event it's part of ("Infection"), when the shows' titles say so.</param>
 public record WatchOrderEpisode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset AirsAtUtc,
     int? RuntimeMinutes, string? Crossover);
 
-/// <summary>Shows between two others (see Catalog.API's BlendApi).</summary>
+/// <summary>
+/// Shows between two others (see Catalog.API's BlendApi).
+/// </summary>
 public record Blend(ShowSummary A, ShowSummary B, int Lean, bool Indexed, IReadOnlyList<BlendMatch> Matches, bool Loose);
 
 /// <param name="LikeA">Where the show sits between the two, as a percentage like A.</param>
@@ -84,7 +94,9 @@ public record SeasonSummary(int Number, string Name, int EpisodeCount, DateTimeO
 /// <param name="TrailShows">Shows where the actor plays this character, this one included (Catalog.API's CharacterApi).</param>
 public record CastMember(string Name, string? Character, string? PhotoUrl, Guid PersonId, int TrailShows = 0);
 
-/// <summary>Every show where an actor plays the same character, by premiere (see Catalog.API's CharacterApi).</summary>
+/// <summary>
+/// Every show where an actor plays the same character, by premiere (see Catalog.API's CharacterApi).
+/// </summary>
 public record CharacterTrail(Guid PersonId, string PersonName, string? PhotoUrl, string Character, IReadOnlyList<TrailShow> Shows);
 
 /// <param name="ShowId">Null for a show outside the catalog.</param>
@@ -100,7 +112,9 @@ public record PersonDetail(Guid Id, string Name, string? PhotoUrl, DateOnly? Bir
 
 public record MadeCredit(ShowSummary Show, IReadOnlyList<string> Roles);
 
-/// <summary>Someone who made a show: a creator, developer or executive producer.</summary>
+/// <summary>
+/// Someone who made a show: a creator, developer or executive producer.
+/// </summary>
 public record Creative(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, Career? Career, IReadOnlyList<ShowRef> OtherShows)
 {
     public bool IsCreator => Roles.Contains("Creator") || Roles.Contains("Developer");
@@ -117,7 +131,9 @@ public record ShowRef(Guid Id, string Title);
 /// <param name="Link">What <paramref name="Url"/> opens; null without one.</param>
 public record WatchProvider(string ProviderName, WatchProviderType Type, string? Url, WatchLink? Link = null);
 
-/// <summary>What a where-to-watch link opens (Catalog.Data's <c>WatchLink</c>, same order).</summary>
+/// <summary>
+/// What a where-to-watch link opens (Catalog.Data's <c>WatchLink</c>, same order).
+/// </summary>
 public enum WatchLink { Site, Search, Title }
 
 public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, string? Overview,
@@ -128,7 +144,9 @@ public record ShowDetail(Guid Id, string Title, string? Overview, string? Poster
     IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode,
     IReadOnlyList<Creative>? Creatives, string? BannerUrl = null, IReadOnlyList<NanogenreRef>? Nanogenres = null);
 
-/// <summary>A fine-grained genre the catalog discovered ("Sports comedy"), by its slug for /nanogenres/{slug}.</summary>
+/// <summary>
+/// A fine-grained genre the catalog discovered ("Sports comedy"), by its slug for /nanogenres/{slug}.
+/// </summary>
 public record NanogenreRef(string Slug, string Name);
 
 /// <param name="Posters">Posters of its most popular shows.</param>
@@ -171,7 +189,9 @@ public record ListItem(Guid ShowId, string? Title, string? PosterUrl, int Positi
 public record ListDetail(Guid Id, string Name, string? Description, IReadOnlyList<ListItem> Items, DateTime UpdatedAtUtc, bool Shared = false,
     string? LinkToken = null);
 
-/// <summary>A list as its link shows it to anyone: no owner.</summary>
+/// <summary>
+/// A list as its link shows it to anyone: no owner.
+/// </summary>
 public record LinkedList(string Name, string? Description, IReadOnlyList<LinkedListItem> Items, DateTime UpdatedAtUtc);
 
 public record LinkedListItem(Guid ShowId, string? Title, string? PosterUrl);
@@ -198,7 +218,9 @@ public record Reactions(IReadOnlyList<ReactionCount> Counts, string? Mine);
 
 public record RecommendedShow(Guid ShowId, string Title, string? PosterUrl, double Score, string Reason);
 
-/// <summary>A show made like another but about something else: the distinctive traits they share, and its other genres.</summary>
+/// <summary>
+/// A show made like another but about something else: the distinctive traits they share, and its other genres.
+/// </summary>
 public record DnaTwin(Guid ShowId, string Title, string? PosterUrl, double Similarity, List<string> SharedTraits, List<string> OtherGenres);
 
 // Notifications
@@ -211,7 +233,9 @@ public record UpdateNotificationPreferences(bool NewEpisodes, bool NewSeasons, b
     bool EmailEnabled, TimeOnly? QuietHoursStart, TimeOnly? QuietHoursEnd,
     bool? WeeklyDigest = null, DayOfWeek? DigestDay = null, int? DigestHour = null);
 
-/// <summary>The weekly digest as it would go out now (Notifications.API).</summary>
+/// <summary>
+/// The weekly digest as it would go out now (Notifications.API).
+/// </summary>
 public record DigestPreview(string Subject, IReadOnlyList<DigestSection> Sections);
 
 public record DigestSection(string Heading, IReadOnlyList<DigestLine> Lines);
@@ -258,7 +282,9 @@ public record ShowInsights(Guid ShowId, string Title, DateTime ComputedAtUtc, Ra
     EpisodePatterns? Patterns, IReadOnlyList<ShowTag>? Tags, ShowDna? Dna = null, Outlook? Outlook = null, GetsGood? GetsGood = null,
     Landing? Landing = null, SeasonVerdict? SeasonVerdict = null, WorthIt? WorthIt = null);
 
-/// <summary>Is it worth the time? Analytics' 0-100 score, from the provider's rating and the factors that move it.</summary>
+/// <summary>
+/// Is it worth the time? Analytics' 0-100 score, from the provider's rating and the factors that move it.
+/// </summary>
 /// <param name="Verdict">"worth-it", "mostly", "mixed" or "hard-to-recommend".</param>
 /// <param name="Value">The rating plus every factor's points, on the rating's scale.</param>
 /// <param name="StillRunning">The ending isn't in the score yet.</param>
@@ -269,7 +295,9 @@ public record WorthIt(int Score, string Verdict, double Rating, double Value, IR
 /// <param name="Points">What it adds to the rating; negative takes away.</param>
 public record WorthItFactor(string Key, double Points, string Text);
 
-/// <summary>How a season that just ended did (3 to 45 days after its finale); spoiler-free.</summary>
+/// <summary>
+/// How a season that just ended did (3 to 45 days after its finale); spoiler-free.
+/// </summary>
 /// <param name="Verdict">One of <see cref="TvTracker.IntegrationEvents.SeasonVerdicts"/>.</param>
 /// <param name="Finale">One of <see cref="TvTracker.IntegrationEvents.FinaleVerdicts"/>; null without a finale rating.</param>
 /// <param name="Started">Our users who watched any of it; null under 5. Finished: of those, who watched the finale.</param>
@@ -278,14 +306,18 @@ public record SeasonVerdict(int Number, DateTime FinaleAiredAtUtc, double Rating
 
 public record SeasonVerdictItem(Guid ShowId, string Title, SeasonVerdict Verdict);
 
-/// <summary>Whether an ended show sticks the landing; spoiler-free (no titles).</summary>
+/// <summary>
+/// Whether an ended show sticks the landing; spoiler-free (no titles).
+/// </summary>
 /// <param name="Verdict">"sticks", "great-finale", "finale-lets-down", "fizzles", "weaker-last-season" or "as-it-ran".</param>
 /// <param name="FinalSeasonRank">The final season's rank among RankedSeasons (1 = best); null with fewer than three.</param>
 /// <param name="RatedHigher">Other episodes rated above the finale; RatedLower below; ties in neither.</param>
 public record Landing(string Verdict, double FinaleRating, double ShowMedian, double FinaleBeats, int? FinalSeasonRank, int RankedSeasons,
     int RatedHigher = 0, int RatedLower = 0, int OtherEpisodes = 0, int SeasonsCompared = 0, int SeasonsHigher = 0, int SeasonsLower = 0);
 
-/// <summary>When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.</summary>
+/// <summary>
+/// When a show gets good: from the start, or at <see cref="Turn"/> after a slow start.
+/// </summary>
 public record GetsGood(bool FromTheStart, double Opening, double Settled, GetsGoodTurn? Turn);
 
 /// <param name="Before">The average rating of the episodes before it; After, of it and the next nine.</param>
@@ -295,7 +327,9 @@ public record GetsGoodTurn(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, 
 /// <param name="EpisodesAway">Episodes between the user's furthest one and it.</param>
 public record GetsGoodAhead(int SeasonNumber, int EpisodeNumber, string Title, int EpisodesAway, int MinutesAway);
 
-/// <summary>Forecasts for a running show; each part is null when the show doesn't qualify.</summary>
+/// <summary>
+/// Forecasts for a running show; each part is null when the show doesn't qualify.
+/// </summary>
 public record Outlook(RatingForecast? NextSeasonRating, RenewalOutlook? Renewal, PremiereForecast? NextSeason);
 
 /// <param name="Low">With High, the range 8 in 10 backtested forecasts landed in.</param>
@@ -361,7 +395,9 @@ public record TopEpisodeItem(Guid EpisodeId, Guid ShowId, string ShowTitle, stri
 public record DiscoveryItem(Guid ShowId, string ShowTitle, string? PosterUrl, double? ShowExternalRating, double Value,
     Guid? EpisodeId, int? SeasonNumber, int? EpisodeNumber, string? EpisodeTitle);
 
-/// <summary>A week of TV history: this week in every past year (EveryYear), or one date's week.</summary>
+/// <summary>
+/// A week of TV history: this week in every past year (EveryYear), or one date's week.
+/// </summary>
 public record TimeMachine(DateOnly Date, bool EveryYear, List<TimeMachineEpisode> Premieres, List<TimeMachineEpisode> Finales,
     List<TimeMachineEpisode> BestEpisodes, List<TimeMachineShow> OnAir);
 
@@ -370,7 +406,9 @@ public record TimeMachineEpisode(Guid ShowId, string ShowTitle, string? PosterUr
 
 public record TimeMachineShow(Guid ShowId, string Title, string? PosterUrl, int SeasonNumber);
 
-/// <summary>A creator's style from their shows' DNA; see Analytics' CreatorFingerprint.</summary>
+/// <summary>
+/// A creator's style from their shows' DNA; see Analytics' CreatorFingerprint.
+/// </summary>
 public record CreatorFingerprint(Guid PersonId, string Name, DateTime ComputedAtUtc, List<FingerprintShow> Shows,
     Dictionary<string, double> Traits, List<SignatureTrait> Signature, List<string> Range, List<FingerprintMatch> MadeThisWay,
     List<KindredCreator> Kindred);
@@ -392,7 +430,9 @@ public record PersonShow(Guid ShowId, string Title, string? PosterUrl, double? R
 
 public record CoStar(Guid PersonId, string Name, IReadOnlyList<PersonShow> SharedShows);
 
-/// <summary>A shorter path through a long show (see Analytics.API's EssentialCutApi).</summary>
+/// <summary>
+/// A shorter path through a long show (see Analytics.API's EssentialCutApi).
+/// </summary>
 /// <param name="Noted">Episodes moderators marked essential or skippable, which the cut follows before ratings.</param>
 public record EssentialCut(Guid ShowId, string Title, string Level, bool Available, string? Reason, CutTotals Full, CutTotals Cut,
     IReadOnlyList<CutSeason> Seasons, IReadOnlyList<SkipRun> Skips, CutProgress? Progress, int Noted = 0);
@@ -413,7 +453,9 @@ public record SkipRun(int SeasonNumber, int FromEpisode, int ToEpisode, int Epis
 
 public record CutProgress(Guid? NextEpisodeId, int? NextSeason, int? NextEpisode, CutTotals FullRemaining, CutTotals CutRemaining);
 
-/// <summary>Taste twins (Analytics.API): anonymous people whose ratings track the user's, and what they loved.</summary>
+/// <summary>
+/// Taste twins (Analytics.API): anonymous people whose ratings track the user's, and what they loved.
+/// </summary>
 public record TasteTwins(int RatedShows, int Twins, double? Agreement, string? Reason, IReadOnlyList<TwinShow> AgreeOn, IReadOnlyList<TwinPick> Picks);
 
 public record TwinShow(Guid ShowId, string Title, string? PosterUrl);
@@ -452,7 +494,9 @@ public record TasteProgress(int Finished, int Watching, int Dropped, IReadOnlyLi
 
 public record ProgressShow(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc);
 
-/// <summary>"Previously on…": a rewatch for coming back after a long break (see Analytics.API's RefresherApi).</summary>
+/// <summary>
+/// "Previously on…": a rewatch for coming back after a long break (see Analytics.API's RefresherApi).
+/// </summary>
 public record Refresher(Guid ShowId, string Title, string? PosterUrl, bool Due, DateTime LastWatchedAtUtc, int DaysSince,
     RefresherEpisode LeftOff, RefresherAhead Ahead, RefresherReturn? Returns, int BudgetMinutes, int PlanMinutes,
     IReadOnlyList<RefresherEpisode> Plan);
@@ -466,7 +510,9 @@ public record RefresherAhead(int Episodes, int Minutes, Guid? NextEpisodeId, int
 
 public record RefresherReturn(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
 
-/// <summary>The catch-up planner: what to watch, and at what pace, before a new season (see Analytics.API's CatchUpApi).</summary>
+/// <summary>
+/// The catch-up planner: what to watch, and at what pace, before a new season (see Analytics.API's CatchUpApi).
+/// </summary>
 /// <param name="Path">"full" or "cut": which path <paramref name="Weeks"/> follow.</param>
 public record CatchUpPlan(Guid ShowId, string Title, string? PosterUrl, CatchUpPremiere Premiere, int DaysLeft, CatchUpPath Full,
     CatchUpPath? Cut, int YourMinutesPerWeek, string Path, IReadOnlyList<CatchUpWeek> Weeks);
@@ -480,7 +526,9 @@ public record CatchUpWeek(DateOnly Starts, int Minutes, IReadOnlyList<CatchUpEpi
 
 public record CatchUpEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes);
 
-/// <summary>"Is it worth going back?" for a dropped show (see Analytics.API's ComebackApi).</summary>
+/// <summary>
+/// "Is it worth going back?" for a dropped show (see Analytics.API's ComebackApi).
+/// </summary>
 /// <param name="Verdict">"gets-good", "better", "same", "worse" or "unknown".</param>
 public record Comeback(Guid ShowId, string Title, string? PosterUrl, int Watched, int Aired, DateTime LastWatchedAtUtc,
     ComebackEpisode StoppedAt, string Verdict, double? BeforeYouStopped, double? Ahead, int AheadEpisodes, int AheadMinutes,
@@ -492,7 +540,9 @@ public record ComebackFrom(int SeasonNumber, bool RestOfSeason, double Average);
 
 public record ComebackTurn(int SeasonNumber, int EpisodeNumber, int EpisodesAway, int MinutesAway);
 
-/// <summary>Backlog triage (see Analytics.API's BacklogApi).</summary>
+/// <summary>
+/// Backlog triage (see Analytics.API's BacklogApi).
+/// </summary>
 public record Backlog(int Minutes, int YourMinutesPerWeek, int? WeeksToClear, int LetGoMinutes, int CutSavesMinutes,
     IReadOnlyList<BacklogShow> Shows, IReadOnlyList<Comeback> Dropped);
 
@@ -500,7 +550,9 @@ public record Backlog(int Minutes, int YourMinutesPerWeek, int? WeeksToClear, in
 public record BacklogShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, int? CutMinutes, double Value,
     string Verdict, IReadOnlyList<string> Reasons);
 
-/// <summary>"Fits your time off" (see Analytics.API's TimeOffApi).</summary>
+/// <summary>
+/// "Fits your time off" (see Analytics.API's TimeOffApi).
+/// </summary>
 public record TimeOff(int BudgetMinutes, IReadOnlyList<TimeOffShow> Fits, TimeOffMix? Mix);
 
 public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, double Value, string? Landing,
@@ -508,7 +560,9 @@ public record TimeOffShow(Guid ShowId, string Title, string? PosterUrl, int Epis
 
 public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
 
-/// <summary>Someone on the app, as Social.API describes them to the caller.</summary>
+/// <summary>
+/// Someone on the app, as Social.API describes them to the caller.
+/// </summary>
 /// <param name="Requested">The user asked to follow this private profile and is waiting for approval.</param>
 /// <param name="BlockedByYou">On the user's block list.</param>
 public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou,
@@ -517,7 +571,9 @@ public record SocialPerson(string UserId, string DisplayName, int Followers, int
 /// <param name="Requests">Follow requests waiting for the user's approval.</param>
 public record MySocial(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following, bool Private = false, int Requests = 0);
 
-/// <summary>Leave either out (null) to keep it as it is.</summary>
+/// <summary>
+/// Leave either out (null) to keep it as it is.
+/// </summary>
 public record SocialSettings(bool? ShareActivity, bool? Private = null);
 
 /// <param name="Shares">Whether they share their activity; when not, <paramref name="Activity"/> is empty.</param>
@@ -533,7 +589,9 @@ public record SharedList(Guid ListId, SocialPerson Owner, string Name, string? D
 
 public record ListShow(Guid ShowId, string? Title, string? PosterUrl);
 
-/// <summary>How far someone is through a show (regular episodes).</summary>
+/// <summary>
+/// How far someone is through a show (regular episodes).
+/// </summary>
 public record PeerProgress(int Watched, int Aired, EpisodeCode? Furthest, bool Finished);
 
 public record FriendOnShow(string UserId, string DisplayName, bool Following, PeerProgress Progress, int? Stars);
@@ -545,7 +603,9 @@ public record TogetherShow(Guid ShowId, string? Title, string? PosterUrl, PeerPr
 
 public record Together(SocialPerson Person, IReadOnlyList<TogetherShow> Shows);
 
-/// <summary>Tonight for two: what the user and someone they follow could watch together (see Social.API's TonightTogetherApi).</summary>
+/// <summary>
+/// Tonight for two: what the user and someone they follow could watch together (see Social.API's TonightTogetherApi).
+/// </summary>
 public record TonightTogether(SocialPerson Person, IReadOnlyList<TonightTogetherShow> Shows, IReadOnlyList<ApartShow> Apart);
 
 /// <param name="Ahead">"you", "them", "level", or null when neither has started.</param>
@@ -556,7 +616,9 @@ public record TonightTogetherShow(Guid ShowId, string Title, string? PosterUrl, 
 /// <param name="SeenBy">"you" or "them" when one has seen it already; null when new to both.</param>
 public record TogetherEpisode(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, int RuntimeMinutes, bool RuntimeEstimated, string? SeenBy);
 
-/// <summary>A shared show one of the two is too far ahead in to watch together tonight.</summary>
+/// <summary>
+/// A shared show one of the two is too far ahead in to watch together tonight.
+/// </summary>
 public record ApartShow(Guid ShowId, string Title, string Ahead, int Gap);
 
 public record Feed(IReadOnlyList<FeedItem> Items, DateTime? NextBefore);
@@ -567,7 +629,9 @@ public record FeedItem(Guid Id, string UserId, string DisplayName, string Kind, 
 
 public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
 
-/// <summary>A feature flag on the flags page (see Identity.API's FlagsApi).</summary>
+/// <summary>
+/// A feature flag on the flags page (see Identity.API's FlagsApi).
+/// </summary>
 /// <param name="Default">What flagd.json says.</param>
 /// <param name="Targeting">flagd.json treats some users differently; an override applies to everyone.</param>
 /// <param name="Override">Set on the flags page; null when flagd.json decides.</param>
@@ -576,17 +640,23 @@ public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
 public record FeatureFlagSetting(string Key, string? Description, bool Default, bool Targeting, bool? Override, bool On,
     IReadOnlyList<string>? Plans = null, string? Name = null);
 
-/// <summary>The result of flagging a comment or community insight (see Ratings.API's CommunityApi).</summary>
+/// <summary>
+/// The result of flagging a comment or community insight (see Ratings.API's CommunityApi).
+/// </summary>
 public record FlagResult(bool Hidden, bool MarkedSpoiler);
 
-/// <summary>A viewer's tip about a show or an episode, ranked by how many found it helpful.</summary>
+/// <summary>
+/// A viewer's tip about a show or an episode, ranked by how many found it helpful.
+/// </summary>
 /// <param name="HiddenReason">Only on the user's own hidden insight.</param>
 public record CommunityInsight(Guid Id, Guid ShowId, Guid? EpisodeId, string DisplayName, string Text, bool IsSpoiler, int Helpful,
     bool VotedHelpful, bool IsMine, bool FlaggedByMe, string? HiddenReason, DateTime CreatedAtUtc);
 
 public record CommunityInsights(int Total, IReadOnlyList<CommunityInsight> Insights);
 
-/// <summary>A suggested fix to show or episode data. Status: pending, accepted, rejected or reverted.</summary>
+/// <summary>
+/// A suggested fix to show or episode data. Status: pending, accepted, rejected or reverted.
+/// </summary>
 public record Correction(Guid Id, Guid ShowId, Guid? EpisodeId, string Field, string? CurrentValue, string SuggestedValue,
     string? Note, string? Context, string DisplayName, string Status, string? ReviewedBy, DateTime? ReviewedAtUtc, DateTime CreatedAtUtc);
 
@@ -601,7 +671,9 @@ public record ModerationLogItem(string Moderator, string Action, string TargetKi
 public record ModerationQueue(IReadOnlyList<ModeratedPost> Posts, IReadOnlyList<Correction> Corrections, IReadOnlyList<Correction> Accepted,
     IReadOnlyList<ModerationLogItem> Log);
 
-/// <summary>"Where do I know them from?" for a show's cast (see Analytics.API's KnownFacesApi).</summary>
+/// <summary>
+/// "Where do I know them from?" for a show's cast (see Analytics.API's KnownFacesApi).
+/// </summary>
 public record KnownFaces(Guid ShowId, int CastCount, IReadOnlyList<KnownFace> People);
 
 public record KnownFace(Guid PersonId, string Name, string? Character, IReadOnlyList<KnownFrom> From);
@@ -609,7 +681,9 @@ public record KnownFace(Guid PersonId, string Name, string? Character, IReadOnly
 /// <param name="CaughtUp">False when the user is partway through that show, so the actor may only arrive later.</param>
 public record KnownFrom(Guid ShowId, string Title, string? PosterUrl, string? Character, int Watched, int Aired, bool CaughtUp);
 
-/// <summary>A holiday with episodes made for it (see Catalog.API's HolidayApi).</summary>
+/// <summary>
+/// A holiday with episodes made for it (see Catalog.API's HolidayApi).
+/// </summary>
 public record HolidaySummary(string Key, string Name, DateOnly Date, int DaysAway);
 
 public record Holiday(string Key, string Name, DateOnly Date, int DaysAway, IReadOnlyList<HolidayEpisode> Episodes,
@@ -621,7 +695,9 @@ public record HolidayEpisode(Guid ShowId, string ShowTitle, string? PosterUrl, G
 
 public record HolidayShow(Guid ShowId, string Title, string? PosterUrl);
 
-/// <summary>Research workspace for moderators (see Research.API's ResearchApi).</summary>
+/// <summary>
+/// Research workspace for moderators (see Research.API's ResearchApi).
+/// </summary>
 public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtUtc, string? Draft, DateTime? DraftingSinceUtc, string? DraftProblem,
     IReadOnlyList<ResearchSourceItem> Sources, IReadOnlyList<ResearchFact> Facts, SavedResearch? Saved, IReadOnlyList<ResearchVersion> Versions,
     IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
@@ -631,7 +707,9 @@ public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtU
 public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Mark, string Reason, string SourceUrl,
     DateTime NotedAtUtc, string NotedBy);
 
-/// <summary>What to research next (Research.API's queue).</summary>
+/// <summary>
+/// What to research next (Research.API's queue).
+/// </summary>
 public record ResearchQueue(IReadOnlyList<QueuedShow> Unresearched, IReadOnlyList<DisagreeingShow> Disagreements, DateTime? CheckedAtUtc);
 
 /// <param name="Rank">Its place among the catalog's most popular.</param>
@@ -682,7 +760,9 @@ public record AssistantShow(Guid Id, string Title);
 public record AssistantAsk(Guid Id, string Question, Guid? PreviousId, string Status, int Ahead, List<AssistantStep> Steps, string? Answer,
     List<AssistantShow> Shows, string? Problem, DateTime AskedAtUtc, double? Seconds);
 
-/// <summary>Network report cards: every network with enough catalog shows, and the whole catalog to compare with.</summary>
+/// <summary>
+/// Network report cards: every network with enough catalog shows, and the whole catalog to compare with.
+/// </summary>
 public record NetworkReportCards(NetworkReport? Baseline, IReadOnlyList<NetworkReport> Networks);
 
 public record NetworkReport(string Network, int Shows, int Ended, double? AverageRating, NetworkEndings? Endings,
@@ -695,7 +775,9 @@ public record NetworkRenewals(int Decided, int Renewed);
 
 public record NetworkShow(Guid ShowId, string Title, string? PosterUrl, double? Rating);
 
-/// <summary>A year of the user's viewing (Year in TV).</summary>
+/// <summary>
+/// A year of the user's viewing (Year in TV).
+/// </summary>
 public record YearInTv(int Year, IReadOnlyList<int> Years, int Episodes, int Minutes, int Shows, int NewShows, int Bulk,
     int DaysWatched, int LongestStreak, YearDay? BusiestDay, YearMonth? BusiestMonth, IReadOnlyList<YearShow> TopShows,
     IReadOnlyList<YearShare> Genres, YearShare? TopNetwork, IReadOnlyList<YearShow> Finished, IReadOnlyList<YearShow> CaughtUp,
@@ -715,7 +797,9 @@ public record YearShift(string Key, string Name, double From, double To, string 
 
 public record YearCalledIt(Guid ShowId, string Title, string? PosterUrl, DateTime FollowedAtUtc, double Ahead, int Followers, double? Rating);
 
-/// <summary>Episode duels for one show: the next pair to compare and the user's ranking so far.</summary>
+/// <summary>
+/// Episode duels for one show: the next pair to compare and the user's ranking so far.
+/// </summary>
 public record DuelState(int Watched, int Duels, DuelPair? Pair, IReadOnlyList<DuelRank> Ranking);
 
 public record DuelPair(Guid First, Guid Second);
@@ -723,14 +807,18 @@ public record DuelPair(Guid First, Guid Second);
 /// <param name="Score">0-100: the chance it beats an average episode of the show, by the user's answers.</param>
 public record DuelRank(Guid EpisodeId, int Score, int Wins, int Losses);
 
-/// <summary>Running shows the user is caught up on, soonest back first.</summary>
+/// <summary>
+/// Running shows the user is caught up on, soonest back first.
+/// </summary>
 public record WaitingRoom(IReadOnlyList<WaitingShow> Shows);
 
 /// <param name="Kind">episode, season, forecast or unknown.</param>
 public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? Network, string Kind, DateTimeOffset? BackAtUtc,
     int? SeasonNumber, DateOnly? Likely, DateOnly? Earliest, DateOnly? Latest, bool Overdue, double? Renewal, DateTimeOffset? LastAiredUtc);
 
-/// <summary>A mixtape: three to five shows, and the shows that fit all of them.</summary>
+/// <summary>
+/// A mixtape: three to five shows, and the shows that fit all of them.
+/// </summary>
 public record Mixtape(IReadOnlyList<ShowSummary> Shows, bool Indexed, IReadOnlyList<string> SharedGenres, IReadOnlyList<MixtapeMatch> Matches,
     bool Loose);
 
@@ -739,7 +827,9 @@ public record MixtapeMatch(ShowSummary Show, int Fit, IReadOnlyList<MixtapeLink>
 
 public record MixtapeLink(Guid ShowId, int Closeness, IReadOnlyList<string> SharedGenres);
 
-/// <summary>What the caller's plan allows for lists, as Tracking enforces it.</summary>
+/// <summary>
+/// What the caller's plan allows for lists, as Tracking enforces it.
+/// </summary>
 /// <param name="MaxLists">Lists the plan allows; null for no plan limit.</param>
 /// <param name="Lists">Lists they have; can be over MaxLists when made before the limits.</param>
 /// <param name="Enforced">False while the plans flag is off: no limits.</param>
@@ -749,7 +839,9 @@ public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists,
     public bool CanShare => !Enforced || ShareLists;
 }
 
-/// <summary>The caller's plan, from Identity.</summary>
+/// <summary>
+/// The caller's plan, from Identity.
+/// </summary>
 /// <param name="Plan">The plan they get: their own, or the family plan they're in.</param>
 /// <param name="Purchased">The plan they pay for themselves.</param>
 public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc, string Purchased = "free",
@@ -767,10 +859,14 @@ public record FamilyInvite(string OwnerName, int SeatsLeft, bool Active);
 
 public record FamilyInviteLink(string Token);
 
-/// <summary>A user on the admins' plans page.</summary>
+/// <summary>
+/// A user on the admins' plans page.
+/// </summary>
 public record PlanUser(string UserId, string DisplayName, string? Email, string Plan, DateTime? PlanChangedAtUtc);
 
-/// <summary>The streaming services behind the networks, with logos and estimated prices.</summary>
+/// <summary>
+/// The streaming services behind the networks, with logos and estimated prices.
+/// </summary>
 public record ServiceDirectory(string PricesAsOf, string PricesSource, IReadOnlyList<ServiceInfo> Services)
 {
     public ServiceInfo? ForNetwork(string network) =>
@@ -784,7 +880,9 @@ public record ServiceInfo(string Key, string Name, decimal? MonthlyUsd, string? 
 /// <param name="Allowed">Whether the user's plan lets them keep services.</param>
 public record MyServices(string Plan, bool Allowed, IReadOnlyList<string> Services);
 
-/// <summary>What the user's services cost per hour they watch, over the last and next WindowDays.</summary>
+/// <summary>
+/// What the user's services cost per hour they watch, over the last and next WindowDays.
+/// </summary>
 public record ServicesReport(int WindowDays, decimal MonthlyUsd, int UnknownPrices, int Minutes, IReadOnlyList<ServiceUse> Services,
     IReadOnlyList<ServiceUse> Missing, string PricesAsOf);
 
@@ -794,7 +892,9 @@ public record ServiceUse(string Key, string Name, decimal? MonthlyUsd, int Minut
 
 public record ServiceShow(Guid ShowId, string Title, int Minutes, int Episodes, DateTimeOffset? NextAirsAtUtc);
 
-/// <summary>Guess the show: today's puzzle, without its answer.</summary>
+/// <summary>
+/// Guess the show: today's puzzle, without its answer.
+/// </summary>
 public record Puzzle(int Number, DateOnly Date, int MaxGuesses, IReadOnlyList<PuzzleClue> Clues);
 
 /// <param name="AfterWrong">How many wrong guesses unlock it.</param>
@@ -814,7 +914,9 @@ public record PuzzleGenre(string Genre, bool Shared);
 
 public record PuzzleShow(Guid Id, string Title, string? PosterUrl);
 
-/// <summary>Call it on a show: its next season to call, the caller's call, and once called, the model's and the crowd's.</summary>
+/// <summary>
+/// Call it on a show: its next season to call, the caller's call, and once called, the model's and the crowd's.
+/// </summary>
 /// <param name="SeasonNumber">The season open to a call; null for an ended show.</param>
 /// <param name="Crowd">Everyone's average call; null under 5 callers or before the caller has called.</param>
 public record ShowCall(int? SeasonNumber, DateTimeOffset? PremieresAtUtc, double? Mine, CallRange? Model, CrowdCall? Crowd,
@@ -833,7 +935,9 @@ public record CallRecord(int Scored, double? AverageMiss, double? ModelAverageMi
 
 public record MyCalls(CallRecord Record, IReadOnlyList<SeasonCallInfo> Calls, IReadOnlyList<SeasonCallInfo> Suggestions);
 
-/// <summary>Six degrees: the shortest chain of shared actors from one show to another.</summary>
+/// <summary>
+/// Six degrees: the shortest chain of shared actors from one show to another.
+/// </summary>
 /// <param name="OutsideCatalog">Shows along the chain that aren't in the catalog.</param>
 public record DegreesResult(DegreesShow From, DegreesShow To, int Degrees, IReadOnlyList<DegreesLink> Links, int OutsideCatalog);
 
@@ -842,16 +946,22 @@ public record DegreesShow(Guid? ShowId, string Title, string? PosterUrl, int? Ye
 
 public record DegreesLink(Guid PersonId, string Name, string? PhotoUrl, DegreesShow From, string? CharacterInFrom, DegreesShow To, string? CharacterInTo);
 
-/// <summary>Two connected shows and how many actors apart they are, without the chain.</summary>
+/// <summary>
+/// Two connected shows and how many actors apart they are, without the chain.
+/// </summary>
 public record DegreesChallenge(DegreesShow From, DegreesShow To, int Degrees);
 
-/// <summary>Shows' milestone episodes (100th, 200th, …) coming up and just aired.</summary>
+/// <summary>
+/// Shows' milestone episodes (100th, 200th, …) coming up and just aired.
+/// </summary>
 public record Milestones(IReadOnlyList<Milestone> Upcoming, IReadOnlyList<Milestone> Reached);
 
 /// <param name="Number">Its place among the show's regular episodes, by the catalog's count.</param>
 public record Milestone(Guid ShowId, string Title, string? PosterUrl, int Number, int Season, int Episode, DateTimeOffset AirsAtUtc, bool Story);
 
-/// <summary>The catalog's actors born on one day of the year, best known first.</summary>
+/// <summary>
+/// The catalog's actors born on one day of the year, best known first.
+/// </summary>
 public record Birthdays(DateOnly Date, IReadOnlyList<Birthday> People);
 
 /// <param name="Turns">Their age on the day asked about: what they turn, or would have turned.</param>
@@ -861,7 +971,9 @@ public record Birthday(Guid PersonId, string Name, string? PhotoUrl, DateOnly Bo
 
 public record BirthdayRole(Guid ShowId, string Title, string? PosterUrl, string? Character);
 
-/// <summary>Every regular episode's rating by season, with the best and weakest episodes and the best run.</summary>
+/// <summary>
+/// Every regular episode's rating by season, with the best and weakest episodes and the best run.
+/// </summary>
 public record EpisodeGrid(Guid ShowId, IReadOnlyList<GridSeason> Seasons, GridCell? Best, GridCell? Weakest, GridRun? BestRun);
 
 /// <param name="Average">The mean of its rated episodes, from three up.</param>
@@ -871,7 +983,9 @@ public record GridCell(Guid EpisodeId, int Season, int Number, string Title, dou
 
 public record GridRun(GridCell From, GridCell To, double Average);
 
-/// <summary>A show's episode-title formula: the words most of its titles open with.</summary>
+/// <summary>
+/// A show's episode-title formula: the words most of its titles open with.
+/// </summary>
 /// <param name="Kind">"phrase", "numbered" or "article".</param>
 /// <param name="Exceptions">Titles that break it, often the notable episodes.</param>
 public record TitleFormula(Guid ShowId, string Kind, string Prefix, int Matching, int Titled, IReadOnlyList<FormulaTitle> Examples,
@@ -883,7 +997,9 @@ public record TitleFormulaLists(IReadOnlyList<FormulaShow> Phrases, IReadOnlyLis
 
 public record FormulaShow(Guid ShowId, string Title, string? PosterUrl, string Prefix, int Matching, int Titled, string? Example);
 
-/// <summary>TV characters who share a first name, and how common it is.</summary>
+/// <summary>
+/// TV characters who share a first name, and how common it is.
+/// </summary>
 /// <param name="Rank">Its place among all first names; null when no character has it.</param>
 /// <param name="Surnames">Characters with it as their last name.</param>
 public record NameReport(string Name, int Count, int? Rank, IReadOnlyList<NamedCharacter> Characters, IReadOnlyList<NamedCharacter> Surnames,
@@ -901,7 +1017,9 @@ public record NameCount(string Name, int Count);
 
 public record NameDecadeTop(int Decade, int Characters, IReadOnlyList<NameCount> Women, IReadOnlyList<NameCount> Men);
 
-/// <summary>Each main cast member's age at a show's latest episode, and who grew up on screen.</summary>
+/// <summary>
+/// Each main cast member's age at a show's latest episode, and who grew up on screen.
+/// </summary>
 /// <param name="MedianAge">The living cast's median age at the latest episode, from four ages up.</param>
 public record CastAges(Guid ShowId, DateOnly FirstAired, DateOnly LastAired, bool Ended, int? MedianAge, IReadOnlyList<CastAge> Members);
 
@@ -914,7 +1032,9 @@ public record CastAgeLists(IReadOnlyList<CastAgeShow> GrewUp, IReadOnlyList<Cast
 /// <param name="Members">Those who grew up on screen, in the grew-up list; otherwise empty.</param>
 public record CastAgeShow(Guid ShowId, string Title, string? PosterUrl, int FirstYear, int LastYear, int? MedianAge, IReadOnlyList<CastAge> Members);
 
-/// <summary>The waits between a show's seasons.</summary>
+/// <summary>
+/// The waits between a show's seasons.
+/// </summary>
 /// <param name="TypicalDays">The median wait, given from three waits up.</param>
 /// <param name="Now">For a running show: since its last episode, and when it's back if dated.</param>
 public record SeasonGaps(Guid ShowId, IReadOnlyList<SeasonGap> Gaps, int? TypicalDays, SeasonGap? Longest, WaitingNow? Now);
@@ -928,7 +1048,9 @@ public record SeasonGapLists(IReadOnlyList<GapShow> Longest, IReadOnlyList<GapSh
 
 public record GapShow(Guid ShowId, string Title, string? PosterUrl, SeasonGap? Gap, WaitingNow? Now);
 
-/// <summary>How long a show's episodes run season by season.</summary>
+/// <summary>
+/// How long a show's episodes run season by season.
+/// </summary>
 /// <param name="Verdict">"longer", "shorter" or "steady": the last counted season against the first.</param>
 public record EpisodeLengths(Guid ShowId, string Verdict, int FirstMinutes, int LastMinutes, SeasonJump? Jump, IReadOnlyList<SeasonLength> Seasons);
 
@@ -944,13 +1066,17 @@ public record EpisodeLengthLists(IReadOnlyList<LengthChange> Longer, IReadOnlyLi
 public record LengthChange(Guid ShowId, string Title, string? PosterUrl, int FirstSeason, int FirstMinutes, int LastSeason, int LastMinutes,
     double Change, SeasonJump? Jump);
 
-/// <summary>Where a show is set and filmed, from Wikidata.</summary>
+/// <summary>
+/// Where a show is set and filmed, from Wikidata.
+/// </summary>
 /// <param name="StandsIn">Filming places far from anywhere it's set, each with the setting it plays.</param>
 public record ShowSettings(Guid ShowId, IReadOnlyList<AtlasPlace> Places, IReadOnlyList<AtlasPlace> Filmed, IReadOnlyList<StandIn> StandsIn);
 
 public record StandIn(string PlaceId, string Name, string? Country, string Plays);
 
-/// <summary>The TV atlas: where a set of shows is set.</summary>
+/// <summary>
+/// The TV atlas: where a set of shows is set.
+/// </summary>
 /// <param name="Yours">From the user's shows, not the popular fallback.</param>
 /// <param name="Placed">Of <paramref name="Shows"/>, how many have a setting on the map.</param>
 /// <param name="Kind">"set" or "filmed": which the places are.</param>
@@ -968,7 +1094,9 @@ public record AtlasShow(Guid ShowId, string Title, string? PosterUrl);
 
 public record AtlasCountry(string Name, int Shows, int Places);
 
-/// <summary>Your TV clock: when the user watches, from their last year of watches (bulk marks left out).</summary>
+/// <summary>
+/// Your TV clock: when the user watches, from their last year of watches (bulk marks left out).
+/// </summary>
 /// <param name="Grid">Minutes by weekday (Monday first) and hour.</param>
 public record TvClock(bool Enough, DateOnly Since, int Episodes, int Minutes, int BulkLeftOut, IReadOnlyList<IReadOnlyList<int>> Grid,
     IReadOnlyList<ClockLabel> Labels, ClockPeak? Peak, IReadOnlyList<ClockShare> Periods, double WeekendShare, Sittings? Sittings,
@@ -987,7 +1115,9 @@ public record LongestSitting(DateOnly Date, int Episodes, int Minutes, Guid Show
 
 public record ClockShow(Guid ShowId, string Title, string? PosterUrl, int Minutes, string Period, double PeriodShare, bool Weekend);
 
-/// <summary>Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.</summary>
+/// <summary>
+/// Your TV life: each year since the viewer was born, with the catalog's biggest premieres and finales and their own watching.
+/// </summary>
 public record TvLife(int Born, IReadOnlyList<TvLifeYear> Years, TvLifeFacts Facts);
 
 public record TvLifeYear(int Year, int Age, IReadOnlyList<TvLifeShow> Premieres, IReadOnlyList<TvLifeShow> Finales, TvLifeYourYear? Yours);
@@ -998,7 +1128,9 @@ public record TvLifeYourYear(int Started, int Finished, int Minutes, TvLifeShow?
 
 public record TvLifeFacts(int OlderThanYou, TvLifeShow? Oldest, int? OldestYear, TvLifeShow? BornWith, int? BiggestYear, int TotalMinutes, int ShowsWatched);
 
-/// <summary>Where a show's cast went next: each member's main roles since the show ended (or, running, since it started).</summary>
+/// <summary>
+/// Where a show's cast went next: each member's main roles since the show ended (or, running, since it started).
+/// </summary>
 public record ShowAfterwards(Guid ShowId, bool Ended, DateOnly Since, int CastCount, int WentOn, int CreditsPending, BiggestRole? Biggest,
     IReadOnlyList<CastAfterwards> Cast);
 
@@ -1010,7 +1142,9 @@ public record CastAfterwards(Guid PersonId, string Name, string? PhotoUrl, strin
 public record NextRole(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Character,
     double Popularity, double? Rating);
 
-/// <summary>Memorable lines from Wikiquote: a few for the show page, and which episodes have lines.</summary>
+/// <summary>
+/// Memorable lines from Wikiquote: a few for the show page, and which episodes have lines.
+/// </summary>
 /// <param name="FromEpisode">The episode <paramref name="Lines"/> come from, when the show's page has none about the whole show.</param>
 public record ShowQuotes(Guid ShowId, string PageUrl, IReadOnlyList<QuoteText> Lines, QuoteEpisode? FromEpisode, int Total,
     IReadOnlyList<QuoteEpisode> Episodes);
@@ -1025,13 +1159,17 @@ public record QuoteText(IReadOnlyList<QuoteLine> Lines);
 /// <param name="Speaker">Null for a stage direction.</param>
 public record QuoteLine(string? Speaker, string Text);
 
-/// <summary>A round of Who said it?: lines from episodes the player has watched, or popular first episodes.</summary>
+/// <summary>
+/// A round of Who said it?: lines from episodes the player has watched, or popular first episodes.
+/// </summary>
 public record WhoSaidItRound(bool FromWatched, IReadOnlyList<WhoSaidItQuestion> Questions);
 
 public record WhoSaidItQuestion(Guid ShowId, string ShowTitle, string? PosterUrl, Guid EpisodeId, int SeasonNumber, int EpisodeNumber,
     string Line, IReadOnlyList<string> Options, string Answer, string PageUrl);
 
-/// <summary>Spoiler watch: the viewer's shows with recent unwatched episodes, riskiest first.</summary>
+/// <summary>
+/// Spoiler watch: the viewer's shows with recent unwatched episodes, riskiest first.
+/// </summary>
 public record SpoilerWatch(IReadOnlyList<SpoilerRisk> Shows);
 
 /// <param name="Level">"high", "medium" or "low".</param>
@@ -1043,7 +1181,9 @@ public record SpoilerRisk(Guid ShowId, string Title, string? PosterUrl, string L
 public record SpoilerEpisode(int SeasonNumber, int EpisodeNumber, DateTimeOffset AiredAtUtc, string Kind);
 
 
-/// <summary>Other shows with a show's title (Same name); <paramref name="Checked"/> is false until the show has been looked up.</summary>
+/// <summary>
+/// Other shows with a show's title (Same name); <paramref name="Checked"/> is false until the show has been looked up.
+/// </summary>
 public record ShowNamesakes(string? Country, IReadOnlyList<Namesake> Namesakes, bool Checked);
 
 /// <param name="ShowId">Its catalog id when it's in the catalog too.</param>
@@ -1053,14 +1193,18 @@ public record Namesake(string ExternalId, Guid? ShowId, string Title, string? Po
 
 public record SharedActor(Guid PersonId, string Name, string? Character);
 
-/// <summary>Same name's lists: comebacks, the same title abroad, and the same title years apart.</summary>
+/// <summary>
+/// Same name's lists: comebacks, the same title abroad, and the same title years apart.
+/// </summary>
 public record NamesakeLists(IReadOnlyList<NamesakePair> Back, IReadOnlyList<NamesakePair> Abroad, IReadOnlyList<NamesakePair> YearsApart);
 
 public record NamesakePair(NamesakeShow Show, Namesake Other);
 
 public record NamesakeShow(Guid Id, string Title, string? PosterUrl, int? Year, string? Country);
 
-/// <summary>Far from home: a show's main cast born outside the one country it's set in.</summary>
+/// <summary>
+/// Far from home: a show's main cast born outside the one country it's set in.
+/// </summary>
 public record ShowCastOrigins(string SetIn, int Known, IReadOnlyList<BornElsewhere> Elsewhere);
 
 /// <param name="Lead">Among the first three billed.</param>
@@ -1075,7 +1219,9 @@ public record SettingCountry(string Country, int Shows, int Cast, int Home, IRea
 
 public record BirthplaceCount(string Country, int Count);
 
-/// <summary>Streaks: days and weeks in a row of watching, and shows kept up with as they air.</summary>
+/// <summary>
+/// Streaks: days and weeks in a row of watching, and shows kept up with as they air.
+/// </summary>
 public record Streaks(int KeptUpDays, int BulkLeftOut, Streak Days, Streak Weeks, IReadOnlyList<KeptUp> KeptUp, IReadOnlyList<StreakDue> Due, KeptUp? Best);
 
 /// <param name="AtRisk">Alive, but nothing watched yet today (this week).</param>
@@ -1087,7 +1233,9 @@ public record KeptUp(Guid ShowId, string Title, string? PosterUrl, int Current, 
 /// <param name="WatchBy">The last day watching it keeps the run.</param>
 public record StreakDue(Guid ShowId, string Title, string? PosterUrl, int Season, int Episode, DateOnly WatchBy, int Streak);
 
-/// <summary>Bring your history: a show from an export to resolve, with the episode numbers watched.</summary>
+/// <summary>
+/// Bring your history: a show from an export to resolve, with the episode numbers watched.
+/// </summary>
 public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes);
 
 public record HistoryEpisodeNumber(int Season, int Number);
@@ -1103,10 +1251,14 @@ public record ImportedWatch(Guid EpisodeId, DateTimeOffset WatchedAtUtc);
 
 public record ImportWatchesResult(int Added);
 
-/// <summary>Affiliate links: where Catalog.API says to send a where-to-watch click (the web app's <c>/go</c> redirect).</summary>
+/// <summary>
+/// Affiliate links: where Catalog.API says to send a where-to-watch click (the web app's <c>/go</c> redirect).
+/// </summary>
 public record OutboundLink(string Url, Guid ClickId, string? Program);
 
-/// <summary>Affiliate links, measured, for admins: clicks, conversions and commission over a window of days.</summary>
+/// <summary>
+/// Affiliate links, measured, for admins: clicks, conversions and commission over a window of days.
+/// </summary>
 public record AffiliateReport(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<Money> Revenue,
     IReadOnlyList<AffiliateServiceRow> Services, IReadOnlyList<AffiliateBreakdown> Surfaces, IReadOnlyList<AffiliateBreakdown> Plans,
     IReadOnlyList<AffiliateDay> Days, IReadOnlyList<AffiliateShowRow> Shows, IReadOnlyList<AffiliateProgramInfo> Programs);

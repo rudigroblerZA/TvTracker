@@ -6,7 +6,9 @@ using System.Text.Json;
 
 namespace TvTracker.UI.Services;
 
-/// <summary>Thrown when the API says the user isn't signed in (or the session expired).</summary>
+/// <summary>
+/// Thrown when the API says the user isn't signed in (or the session expired).
+/// </summary>
 public sealed class SignInRequiredException() : Exception("Please sign in again.");
 
 /// <summary>
@@ -18,7 +20,9 @@ public abstract class ApiClientBase(
 {
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    /// <summary>GET; returns null on 404. With <paramref name="cacheForOffline"/>, the last response is served when offline.</summary>
+    /// <summary>
+    /// GET; returns null on 404. With <paramref name="cacheForOffline"/>, the last response is served when offline.
+    /// </summary>
     protected async Task<T?> GetAsync<T>(string client, string url, CancellationToken ct, bool cacheForOffline = false)
     {
         var cacheKey = $"{client}:{url}";
@@ -92,7 +96,9 @@ public abstract class ApiClientBase(
     protected Task SendAsync(string client, HttpMethod method, string url, object? body, CancellationToken ct, bool queueIfOffline = false) =>
         SendAsync<JsonElement?>(client, method, url, body, ct, queueIfOffline);
 
-    /// <summary>Replays a queued offline change. Used by the mobile app's sync service.</summary>
+    /// <summary>
+    /// Replays a queued offline change. Used by the mobile app's sync service.
+    /// </summary>
     public async Task<bool> ReplayAsync(PendingRequest pending, CancellationToken ct)
     {
         using var request = await CreateRequestAsync(new HttpMethod(pending.Method), pending.Url, pending.Body, ct);
@@ -143,7 +149,9 @@ public abstract class ApiClientBase(
     private static string Truncate(string s) => s.Length > 300 ? s[..300] : s;
 }
 
-/// <summary>Whether the last API call reached the server; the layout shows an offline banner from it.</summary>
+/// <summary>
+/// Whether the last API call reached the server; the layout shows an offline banner from it.
+/// </summary>
 public sealed class ConnectionState
 {
     public bool IsOffline { get; private set; }

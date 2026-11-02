@@ -15,7 +15,9 @@ public record NetworkService(string Key, string Name, string Domain, decimal? Mo
 
 public static class NetworkServices
 {
-    /// <summary>When the prices were checked, and where: US list prices before tax.</summary>
+    /// <summary>
+    /// When the prices were checked, and where: US list prices before tax.
+    /// </summary>
     public const string PricesAsOf = "October 2026";
 
     public const string PricesSource = "https://stream-wiser.com/prices";
@@ -92,7 +94,9 @@ public static class NetworkServices
         ["Tokyo MX"] = "tokyo-mx"
     };
 
-    /// <summary>US broadcast networks, free over the air as well as on their streaming home.</summary>
+    /// <summary>
+    /// US broadcast networks, free over the air as well as on their streaming home.
+    /// </summary>
     public static readonly IReadOnlySet<string> FreeOverTheAir = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "ABC", "CBS", "NBC", "FOX", "The CW", "PBS" };
 
@@ -100,10 +104,14 @@ public static class NetworkServices
 
     public static NetworkService? Get(string key) => ByKey.GetValueOrDefault(key);
 
-    /// <summary>The service a network's shows are on; null for a network not in the directory.</summary>
+    /// <summary>
+    /// The service a network's shows are on; null for a network not in the directory.
+    /// </summary>
     public static NetworkService? ForNetwork(string? network) =>
         network is not null && ServiceOfNetwork.TryGetValue(network, out var key) ? ByKey[key] : null;
 
-    /// <summary>The catalog networks whose shows are on a service.</summary>
+    /// <summary>
+    /// The catalog networks whose shows are on a service.
+    /// </summary>
     public static IEnumerable<string> NetworksOf(string key) => ServiceOfNetwork.Where(n => n.Value == key).Select(n => n.Key);
 }

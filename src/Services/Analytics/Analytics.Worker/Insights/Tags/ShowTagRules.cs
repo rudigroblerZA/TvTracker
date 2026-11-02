@@ -31,7 +31,9 @@ public sealed class DropsAtOnceRule : IShowTagRule
             : null;
     }
 
-    /// <summary>A season the rule can judge: fully aired, three or more episodes.</summary>
+    /// <summary>
+    /// A season the rule can judge: fully aired, three or more episodes.
+    /// </summary>
     public static bool IsFull(SeasonStats season) => season.AiredCount > 0 && season.AiredCount == season.EpisodeCount && season.AiredCount >= 3;
 
     /// <summary>
@@ -43,7 +45,9 @@ public sealed class DropsAtOnceRule : IShowTagRule
         releaseDays.Count == 1 || releaseDays.Count <= ShowTags.MaxDropDays && season.AiredCount >= 2 * releaseDays.Count;
 }
 
-/// <summary>Short seasons, not too long in all, with nothing left to air (see <see cref="ShowTags.Bingeable"/>).</summary>
+/// <summary>
+/// Short seasons, not too long in all, with nothing left to air (see <see cref="ShowTags.Bingeable"/>).
+/// </summary>
 public sealed class BingeableRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
@@ -63,13 +67,17 @@ public sealed class BingeableRule : IShowTagRule
             : $"About {perSeason:0} episodes a season · all {aired.Count}{time}");
     }
 
-    /// <summary>Everything announced so far has aired (no season part-way through), and there are a few episodes.</summary>
+    /// <summary>
+    /// Everything announced so far has aired (no season part-way through), and there are a few episodes.
+    /// </summary>
     public static bool AllOut(ShowInsightContext show) =>
         show.RegularSeasonStats.Any(s => s.AiredCount > 0) && show.RegularSeasonStats.All(s => s.AiredCount == s.EpisodeCount)
         && show.RegularAired.Count >= 3;
 }
 
-/// <summary>Everything aired fits in <see cref="ShowTags.WeekendBingeMaxMinutes"/>, with nothing left to air.</summary>
+/// <summary>
+/// Everything aired fits in <see cref="ShowTags.WeekendBingeMaxMinutes"/>, with nothing left to air.
+/// </summary>
 public sealed class WeekendBingeRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
@@ -81,7 +89,9 @@ public sealed class WeekendBingeRule : IShowTagRule
     }
 }
 
-/// <summary>Our users' favourite (from the minimum number of ratings), else the provider's.</summary>
+/// <summary>
+/// Our users' favourite (from the minimum number of ratings), else the provider's.
+/// </summary>
 public sealed class FanFavoriteRule(Branding brand) : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
@@ -98,7 +108,9 @@ public sealed class FanFavoriteRule(Branding brand) : IShowTagRule
     }
 }
 
-/// <summary>One season, and the show has ended.</summary>
+/// <summary>
+/// One season, and the show has ended.
+/// </summary>
 public sealed class LimitedSeriesRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show) =>
@@ -107,7 +119,9 @@ public sealed class LimitedSeriesRule : IShowTagRule
             : null;
 }
 
-/// <summary>The typical (median) episode is at most <see cref="ShowTags.QuickEpisodeMaxMinutes"/> minutes.</summary>
+/// <summary>
+/// The typical (median) episode is at most <see cref="ShowTags.QuickEpisodeMaxMinutes"/> minutes.
+/// </summary>
 public sealed class QuickEpisodesRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
@@ -119,7 +133,9 @@ public sealed class QuickEpisodesRule : IShowTagRule
     }
 }
 
-/// <summary>At least <see cref="ShowTags.LongRunningMinSeasons"/> seasons.</summary>
+/// <summary>
+/// At least <see cref="ShowTags.LongRunningMinSeasons"/> seasons.
+/// </summary>
 public sealed class LongRunningRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
@@ -135,7 +151,9 @@ public sealed class LongRunningRule : IShowTagRule
     }
 }
 
-/// <summary>The show's most prolific maker: "Prolific creator · Chuck Lorre, 19 shows behind the camera".</summary>
+/// <summary>
+/// The show's most prolific maker: "Prolific creator · Chuck Lorre, 19 shows behind the camera".
+/// </summary>
 public sealed class ProlificMakerRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)

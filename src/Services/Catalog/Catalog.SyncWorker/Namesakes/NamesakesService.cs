@@ -111,10 +111,14 @@ public sealed class NamesakesService(IServiceScopeFactory scopeFactory, TimeProv
     }
 }
 
-/// <summary>How two titles are compared for Same name.</summary>
+/// <summary>
+/// How two titles are compared for Same name.
+/// </summary>
 public static partial class NamesakeTitles
 {
-    /// <summary>Lower case, "&amp;" read as "and", a trailing parenthesis ("(2024)", "(US)") and punctuation dropped.</summary>
+    /// <summary>
+    /// Lower case, "&amp;" read as "and", a trailing parenthesis ("(2024)", "(US)") and punctuation dropped.
+    /// </summary>
     public static string Key(string title)
     {
         var text = TrailingParenthesis().Replace(title, "").Replace("&", " and ").ToLowerInvariant();

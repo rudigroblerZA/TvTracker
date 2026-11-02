@@ -10,7 +10,9 @@ namespace TvTracker.IntegrationEvents;
 /// </summary>
 public record ShowTagsChangedIntegrationEvent(IReadOnlyList<ShowTagKeys> Shows) : IntegrationEvent
 {
-    /// <summary>Shows per event; a full send is split into several.</summary>
+    /// <summary>
+    /// Shows per event; a full send is split into several.
+    /// </summary>
     public const int MaxShows = 500;
 }
 

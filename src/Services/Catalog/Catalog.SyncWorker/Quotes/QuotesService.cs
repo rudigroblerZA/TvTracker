@@ -51,7 +51,9 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
         }
     }
 
-    /// <summary>Finds the Wikiquote pages of one batch of shows never looked up, or not for a month.</summary>
+    /// <summary>
+    /// Finds the Wikiquote pages of one batch of shows never looked up, or not for a month.
+    /// </summary>
     private async Task LookUpAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -93,7 +95,9 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
         logger.LogInformation("Memorable lines: looked up {Shows} shows on Wikidata, {Found} have a Wikiquote page", due.Count, pages.Count);
     }
 
-    /// <summary>Reads the most popular show whose lines are missing or stale, and replaces them.</summary>
+    /// <summary>
+    /// Reads the most popular show whose lines are missing or stale, and replaces them.
+    /// </summary>
     private async Task ReadNextAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -141,7 +145,9 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
             quotes.Where(q => q.EpisodeNumber is not null).Select(q => (q.SeasonNumber, q.EpisodeNumber)).Distinct().Count());
     }
 
-    /// <summary>The show's page and every season page it links to, parsed in page order.</summary>
+    /// <summary>
+    /// The show's page and every season page it links to, parsed in page order.
+    /// </summary>
     private async Task<List<ParsedQuote>> ReadPagesAsync(string page, CancellationToken ct)
     {
         var main = await WithRetryAsync(() => WikiquoteClient.GetWikitextAsync(page, ct), ct);
@@ -165,7 +171,9 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
         return quotes;
     }
 
-    /// <summary>A Wikimedia call, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.</summary>
+    /// <summary>
+    /// A Wikimedia call, waiting out a 429's Retry-After (up to <see cref="MaxWait"/>) between tries.
+    /// </summary>
     private async Task<T> WithRetryAsync<T>(Func<Task<T>> call, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)

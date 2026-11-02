@@ -13,7 +13,9 @@ public enum ShowStatus
     Cancelled
 }
 
-/// <summary>A show was imported into the catalog for the first time.</summary>
+/// <summary>
+/// A show was imported into the catalog for the first time.
+/// </summary>
 /// <param name="ExternalRating">The provider's average rating (0-10), if any.</param>
 /// <param name="Cast">The cast with character ids, in billing order. Null in events published before it was added.</param>
 /// <param name="Creatives">Its creators and executive producers, creators first. Null in events published before it was added.</param>
@@ -35,7 +37,9 @@ public record ShowAddedIntegrationEvent(
     string? Network = null,
     bool NetworkKnown = false) : IntegrationEvent;
 
-/// <summary>A show's details changed (title, poster, genres, keywords, cast, creatives, similar shows, rating, network).</summary>
+/// <summary>
+/// A show's details changed (title, poster, genres, keywords, cast, creatives, similar shows, rating, network).
+/// </summary>
 /// <param name="Network">As in <see cref="ShowAddedIntegrationEvent"/>.</param>
 public record ShowUpdatedIntegrationEvent(
     Guid ShowId,
@@ -156,7 +160,9 @@ public record EpisodeScheduledIntegrationEvent(
     DateTimeOffset? AirsAtUtc,
     int? RuntimeMinutes) : IntegrationEvent;
 
-/// <summary>The episode's air time has passed.</summary>
+/// <summary>
+/// The episode's air time has passed.
+/// </summary>
 public record EpisodeAiredIntegrationEvent(
     Guid ShowId,
     string ShowTitle,

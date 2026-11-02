@@ -5,7 +5,9 @@ using TvTracker.Persistence;
 
 namespace Tracking.API.Services;
 
-/// <summary>Write operations on follows and watched episodes, with their events.</summary>
+/// <summary>
+/// Write operations on follows and watched episodes, with their events.
+/// </summary>
 public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox outbox, UserCache cache, TimeProvider time)
 {
     public async Task<Follow> FollowAsync(string userId, Guid showId, WatchStatus status, CancellationToken ct)

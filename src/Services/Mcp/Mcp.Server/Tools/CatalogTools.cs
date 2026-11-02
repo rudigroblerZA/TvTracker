@@ -6,7 +6,9 @@ using ModelContextProtocol.Server;
 
 namespace Mcp.Server.Tools;
 
-/// <summary>Catalog.API (shows, people, universes, holiday episodes) and Research.API (saved research). Public data, no user involved.</summary>
+/// <summary>
+/// Catalog.API (shows, people, universes, holiday episodes) and Research.API (saved research). Public data, no user involved.
+/// </summary>
 [McpServerToolType]
 public sealed class CatalogTools(Backends backends, ShowResolver resolver)
 {

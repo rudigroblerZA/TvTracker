@@ -49,7 +49,9 @@ public static class QuotesApi
 
     private sealed record StoredEpisode(Guid Id, int SeasonNumber, int EpisodeNumber);
 
-    /// <summary>What's cached per show (as JSON in Redis, so plain lists).</summary>
+    /// <summary>
+    /// What's cached per show (as JSON in Redis, so plain lists).
+    /// </summary>
     private sealed record Cached(string PageUrl, List<Stored> Quotes, List<StoredEpisode> Episodes);
 
     public static void MapQuotesApi(this RouteGroupBuilder api)
@@ -124,7 +126,9 @@ public static class QuotesApi
             return new Cached(ShowQuoteSource.PageUrl(source), quotes, episodes.DistinctBy(e => (e.SeasonNumber, e.EpisodeNumber)).ToList());
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
-    /// <summary>The shortest few, in page order: a page has room for lines, not scenes.</summary>
+    /// <summary>
+    /// The shortest few, in page order: a page has room for lines, not scenes.
+    /// </summary>
     private static List<QuoteDto> Shortest(IEnumerable<Stored> quotes, int count) =>
         quotes.Select((q, i) => (Quote: q, Index: i))
             .OrderBy(x => x.Quote.Lines.Sum(l => l.Length)).Take(count)

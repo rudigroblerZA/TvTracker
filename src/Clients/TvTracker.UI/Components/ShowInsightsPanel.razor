@@ -312,10 +312,14 @@
 @code {
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
 
-    /// <summary>Who made the show, from the catalog; prolific creators and producers are highlighted.</summary>
+    /// <summary>
+    /// Who made the show, from the catalog; prolific creators and producers are highlighted.
+    /// </summary>
     [Parameter] public IReadOnlyList<Creative>? Creatives { get; set; }
 
-    /// <summary>The episodes the user has watched, so the spoiler shield can hide the titles of the rest.</summary>
+    /// <summary>
+    /// The episodes the user has watched, so the spoiler shield can hide the titles of the rest.
+    /// </summary>
     [Parameter] public IReadOnlySet<Guid>? Watched { get; set; }
 
     private bool Seen(Guid episodeId) => Watched?.Contains(episodeId) == true;
@@ -344,7 +348,9 @@
     private static string RatingText(SeasonHighlight highlight) =>
         highlight.Source == "external" ? Format.Rating(highlight.Rating) : $"★ {highlight.Rating:0.0}";
 
-    /// <summary>More seasons than this, and the chart squeezes to fit rather than labelling every column.</summary>
+    /// <summary>
+    /// More seasons than this, and the chart squeezes to fit rather than labelling every column.
+    /// </summary>
     private const int DenseSeasons = 12;
 
     private string SeasonTitle(SeasonStats season) =>

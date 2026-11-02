@@ -36,16 +36,24 @@ public interface IListInsight
     ListBuilder Begin(InsightSources sources);
 }
 
-/// <summary>A list being built during one run.</summary>
+/// <summary>
+/// A list being built during one run.
+/// </summary>
 public abstract class ListBuilder
 {
-    /// <summary>For the log: "premieres", "top-episodes".</summary>
+    /// <summary>
+    /// For the log: "premieres", "top-episodes".
+    /// </summary>
     public abstract string Name { get; }
 
-    /// <summary>Rows written by the last <see cref="ReplaceAsync"/>.</summary>
+    /// <summary>
+    /// Rows written by the last <see cref="ReplaceAsync"/>.
+    /// </summary>
     public int Count { get; protected set; }
 
-    /// <summary>Called once per show, in batches, after the show's document is complete.</summary>
+    /// <summary>
+    /// Called once per show, in batches, after the show's document is complete.
+    /// </summary>
     public abstract void Add(ShowInsightContext show, ShowInsights insights);
 
     /// <summary>
@@ -70,7 +78,9 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
 
     private const string ComputedAt = "ComputedAtUtc";
 
-    /// <summary>A row's primary key values, compared one by one (a joined string could collide on a separator in a text key).</summary>
+    /// <summary>
+    /// A row's primary key values, compared one by one (a joined string could collide on a separator in a text key).
+    /// </summary>
     private sealed class RowKey(object?[] values) : IEquatable<RowKey>
     {
         private readonly object?[] values = values;
@@ -82,7 +92,9 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
         public override int GetHashCode() => values.Aggregate(17, (hash, value) => hash * 31 + (value?.GetHashCode() ?? 0));
     }
 
-    /// <summary>The row's values as one comparable string: every mapped property but the computed-at stamp, documents canonical.</summary>
+    /// <summary>
+    /// The row's values as one comparable string: every mapped property but the computed-at stamp, documents canonical.
+    /// </summary>
     private static string Comparable(TRow row, IEnumerable<IProperty> properties)
     {
         var text = new StringBuilder();
@@ -107,7 +119,9 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
         return text.ToString();
     }
 
-    /// <summary>Compact JSON with object keys sorted, computed-at stamps left out at any depth.</summary>
+    /// <summary>
+    /// Compact JSON with object keys sorted, computed-at stamps left out at any depth.
+    /// </summary>
     private static void Canonical(JsonNode? node, StringBuilder text)
     {
         switch (node)
@@ -137,7 +151,9 @@ public abstract class ListBuilder<TRow>(Func<AnalyticsContext, DbSet<TRow>> tabl
         }
     }
 
-    /// <summary>The rows to store, once every show has been added.</summary>
+    /// <summary>
+    /// The rows to store, once every show has been added.
+    /// </summary>
     protected abstract IReadOnlyCollection<TRow> Rows();
 
     public override async Task ReplaceAsync(AnalyticsContext db, CancellationToken ct)
@@ -183,30 +199,42 @@ public interface IInsightPublication
     PublicationBuilder Begin(bool publishAll);
 }
 
-/// <summary>A publication being collected during one run.</summary>
+/// <summary>
+/// A publication being collected during one run.
+/// </summary>
 public abstract class PublicationBuilder
 {
-    /// <summary>For the log: "tags", "DNA".</summary>
+    /// <summary>
+    /// For the log: "tags", "DNA".
+    /// </summary>
     public abstract string Name { get; }
 
-    /// <summary>Shows sent so far this run.</summary>
+    /// <summary>
+    /// Shows sent so far this run.
+    /// </summary>
     public int Count { get; protected set; }
 
     /// <param name="previous">The show's stored document from the last run; null for a show computed for the first time.</param>
     public abstract void Add(ShowInsights insights, JsonElement? previous);
 
-    /// <summary>The events for the shows added since the last call; the pipeline saves them with those shows' documents.</summary>
+    /// <summary>
+    /// The events for the shows added since the last call; the pipeline saves them with those shows' documents.
+    /// </summary>
     public abstract IReadOnlyList<IntegrationEvent> TakeEvents();
 }
 
-/// <summary>A publication of one value per show, sent in events of at most <paramref name="maxPerEvent"/> shows.</summary>
+/// <summary>
+/// A publication of one value per show, sent in events of at most <paramref name="maxPerEvent"/> shows.
+/// </summary>
 public abstract class PublicationBuilder<TValue>(bool publishAll, int maxPerEvent) : PublicationBuilder where TValue : class
 {
     private readonly List<TValue> changed = [];
 
     protected abstract TValue ValueOf(ShowInsights insights);
 
-    /// <summary>The value in a stored document.</summary>
+    /// <summary>
+    /// The value in a stored document.
+    /// </summary>
     protected abstract TValue PreviousValueOf(JsonElement document);
 
     protected abstract bool Same(TValue previous, TValue current);

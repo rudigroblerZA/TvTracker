@@ -144,7 +144,9 @@
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    /// <summary>Optional, like the refreshers.</summary>
+    /// <summary>
+    /// Optional, like the refreshers.
+    /// </summary>
     private async Task<List<CatchUpPlan>?> LoadCatchUpsAsync()
     {
         try
@@ -157,7 +159,9 @@
         }
     }
 
-    /// <summary>Optional: Up Next works without it (flag off, or Analytics unavailable).</summary>
+    /// <summary>
+    /// Optional: Up Next works without it (flag off, or Analytics unavailable).
+    /// </summary>
     private async Task<List<Refresher>?> LoadRefreshersAsync()
     {
         try

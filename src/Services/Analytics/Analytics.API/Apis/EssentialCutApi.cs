@@ -64,10 +64,14 @@ public record CutProgressDto(Guid? NextEpisodeId, int? NextSeason, int? NextEpis
 /// </summary>
 public static class EssentialCutApi
 {
-    /// <summary>Shorter shows aren't worth cutting.</summary>
+    /// <summary>
+    /// Shorter shows aren't worth cutting.
+    /// </summary>
     public const int MinEpisodes = 20;
 
-    /// <summary>The share of aired episodes that must be rated for the cut to mean anything.</summary>
+    /// <summary>
+    /// The share of aired episodes that must be rated for the cut to mean anything.
+    /// </summary>
     public const double MinRatedShare = 0.8;
 
     // Each level skips up to a share of each season, lowest-rated first, among episodes rated at least a margin
@@ -150,15 +154,21 @@ public static class EssentialCutApi
             aired.Count(e => notes.ContainsKey(e.EpisodeId))));
     }
 
-    /// <summary>Moderators' notes on the show's episodes (see the class remarks), by episode.</summary>
+    /// <summary>
+    /// Moderators' notes on the show's episodes (see the class remarks), by episode.
+    /// </summary>
     internal static Task<Dictionary<Guid, EpisodeNoteCopy>> NotesAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
         db.EpisodeNotes.AsNoTracking().Where(n => n.ShowId == showId).ToDictionaryAsync(n => n.EpisodeId, ct);
 
-    /// <summary>The ratings the cut goes by: the provider's, averaged with our users' once enough rated an episode.</summary>
+    /// <summary>
+    /// The ratings the cut goes by: the provider's, averaged with our users' once enough rated an episode.
+    /// </summary>
     internal static async Task<Func<EpisodeCopy, double?>> RatingsAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
         (await RatingsAsync(db, [showId], ct))(showId);
 
-    /// <summary>The same, for several shows in one query: a rating function per show.</summary>
+    /// <summary>
+    /// The same, for several shows in one query: a rating function per show.
+    /// </summary>
     internal static async Task<Func<Guid, Func<EpisodeCopy, double?>>> RatingsAsync(AnalyticsContext db, IReadOnlyCollection<Guid> showIds,
         CancellationToken ct)
     {
@@ -182,7 +192,9 @@ public static class EssentialCutApi
         };
     }
 
-    /// <summary>Episode runtimes, with missing ones counted as the show's typical one so the hours stay honest.</summary>
+    /// <summary>
+    /// Episode runtimes, with missing ones counted as the show's typical one so the hours stay honest.
+    /// </summary>
     internal static Func<EpisodeCopy, int> MinutesOf(List<EpisodeCopy> aired)
     {
         var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
@@ -190,7 +202,9 @@ public static class EssentialCutApi
         return e => e.RuntimeMinutes is > 0 ? e.RuntimeMinutes.Value : typical;
     }
 
-    /// <summary>Why the show can't be cut (too short, or too few episodes rated and none noted); null when it can.</summary>
+    /// <summary>
+    /// Why the show can't be cut (too short, or too few episodes rated and none noted); null when it can.
+    /// </summary>
     internal static string? Unavailable(List<EpisodeCopy> aired, Func<EpisodeCopy, double?> rating,
         IReadOnlyDictionary<Guid, EpisodeNoteCopy> notes)
     {
@@ -202,7 +216,9 @@ public static class EssentialCutApi
                 : null;
     }
 
-    /// <summary>The "lean" level's settings, for other features that offer the cut as a shorter path.</summary>
+    /// <summary>
+    /// The "lean" level's settings, for other features that offer the cut as a shorter path.
+    /// </summary>
     internal static (double Share, double Margin) Lean => Levels["lean"];
 
     /// <summary>
@@ -285,7 +301,9 @@ public static class EssentialCutApi
         return decisions;
     }
 
-    /// <summary>Consecutive skipped episodes within a season, as ranges.</summary>
+    /// <summary>
+    /// Consecutive skipped episodes within a season, as ranges.
+    /// </summary>
     private static List<SkipRunDto> SkipRuns(List<EpisodeCopy> aired, Dictionary<Guid, (bool Keep, string Why)> decisions,
         Func<EpisodeCopy, double?> rating, Func<EpisodeCopy, int> minutes)
     {
@@ -314,7 +332,9 @@ public static class EssentialCutApi
         return runs;
     }
 
-    /// <summary>What's left from the user's next unwatched episode, in full and in the cut.</summary>
+    /// <summary>
+    /// What's left from the user's next unwatched episode, in full and in the cut.
+    /// </summary>
     private static CutProgressDto? Progress(List<EpisodeCopy> aired, Dictionary<Guid, (bool Keep, string Why)> decisions,
         HashSet<Guid> watched, Func<EpisodeCopy, int> minutes)
     {

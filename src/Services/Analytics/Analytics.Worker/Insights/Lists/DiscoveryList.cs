@@ -2,7 +2,9 @@ using Analytics.Data;
 
 namespace Analytics.Worker.Insights;
 
-/// <summary>The discovery lists (see <see cref="DiscoveryLists"/>), overall (genre "") and per genre.</summary>
+/// <summary>
+/// The discovery lists (see <see cref="DiscoveryLists"/>), overall (genre "") and per genre.
+/// </summary>
 public sealed class DiscoveryList : IListInsight
 {
     private const int ListLength = 30;
@@ -16,18 +18,26 @@ public sealed class DiscoveryList : IListInsight
 
     private const double HiddenGemPopularShare = 0.4;
 
-    /// <summary>The consistency lists only rank shows rated at least this, so dull-but-steady shows don't top them.</summary>
+    /// <summary>
+    /// The consistency lists only rank shows rated at least this, so dull-but-steady shows don't top them.
+    /// </summary>
     private const double MostConsistentMinRating = 7.5;
 
     private const double RollercoasterMinRating = 7.0;
 
-    /// <summary>Worth the wait: slow starters rated at least this as a show...</summary>
+    /// <summary>
+    /// Worth the wait: slow starters rated at least this as a show...
+    /// </summary>
     private const double WorthTheWaitMinRating = 7.5;
 
-    /// <summary>...that rate at least this much better from the turn than before it.</summary>
+    /// <summary>
+    /// ...that rate at least this much better from the turn than before it.
+    /// </summary>
     private const double WorthTheWaitMinLift = 0.4;
 
-    /// <summary>Great endings: ended shows rated at least this that stick the landing.</summary>
+    /// <summary>
+    /// Great endings: ended shows rated at least this that stick the landing.
+    /// </summary>
     private const double GreatEndingsMinRating = 7.5;
 
     public ListBuilder Begin(InsightSources sources) => new Builder();
@@ -60,7 +70,9 @@ public sealed class DiscoveryList : IListInsight
                 insights.Run.RuntimeMinutes, insights.GetsGood?.Turn, insights.Landing, insights.WorthIt));
         }
 
-        /// <summary>Each fully aired season's last episode, when it's rated and the season has enough rated episodes.</summary>
+        /// <summary>
+        /// Each fully aired season's last episode, when it's rated and the season has enough rated episodes.
+        /// </summary>
         private static IEnumerable<EpisodeCopy> FinalesOf(ShowInsightContext show)
         {
             var bySeason = show.Episodes.ToLookup(e => e.SeasonNumber);

@@ -6,7 +6,9 @@ namespace Catalog.Data;
 /// </summary>
 public static class HistoryImports
 {
-    /// <summary>Shows a call, since each one the catalog lacks is two provider calls on the shared limiter.</summary>
+    /// <summary>
+    /// Shows a call, since each one the catalog lacks is two provider calls on the shared limiter.
+    /// </summary>
     public const int MaxShows = 10;
 }
 

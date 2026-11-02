@@ -6,7 +6,9 @@ using Tracking.API.Services;
 
 namespace Tracking.API.Apis;
 
-/// <summary>Up Next, calendar, per-show progress and stats.</summary>
+/// <summary>
+/// Up Next, calendar, per-show progress and stats.
+/// </summary>
 public static class ScheduleApi
 {
     public static RouteGroupBuilder MapScheduleApi(this IEndpointRouteBuilder app)
@@ -85,7 +87,9 @@ public static class ScheduleApi
         return TypedResults.Ok(items);
     }
 
-    /// <summary>Episodes of followed shows (except stopped ones) airing in the range, with watched flags. Times are UTC.</summary>
+    /// <summary>
+    /// Episodes of followed shows (except stopped ones) airing in the range, with watched flags. Times are UTC.
+    /// </summary>
     private static async Task<Results<Ok<List<CalendarItemDto>>, BadRequest<string>>> GetCalendarAsync(
         ClaimsPrincipal user, TrackingContext db, DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
     {

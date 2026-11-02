@@ -5,7 +5,9 @@ using static Analytics.UnitTests.Build;
 
 namespace Analytics.UnitTests;
 
-/// <summary>The worker's show stages, on a show built in memory (see CONTEXT.md, When it gets good, Does it stick the landing?, Season verdict).</summary>
+/// <summary>
+/// The worker's show stages, on a show built in memory (see CONTEXT.md, When it gets good, Does it stick the landing?, Season verdict).
+/// </summary>
 public class ShowInsightTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
@@ -138,7 +140,9 @@ public class ShowInsightTests
     [Fact]
     public void Margins_survive_floating_point() => Assert.True(InsightMath.Reaches(8.1 - 7.8, 0.3));
 
-    /// <summary>An ended show with one weekly season per rating list, years ago.</summary>
+    /// <summary>
+    /// An ended show with one weekly season per rating list, years ago.
+    /// </summary>
     private static (ShowCopy Show, List<EpisodeCopy> Episodes) Ended(params double?[][] seasons)
     {
         var show = Show(ShowStatus.Ended);

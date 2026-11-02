@@ -6,14 +6,18 @@ using TvTracker;
 
 namespace Analytics.API.Apis;
 
-/// <summary>What the user gave Analytics directly (everything else here is a copy of other services' data).</summary>
+/// <summary>
+/// What the user gave Analytics directly (everything else here is a copy of other services' data).
+/// </summary>
 public record AnalyticsExportDto(IReadOnlyList<ExportedServiceDto> Services, IReadOnlyList<ExportedCallDto> SeasonCalls);
 
 public record ExportedServiceDto(string ServiceKey, DateTime AddedAtUtc);
 
 public record ExportedCallDto(Guid ShowId, int SeasonNumber, double Rating, DateTime CalledAtUtc, double? Actual);
 
-/// <summary>The data export Identity gathers from every service: the user's picked services and season calls.</summary>
+/// <summary>
+/// The data export Identity gathers from every service: the user's picked services and season calls.
+/// </summary>
 public static class ExportApi
 {
     public static void MapExportApi(this RouteGroupBuilder api) => api.MapGet("/me/export", GetAsync);

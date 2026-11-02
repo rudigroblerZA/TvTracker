@@ -43,7 +43,9 @@ public record WatchOrderDto(Guid Id, string Name, IReadOnlyList<ShowSummaryDto> 
 public record WatchOrderEpisodeDto(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title, DateTimeOffset AirsAtUtc,
     int? RuntimeMinutes, string? Crossover = null);
 
-/// <summary>Shared universes found from the cast and franchise names; public, like the rest of the catalog (see <see cref="Universes"/>).</summary>
+/// <summary>
+/// Shared universes found from the cast and franchise names; public, like the rest of the catalog (see <see cref="Universes"/>).
+/// </summary>
 public static class UniverseApi
 {
     public static void MapUniverseApi(this RouteGroupBuilder api)
@@ -88,7 +90,9 @@ public static class UniverseApi
             .ToList());
     }
 
-    /// <summary>The universe a show is in; 404 when it shares characters with no other show.</summary>
+    /// <summary>
+    /// The universe a show is in; 404 when it shares characters with no other show.
+    /// </summary>
     private static async Task<Results<Ok<UniverseDto>, NotFound>> GetUniverseAsync(
         Guid id, Universes universes, CatalogContext db, TimeProvider time, CancellationToken ct)
     {

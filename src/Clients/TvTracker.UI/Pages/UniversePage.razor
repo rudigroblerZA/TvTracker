@@ -126,7 +126,9 @@ else
             ["hide"] = next == "order" ? Hide : null
         }), replace: true);
 
-    /// <summary>"3 shows, 2012–2026, linked by 20 characters played by the same actors" or "… by their franchise name".</summary>
+    /// <summary>
+    /// "3 shows, 2012–2026, linked by 20 characters played by the same actors" or "… by their franchise name".
+    /// </summary>
     private string Summary
     {
         get
@@ -153,7 +155,9 @@ else
 
     private int CharacterCount => universe?.Links.SelectMany(l => l.Characters).Select(c => (c.PersonId, c.Character.ToLowerInvariant())).Distinct().Count() ?? 0;
 
-    /// <summary>"2012–now" while any show is still running, else first premiere to last episode ("2006–2025").</summary>
+    /// <summary>
+    /// "2012–now" while any show is still running, else first premiere to last episode ("2006–2025").
+    /// </summary>
     private string Years
     {
         get
@@ -201,7 +205,9 @@ else
 
     private static int Center(int row) => row * RowHeight + RowHeight / 2;
 
-    /// <summary>A half-loop in the gutter from one show's row to the other's; longer spans reach further left.</summary>
+    /// <summary>
+    /// A half-loop in the gutter from one show's row to the other's; longer spans reach further left.
+    /// </summary>
     private string Arc(UniverseLink link)
     {
         var (y1, y2) = (Center(Index(link.A)), Center(Index(link.B)));
@@ -212,7 +218,9 @@ else
 
     private ShowSummary Show(Guid id) => universe!.Shows.First(s => s.Show.Id == id).Show;
 
-    /// <summary>The link from the selected show's point of view.</summary>
+    /// <summary>
+    /// The link from the selected show's point of view.
+    /// </summary>
     private static string KindText(UniverseLink link, Guid from) => (link.Kind, link.A == from) switch
     {
         ("continuation", true) => "Continues in",

@@ -32,7 +32,9 @@ public record RefresherDto(
 public record RefresherEpisodeDto(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, string Title, int Minutes, double? Rating,
     int? YourStars, string Why);
 
-/// <summary>Aired episodes after the furthest one watched, and the first of them.</summary>
+/// <summary>
+/// Aired episodes after the furthest one watched, and the first of them.
+/// </summary>
 public record RefresherAheadDto(int Episodes, int Minutes, Guid? NextEpisodeId, int? NextSeason, int? NextEpisode);
 
 /// <param name="NewSeason">A season premiere (or an announced season), rather than the next episode of one already airing.</param>
@@ -47,17 +49,23 @@ public record RefresherReturnDto(int SeasonNumber, DateTimeOffset PremieresAtUtc
 /// </summary>
 public static class RefresherApi
 {
-    /// <summary>A break this long, or longer, is worth a refresher.</summary>
+    /// <summary>
+    /// A break this long, or longer, is worth a refresher.
+    /// </summary>
     public const int GapDays = 120;
 
     public const int DefaultBudget = 120;
     private const int MinBudget = 30;
     private const int MaxBudget = 600;
 
-    /// <summary>The list on Up Next looks at this many of the user's most recently paused shows.</summary>
+    /// <summary>
+    /// The list on Up Next looks at this many of the user's most recently paused shows.
+    /// </summary>
     private const int MaxShows = 40;
 
-    /// <summary>Each season contributes up to this many of its best episodes before the rest are considered.</summary>
+    /// <summary>
+    /// Each season contributes up to this many of its best episodes before the rest are considered.
+    /// </summary>
     private const int TopBest = 2;
 
     public static void MapRefresherApi(this RouteGroupBuilder api)
@@ -66,7 +74,9 @@ public static class RefresherApi
         api.MapGet("/me/refreshers", GetAllAsync).RequireFeature(FeatureFlags.Refresher);
     }
 
-    /// <summary>204 when the user hasn't watched the show, or has seen all of it and nothing more is coming.</summary>
+    /// <summary>
+    /// 204 when the user hasn't watched the show, or has seen all of it and nothing more is coming.
+    /// </summary>
     private static async Task<Results<Ok<RefresherDto>, NoContent, ValidationProblem>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int minutes = DefaultBudget, CancellationToken ct = default)
     {
@@ -85,7 +95,9 @@ public static class RefresherApi
         return Build(load, returns.GetValueOrDefault(showId), minutes, now) is { } refresher ? TypedResults.Ok(refresher) : TypedResults.NoContent();
     }
 
-    /// <summary>Followed shows due a refresher: the ones coming back soonest first, then the most recently paused.</summary>
+    /// <summary>
+    /// Followed shows due a refresher: the ones coming back soonest first, then the most recently paused.
+    /// </summary>
     private static async Task<Ok<List<RefresherDto>>> GetAllAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -225,7 +237,9 @@ public static class RefresherApi
         return picked.Values.OrderBy(p => p.Episode.SeasonNumber).ThenBy(p => p.Episode.EpisodeNumber).ToList();
     }
 
-    /// <summary>The other half of a two-parter, when the user has seen it too.</summary>
+    /// <summary>
+    /// The other half of a two-parter, when the user has seen it too.
+    /// </summary>
     private static EpisodeCopy? PartnerOf(EpisodeCopy episode, List<EpisodeCopy> seen)
     {
         if (!EssentialCutApi.PartPattern.IsMatch(episode.Title))

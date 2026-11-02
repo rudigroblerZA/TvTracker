@@ -51,7 +51,9 @@
 }
 
 @code {
-    /// <summary>Weeks shown before "All weeks".</summary>
+    /// <summary>
+    /// Weeks shown before "All weeks".
+    /// </summary>
     private const int Shown = 2;
 
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
@@ -73,7 +75,9 @@
         await LoadAsync(false);
     }
 
-    /// <summary>Up Next links to #catch-up; the section appears only once loaded, so its heading is focused then.</summary>
+    /// <summary>
+    /// Up Next links to #catch-up; the section appears only once loaded, so its heading is focused then.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (scrollPending && plan is not null)
@@ -106,14 +110,18 @@
 
     public static string Episodes(int count) => count == 1 ? "1 episode" : $"{count:N0} episodes";
 
-    /// <summary>"About 3 episodes (2 h 30 min) a week".</summary>
+    /// <summary>
+    /// "About 3 episodes (2 h 30 min) a week".
+    /// </summary>
     public static string PerWeek(CatchUpPath path)
     {
         var episodes = Math.Max(1, (int)Math.Round(path.EpisodesPerWeek, MidpointRounding.AwayFromZero));
         return $"About {Episodes(episodes)} ({Format.Hours(path.MinutesPerWeek)}) a week.";
     }
 
-    /// <summary>How that compares with the user's own pace, and the cut when it changes the answer.</summary>
+    /// <summary>
+    /// How that compares with the user's own pace, and the cut when it changes the answer.
+    /// </summary>
     private static string Advice(CatchUpPlan p, CatchUpPath path)
     {
         var pace = Format.Hours(p.YourMinutesPerWeek);
@@ -133,7 +141,9 @@
         return cutHelps ? $"{text} The essential cut makes it {p.Cut!.Verdict}." : text;
     }
 
-    /// <summary>"about 3 weeks": how long after the premiere the user would finish at their pace.</summary>
+    /// <summary>
+    /// "about 3 weeks": how long after the premiere the user would finish at their pace.
+    /// </summary>
     private static string WeeksLate(CatchUpPlan p, CatchUpPath path)
     {
         var days = Math.Ceiling(path.Minutes * 7.0 / Math.Max(1, p.YourMinutesPerWeek)) - p.DaysLeft;
@@ -151,7 +161,9 @@
         _ => "info"
     };
 
-    /// <summary>A week's episodes as compact ranges: "S02E01–E04, E06 · S03E01".</summary>
+    /// <summary>
+    /// A week's episodes as compact ranges: "S02E01–E04, E06 · S03E01".
+    /// </summary>
     public static string Range(IReadOnlyList<CatchUpEpisode> episodes) => string.Join(" · ", episodes
         .GroupBy(e => e.SeasonNumber)
         .Select(season =>

@@ -48,8 +48,12 @@ public static class Format
         : minutes < 60 * 24 ? (minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes / 60} h {minutes % 60} min")
         : $"{minutes / (60 * 24)} day{(minutes / (60 * 24) == 1 ? "" : "s")} {minutes % (60 * 24) / 60} h";
 
-    /// <summary>Watching time in whole hours ("365 h") for long stretches, where days would be misleading.</summary>
-    /// <summary>A wait in days as people say it: "3 weeks", "8 months", "2 years 9 months".</summary>
+    /// <summary>
+    /// Watching time in whole hours ("365 h") for long stretches, where days would be misleading.
+    /// </summary>
+    /// <summary>
+    /// A wait in days as people say it: "3 weeks", "8 months", "2 years 9 months".
+    /// </summary>
     public static string Wait(int days)
     {
         if (days < 14) return $"{days} {(days == 1 ? "day" : "days")}";
@@ -73,22 +77,34 @@ public static class Format
         return years > 1 ? $"{years} years ago" : years == 1 ? "a year ago" : null;
     }
 
-    /// <summary>How a provider rating reads, for colour: "great" (8.5+), "good" (8+), "ok" (7+) or "low".</summary>
+    /// <summary>
+    /// How a provider rating reads, for colour: "great" (8.5+), "good" (8+), "ok" (7+) or "low".
+    /// </summary>
     public static string RatingTone(double rating) => rating >= 8.5 ? "great" : rating >= 8 ? "good" : rating >= 7 ? "ok" : "low";
 
-    /// <summary>A provider rating (0-10), e.g. "7.9".</summary>
+    /// <summary>
+    /// A provider rating (0-10), e.g. "7.9".
+    /// </summary>
     public static string Rating(double rating) => rating.ToString("0.0");
 
-    /// <summary>Our users' average stars with how many rated, e.g. "★ 4.2 (12)".</summary>
+    /// <summary>
+    /// Our users' average stars with how many rated, e.g. "★ 4.2 (12)".
+    /// </summary>
     public static string Stars(double average, int count) => $"★ {average:0.0} ({count})";
 
-    /// <summary>A 0-1 share as a whole percentage, e.g. "42%".</summary>
+    /// <summary>
+    /// A 0-1 share as a whole percentage, e.g. "42%".
+    /// </summary>
     public static string Percent(double share) => $"{share * 100:0}%";
 
-    /// <summary>"$8.99", in US dollars whatever the device's culture, since the prices are US prices.</summary>
+    /// <summary>
+    /// "$8.99", in US dollars whatever the device's culture, since the prices are US prices.
+    /// </summary>
     public static string Usd(decimal amount) => amount.ToString("$0.00", System.Globalization.CultureInfo.InvariantCulture);
 
-    /// <summary>New follows in the last four weeks compared with the four before, e.g. "+12 in 4 weeks (up 50%)".</summary>
+    /// <summary>
+    /// New follows in the last four weeks compared with the four before, e.g. "+12 in 4 weeks (up 50%)".
+    /// </summary>
     public static string Growth(int recent, int previous) =>
         recent == 0 ? "no new follows in 4 weeks"
         : previous == 0 ? $"+{recent} in 4 weeks"
@@ -102,7 +118,9 @@ public static class Format
         _ => trend
     };
 
-    /// <summary>"in 3 days", "2 hours ago", relative to now.</summary>
+    /// <summary>
+    /// "in 3 days", "2 hours ago", relative to now.
+    /// </summary>
     public static string Relative(DateTimeOffset when)
     {
         var diff = when - DateTimeOffset.UtcNow;
@@ -132,7 +150,9 @@ public static class Format
         }
     }
 
-    /// <summary>"2005–2013", "2023–" for one still running, "1963".</summary>
+    /// <summary>
+    /// "2005–2013", "2023–" for one still running, "1963".
+    /// </summary>
     public static string Years(int? from, int? to, bool running) => from is not { } start ? "year unknown"
         : running ? $"{start}–"
         : to is { } end && end != start ? $"{start}–{end}"

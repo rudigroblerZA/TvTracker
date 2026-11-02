@@ -17,7 +17,9 @@ public record TogetherEpisodeDto(Guid EpisodeId, int SeasonNumber, int EpisodeNu
 public record TonightTogetherShowDto(Guid ShowId, string Title, string? PosterUrl, string? Ahead, int Gap,
     DateTime? LastWatchedAtUtc, IReadOnlyList<TogetherEpisodeDto> Episodes);
 
-/// <summary>A shared show left out because one of the two is too far ahead to catch up in an evening.</summary>
+/// <summary>
+/// A shared show left out because one of the two is too far ahead to catch up in an evening.
+/// </summary>
 public record ApartShowDto(Guid ShowId, string Title, string Ahead, int Gap);
 
 public record TonightTogetherDto(PersonDto Person, IReadOnlyList<TonightTogetherShowDto> Shows, IReadOnlyList<ApartShowDto> Apart);

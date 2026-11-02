@@ -44,10 +44,14 @@ public record CatchUpEpisodeDto(Guid EpisodeId, int SeasonNumber, int EpisodeNum
 /// </summary>
 public static class CatchUpApi
 {
-    /// <summary>Premieres this far ahead, or nearer, are worth planning for.</summary>
+    /// <summary>
+    /// Premieres this far ahead, or nearer, are worth planning for.
+    /// </summary>
     public const int HorizonDays = 120;
 
-    /// <summary>The user's pace is their watching over this many weeks.</summary>
+    /// <summary>
+    /// The user's pace is their watching over this many weeks.
+    /// </summary>
     public const int PaceWeeks = 8;
 
     /// <summary>
@@ -56,7 +60,9 @@ public static class CatchUpApi
     /// </summary>
     private const int MaxMinutesPerDay = 240;
 
-    /// <summary>The cut is offered when it saves at least this share of the time.</summary>
+    /// <summary>
+    /// The cut is offered when it saves at least this share of the time.
+    /// </summary>
     private const double MinCutSaving = 0.1;
 
     public static void MapCatchUpApi(this RouteGroupBuilder api)
@@ -65,7 +71,9 @@ public static class CatchUpApi
         api.MapGet("/me/catch-up", GetAllAsync).RequireFeature(FeatureFlags.CatchUp);
     }
 
-    /// <summary>204 when no new season is due within <see cref="HorizonDays"/> days, or the user is already caught up.</summary>
+    /// <summary>
+    /// 204 when no new season is due within <see cref="HorizonDays"/> days, or the user is already caught up.
+    /// </summary>
     private static async Task<Results<Ok<CatchUpDto>, NoContent>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, bool cut = false, CancellationToken ct = default)
     {
@@ -81,7 +89,9 @@ public static class CatchUpApi
         return Build(load, premieres.GetValueOrDefault(showId), pace, cut, now) is { } plan ? TypedResults.Ok(plan) : TypedResults.NoContent();
     }
 
-    /// <summary>Every followed show with a season coming and something to catch up on, soonest premiere first.</summary>
+    /// <summary>
+    /// Every followed show with a season coming and something to catch up on, soonest premiere first.
+    /// </summary>
     private static async Task<Ok<List<CatchUpDto>>> GetAllAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -171,7 +181,9 @@ public static class CatchUpApi
         return new CatchUpPathDto(path.Count, total, Math.Round(path.Count / weeks, 1), perWeek, verdict, startBy);
     }
 
-    /// <summary>The path split into weeks up to the premiere, by running time rather than count, so long episodes spread out.</summary>
+    /// <summary>
+    /// The path split into weeks up to the premiere, by running time rather than count, so long episodes spread out.
+    /// </summary>
     private static List<CatchUpWeekDto> Weeks(List<EpisodeCopy> path, Func<EpisodeCopy, int> minutes, int daysLeft, DateTimeOffset now)
     {
         var weekCount = Math.Max(1, daysLeft / 7);

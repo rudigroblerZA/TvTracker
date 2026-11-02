@@ -15,6 +15,8 @@ public static class ShowKinds
         "award show", "panel show"
     };
 
-    /// <summary>The show's kind from its keywords, or null when it has none.</summary>
+    /// <summary>
+    /// The show's kind from its keywords, or null when it has none.
+    /// </summary>
     public static string? Of(IEnumerable<string> keywords) => keywords.FirstOrDefault(All.Contains);
 }

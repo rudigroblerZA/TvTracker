@@ -20,7 +20,9 @@ public record SeasonSummaryDto(int Number, string Name, int EpisodeCount, DateTi
 /// means the actor plays the character elsewhere too.</param>
 public record CastMemberDto(string Name, string? Character, string? PhotoUrl, Guid PersonId, int TrailShows = 0);
 
-/// <summary>A show someone appears in, with the character they play.</summary>
+/// <summary>
+/// A show someone appears in, with the character they play.
+/// </summary>
 public record PersonCreditDto(ShowSummaryDto Show, string? Character);
 
 /// <param name="Credits">Their shows in the catalog, newest first.</param>
@@ -38,10 +40,14 @@ public record PersonDetailDto(
     CareerDto? Career = null,
     IReadOnlyList<MadeCreditDto>? Made = null);
 
-/// <summary>A show someone made, with their roles on it ("Creator", "Developer", "Executive Producer").</summary>
+/// <summary>
+/// A show someone made, with their roles on it ("Creator", "Developer", "Executive Producer").
+/// </summary>
 public record MadeCreditDto(ShowSummaryDto Show, IReadOnlyList<string> Roles);
 
-/// <summary>Someone who made a show.</summary>
+/// <summary>
+/// Someone who made a show.
+/// </summary>
 /// <param name="Roles">"Creator", "Developer" and/or "Executive Producer".</param>
 /// <param name="OtherShows">Other catalog shows they made, most popular first.</param>
 public record CreativeDto(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, CareerDto? Career,
@@ -52,7 +58,9 @@ public record CreativeDto(Guid PersonId, string Name, string? PhotoUrl, IReadOnl
 /// <param name="NotableShows">Their best-known shows, most popular first (titles; many aren't in the catalog).</param>
 public record CareerDto(int Shows, int Created, int ExecutiveProduced, bool Prolific, IReadOnlyList<string> NotableShows)
 {
-    /// <summary>Behind-the-camera credits on this many shows make a "prolific" creator or producer (Dick Wolf has 57).</summary>
+    /// <summary>
+    /// Behind-the-camera credits on this many shows make a "prolific" creator or producer (Dick Wolf has 57).
+    /// </summary>
     public const int ProlificMinShows = 10;
 
     public static CareerDto? For(Person person, string? excludeTitle = null) => person.CareerShows is { } shows
@@ -90,7 +98,9 @@ public record ShowDetailDto(
     string? Source = null,
     string? ExternalId = null);
 
-/// <summary>A nanogenre the show is in (see <see cref="Catalog.Data.Nanogenre"/>), most specific first.</summary>
+/// <summary>
+/// A nanogenre the show is in (see <see cref="Catalog.Data.Nanogenre"/>), most specific first.
+/// </summary>
 public record NanogenreRefDto(string Slug, string Name);
 
 public record EpisodeDto(
@@ -104,7 +114,9 @@ public record EpisodeDto(
     int? RuntimeMinutes,
     EpisodeLabel Label);
 
-/// <summary>Premiere = first episode of a season; finale = last scheduled episode of a season.</summary>
+/// <summary>
+/// Premiere = first episode of a season; finale = last scheduled episode of a season.
+/// </summary>
 public enum EpisodeLabel
 {
     None,
@@ -125,7 +137,9 @@ public static class CatalogMappings
     public static EpisodeDto ToDto(this Episode e, EpisodeLabel label = EpisodeLabel.None) =>
         new(e.Id, e.ShowId, e.SeasonNumber, e.EpisodeNumber, e.Title, e.Overview, e.AirsAtUtc, e.RuntimeMinutes, label);
 
-    /// <summary>Labels premieres and finales, given all of the season's episodes.</summary>
+    /// <summary>
+    /// Labels premieres and finales, given all of the season's episodes.
+    /// </summary>
     public static EpisodeLabel LabelFor(Episode episode, IReadOnlyCollection<Episode> seasonEpisodes)
     {
         if (episode.EpisodeNumber == 1)

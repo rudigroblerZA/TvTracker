@@ -61,7 +61,9 @@ public record YearCalledItDto(Guid ShowId, string Title, string? PosterUrl, Date
 /// </summary>
 public static class YearInTvApi
 {
-    /// <summary>A trait is named in the shift when the minutes-weighted average moved at least this much.</summary>
+    /// <summary>
+    /// A trait is named in the shift when the minutes-weighted average moved at least this much.
+    /// </summary>
     public const double MinShift = 0.1;
 
     private const int MaxShows = 5;
@@ -168,7 +170,9 @@ public static class YearInTvApi
             await CalledItAsync(db, userId, shown, zone, ct)));
     }
 
-    /// <summary>Most consecutive days in the set.</summary>
+    /// <summary>
+    /// Most consecutive days in the set.
+    /// </summary>
     internal static int LongestStreak(IEnumerable<DateOnly> days)
     {
         var (longest, run) = (0, 0);
@@ -224,7 +228,9 @@ public static class YearInTvApi
         return (finished, caughtUp, leftBehind);
     }
 
-    /// <summary>The DNA traits that moved most between the year before and this one (minutes-weighted).</summary>
+    /// <summary>
+    /// The DNA traits that moved most between the year before and this one (minutes-weighted).
+    /// </summary>
     private static async Task<List<YearShiftDto>> ShiftAsync(AnalyticsContext db, List<Watch> inYear, List<Watch> lastYear, CancellationToken ct)
     {
         if (inYear.Count == 0 || lastYear.Count == 0)
@@ -268,7 +274,9 @@ public static class YearInTvApi
             : [];
     }
 
-    /// <summary>The show followed that year that they were furthest ahead of its other followers on (see the summary).</summary>
+    /// <summary>
+    /// The show followed that year that they were furthest ahead of its other followers on (see the summary).
+    /// </summary>
     private static async Task<YearCalledItDto?> CalledItAsync(AnalyticsContext db, string userId, int year, TimeZoneInfo zone, CancellationToken ct)
     {
         var from = TimeZoneInfo.ConvertTimeToUtc(new DateTime(year, 1, 1), zone);

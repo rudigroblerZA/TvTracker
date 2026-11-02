@@ -93,14 +93,18 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
     }
 }
 
-/// <summary>Turns tvtracker:// links into in-app navigation (handled by MainPage).</summary>
+/// <summary>
+/// Turns tvtracker:// links into in-app navigation (handled by MainPage).
+/// </summary>
 public sealed class DeepLinkService
 {
     private string? _pending;
 
     public event Action<string>? LinkReceived;
 
-    /// <summary>tvtracker://shows/{id} → "shows/{id}". Sign-in callbacks are handled by WebAuthenticator.</summary>
+    /// <summary>
+    /// tvtracker://shows/{id} → "shows/{id}". Sign-in callbacks are handled by WebAuthenticator.
+    /// </summary>
     public void Handle(Uri uri)
     {
         if (!string.Equals(uri.Scheme, "tvtracker", StringComparison.OrdinalIgnoreCase) || uri.Host == "callback")
@@ -119,7 +123,9 @@ public sealed class DeepLinkService
         }
     }
 
-    /// <summary>A link that arrived before the UI was ready (app opened from a link).</summary>
+    /// <summary>
+    /// A link that arrived before the UI was ready (app opened from a link).
+    /// </summary>
     public string? TakePending()
     {
         var path = _pending;

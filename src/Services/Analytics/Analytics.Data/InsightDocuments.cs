@@ -17,7 +17,9 @@ public static class InsightDocuments
 
     public static ShowInsights? Read(ShowInsightsRow row) => Deserialize<ShowInsights>(row.Document);
 
-    /// <summary>The jsonb keys of the parts readers select by path, as <see cref="Options"/> names them.</summary>
+    /// <summary>
+    /// The jsonb keys of the parts readers select by path, as <see cref="Options"/> names them.
+    /// </summary>
     public static class Paths
     {
         public static readonly string Title = Name(nameof(ShowInsights.Title));
