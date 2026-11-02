@@ -1276,3 +1276,25 @@ public record AffiliateDay(DateOnly Day, int Clicks, int Conversions);
 public record AffiliateShowRow(Guid ShowId, string Title, int Clicks, int Conversions);
 
 public record AffiliateProgramInfo(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid);
+
+/// <summary>From the makers: a show someone created or developed (in the catalog or not).</summary>
+public record MadeShow(Guid? ShowId, string ExternalId, string Title, string? PosterUrl, int? From, int? To, ShowStatus Status,
+    double? Rating, double Popularity, bool New);
+
+/// <param name="CreditsPending">Their credits aren't fetched yet.</param>
+public record Maker(Guid PersonId, string Name, string? PhotoUrl, IReadOnlyList<string> Roles, bool CreditsPending, IReadOnlyList<MadeShow> Shows);
+
+public record ShowMakers(Guid ShowId, IReadOnlyList<Maker> Makers);
+
+/// <summary>Analytics' loved and known shows, sent on to the catalog for From the makers you love.</summary>
+public record LovedShows(IReadOnlyList<LovedShow> Loved, IReadOnlyList<Guid> Known);
+
+public record LovedShow(Guid ShowId, double Weight);
+
+public record YourMaker(Guid PersonId, string Name, string? PhotoUrl, double Love, IReadOnlyList<ShowRef> LovedShows, int OtherShows);
+
+public record MakerCredit(Guid PersonId, string Name, ShowRef Because);
+
+public record MakerPick(MadeShow Show, IReadOnlyList<MakerCredit> By, double Score);
+
+public record MakersForYou(int LovedShows, int MakersPending, IReadOnlyList<YourMaker> Makers, IReadOnlyList<MakerPick> New, IReadOnlyList<MakerPick> Picks);

@@ -509,6 +509,16 @@ public sealed partial class TvMazeCatalogProvider(
                 .ThenByDescending(s => s.Rating?.Average ?? 0)
                 .Take(10)
                 .Select(s => Truncate(s.Name ?? $"Show {s.Id}", 256))
+                .ToList(),
+            shows.Where(c => c.Type is "Creator" or "Developer")
+                .GroupBy(c => c.Embedded!.Show!.Id)
+                .Select(g =>
+                {
+                    var show = g.First().Embedded!.Show!;
+                    return new ProviderMadeShow(show.Id.ToString(), Truncate(show.Name ?? $"Show {show.Id}", 256),
+                        show.Image?.Medium ?? show.Image?.Original, show.Premiered, show.Ended, MapStatus(show), show.Rating?.Average,
+                        show.Weight, show.Type?.ToLowerInvariant(), g.Select(c => c.Type!).Distinct().Order().ToList());
+                })
                 .ToList());
     }
 

@@ -878,6 +878,27 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   credits yet; the section counts them as pending rather than reading "no other role".
 - **Cached** an hour per show (HybridCache); the page loads it after the cast, and it fails quietly.
 
+## From the makers
+
+- **Creator credits come with careers** (`PersonMadeShow`, `person_made_shows`, migration `MadeShows`): TVmaze's
+  `/people/{id}/crewcredits?embed=show` was already fetched for every catalog creator and developer (and anyone on two
+  catalog shows), and only counts and ten names were kept. Its Creator and Developer credits, with each show's years,
+  status, rating, popularity and kind, are now stored too, replaced at every fetch: no extra calls. The migration made
+  every career due again, so the table fills at 30 people a minute.
+- **Matched on read:** rows keep the provider's show id, and Catalog.API joins it to catalog shows when reading, so a
+  show imported later links up (as the character trail does with cast credits).
+- **Creators and developers only:** an executive producer's credits follow a production company, not a voice, as the
+  creator fingerprint decided. Vince Gilligan's four: Breaking Bad, Better Call Saul, Battle Creek and Pluribus.
+- **The show page's part is free** (`MakersApi`, `/shows/{id}/makers`, cached an hour): it's about shows. **The personal
+  part is Plus** (`makers-for-you` in the plans): it reads the viewer's history, like the reunion radar.
+- **Split across services, joined by the page:** Analytics knows what the viewer loves, Catalog who made what. The page
+  asks Analytics (`/me/loved`: loved shows with weights and every known show, by the reunion radar's rules, now shared
+  as `ReunionsApi.LoveAsync`) and posts them to Catalog (`/makers/for-you`), which stores nothing. An event copy of the
+  credits into Analytics would have meant a contract, a handler, a table and its healing for one page.
+- **Ranking** (`MakersRanking`, a pure function): a maker's love is the summed weight of the viewer's loved shows they
+  made; a pick's score is its makers' love (summed when two made it) × its rating / 10, unrated as 7. New (premiered
+  within a year, or coming) is listed apart, coming first; known and loved shows are left out.
+
 ## Memorable lines
 
 - **Wikiquote, not scripts** (a decision): scripts and transcripts are copyrighted. BBC Writersroom, the one official
@@ -1512,8 +1533,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
 - **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
-  overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, and the TVmaze budget
-  (the two-lane limiter on a fake clock, the change rule and the refresh schedule); Analytics' copy rules, streaks, the
+  overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, the TVmaze budget
+  (the two-lane limiter on a fake clock, the change rule and the refresh schedule) and the makers ranking; Analytics' copy rules, streaks, the
   essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages.
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.

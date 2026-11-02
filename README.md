@@ -226,6 +226,20 @@ link to a search, which imports them. Main casts only, as TVmaze lists them, so 
 members whose credits haven't been fetched yet are counted as pending. It works signed out.
 - **API:** `GET /api/v1/shows/{id}/afterwards` (Catalog.API, public, cached an hour per show).
 
+**From the makers** (TV's answer to following a director). Two parts:
+- **From the same creators** (on every show page; `makers` flag, free): each of the show's creators and developers
+  with their other shows, coming and newest first, with years and rating. Breaking Bad lists Vince Gilligan's Better
+  Call Saul, Battle Creek and Pluribus. Shows outside the catalog link to a search, which imports them. It works signed out.
+- **From the makers you love** (`/makers`, from For you; `makers-for-you` flag, Plus and Family): the creators and
+  developers behind your 4- and 5-star shows and the ones you follow or watch, weighted by how much you love their
+  shows. It lists what's new or coming from them, then their shows you haven't seen, best first: each pick's score is
+  its makers' love × its rating / 10, and it says who made it and which of your shows you know them from.
+- **Data:** the crew credits TVmaze returns with each maker's career (`/people/{id}/crewcredits`), already fetched for
+  every creator and developer in the catalog, so it costs no extra calls. Executive producers aren't counted: their
+  credits follow a production company. Until a maker's credits are in, the pages say so.
+- **API:** `GET /api/v1/shows/{id}/makers` (Catalog.API, public, cached an hour); `GET /api/v1/me/loved` (Analytics.API,
+  your loved and known shows) and `POST /api/v1/makers/for-you` (Catalog.API, signed in), which the page joins.
+
 **Memorable lines** (on show and episode pages; `memorable-lines` flag): lines and short exchanges from
 [Wikiquote](https://en.wikiquote.org), credited to it under CC BY-SA 4.0. The show page shows the three shortest
 exchanges about the whole show (or, when its page has none, from the first episode with lines, which says the least),
@@ -676,7 +690,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -688,6 +702,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `tonight-plan` | `/tonight` and its links on Home and Up Next |
 | `tonight-together` | Tonight for two: the "Watching" choice on `/tonight`, the link on people's pages, and its endpoint |
 | `reunion-radar` | `/reunions` and its link on For you |
+| `makers` | From the same creators on show pages, and its endpoint |
+| `makers-for-you` | `/makers` and its link on For you, and the loved-shows and for-you endpoints (Plus and Family) |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
 | `endings` | "Does it stick the landing?" on ended shows' pages, and the Great endings list on Discover |

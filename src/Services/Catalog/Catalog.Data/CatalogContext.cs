@@ -22,6 +22,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<ShowSettingLookup> SettingLookups => Set<ShowSettingLookup>();
     public DbSet<ShowNamesake> Namesakes => Set<ShowNamesake>();
     public DbSet<ShowNamesakeLookup> NamesakeLookups => Set<ShowNamesakeLookup>();
+    public DbSet<PersonMadeShow> MadeShows => Set<PersonMadeShow>();
     public DbSet<OutboundClick> OutboundClicks => Set<OutboundClick>();
     public DbSet<AffiliateConversion> AffiliateConversions => Set<AffiliateConversion>();
 
@@ -198,6 +199,18 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasIndex(w => new { w.ShowId, w.Region });
             entity.Property(w => w.Region).HasMaxLength(2);
             entity.Property(w => w.ProviderName).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<PersonMadeShow>(entity =>
+        {
+            entity.ToTable("person_made_shows");
+            entity.HasKey(m => new { m.PersonId, m.ShowExternalId });
+            entity.HasOne<Person>().WithMany().HasForeignKey(m => m.PersonId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(m => m.ShowExternalId);
+            entity.Property(m => m.ShowExternalId).HasMaxLength(64);
+            entity.Property(m => m.Title).HasMaxLength(256);
+            entity.Property(m => m.PosterUrl).HasMaxLength(512);
+            entity.Property(m => m.Kind).HasMaxLength(32);
         });
 
         // Written by Catalog.API (affiliate links), the one place it writes: clicks aren't shows, so the sync worker stays

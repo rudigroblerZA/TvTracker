@@ -1,0 +1,32 @@
+@* A show from From the makers: poster, title (a search, which imports it, when it isn't in the catalog), years and rating. *@
+<li class="made-show">
+    <a href="@Link">
+        <Poster Title="@Show.Title" Url="@Show.PosterUrl" Size="small" />
+    </a>
+    <div>
+        <a href="@Link" class="strong" title="@(Show.ShowId is null ? "Not in the catalog yet; search imports it" : null)">@Show.Title</a>
+        <div class="muted small">
+            <span>@Format.Years(Show.From, Show.To, Show.Status is ShowStatus.Airing or ShowStatus.Renewed)</span>
+            @if (Show.Rating is { } rating)
+            {
+                <span>@($" · ★ {rating:0.0}")</span>
+            }
+            @if (Show.Status == ShowStatus.Upcoming)
+            {
+                <span>@(" ")<span class="tag">Coming</span></span>
+            }
+            else if (Show.New)
+            {
+                <span>@(" ")<span class="tag">New</span></span>
+            }
+        </div>
+        @ChildContent
+    </div>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public MadeShow Show { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string Link => Show.ShowId is { } id ? $"shows/{id}" : $"search?q={Uri.EscapeDataString(Show.Title)}";
+}

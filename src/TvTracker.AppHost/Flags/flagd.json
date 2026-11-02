@@ -27,6 +27,19 @@
       "metadata": { "description": "Tonight's plan: episodes that fit the time and mood given (/tonight, and its links on Home and Up Next).", "name": "Tonight's plan", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
+    "makers": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "From the same creators: the other shows by a show's creators and developers, on show pages." }
+    },
+    "makers-for-you": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "From the makers you love: the creators behind the shows you love, and their other shows you haven't seen (/makers, and its link on For you).", "name": "From the makers you love", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
+    },
     "reunion-radar": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

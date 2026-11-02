@@ -359,6 +359,54 @@ namespace Catalog.Data.Migrations
                     b.ToTable("person_cast_credits", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.PersonMadeShow", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ShowExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateOnly?>("Ended")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<double>("Popularity")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("PosterUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateOnly?>("Premiered")
+                        .HasColumnType("date");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("double precision");
+
+                    b.PrimitiveCollection<List<string>>("Roles")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("PersonId", "ShowExternalId");
+
+                    b.HasIndex("ShowExternalId");
+
+                    b.ToTable("person_made_shows", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.Quote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -837,6 +885,15 @@ namespace Catalog.Data.Migrations
                 });
 
             modelBuilder.Entity("Catalog.Data.PersonCastCredit", b =>
+                {
+                    b.HasOne("Catalog.Data.Person", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.PersonMadeShow", b =>
                 {
                     b.HasOne("Catalog.Data.Person", null)
                         .WithMany()

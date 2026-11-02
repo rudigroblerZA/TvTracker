@@ -458,6 +458,42 @@ public class ShowNamesakeLookup
 /// <summary>
 /// A person who made a show, with their roles on it.
 /// </summary>
+/// <summary>
+/// A show someone created or developed, from the provider's crew credits for them (fetched with their career, so no
+/// call of its own): what From the makers lists, in the catalog or not. Each person's rows are replaced at every fetch,
+/// and matched to catalog shows by the provider's id when read, so a show imported later links up.
+/// </summary>
+public class PersonMadeShow
+{
+    public Guid PersonId { get; set; }
+
+    public required string ShowExternalId { get; set; }
+
+    public required string Title { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    public DateOnly? Premiered { get; set; }
+
+    public DateOnly? Ended { get; set; }
+
+    public ShowStatus Status { get; set; }
+
+    public double? Rating { get; set; }
+
+    public double Popularity { get; set; }
+
+    /// <summary>
+    /// The provider's type, lower case ("scripted", "animation", …).
+    /// </summary>
+    public string? Kind { get; set; }
+
+    /// <summary>
+    /// "Creator" and/or "Developer".
+    /// </summary>
+    public List<string> Roles { get; set; } = [];
+}
+
 public class ShowCreative
 {
     public Guid ShowId { get; set; }
