@@ -699,6 +699,12 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
         GetAsync<WaitingRoom>(ApiClients.Analytics, "api/v1/me/waiting", ct, cacheForOffline: true);
 
     /// <summary>
+    /// While you wait: finished shows that fit before each show the user is caught up on is back; null while the flag is off.
+    /// </summary>
+    public Task<WhileYouWait?> GetWhileYouWaitAsync(CancellationToken ct = default) =>
+        GetAsync<WhileYouWait>(ApiClients.Analytics, "api/v1/me/while-you-wait", ct, cacheForOffline: true);
+
+    /// <summary>
     /// Network report cards, most shows first, with the whole catalog as the baseline.
     /// </summary>
     public Task<NetworkReportCards?> GetNetworkReportsAsync(CancellationToken ct = default) =>

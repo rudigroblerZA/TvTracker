@@ -380,6 +380,13 @@
       "defaultVariant": "on",
       "metadata": { "description": "Waiting room: shows you're caught up on, with when they're back (scheduled or forecast)." }
     },
+    "while-you-wait": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "While you wait: for each show you're caught up on, a finished show you can watch whole before it's back, chosen for how alike they are (/while-you-wait).", "name": "While you wait", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
+    },
     "mixtape": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

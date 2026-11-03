@@ -1,0 +1,105 @@
+@page "/while-you-wait"
+@attribute [RequiresFeature(FeatureFlags.WhileYouWait)]
+@inject AnalyticsClient Analytics
+
+<PageTitle>While you wait · @Brand.AppName</PageTitle>
+
+<h1>While you wait</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">For each show you're caught up on and that's coming back, a finished show you can watch from start to end before it does, chosen for how much it's like the one you're waiting for.</p>
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+        @if (result is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">Working out what fits…</p>
+            }
+        }
+        else if (result.Waits.Count == 0)
+        {
+            <p class="muted">Nothing to fill: none of the shows you're caught up on has a return between a week and six months away. The <a href="waiting">waiting room</a> has the rest.</p>
+        }
+        else
+        {
+            <p class="muted small">
+                @(result.PaceAssumed
+                    ? $"You haven't watched anything in the last 8 weeks, so this assumes {Format.Hours(result.YourMinutesPerWeek)} a week."
+                    : $"At your pace of {Format.Hours(result.YourMinutesPerWeek)} a week over the last 8 weeks.")
+            </p>
+            @foreach (var wait in result.Waits)
+            {
+                <section class="backlog-group" @key="wait.ShowId">
+                    <h2><a href="shows/@wait.ShowId">@wait.Title</a></h2>
+                    <p class="muted small">@When(wait) · room for @Format.Hours(wait.BudgetMinutes) at your pace</p>
+                    @if (wait.Picks.Count == 0)
+                    {
+                        <p class="muted small">Nothing finished that you haven't started fits in that time.</p>
+                    }
+                    else
+                    {
+                        <ul class="backlog-list">
+                            @foreach (var pick in wait.Picks)
+                            {
+                                <li @key="pick.ShowId" class="tone-@(pick.Alike >= 0.5 ? "good" : "info")">
+                                    <a href="shows/@pick.ShowId"><Poster Title="@pick.Title" Url="@pick.PosterUrl" Size="small" /></a>
+                                    <div class="backlog-body">
+                                        <a class="strong" href="shows/@pick.ShowId">@pick.Title</a>
+                                        <div class="muted small">
+                                            <span>@(pick.Episodes == 1 ? "1 episode" : $"{pick.Episodes} episodes") · @Format.Hours(pick.Minutes) · done around @pick.FinishesAround.ToString("d MMMM"), @Spare(pick.DaysToSpare)</span>
+                                        </div>
+                                        <ul class="backlog-reasons">
+                                            @foreach (var reason in pick.Reasons)
+                                            {
+                                                <li>@reason</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                    <span class="rating-pill rating-@Format.RatingTone(pick.Value)" title="Worth your time, out of 10">@Format.Rating(pick.Value)</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to find something to watch while your shows are away." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private WhileYouWait? result;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            result = await Analytics.GetWhileYouWaitAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private static string When(Wait wait)
+    {
+        var day = wait.BackAt.ToString("d MMMM yyyy");
+        return wait.Kind switch
+        {
+            "episode" => $"Next episode on {day}, in {wait.DaysLeft} days",
+            "season" => $"Season {wait.SeasonNumber} premieres on {day}, in {wait.DaysLeft} days",
+            _ => $"Season {wait.SeasonNumber} likely around {wait.BackAt:MMMM yyyy}, about {wait.DaysLeft} days away (a forecast)"
+        };
+    }
+
+    private static string Spare(int days) => days <= 0 ? "just in time" : days == 1 ? "a day to spare" : days < 14 ? $"{days} days to spare" : $"{days / 7} weeks to spare";
+}

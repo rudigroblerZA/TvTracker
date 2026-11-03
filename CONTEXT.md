@@ -641,6 +641,20 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   show documents' `NextPremiere` and `Outlook`. Caught up means every aired regular episode watched; ended shows have
   nothing to wait for. A dated next episode in the current season is "episode", a dated premiere "season", else the
   timing forecast, else unknown.
+- **While you wait** (`WhileYouWaitApi`, the rules in `WhileYouWait`): computed on request by joining three things Analytics
+  already has, so it reads nothing new: the waiting room (`WaitingRoomApi.ComputeAsync`, shared for this), the catch-up
+  planner's pace (`CatchUpApi.PaceAsync`) and Fits your time off's cached shelf (`TimeOffApi.GetShelfAsync`, which now
+  carries each show's DNA).
+  - **A return in view:** a dated episode or premiere, or a forecast's likely date, 7 to 180 days away. Nearer, there's no
+    time to start anything; further, the forecast is too loose to plan on. An overdue forecast doesn't count.
+  - **The budget** is the days left at the viewer's pace; with no watches in 8 weeks, 300 minutes a week is assumed and
+    the page says so. A pick must fit: the point is to finish before the show is back.
+  - **Alike** is half the genres' Jaccard overlap and half DNA similarity rescaled as Recommendations' affinity (0.65 → 0,
+    0.95 → 1), each half standing alone when the other is missing. Score = value + 2 × alike, so a slightly worse show
+    that's much more like the awaited one wins; under 0.35 alike the reason reads "a change of pace" instead.
+  - **Each pick once:** waits are planned soonest first and a show picked for one isn't offered for the next, so two
+    waits don't both get Dark.
+  - **Tested** in `WhileYouWaitTests` (Severance and Silo against Dark, Counterpart, Friends and The Office).
 - **Where do I know them from?** (`KnownFacesApi`): computed on request from the caller's watches and ratings and the
   catalog copy's main casts (`cast_credits`), so no minimum counts.
   - **Seen:** a watched episode or a show rating; a follow alone says nothing about having watched.

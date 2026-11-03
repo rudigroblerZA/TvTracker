@@ -31,11 +31,14 @@ public static class WaitingRoomApi
     public static void MapWaitingRoomApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/waiting", GetAsync).RequireFeature(FeatureFlags.WaitingRoom);
 
-    private static async Task<Ok<WaitingRoomDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
-    {
-        var userId = user.GetUserId();
-        var now = time.GetUtcNow();
+    private static async Task<Ok<WaitingRoomDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct) =>
+        TypedResults.Ok(new WaitingRoomDto(await ComputeAsync(db, user.GetUserId(), time.GetUtcNow(), ct)));
 
+    /// <summary>
+    /// The caller's waiting room, soonest back first; shared with While you wait.
+    /// </summary>
+    internal static async Task<List<WaitingShowDto>> ComputeAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
+    {
         // Caught up: every aired regular episode watched (the aggregate), on a show that's still running.
         var progress = await Viewer.ProgressAsync(db, userId, now, null, ct);
         var allWatched = progress.Values.Where(p => p.AllWatched).Select(p => p.ShowId).ToList();
@@ -85,6 +88,6 @@ public static class WaitingRoomApi
             .ThenByDescending(s => s.LastAiredUtc)
             .ToList();
 
-        return TypedResults.Ok(new WaitingRoomDto(result));
+        return result;
     }
 }
