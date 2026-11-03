@@ -91,7 +91,7 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 ## Gotchas
 
 - Blazor drops whitespace-only text between elements; put spaces inside spans or expressions.
-- System.CommandLine 2.0.13 (ImportCli) has no `Uri` option type. Use a string, and keep `EnableDefaultExceptionHandler = false`.
+- System.CommandLine 2.0.14 (ImportCli) has no `Uri` option type. Use a string, and keep `EnableDefaultExceptionHandler = false`.
 - Postgres runs from the pgvector trixie image, with the volume mounted explicitly in `AppHost.cs`. Don't switch to
   `WithDataVolume` or a bookworm tag.
 - Leftover `dcp` / service processes from a previous AppHost run hold ports. Kill them before starting again.

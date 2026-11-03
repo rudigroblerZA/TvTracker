@@ -1564,6 +1564,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
+- **Runner:** xunit.v3 4 runs on Microsoft.Testing.Platform only, which on the .NET 10 SDK refuses the old VSTest
+  `dotnet test`; `global.json`'s `test.runner` opts into the new one, and the documented commands work unchanged.
 - **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
   overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, the TVmaze budget
   (the two-lane limiter on a fake clock, the change rule and the refresh schedule) and the makers ranking; Analytics' copy rules, streaks, the
