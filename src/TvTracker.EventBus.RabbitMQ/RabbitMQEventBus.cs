@@ -100,6 +100,13 @@ public sealed class RabbitMQEventBus(
     private IConnection? _connection;
     private IChannel? _consumerChannel;
     private Task? _consumerTask;
+    private string? _consumerTag;
+
+    /// <summary>
+    /// How long a retry or dead-letter copy may wait for the broker's confirm. Past it (a memory or disk alarm blocks
+    /// publishes), the original goes back to RabbitMQ's redelivery instead of holding the consumer.
+    /// </summary>
+    private static readonly TimeSpan ForwardTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// True once this service's queue is declared, bound and being consumed (or it has no subscriptions).
@@ -146,6 +153,12 @@ public sealed class RabbitMQEventBus(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Stop deliveries first, so a message nacked back during shutdown isn't redelivered to this consumer at once.
+        if (_consumerChannel is { IsOpen: true } channel && _consumerTag is { } tag)
+        {
+            try { await channel.BasicCancelAsync(tag, cancellationToken: cancellationToken); }
+            catch (Exception ex) { logger.LogDebug(ex, "Couldn't cancel the consumer"); }
+        }
         await _stopping.CancelAsync();
         if (_consumerTask is not null)
         {
@@ -204,7 +217,7 @@ public sealed class RabbitMQEventBus(
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += OnMessageReceivedAsync;
 
-        await channel.BasicConsumeAsync(queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
+        _consumerTag = await channel.BasicConsumeAsync(queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
 
         _consumerChannel = channel;
         logger.LogInformation("Consuming queue {Queue} for {Count} event types", queueName, subscriptionInfo.Value.EventTypes.Count);
@@ -335,19 +348,28 @@ public sealed class RabbitMQEventBus(
     /// Republishes a received message to this service's retry queue for <paramref name="delay"/>, with the attempt count.
     /// </summary>
     private Task RetryAsync(BasicDeliverEventArgs args, string eventName, int attempt, TimeSpan delay) =>
-        PublishConfirmedAsync(RetryQueueName(QueueName(), delay),
-            CopyProperties(args.BasicProperties, eventName, headers => headers[AttemptHeader] = attempt), args.Body, CancellationToken.None);
+        ForwardAsync(RetryQueueName(QueueName(), delay),
+            CopyProperties(args.BasicProperties, eventName, headers => headers[AttemptHeader] = attempt), args.Body);
 
     /// <summary>
     /// Republishes a received message to the shared dead letters, with the attempts, the queue it came from and the error.
     /// </summary>
     private Task DeadLetterAsync(BasicDeliverEventArgs args, string eventName, int attempt, string error) =>
-        PublishConfirmedAsync(DeadLetterQueue, CopyProperties(args.BasicProperties, eventName, headers =>
+        ForwardAsync(DeadLetterQueue, CopyProperties(args.BasicProperties, eventName, headers =>
         {
             headers[AttemptHeader] = attempt;
             headers[QueueHeader] = QueueName();
             headers[ErrorHeader] = error.Length > MaxErrorLength ? error[..MaxErrorLength] : error;
-        }), args.Body, CancellationToken.None);
+        }), args.Body);
+
+    /// <summary>
+    /// A confirmed publish for the consumer, given <see cref="ForwardTimeout"/>; a timeout throws, and the caller nacks.
+    /// </summary>
+    private async Task ForwardAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body)
+    {
+        using var timeout = new CancellationTokenSource(ForwardTimeout);
+        await PublishConfirmedAsync(queue, properties, body, timeout.Token);
+    }
 
     /// <summary>
     /// A persistent copy of a message's properties (id, type, content type, correlation, timestamp and headers), with its

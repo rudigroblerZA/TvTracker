@@ -9,8 +9,8 @@ var appName = builder.Configuration["Branding:AppName"] is { Length: > 0 } confi
 // Secrets are Aspire secret parameters (Parameters:<name>: user secrets, environment variables, or azd's environment
 // secrets in a deployment). Running locally, one that isn't set takes its development value, which matches
 // Realms/tvtracker-realm.json; a publish never carries those, so a deployment has to be given every one. Identity.API puts
-// the client secrets and the app admin's password into Keycloak's realm on start (RealmSecretsSeeder), so a realm imported
-// from the file doesn't keep the development values.
+// them into Keycloak's realm on start (client secrets: RealmSecretsSeeder; the app admin's password: AdminAccountSeeder), so
+// a realm imported from the file doesn't keep the development values.
 IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
 {
     if (!builder.ExecutionContext.IsPublishMode && string.IsNullOrEmpty(builder.Configuration[$"Parameters:{name}"]))

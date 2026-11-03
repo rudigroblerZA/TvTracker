@@ -37,8 +37,7 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         var token = await GetAdminTokenAsync(cancellationToken);
         if (await FindUserIdAsync(token, username, cancellationToken) is { } id)
         {
-            await SendAsync<JsonNode>(HttpMethod.Put, $"{Users}/{id}/reset-password", token,
-                new JsonObject { ["type"] = "password", ["value"] = password, ["temporary"] = false }, cancellationToken);
+            await ResetPasswordAsync(token, id, password, cancellationToken);
             return false;
         }
 
@@ -52,8 +51,21 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
             ["emailVerified"] = true,
             ["credentials"] = new JsonArray(new JsonObject { ["type"] = "password", ["value"] = password, ["temporary"] = false })
         }, cancellationToken, HttpStatusCode.Conflict);
-        return status != HttpStatusCode.Conflict;
+        if (status != HttpStatusCode.Conflict)
+        {
+            return true;
+        }
+        // Created between the lookup and the create (the realm import finishing): still give it this password.
+        if (await FindUserIdAsync(token, username, cancellationToken) is { } created)
+        {
+            await ResetPasswordAsync(token, created, password, cancellationToken);
+        }
+        return false;
     }
+
+    private Task ResetPasswordAsync(string token, string userId, string password, CancellationToken cancellationToken) =>
+        SendAsync<JsonNode>(HttpMethod.Put, $"{Users}/{userId}/reset-password", token,
+            new JsonObject { ["type"] = "password", ["value"] = password, ["temporary"] = false }, cancellationToken);
 
     /// <summary>
     /// A token for the master realm's admin (password grant through admin-cli), which can manage clients.
