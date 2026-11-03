@@ -45,6 +45,8 @@ So the rest of the list reads in proportion:
 - **What:**
   - A GitHub Actions workflow that builds `src/TvTracker.AppHost` and `src/Tools/Catalog.ImportCli` and runs `dotnet test`
     on pull requests. The MAUI app needs its workload, so it's Q3.
+    The tests run on Microsoft.Testing.Platform only (CONTEXT.md, Tests), so the workflow uses its arguments
+    (`--report-trx`, `--coverage`), not VSTest's `--logger trx` or `--collect:"XPlat Code Coverage"`.
   - Tests for the rest of the pure logic that's easiest to get wrong:
     - **Analytics:** `DnaInsight` anchors, the renewal cohorts, the catch-up planner's week split.
     - **Planners:** `TonightPlanner` (knapsack, mix cap, overrun), in TvTracker.UI.
