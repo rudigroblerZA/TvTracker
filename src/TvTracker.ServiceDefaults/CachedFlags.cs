@@ -49,10 +49,13 @@ public sealed class CachedFlags(IFeatureClient client, IMemoryCache cache)
     /// </summary>
     public static string KeyOf(string flag, EvaluationContext context)
     {
-        var key = new StringBuilder(flag).Append('\u001f').Append(context.TargetingKey);
+        // Every part is length-prefixed, so no targeting key, name or value can make two contexts read alike.
+        var key = new StringBuilder().Append(flag.Length).Append(':').Append(flag);
+        key.Append(context.TargetingKey?.Length ?? -1).Append(':').Append(context.TargetingKey);
         foreach (var (name, value) in context.AsDictionary().OrderBy(p => p.Key, StringComparer.Ordinal))
         {
-            Append(key.Append('\u001f').Append(name).Append('='), value);
+            Append(key.Append(name.Length).Append(':').Append(name).Append('='), value);
+            key.Append(';');
         }
         return key.ToString();
     }

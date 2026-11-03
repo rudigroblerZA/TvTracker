@@ -12,15 +12,12 @@ namespace Identity.API.Services;
 /// being set.</item>
 /// <item><b>Idempotent:</b> a client whose secret already matches is left alone, so in development (values equal to the
 /// realm file's) nothing changes.</item>
-/// <item><b>Retried</b> every 30 s on any failure, 20 times (Keycloak still starting, a timeout, an error page); after that
-/// an error is logged, since every service using a changed secret gets 401 from Keycloak until Identity restarts.</item>
+/// <item><b>Retried</b> as <see cref="KeycloakRetry"/> says; when it gives up, every service using a changed secret gets
+/// 401 from Keycloak until Identity restarts.</item>
 /// </list>
 /// </summary>
 public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
-    private const int MaxAttempts = 20;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (config["Keycloak:AdminUsername"] is not { Length: > 0 } adminUser || config["Keycloak:AdminPassword"] is not { Length: > 0 } adminPassword)
@@ -31,36 +28,21 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
             .Where(c => c.Value is { Length: > 0 })
             .ToDictionary(c => c.Key, c => c.Value!);
 
-        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+        await KeycloakRetry.RunAsync(logger, "set the realm's client secrets", async () =>
         {
-            try
+            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
+            foreach (var (clientId, secret) in secrets)
             {
-                var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
-                foreach (var (clientId, secret) in secrets)
+                switch (await keycloak.SetClientSecretAsync(token, clientId, secret, stoppingToken))
                 {
-                    switch (await keycloak.SetClientSecretAsync(token, clientId, secret, stoppingToken))
-                    {
-                        case null:
-                            logger.LogInformation("Keycloak has no client {ClientId} yet; its secret is set when it's created", clientId);
-                            break;
-                        case true:
-                            logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
-                            break;
-                    }
+                    case null:
+                        logger.LogInformation("Keycloak has no client {ClientId} yet; its secret is set when it's created", clientId);
+                        break;
+                    case true:
+                        logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
+                        break;
                 }
-                return;
             }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
-            {
-                if (attempt == MaxAttempts)
-                {
-                    logger.LogError(ex, "Gave up setting the realm's secrets in Keycloak after {Attempts} attempts; services whose "
-                        + "secret changed get 401 from Keycloak until Identity.API restarts", attempt);
-                    return;
-                }
-                logger.LogWarning(ex, "Couldn't set the realm's secrets in Keycloak (attempt {Attempt}); trying again", attempt);
-                await Task.Delay(RetryDelay, stoppingToken);
-            }
-        }
+        }, stoppingToken);
     }
 }

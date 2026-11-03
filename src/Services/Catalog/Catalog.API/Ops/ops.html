@@ -132,7 +132,7 @@ function render(data) {
     tile("Sync", n(c.showsDueForRefresh), `due for refresh · last sync ${ago(c.lastSyncedAtUtc)}`),
     data.deadLetters == null ? tile("Dead letters", `<span class="down">—</span>`, "RabbitMQ unavailable")
       : tile("Dead letters", data.deadLetters ? `<span class="down">${n(data.deadLetters)}</span>` : "0",
-          `events no service could handle after 3 retries${data.deadLetters ? `<br><button type="button" onclick="replayDeadLetters(this)">Replay to their queues</button>` : ""}${lastReplay ? `<br>Last replay: ${esc(lastReplay)}` : ""}`),
+          `events no service could handle after its retries${data.deadLetters ? `<br><button type="button" onclick="replayDeadLetters(this)">Replay to their queues</button>` : ""}${lastReplay ? `<br>Last replay: ${esc(lastReplay)}` : ""}`),
     a ? tile("Insights", `${n(a.showsWithInsights)}<span class="muted small"> / ${n(a.shows)}</span>`,
           `shows computed · ${ago(a.lastComputedAtUtc)}<br>${n(a.sharedCastLinks)} shared-cast links`,
           meter([[a.showsWithInsights, a.shows, "var(--accent)"]]))
