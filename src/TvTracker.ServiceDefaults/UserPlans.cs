@@ -23,8 +23,8 @@ public interface IUserPlans
 
 /// <summary>
 /// The shared part of every plan source: the <see cref="FeatureFlags.Plans"/> switch, signed-out callers, and a short cache
-/// per user; a service supplies the lookup (<see cref="LookUpAsync"/>). Registered scoped, since OpenFeature's
-/// <see cref="CachedFlags"/> and OpenFeature's <see cref="IFeatureClient"/> are (as a singleton, every service that registered one failed to start); the cache is the
+/// per user; a service supplies the lookup (<see cref="LookUpAsync"/>). Registered scoped, since <see cref="CachedFlags"/>
+/// and OpenFeature's <see cref="IFeatureClient"/> behind it are (as a singleton, every service that registered one failed to start); the cache is the
 /// process-wide <see cref="IMemoryCache"/>.
 /// <list type="bullet">
 /// <item><b>From the service's own copy where it has one</b> (Tracking, Analytics, Social, Recommendations keep

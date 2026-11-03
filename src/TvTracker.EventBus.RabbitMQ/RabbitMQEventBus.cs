@@ -84,7 +84,7 @@ public sealed class RabbitMQEventBus(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Publishing channels kept open between publishes, at most this many.
+    /// Channels kept open between publishes, at most this many per pool.
     /// </summary>
     private const int MaxIdlePublishChannels = 8;
 
@@ -114,8 +114,7 @@ public sealed class RabbitMQEventBus(
         // Opening a channel per publish and declaring the exchange each time cost three round trips per event inside
         // every write request, so channels come from a small pool (one publish at a time each) and the exchange is
         // declared once per connection.
-        var connection = await GetConnectionAsync(cancellationToken);
-        var channel = await RentPublishChannelAsync(connection, cancellationToken);
+        await EnsureExchangeAsync(await GetConnectionAsync(cancellationToken), cancellationToken);
 
         var body = JsonSerializer.SerializeToUtf8Bytes(@event, @event.GetType(), JsonOptions);
         var properties = new BasicProperties
@@ -126,16 +125,8 @@ public sealed class RabbitMQEventBus(
             ContentType = "application/json"
         };
 
-        try
-        {
-            await channel.BasicPublishAsync(ExchangeName, routingKey, mandatory: false, basicProperties: properties, body: body, cancellationToken: cancellationToken);
-        }
-        catch
-        {
-            await channel.DisposeAsync();
-            throw;
-        }
-        await ReturnPublishChannelAsync(channel);
+        await PublishPooledAsync(_publishChannels, channelOptions: null, ExchangeName, routingKey, mandatory: false, properties, body,
+            cancellationToken);
 
         logger.LogDebug("Published {EventName} {EventId}", routingKey, @event.Id);
     }
@@ -230,7 +221,7 @@ public sealed class RabbitMQEventBus(
 
         IntegrationEvent? @event = null;
         Exception? failure = null;
-        string? deadLetterReason = null;
+        string? unreadable = null;
         try
         {
             if (subscriptionInfo.Value.EventTypes.TryGetValue(eventName, out var eventType))
@@ -239,12 +230,15 @@ public sealed class RabbitMQEventBus(
                 {
                     @event = (IntegrationEvent?)JsonSerializer.Deserialize(args.Body.Span, eventType, JsonOptions);
                 }
-                catch (JsonException) { }
+                catch (JsonException ex)
+                {
+                    unreadable = ex.Message;
+                }
 
                 if (@event is null)
                 {
                     // Unreadable now means unreadable on every retry.
-                    deadLetterReason = $"Could not deserialize {eventName}";
+                    unreadable ??= "null body";
                 }
                 else
                 {
@@ -272,7 +266,7 @@ public sealed class RabbitMQEventBus(
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
         }
 
-        if (failure is null && deadLetterReason is null)
+        if (failure is null && unreadable is null)
         {
             // Outside the handlers' try: an ack that fails (the channel closed) isn't a handler failure. The broker then
             // redelivers the message, and the inbox makes that a no-op.
@@ -283,18 +277,23 @@ public sealed class RabbitMQEventBus(
         try
         {
             var delays = options.Value.RetryDelays;
-            if (failure is not null && attempt < delays.Length)
+            if (unreadable is not null)
             {
-                await ForwardAsync(args, eventName, RetryQueueName(QueueName(), delays[attempt]), attempt + 1, error: null);
+                await DeadLetterAsync(args, eventName, attempt, $"Could not deserialize {eventName}: {unreadable}");
+                logger.LogError("Could not deserialize {EventName} {MessageId} ({Reason}); sent to {DeadLetters}", eventName,
+                    args.BasicProperties.MessageId, unreadable, DeadLetterQueue);
+            }
+            else if (attempt < delays.Length)
+            {
+                await RetryAsync(args, eventName, attempt + 1, delays[attempt]);
                 logger.LogWarning(failure, "Error handling {EventName} {EventId} (attempt {Attempt}); retrying in {Delay}",
                     eventName, @event?.Id, attempt + 1, delays[attempt]);
             }
             else
             {
-                await ForwardAsync(args, eventName, DeadLetterQueue, attempt, failure?.ToString() ?? deadLetterReason);
-                logger.LogError(failure, "{Reason} {EventName} {MessageId} after {Attempts} attempts; sent to {DeadLetters}",
-                    failure is null ? deadLetterReason : "Error handling", eventName, args.BasicProperties.MessageId, attempt + 1,
-                    DeadLetterQueue);
+                await DeadLetterAsync(args, eventName, attempt, failure!.ToString());
+                logger.LogError(failure, "Error handling {EventName} {EventId} after {Attempts} attempts; sent to {DeadLetters}",
+                    eventName, @event?.Id, attempt + 1, DeadLetterQueue);
             }
         }
         catch (Exception forwardError)
@@ -333,22 +332,22 @@ public sealed class RabbitMQEventBus(
     }
 
     /// <summary>
-    /// Republishes a received message to <paramref name="queue"/> through the default exchange (so only that queue gets it),
-    /// with the attempt count; a dead letter also gets the queue it came from and the error.
+    /// Republishes a received message to this service's retry queue for <paramref name="delay"/>, with the attempt count.
     /// </summary>
-    private Task ForwardAsync(BasicDeliverEventArgs args, string eventName, string queue, int attempt, string? error)
-    {
-        var properties = CopyProperties(args.BasicProperties, eventName, headers =>
+    private Task RetryAsync(BasicDeliverEventArgs args, string eventName, int attempt, TimeSpan delay) =>
+        PublishConfirmedAsync(RetryQueueName(QueueName(), delay),
+            CopyProperties(args.BasicProperties, eventName, headers => headers[AttemptHeader] = attempt), args.Body, CancellationToken.None);
+
+    /// <summary>
+    /// Republishes a received message to the shared dead letters, with the attempts, the queue it came from and the error.
+    /// </summary>
+    private Task DeadLetterAsync(BasicDeliverEventArgs args, string eventName, int attempt, string error) =>
+        PublishConfirmedAsync(DeadLetterQueue, CopyProperties(args.BasicProperties, eventName, headers =>
         {
             headers[AttemptHeader] = attempt;
-            if (queue == DeadLetterQueue)
-            {
-                headers[QueueHeader] = QueueName();
-                headers[ErrorHeader] = error is { Length: > MaxErrorLength } ? error[..MaxErrorLength] : error;
-            }
-        });
-        return PublishConfirmedAsync(queue, properties, args.Body, CancellationToken.None);
-    }
+            headers[QueueHeader] = QueueName();
+            headers[ErrorHeader] = error.Length > MaxErrorLength ? error[..MaxErrorLength] : error;
+        }), args.Body, CancellationToken.None);
 
     /// <summary>
     /// A persistent copy of a message's properties (id, type, content type, correlation, timestamp and headers), with its
@@ -376,30 +375,46 @@ public sealed class RabbitMQEventBus(
     /// doesn't exist (a renamed service) is an error rather than a silent drop. The original is acked only after this, so
     /// a failure at the broker (a memory or disk alarm, a closed connection) can't lose the event between the two.
     /// </summary>
-    private async Task PublishConfirmedAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    private Task PublishConfirmedAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken) =>
+        PublishPooledAsync(_confirmChannels, ConfirmedChannel, exchange: "", queue, mandatory: true, properties, body, cancellationToken);
+
+    private static readonly CreateChannelOptions ConfirmedChannel =
+        new(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true);
+
+    /// <summary>
+    /// Publishes on a channel rented from <paramref name="pool"/> (made with <paramref name="channelOptions"/> when the pool
+    /// has no open one), returned afterwards, or disposed if the publish threw.
+    /// </summary>
+    private async Task PublishPooledAsync(ConcurrentBag<IChannel> pool, CreateChannelOptions? channelOptions, string exchange,
+        string routingKey, bool mandatory, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
         var connection = await GetConnectionAsync(cancellationToken);
-        if (!_confirmChannels.TryTake(out var channel) || !channel.IsOpen)
+        IChannel? channel = null;
+        while (channel is null && pool.TryTake(out var pooled))
         {
-            if (channel is not null)
+            if (pooled.IsOpen)
             {
-                await channel.DisposeAsync();
+                channel = pooled;
             }
-            channel = await connection.CreateChannelAsync(
-                new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true), cancellationToken);
+            else
+            {
+                await pooled.DisposeAsync();
+            }
         }
+        channel ??= await connection.CreateChannelAsync(channelOptions, cancellationToken);
+
         try
         {
-            await channel.BasicPublishAsync("", queue, mandatory: true, basicProperties: properties, body: body, cancellationToken: cancellationToken);
+            await channel.BasicPublishAsync(exchange, routingKey, mandatory, properties, body, cancellationToken);
         }
         catch
         {
             await channel.DisposeAsync();
             throw;
         }
-        if (channel.IsOpen && _confirmChannels.Count < MaxIdlePublishChannels)
+        if (channel.IsOpen && pool.Count < MaxIdlePublishChannels)
         {
-            _confirmChannels.Add(channel);
+            pool.Add(channel);
         }
         else
         {
@@ -408,20 +423,27 @@ public sealed class RabbitMQEventBus(
     }
 
     /// <summary>
-    /// Messages waiting in the shared dead-letter queue (0 before any service has declared it).
+    /// The dead-letter queue's depth, or null before any service has declared it (the broker closes the channel then).
     /// </summary>
-    public async Task<uint> DeadLetterCountAsync(CancellationToken cancellationToken = default)
+    private static async Task<uint?> DeadLettersDeclaredAsync(IChannel channel, CancellationToken cancellationToken)
     {
-        var connection = await GetConnectionAsync(cancellationToken);
-        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
         try
         {
             return (await channel.QueueDeclarePassiveAsync(DeadLetterQueue, cancellationToken)).MessageCount;
         }
         catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
         {
-            return 0; // not declared yet: nothing has failed
+            return null;
         }
+    }
+
+    /// <summary>
+    /// Messages waiting in the shared dead-letter queue (0 before any service has declared it: nothing has failed).
+    /// </summary>
+    public async Task<uint> DeadLetterCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var channel = await (await GetConnectionAsync(cancellationToken)).CreateChannelAsync(cancellationToken: cancellationToken);
+        return await DeadLettersDeclaredAsync(channel, cancellationToken) ?? 0;
     }
 
     /// <summary>
@@ -433,13 +455,8 @@ public sealed class RabbitMQEventBus(
     {
         var replayed = new Dictionary<string, int>();
         var kept = new List<ulong>();
-        var connection = await GetConnectionAsync(cancellationToken);
-        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-        try
-        {
-            await channel.QueueDeclarePassiveAsync(DeadLetterQueue, cancellationToken);
-        }
-        catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        await using var channel = await (await GetConnectionAsync(cancellationToken)).CreateChannelAsync(cancellationToken: cancellationToken);
+        if (await DeadLettersDeclaredAsync(channel, cancellationToken) is null)
         {
             return replayed;
         }
@@ -496,31 +513,19 @@ public sealed class RabbitMQEventBus(
     public const string KeptKey = "(kept)";
 
     internal static string RetryQueueName(string queue, TimeSpan delay) =>
-        $"{queue}.retry.{(delay.TotalSeconds >= 1 && delay.TotalSeconds % 1 == 0 ? $"{delay.TotalSeconds:0}s" : $"{delay.TotalMilliseconds:0}ms")}";
+        $"{queue}.retry.{delay.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}s";
 
+    /// <summary>
+    /// The attempt header, which only this class writes (an int; the broker hands it back as one).
+    /// </summary>
     private static int ReadInt(IDictionary<string, object?>? headers, string name) =>
-        headers is not null && headers.TryGetValue(name, out var value)
-            ? value switch
-            {
-                int i => i,
-                long l => (int)l,
-                short s => s,
-                byte b => b,
-                byte[] bytes when int.TryParse(System.Text.Encoding.UTF8.GetString(bytes), out var parsed) => parsed,
-                string text when int.TryParse(text, out var parsed) => parsed,
-                _ => 0
-            }
-            : 0;
+        headers?.TryGetValue(name, out var value) == true && value is int i ? i : 0;
 
+    /// <summary>
+    /// A string header, which the broker hands back as UTF-8 bytes.
+    /// </summary>
     private static string? ReadString(IDictionary<string, object?>? headers, string name) =>
-        headers is not null && headers.TryGetValue(name, out var value)
-            ? value switch
-            {
-                byte[] bytes => System.Text.Encoding.UTF8.GetString(bytes),
-                string text => text,
-                _ => null
-            }
-            : null;
+        headers?.TryGetValue(name, out var value) == true && value is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : null;
 
     private string QueueName()
     {
@@ -566,7 +571,10 @@ public sealed class RabbitMQEventBus(
         }
     }
 
-    private async Task<IChannel> RentPublishChannelAsync(IConnection connection, CancellationToken cancellationToken)
+    /// <summary>
+    /// Declares the exchange once per connection.
+    /// </summary>
+    private async Task EnsureExchangeAsync(IConnection connection, CancellationToken cancellationToken)
     {
         if (!ReferenceEquals(_exchangeDeclaredOn, connection))
         {
@@ -574,26 +582,6 @@ public sealed class RabbitMQEventBus(
             await declare.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
             _exchangeDeclaredOn = connection;
         }
-
-        while (_publishChannels.TryTake(out var pooled))
-        {
-            if (pooled.IsOpen)
-            {
-                return pooled;
-            }
-            await pooled.DisposeAsync();
-        }
-        return await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-    }
-
-    private async ValueTask ReturnPublishChannelAsync(IChannel channel)
-    {
-        if (channel.IsOpen && _publishChannels.Count < MaxIdlePublishChannels)
-        {
-            _publishChannels.Add(channel);
-            return;
-        }
-        await channel.DisposeAsync();
     }
 
     public async ValueTask DisposeAsync()

@@ -1,14 +1,14 @@
 ﻿using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json;
 using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using OpenFeature;
-using TvTracker.EventBus.RabbitMQ;
 using TvTracker;
+using TvTracker.EventBus.RabbitMQ;
 
 namespace Catalog.API.Apis;
 
@@ -17,7 +17,7 @@ namespace Catalog.API.Apis;
 /// <param name="DeadLetters">Events no service could handle after its retries, waiting in the shared dead-letter queue;
 /// null when RabbitMQ can't be asked.</param>
 public record OpsStats(DateTime GeneratedAtUtc, CatalogOpsStats Catalog, JsonElement? Analytics, JsonElement? BulkImport,
-    JsonElement? Research = null, JsonElement? TvMaze = null, long? DeadLetters = null);
+    JsonElement? Research = null, JsonElement? TvMaze = null, uint? DeadLetters = null);
 
 public record CatalogOpsStats(
     int Shows,
@@ -174,7 +174,7 @@ public static class OpsApi
     /// The dead-letter depth, started with the other sections and given 2 s: with RabbitMQ down, connecting would
     /// otherwise hold the bus's connection lock (and the crossover publishes behind it) for the whole connect timeout.
     /// </summary>
-    private static async Task<long?> CountDeadLettersAsync(RabbitMQEventBus bus, ILogger logger, CancellationToken ct)
+    private static async Task<uint?> CountDeadLettersAsync(RabbitMQEventBus bus, ILogger logger, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(2));

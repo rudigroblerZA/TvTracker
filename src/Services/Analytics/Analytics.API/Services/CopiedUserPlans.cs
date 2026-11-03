@@ -1,6 +1,5 @@
 using Analytics.Data;
 using Microsoft.Extensions.Caching.Memory;
-using OpenFeature;
 using TvTracker;
 
 namespace Analytics.API.Services;
