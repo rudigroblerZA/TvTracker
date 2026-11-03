@@ -24,11 +24,28 @@ public sealed class RabbitMQEventBusOptions
     public string SubscriptionClientName { get; set; } = "";
 
     public ushort PrefetchCount { get; set; } = 10;
+
+    /// <summary>
+    /// How long a failed message waits before each retry; after the last it goes to the dead-letter queue. Each delay is
+    /// a queue of its own (<c>{queue}.retry.{delay}</c>), so changing one declares a new queue rather than altering one.
+    /// </summary>
+    public TimeSpan[] RetryDelays { get; set; } = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(60)];
 }
 
 /// <summary>
 /// Publishes events to a direct exchange (routing key = event type name) and consumes this service's queue.
-/// Failed messages are requeued once; a message that fails again is dropped and logged.
+/// <list type="bullet">
+/// <item><b>Delayed retries:</b> a message whose handler throws is acked and republished to a retry queue
+/// (<see cref="RabbitMQEventBusOptions.RetryDelays"/>: 1 s, 10 s, 60 s) whose TTL dead-letters it back to this
+/// service's queue alone, counting attempts in <see cref="AttemptHeader"/>. Before, it was requeued once at once and then
+/// dropped, so a database hiccup of a few hundred milliseconds could lose an event for good.</item>
+/// <item><b>Dead letters:</b> after the last retry, or at once when it can't be read, a message goes to
+/// <see cref="DeadLetterQueue"/>, one queue shared by every service, with the queue it came from
+/// (<see cref="QueueHeader"/>) and the error. <see cref="ReplayDeadLettersAsync"/> sends them back to that queue only,
+/// so other subscribers don't see the event twice.</item>
+/// <item><b>Order:</b> a retried event arrives after later ones. Handlers already cope (the inbox, and newest-wins
+/// copies such as Social's shared lists), since redeliveries were never ordered either.</item>
+/// </list>
 /// </summary>
 public sealed class RabbitMQEventBus(
     ILogger<RabbitMQEventBus> logger,
@@ -38,6 +55,28 @@ public sealed class RabbitMQEventBus(
     IOptions<EventBusSubscriptionInfo> subscriptionInfo) : IEventBus, IHostedService, IAsyncDisposable
 {
     public const string ExchangeName = "tvtracker_event_bus";
+
+    /// <summary>
+    /// The queue every service's undeliverable messages end up in.
+    /// </summary>
+    public const string DeadLetterQueue = "tvtracker_dead_letters";
+
+    /// <summary>
+    /// Retries so far, on a message in or back from a retry queue.
+    /// </summary>
+    public const string AttemptHeader = "x-tvtracker-attempt";
+
+    /// <summary>
+    /// On a dead letter: the queue it was taken from, which a replay sends it back to.
+    /// </summary>
+    public const string QueueHeader = "x-tvtracker-queue";
+
+    /// <summary>
+    /// On a dead letter: the last error, cut to <see cref="MaxErrorLength"/> characters.
+    /// </summary>
+    public const string ErrorHeader = "x-tvtracker-error";
+
+    private const int MaxErrorLength = 1000;
 
     internal static readonly ActivitySource ActivitySource = new("TvTracker.EventBus");
 
@@ -145,6 +184,18 @@ public sealed class RabbitMQEventBus(
 
         await channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
         await channel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await channel.QueueDeclareAsync(DeadLetterQueue, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        foreach (var delay in options.Value.RetryDelays)
+        {
+            // A message waits out the queue's TTL, then the default exchange routes it back to this service's queue only.
+            await channel.QueueDeclareAsync(RetryQueueName(queueName, delay), durable: true, exclusive: false, autoDelete: false,
+                arguments: new Dictionary<string, object?>
+                {
+                    ["x-message-ttl"] = (int)delay.TotalMilliseconds,
+                    ["x-dead-letter-exchange"] = "",
+                    ["x-dead-letter-routing-key"] = queueName
+                }, cancellationToken: cancellationToken);
+        }
 
         foreach (var eventName in subscriptionInfo.Value.EventTypes.Keys)
         {
@@ -165,15 +216,32 @@ public sealed class RabbitMQEventBus(
     private async Task OnMessageReceivedAsync(object sender, BasicDeliverEventArgs args)
     {
         var channel = _consumerChannel ?? ((AsyncEventingBasicConsumer)sender).Channel;
-        var eventName = args.RoutingKey;
+        // A message back from a retry queue carries the queue's name as its routing key, so the event's name is read from
+        // its type (set on every publish), and from the routing key for anything published before that.
+        var eventName = string.IsNullOrEmpty(args.BasicProperties.Type) ? args.RoutingKey : args.BasicProperties.Type;
+        var attempt = ReadInt(args.BasicProperties.Headers, AttemptHeader);
         using var activity = ActivitySource.StartActivity($"process {eventName}", ActivityKind.Consumer);
 
+        IntegrationEvent? @event = null;
         try
         {
             if (subscriptionInfo.Value.EventTypes.TryGetValue(eventName, out var eventType))
             {
-                var @event = (IntegrationEvent?)JsonSerializer.Deserialize(args.Body.Span, eventType, JsonOptions)
-                    ?? throw new InvalidOperationException($"Could not deserialize {eventName}");
+                try
+                {
+                    @event = (IntegrationEvent?)JsonSerializer.Deserialize(args.Body.Span, eventType, JsonOptions);
+                }
+                catch (JsonException) { }
+
+                if (@event is null)
+                {
+                    // Unreadable now means unreadable on every retry.
+                    await ForwardAsync(args, eventName, DeadLetterQueue, attempt, $"Could not deserialize {eventName}");
+                    logger.LogError("Could not deserialize {EventName} {MessageId}; sent to {DeadLetters}", eventName,
+                        args.BasicProperties.MessageId, DeadLetterQueue);
+                    await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
+                    return;
+                }
 
                 await using var scope = serviceProvider.CreateAsyncScope();
                 foreach (var handler in scope.ServiceProvider.GetKeyedServices<IIntegrationEventHandler>(eventType))
@@ -188,14 +256,183 @@ public sealed class RabbitMQEventBus(
 
             await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!_stopping.IsCancellationRequested)
         {
-            var requeue = !args.Redelivered;
-            logger.LogError(ex, "Error handling {EventName}; requeue: {Requeue}", eventName, requeue);
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: requeue);
+            var delays = options.Value.RetryDelays;
+            try
+            {
+                if (attempt < delays.Length)
+                {
+                    var next = RetryQueueName(QueueName(), delays[attempt]);
+                    await ForwardAsync(args, eventName, next, attempt + 1, error: null);
+                    logger.LogWarning(ex, "Error handling {EventName} {EventId} (attempt {Attempt}); retrying in {Delay}",
+                        eventName, @event?.Id, attempt + 1, delays[attempt]);
+                }
+                else
+                {
+                    await ForwardAsync(args, eventName, DeadLetterQueue, attempt, ex.ToString());
+                    logger.LogError(ex, "Error handling {EventName} {EventId} after {Attempts} attempts; sent to {DeadLetters}",
+                        eventName, @event?.Id, attempt + 1, DeadLetterQueue);
+                }
+                await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
+            }
+            catch (Exception forwardError)
+            {
+                // Couldn't park it: fall back to RabbitMQ's own redelivery rather than lose it at once.
+                var requeue = !args.Redelivered;
+                logger.LogError(forwardError, "Couldn't forward failed {EventName}; requeue: {Requeue}", eventName, requeue);
+                await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: requeue);
+            }
+        }
+        catch (Exception) when (_stopping.IsCancellationRequested)
+        {
+            // Shutting down mid-handler: put it back for the next start, without counting an attempt.
+            await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true);
         }
     }
+
+    /// <summary>
+    /// Republishes a received message to <paramref name="queue"/> through the default exchange (so only that queue gets it),
+    /// with its body, id and type, and the attempt count; a dead letter also gets the queue it came from and the error.
+    /// </summary>
+    private async Task ForwardAsync(BasicDeliverEventArgs args, string eventName, string queue, int attempt, string? error)
+    {
+        var headers = args.BasicProperties.Headers is { } existing ? new Dictionary<string, object?>(existing) : [];
+        headers[AttemptHeader] = attempt;
+        if (queue == DeadLetterQueue)
+        {
+            headers[QueueHeader] = QueueName();
+            headers[ErrorHeader] = error is { Length: > MaxErrorLength } ? error[..MaxErrorLength] : error;
+        }
+        var properties = new BasicProperties
+        {
+            DeliveryMode = DeliveryModes.Persistent,
+            MessageId = args.BasicProperties.MessageId,
+            Type = eventName,
+            ContentType = args.BasicProperties.ContentType ?? "application/json",
+            Headers = headers
+        };
+        await PublishRawAsync(queue, properties, args.Body, CancellationToken.None);
+    }
+
+    private async Task PublishRawAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    {
+        var connection = await GetConnectionAsync(cancellationToken);
+        var channel = await RentPublishChannelAsync(connection, cancellationToken);
+        try
+        {
+            await channel.BasicPublishAsync("", queue, mandatory: false, basicProperties: properties, body: body, cancellationToken: cancellationToken);
+        }
+        catch
+        {
+            await channel.DisposeAsync();
+            throw;
+        }
+        await ReturnPublishChannelAsync(channel);
+    }
+
+    /// <summary>
+    /// Messages waiting in the shared dead-letter queue (0 before any service has declared it).
+    /// </summary>
+    public async Task<uint> DeadLetterCountAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await GetConnectionAsync(cancellationToken);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        try
+        {
+            return (await channel.QueueDeclarePassiveAsync(DeadLetterQueue, cancellationToken)).MessageCount;
+        }
+        catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        {
+            return 0; // not declared yet: nothing has failed
+        }
+    }
+
+    /// <summary>
+    /// Sends up to <paramref name="max"/> dead letters back to the queue each came from, with a fresh attempt count, and
+    /// says how many went to each. A letter without its queue stays where it is.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, int>> ReplayDeadLettersAsync(int max, CancellationToken cancellationToken = default)
+    {
+        var replayed = new Dictionary<string, int>();
+        var kept = new List<ulong>();
+        var connection = await GetConnectionAsync(cancellationToken);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        try
+        {
+            await channel.QueueDeclarePassiveAsync(DeadLetterQueue, cancellationToken);
+        }
+        catch (global::RabbitMQ.Client.Exceptions.OperationInterruptedException)
+        {
+            return replayed;
+        }
+
+        for (var i = 0; i < max; i++)
+        {
+            var letter = await channel.BasicGetAsync(DeadLetterQueue, autoAck: false, cancellationToken);
+            if (letter is null)
+            {
+                break;
+            }
+            if (ReadString(letter.BasicProperties.Headers, QueueHeader) is not { Length: > 0 } queue)
+            {
+                kept.Add(letter.DeliveryTag);
+                continue;
+            }
+
+            var headers = letter.BasicProperties.Headers is { } existing ? new Dictionary<string, object?>(existing) : [];
+            headers.Remove(AttemptHeader);
+            headers.Remove(QueueHeader);
+            headers.Remove(ErrorHeader);
+            var properties = new BasicProperties
+            {
+                DeliveryMode = DeliveryModes.Persistent,
+                MessageId = letter.BasicProperties.MessageId,
+                Type = letter.BasicProperties.Type,
+                ContentType = letter.BasicProperties.ContentType,
+                Headers = headers
+            };
+            await PublishRawAsync(queue, properties, letter.Body, cancellationToken);
+            await channel.BasicAckAsync(letter.DeliveryTag, multiple: false, cancellationToken);
+            replayed[queue] = replayed.GetValueOrDefault(queue) + 1;
+        }
+
+        // Released only now, so the loop doesn't take the same unroutable letter again.
+        foreach (var tag in kept)
+        {
+            await channel.BasicNackAsync(tag, multiple: false, requeue: true, cancellationToken);
+        }
+        logger.LogInformation("Replayed dead letters: {Replayed}", replayed);
+        return replayed;
+    }
+
+    internal static string RetryQueueName(string queue, TimeSpan delay) =>
+        $"{queue}.retry.{(delay.TotalSeconds >= 1 && delay.TotalSeconds % 1 == 0 ? $"{delay.TotalSeconds:0}s" : $"{delay.TotalMilliseconds:0}ms")}";
+
+    private static int ReadInt(IDictionary<string, object?>? headers, string name) =>
+        headers is not null && headers.TryGetValue(name, out var value)
+            ? value switch
+            {
+                int i => i,
+                long l => (int)l,
+                short s => s,
+                byte b => b,
+                byte[] bytes when int.TryParse(System.Text.Encoding.UTF8.GetString(bytes), out var parsed) => parsed,
+                string text when int.TryParse(text, out var parsed) => parsed,
+                _ => 0
+            }
+            : 0;
+
+    private static string? ReadString(IDictionary<string, object?>? headers, string name) =>
+        headers is not null && headers.TryGetValue(name, out var value)
+            ? value switch
+            {
+                byte[] bytes => System.Text.Encoding.UTF8.GetString(bytes),
+                string text => text,
+                _ => null
+            }
+            : null;
 
     private string QueueName()
     {

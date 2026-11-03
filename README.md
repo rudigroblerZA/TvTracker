@@ -684,6 +684,9 @@ http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refre
   genres), whether Analytics' copy of the catalog is in step, and whether its copy of the episode notes matches
   Research's (with any note events still waiting in Research's outbox).
 - **Feature flags:** every flag, on or off, as flagd answers a signed-out caller.
+- **Dead letters:** events no service could handle after three retries (1 s, 10 s, 60 s apart), with a button that
+  sends them back to the service each came from. App admins can do the same anywhere with
+  `POST /api/v1/ops/dead-letters/replay` on Catalog.API (`?max=`, up to 500).
 
 Catalog.API gathers the other services' sections server-side (`/api/v1/ops/stats` on Analytics.API and Research.API,
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
@@ -1480,9 +1483,12 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 
 ## Before production
 
-- Change the development secrets in `AppHost.cs` and `Realms/tvtracker-realm.json`, and turn on HTTPS for Keycloak.
+- Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
+  `identity-admin-client-secret`, `mcp-client-secret`, `mcp-gateway-key`, `app-admin-password` and
+  `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
+  password into Keycloak's realm on start.
+- Delete the realm's demo user, and turn on HTTPS for Keycloak.
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
-- Add a dead-letter queue for events that fail twice, and tests.
 
 ## Package versions
 

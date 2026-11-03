@@ -120,7 +120,7 @@ public static class ServicesApi
     }
 
     private static async Task<Ok<MyServicesDto>> GetMineAsync(
-        ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
@@ -132,7 +132,7 @@ public static class ServicesApi
     /// Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.
     /// </summary>
     private static async Task<Results<Ok<MyServicesDto>, ValidationProblem, ProblemHttpResult>> SetMineAsync(
-        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
+        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
@@ -160,7 +160,7 @@ public static class ServicesApi
     }
 
     private static async Task<Results<Ok<ServicesReportDto>, ProblemHttpResult>> GetReportAsync(
-        ClaimsPrincipal user, AnalyticsContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
@@ -242,10 +242,10 @@ public static class ServicesApi
     /// The caller's plan from Analytics' copy, and whether it allows services: always while <c>plans</c> is off (fail open).
     /// </summary>
     private static async Task<(string Plan, bool Allowed)> PlanOfAsync(ClaimsPrincipal user, string userId, AnalyticsContext db,
-        IFeatureClient flags, CancellationToken ct)
+        CachedFlags flags, CancellationToken ct)
     {
         var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
-        var limited = await flags.GetBooleanValueAsync(FeatureFlags.Plans, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct);
+        var limited = await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), ct);
         return (plan, !limited || Plans.Limits(plan).TrackServices);
     }
 

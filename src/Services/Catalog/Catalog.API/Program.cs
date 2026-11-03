@@ -90,5 +90,6 @@ if (app.Environment.IsDevelopment())
 
 app.MapGet("/api/v1/status", () => new { Service = "catalog-api", Status = "ok" });
 app.MapCatalogApi();
+app.MapDeadLettersApi();
 
 app.Run();

@@ -69,7 +69,7 @@ public static class ListsApi
     /// <summary>
     /// What the caller's plan allows, as the list endpoints enforce it, and how many lists they have.
     /// </summary>
-    private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
+    private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, CachedFlags flags, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var (plan, limits) = await PlanAsync(user, db, flags, ct);
@@ -78,7 +78,7 @@ public static class ListsApi
     }
 
     private static async Task<Results<Created<ListSummaryDto>, ValidationProblem, ProblemHttpResult>> CreateListAsync(
-        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, TimeProvider time, CancellationToken ct)
+        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
         {
@@ -137,7 +137,7 @@ public static class ListsApi
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem, ProblemHttpResult>> UpdateListAsync(
-        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, IFeatureClient flags,
+        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, CachedFlags flags,
         TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
@@ -288,7 +288,7 @@ public static class ListsApi
     /// Gives the list a link, or returns the one it has.
     /// </summary>
     private static async Task<Results<Ok<ListLinkDto>, NotFound, ProblemHttpResult>> CreateLinkAsync(
-        Guid id, ClaimsPrincipal user, TrackingContext db, IFeatureClient flags, CancellationToken ct)
+        Guid id, ClaimsPrincipal user, TrackingContext db, CachedFlags flags, CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct);
         if (list is null)
@@ -345,12 +345,12 @@ public static class ListsApi
     /// The caller's plan and its limits; null limits while the <c>plans</c> flag is off for them (fail open: nobody is
     /// limited then).
     /// </summary>
-    private static async Task<(string Plan, PlanLimits? Limits)> PlanAsync(ClaimsPrincipal user, TrackingContext db, IFeatureClient flags,
+    private static async Task<(string Plan, PlanLimits? Limits)> PlanAsync(ClaimsPrincipal user, TrackingContext db, CachedFlags flags,
         CancellationToken ct)
     {
         var userId = user.GetUserId();
         var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
-        var on = await flags.GetBooleanValueAsync(FeatureFlags.Plans, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct);
+        var on = await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), ct);
         return (plan, on ? Plans.Limits(plan) : null);
     }
 

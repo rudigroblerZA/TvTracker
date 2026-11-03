@@ -18,6 +18,8 @@ builder.Services.AddIntegrationEventOutbox<IdentityContext>();
 builder.Services.AddHttpClient<KeycloakAdminClient>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<ProfileSnapshotPublisher>();
+builder.Services.AddHttpClient<RealmSecretsSeeder>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RealmSecretsSeeder>());
 builder.Services.AddHostedService<AdminAccountSeeder>();
 
 // Used by the data export to collect each service's data for the user.

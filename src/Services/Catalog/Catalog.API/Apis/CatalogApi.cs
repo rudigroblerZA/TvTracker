@@ -76,7 +76,7 @@ public static class CatalogApi
     /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
     /// </param>
     private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
-        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, IFeatureClient features, string? search,
+        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, CachedFlags features, string? search,
         string? genre, ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
@@ -85,7 +85,7 @@ public static class CatalogApi
         }
 
         if (!string.IsNullOrWhiteSpace(nanogenre)
-            && !await features.GetBooleanValueAsync(FeatureFlags.Nanogenres, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user), cancellationToken: ct))
+            && !await features.IsEnabledAsync(FeatureFlags.Nanogenres, FeatureFlags.ContextFor(user), ct))
         {
             nanogenre = null;
         }

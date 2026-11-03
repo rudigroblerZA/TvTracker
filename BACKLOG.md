@@ -10,14 +10,12 @@ that shows it), what done looks like, its priority and its size.
 
 ## Now
 
-In this order. The first three make every later change safer; the last is a cheap speed-up.
+Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
+November 2026; CONTEXT.md has the decisions.
 
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
 | Q1 | [Tests and CI](#q1-tests-and-ci) | P1 | M |
-| R2 | [Retry with backoff, and a dead-letter queue](#r2-retry-with-backoff-and-a-dead-letter-queue) | P1 | M |
-| S1 | [Secrets out of the AppHost](#s1-secrets-out-of-the-apphost) (before any deployment) | P1 | M |
-| P2 | [Cache feature-flag answers in services](#p2-cache-feature-flag-answers-in-services) | P2 | S |
 
 ## What the review found sound
 
@@ -80,24 +78,6 @@ So the rest of the list reads in proportion:
 
 ## Reliability
 
-### R2. Retry with backoff, and a dead-letter queue
-
-**P1 · M**
-
-- **Why:**
-  - A failing message is requeued once, immediately, then dropped (`RabbitMQEventBus.cs:185`). A database hiccup of a
-    few hundred milliseconds can therefore lose an event for good.
-  - Lost events are healed only where a periodic full send exists (tags, DNA, snapshots, catalog replay). Nothing heals
-    a lost season verdict, an account deletion step, a list share or a correction.
-  - CONTEXT.md lists "no dead-letter queue" as a known gap.
-- **What:**
-  - Delayed retries: for example 1 s, 10 s and 60 s through a per-queue retry queue with a message TTL that dead-letters
-    back to the main queue, counting attempts in a header.
-  - Then a dead-letter queue per service queue.
-  - Show the dead-letter depth on `/ops`, with a way to replay a dead letter.
-- **Done when:** a handler that throws twice and then succeeds still processes the event; one that always throws lands
-  in the dead-letter queue, visible on `/ops`; CONTEXT.md's Events section is updated.
-
 ### R4. Inbox and delivery retention in Notifications
 
 **P3 · S**
@@ -109,22 +89,6 @@ So the rest of the list reads in proportion:
 - **Done when:** a scheduled pass trims both; README says how long the inbox keeps items.
 
 ## Security
-
-### S1. Secrets out of the AppHost
-
-**P1 before any deployment · M**
-
-- **Why:**
-  - Client secrets, the gateway key and the app admin password are constants in `AppHost.cs` (lines 80-83, 192), and
-    the realm file carries the same secrets.
-  - Fine for development (CONTEXT.md lists it), but a deployment from this AppHost would ship known secrets.
-- **What:**
-  - Make each one an Aspire secret parameter (`AddParameter(..., secret: true)`) with the current value as the
-    development default only.
-  - Generate the realm's client secrets at deploy time, or set them through the admin API on start, as
-    `AdminAccountSeeder` does.
-  - Document where production values come from (Key Vault, or `azd` environment secrets).
-- **Done when:** a publish (`aspire publish` / `azd`) without values fails rather than using the development ones.
 
 ### S2. Service-to-service auth for internal APIs
 
@@ -187,26 +151,13 @@ So the rest of the list reads in proportion:
 
 ## Performance
 
-### P2. Cache feature-flag answers in services
-
-**P2 · S**
-
-- **Why:**
-  - `RequireFeature` evaluates the flag on every request with a gRPC call to flagd. The provider's cache is off
-    because it failed in OpenFeature.Providers.Flagd 0.8.0 (`FeatureFlagExtensions.cs:18`).
-  - The UI caches answers for 30 s; services don't, so every gated request pays an extra round trip.
-- **What:** first try a newer provider version with its cache on. Otherwise add a small in-process cache keyed by flag
-  and targeting key, for 5-10 s.
-- **Done when:** gated endpoints make no flagd call on a cache hit, and turning a flag off still applies within the
-  cache time.
-
 ### P3. Fewer calls per show page
 
 **P3 · M**
 
 - **Why:** about 25 calls per show page, each with its own token handling and a flag check, from Blazor Server to many
   services.
-- **What:** measure first (the show page's own calls now run in parallel; P2 may be enough). If not, batch what goes together, such as Tracking's follow,
+- **What:** measure first (the show page's own calls now run in parallel, and flag answers are cached now). If not, batch what goes together, such as Tracking's follow,
   progress and lists, or Ratings' summary and the user's rating, into one call per service.
 - **Done when:** decided by measurement and recorded in CONTEXT.md.
 
@@ -304,7 +255,7 @@ All the features from the review have shipped; new ideas go here.
 
 ### O1. A deployment
 
-**P2 · L, after S1**
+**P2 · L**
 
 - **What:**
   - Publish the AppHost to Azure Container Apps (`aspire publish` / `azd`), with managed Postgres and PgBouncer (the
@@ -319,7 +270,7 @@ All the features from the review have shipped; new ideas go here.
 
 - **What:** alerts on what's already logged or countable:
   - outbox rows pending for over 5 minutes;
-  - dead-letter depth (after R2);
+  - dead-letter depth (`tvtracker_dead_letters`, on `/ops` already);
   - "Computing insights failed";
   - the sync worker's TVmaze error rate;
   - Ask's queue length.

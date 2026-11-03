@@ -42,6 +42,10 @@ public static class FeatureFlagExtensions
             }
         });
 
+        // Answers are kept a few seconds (CachedFlags), so a gated request doesn't make two gRPC calls to flagd.
+        builder.Services.AddMemoryCache();
+        builder.Services.TryAddScoped<CachedFlags>();
+
         // Plans: where Identity is reachable (the AppHost references it), the caller's plan joins the flag context. A
         // service with its own copy of plans registers that instead (AddUserPlans), which replaces this.
         if (builder.Configuration.GetSection("services:identity-api").Exists())
@@ -56,16 +60,16 @@ public static class FeatureFlagExtensions
     /// <summary>
     /// Answers 404 while <paramref name="flag"/> is off for the caller, as if the endpoint didn't exist. Evaluated per
     /// request with the caller's context (<see cref="FeatureFlags.ContextFor"/>), so flags can target users, and with
-    /// their plan (<see cref="IUserPlans"/>, when registered), so a flag can be part of some plans only.
+    /// their plan (<see cref="IUserPlans"/>, when registered), so a flag can be part of some plans only. Answers come from
+    /// <see cref="CachedFlags"/>, so turning a flag off applies within a few seconds.
     /// </summary>
     public static TBuilder RequireFeature<TBuilder>(this TBuilder endpoints, string flag) where TBuilder : IEndpointConventionBuilder =>
         endpoints.AddEndpointFilter(async (context, next) =>
         {
             var http = context.HttpContext;
-            var client = http.RequestServices.GetRequiredService<IFeatureClient>();
+            var flags = http.RequestServices.GetRequiredService<CachedFlags>();
             var plan = http.RequestServices.GetService<IUserPlans>() is { } plans ? await plans.PlanAsync(http) : null;
-            var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(http.User, plan),
-                cancellationToken: http.RequestAborted);
+            var enabled = await flags.IsEnabledAsync(flag, FeatureFlags.ContextFor(http.User, plan), http.RequestAborted);
             return enabled ? await next(context) : TypedResults.NotFound();
         });
 

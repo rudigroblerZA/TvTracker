@@ -95,6 +95,8 @@ Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not n
 - Postgres runs from the pgvector trixie image, with the volume mounted explicitly in `AppHost.cs`. Don't switch to
   `WithDataVolume` or a bookworm tag.
 - Leftover `dcp` / service processes from a previous AppHost run hold ports. Kill them before starting again.
+- Without a trusted HTTPS dev certificate (a fresh container), the AppHost's https profile never passes health checks, so
+  resources that `WaitFor` a project never start. Run it with `--launch-profile http`.
 
 ## Git
 

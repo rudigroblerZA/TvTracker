@@ -4,15 +4,20 @@ using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http.HttpResults;
 using OpenFeature;
+using TvTracker.EventBus.RabbitMQ;
 using TvTracker;
 
 namespace Catalog.API.Apis;
 
 /// <param name="Research">Research.API's counts; null when it's down or the research flag is off.</param>
 /// <param name="TvMaze">The sync worker's TVmaze calls over the last hour, by caller; null when it's down or on the mock provider.</param>
+/// <param name="DeadLetters">Events no service could handle after its retries, waiting in the shared dead-letter queue;
+/// null when RabbitMQ can't be asked.</param>
 public record OpsStats(DateTime GeneratedAtUtc, CatalogOpsStats Catalog, JsonElement? Analytics, JsonElement? BulkImport,
-    JsonElement? Research = null, JsonElement? TvMaze = null);
+    JsonElement? Research = null, JsonElement? TvMaze = null, long? DeadLetters = null);
 
 public record CatalogOpsStats(
     int Shows,
@@ -112,11 +117,36 @@ public static class OpsApi
     {
         app.MapGet("/ops", (Branding brand) => Results.Text(OpsPage.Html(brand), "text/html; charset=utf-8")).ExcludeFromDescription();
         app.MapGet("/ops/stats", GetStatsAsync);
+        // The dashboard's own replay button; unsigned like the page, so Development only with it.
+        app.MapPost("/ops/dead-letters/replay", async (RabbitMQEventBus bus, CancellationToken ct) =>
+            TypedResults.Ok(await bus.ReplayDeadLettersAsync(MaxReplay, ct))).ExcludeFromDescription();
+    }
+
+    /// <summary>
+    /// Dead letters sent back per replay call; more than this is a reason to look at why before sending the rest.
+    /// </summary>
+    private const int MaxReplay = 500;
+
+    /// <summary>
+    /// Sends dead letters back to the queue each came from (<see cref="RabbitMQEventBus.ReplayDeadLettersAsync"/>), for app
+    /// admins (<c>Admin:Users</c>) in any environment; 404 for anyone else, as the affiliate report.
+    /// </summary>
+    public static void MapDeadLettersApi(this IEndpointRouteBuilder app) =>
+        app.MapPost("/api/v1/ops/dead-letters/replay", ReplayDeadLettersAsync).RequireAuthorization();
+
+    private static async Task<Results<Ok<IReadOnlyDictionary<string, int>>, NotFound>> ReplayDeadLettersAsync(
+        ClaimsPrincipal user, IConfiguration config, RabbitMQEventBus bus, int? max, CancellationToken ct)
+    {
+        if (!Admins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+        return TypedResults.Ok(await bus.ReplayDeadLettersAsync(Math.Clamp(max ?? MaxReplay, 1, MaxReplay), ct));
     }
 
     private static async Task<OpsStats> GetStatsAsync(
         CatalogContext db, EmbeddingModel model, Universes universes, IFeatureClient features, IHttpClientFactory httpFactory, TimeProvider time,
-        ILogger<OpsStats> logger, CancellationToken ct)
+        RabbitMQEventBus bus, ILogger<OpsStats> logger, CancellationToken ct)
     {
         var now = time.GetUtcNow();
 
@@ -127,7 +157,17 @@ public static class OpsApi
         var tvmaze = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/tvmaze", logger, ct);
         var catalog = await GetCatalogStatsAsync(db, model.Id, universes, features, now, ct);
 
-        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research, await tvmaze);
+        long? deadLetters = null;
+        try
+        {
+            deadLetters = await bus.DeadLetterCountAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Couldn't count dead letters");
+        }
+
+        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research, await tvmaze, deadLetters);
     }
 
     private static async Task<CatalogOpsStats> GetCatalogStatsAsync(

@@ -6,6 +6,20 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Passed to the web app and the services that put it in text; the phone has its own (MobileSettings.AppName).
 var appName = builder.Configuration["Branding:AppName"] is { Length: > 0 } configuredName ? configuredName : "TV Tracker";
 
+// Secrets are Aspire secret parameters (Parameters:<name>: user secrets, environment variables, or azd's environment
+// secrets in a deployment). Running locally, one that isn't set takes its development value, which matches
+// Realms/tvtracker-realm.json; a publish never carries those, so a deployment has to be given every one. Identity.API puts
+// the client secrets and the app admin's password into Keycloak's realm on start (RealmSecretsSeeder), so a realm imported
+// from the file doesn't keep the development values.
+IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
+{
+    if (!builder.ExecutionContext.IsPublishMode && string.IsNullOrEmpty(builder.Configuration[$"Parameters:{name}"]))
+    {
+        builder.Configuration[$"Parameters:{name}"] = developmentValue;
+    }
+    return builder.AddParameter(name, secret: true);
+}
+
 // ---------------------------------------------------------------------------
 // Infrastructure (containers; Docker or Podman must be running)
 // ---------------------------------------------------------------------------
@@ -43,7 +57,7 @@ var eventBus = builder.AddRabbitMQ("eventbus")
 // Keycloak: sign-up, sign-in, password reset, external logins. The "tvtracker" realm is imported from ./Realms
 // on first start. It listens on a fixed port (8080) so token issuers stay the same for the web app, the services
 // and the Android emulator (10.0.2.2:8080). Admin console: http://localhost:8080 (admin / the parameter below).
-var keycloakAdminPassword = builder.AddParameter("keycloak-admin-password", "admin", secret: true);
+var keycloakAdminPassword = Secret("keycloak-admin-password", "admin");
 
 var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.4")
     .WithArgs("start-dev", "--import-realm")
@@ -75,11 +89,12 @@ var flagd = builder.AddFlagd("flagd")
     .WithArgs("--uri", "file:./flags/overrides.json")
     .WithLifetime(ContainerLifetime.Persistent);
 
-// Development secrets; they match Realms/tvtracker-realm.json. Change both for any shared environment.
-const string WebClientSecret = "tvtracker-web-dev-secret";
-const string IdentityAdminClientSecret = "tvtracker-identity-admin-dev-secret";
-const string McpClientSecret = "tvtracker-mcp-dev-secret";
-const string AppAdminPassword = "admin";
+// The Keycloak clients' secrets, the MCP gateway's key and the app admin's password (see Secret above).
+var webClientSecret = Secret("web-client-secret", "tvtracker-web-dev-secret");
+var identityAdminClientSecret = Secret("identity-admin-client-secret", "tvtracker-identity-admin-dev-secret");
+var mcpClientSecret = Secret("mcp-client-secret", "tvtracker-mcp-dev-secret");
+var mcpGatewayKey = Secret("mcp-gateway-key", "tvtracker-gateway-dev-key");
+var appAdminPassword = Secret("app-admin-password", "admin");
 
 // ---------------------------------------------------------------------------
 // Services
@@ -90,7 +105,12 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithEnvironment("Identity__Url", keycloakUrl)
-    .WithEnvironment("Identity__AdminClientSecret", IdentityAdminClientSecret)
+    .WithEnvironment("Identity__AdminClientSecret", identityAdminClientSecret)
+    .WithEnvironment("Keycloak__AdminUsername", "admin")
+    .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
+    .WithEnvironment("Keycloak__ClientSecrets__tvtracker-web", webClientSecret)
+    .WithEnvironment("Keycloak__ClientSecrets__tvtracker-identity-admin", identityAdminClientSecret)
+    .WithEnvironment("Keycloak__ClientSecrets__tvtracker-mcp", mcpClientSecret)
     .WithEnvironment("Flags__Directory", flagsDirectory)
     .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
@@ -183,7 +203,7 @@ var mcpServer = builder.AddProject<Projects.Mcp_Server>("mcp-server")
     .WithReference(analyticsApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithReference(researchApi)
-    .WithEnvironment("Mcp__ClientSecret", McpClientSecret)
+    .WithEnvironment("Mcp__ClientSecret", mcpClientSecret)
     .WithEnvironment("Keycloak__AdminUsername", "admin")
     .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
     .WaitFor(keycloak)
@@ -192,9 +212,8 @@ var mcpServer = builder.AddProject<Projects.Mcp_Server>("mcp-server")
 // MCP gateway (http://localhost:5113/mcp): one endpoint, with an API key, in front of the app's MCP servers
 // (Gateway:Servers:{name}:Url, optionally BearerToken and a Tools allow-list), logging every call. Open WebUI uses it.
 // More servers can be added under Gateway:Servers in this project's configuration.
-const string McpGatewayKey = "tvtracker-gateway-dev-key";
 var mcpGateway = builder.AddProject<Projects.Mcp_Gateway>("mcp-gateway")
-    .WithEnvironment("Gateway__ApiKey", McpGatewayKey)
+    .WithEnvironment("Gateway__ApiKey", mcpGatewayKey)
     .WithEnvironment("Gateway__Servers__tvtracker__Url", ReferenceExpression.Create($"{mcpServer.GetEndpoint("http")}/mcp"))
     .WaitFor(mcpServer)
     .WithHttpHealthCheck("/health");
@@ -204,7 +223,7 @@ var assistantApi = builder.AddProject<Projects.Assistant_API>("assistant-api")
     .WithReference(flagd).WithReference(identityApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithEnvironment("Assistant__GatewayUrl", ReferenceExpression.Create($"{mcpGateway.GetEndpoint("http")}/mcp"))
-    .WithEnvironment("Assistant__GatewayKey", McpGatewayKey)
+    .WithEnvironment("Assistant__GatewayKey", mcpGatewayKey)
     .WaitFor(mcpGateway)
     .WithHttpHealthCheck("/health");
 
@@ -241,7 +260,7 @@ foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildre
 }
 identityApi
     .WithEnvironment("Admin__Account__Username", "admin")
-    .WithEnvironment("Admin__Account__Password", AppAdminPassword);
+    .WithEnvironment("Admin__Account__Password", appAdminPassword);
 
 identityApi
     .WithReference(trackingApi)
@@ -375,7 +394,7 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
         // this config, so Open WebUI reads it from here on every start instead of keeping its first copy in its database.
         // Keep the closing braces apart: ReferenceExpression turns "}}" in its literal text into "}".
         .WithEnvironment("TOOL_SERVER_CONNECTIONS", ReferenceExpression.Create(
-            $"[{{\"type\":\"mcp\",\"url\":\"{mcpGateway.GetEndpoint("http")}/mcp\",\"path\":\"\",\"auth_type\":\"bearer\",\"key\":\"{McpGatewayKey}\",\"config\":{{\"enable\":true}},\"info\":{{\"id\":\"tvtracker\",\"name\":\"{appName}\",\"description\":\"Shows, insights, discovery lists and premieres from the catalog and Analytics\"}} }}]"))
+            $"[{{\"type\":\"mcp\",\"url\":\"{mcpGateway.GetEndpoint("http")}/mcp\",\"path\":\"\",\"auth_type\":\"bearer\",\"key\":\"{mcpGatewayKey}\",\"config\":{{\"enable\":true}},\"info\":{{\"id\":\"tvtracker\",\"name\":\"{appName}\",\"description\":\"Shows, insights, discovery lists and premieres from the catalog and Analytics\"}} }}]"))
         .WithEnvironment("ENABLE_PERSISTENT_CONFIG", "False")
         .WithReference(mcpGateway).WaitFor(mcpGateway)
         .WithHttpHealthCheck("/health")
@@ -426,7 +445,7 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
     .WithEnvironment("Identity__Url", keycloakUrl)
-    .WithEnvironment("Identity__WebClientSecret", WebClientSecret)
+    .WithEnvironment("Identity__WebClientSecret", webClientSecret)
     .WaitFor(keycloak)
     .WithReference(identityApi)
     .WithReference(catalogApi).WaitFor(catalogApi)

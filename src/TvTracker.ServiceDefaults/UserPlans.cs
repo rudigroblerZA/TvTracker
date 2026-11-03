@@ -24,7 +24,7 @@ public interface IUserPlans
 /// <summary>
 /// The shared part of every plan source: the <see cref="FeatureFlags.Plans"/> switch, signed-out callers, and a short cache
 /// per user; a service supplies the lookup (<see cref="LookUpAsync"/>). Registered scoped, since OpenFeature's
-/// <see cref="IFeatureClient"/> is (as a singleton, every service that registered one failed to start); the cache is the
+/// <see cref="CachedFlags"/> and OpenFeature's <see cref="IFeatureClient"/> are (as a singleton, every service that registered one failed to start); the cache is the
 /// process-wide <see cref="IMemoryCache"/>.
 /// <list type="bullet">
 /// <item><b>From the service's own copy where it has one</b> (Tracking, Analytics, Social, Recommendations keep
@@ -36,7 +36,7 @@ public interface IUserPlans
 /// who pays because a service is down.</item>
 /// </list>
 /// </summary>
-public abstract class UserPlansBase(IFeatureClient flags, IMemoryCache cache) : IUserPlans
+public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUserPlans
 {
     /// <summary>
     /// How long a user's plan is kept: a change reaches the service within this time.
@@ -46,8 +46,7 @@ public abstract class UserPlansBase(IFeatureClient flags, IMemoryCache cache) : 
     public async Task<string?> PlanAsync(HttpContext context)
     {
         var user = context.User;
-        if (!await flags.GetBooleanValueAsync(FeatureFlags.Plans, FeatureFlags.DefaultValue, FeatureFlags.ContextFor(user),
-                cancellationToken: context.RequestAborted))
+        if (!await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), context.RequestAborted))
         {
             return null;
         }
@@ -80,7 +79,7 @@ public abstract class UserPlansBase(IFeatureClient flags, IMemoryCache cache) : 
 /// Asks Identity (<c>GET /api/v1/me/plan</c>, with the caller's own token), for services that keep no copy of plans.
 /// Identity answers with the plan the user gets, so a family member reads "family". Kept a minute per user.
 /// </summary>
-public sealed class IdentityUserPlans(IHttpClientFactory http, IFeatureClient flags, IMemoryCache cache, ILogger<IdentityUserPlans> logger)
+public sealed class IdentityUserPlans(IHttpClientFactory http, CachedFlags flags, IMemoryCache cache, ILogger<IdentityUserPlans> logger)
     : UserPlansBase(flags, cache)
 {
     public const string ClientName = "identity-plans";
