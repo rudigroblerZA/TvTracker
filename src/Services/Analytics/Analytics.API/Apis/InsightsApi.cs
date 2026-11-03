@@ -77,6 +77,7 @@ public static class InsightsApi
         api.MapNetworkReportsApi();
         api.MapYearInTvApi();
         api.MapWaitingRoomApi();
+        api.MapWhileYouWaitApi();
         api.MapServicesApi();
         api.MapExportApi();
         api.MapTvLifeApi();

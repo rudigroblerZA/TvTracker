@@ -691,7 +691,7 @@ isn't signed in, it and the stats endpoints are only mapped in Development.
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, While you wait, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -736,6 +736,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
+| `while-you-wait` | `/while-you-wait`, its Up Next and waiting-room links, and its endpoint (Plus and Family) |
 
 - **Turning one off:** set its `defaultVariant` to `"off"`.
   - The UI then hides its links and sections, and its pages say "Not available".
@@ -1216,6 +1217,15 @@ How events flow:
     back first: the next episode or season premiere when it's dated, else the forecast from the show's own past waits
     (with "overdue" past its range), with how often comparable shows came back as a weak signal.
     - **API:** `GET /api/v1/me/waiting` on Analytics.API, signed in.
+  - **While you wait** (`/while-you-wait`, linked from Up Next and the waiting room; `while-you-wait` flag, Plus and
+    Family): for each show you're caught up on that's back between a week and six months from now (dated, or a
+    forecast's likely month), up to three finished shows you haven't started that you can watch from start to end before
+    it returns, at your own pace over the last 8 weeks (5 hours a week assumed when you've watched nothing lately). Picks
+    are chosen for how alike they are to the show you're waiting for, by genres and show DNA, then by how much they're
+    worth your time; each says when you'd finish and how many days you'd have to spare, and a show picked for one wait
+    isn't offered for the next. Shows that fizzle out at the end aren't picked, and a pick that isn't like the show ("a
+    change of pace") has to be worth 7.5 or more.
+    - **API:** `GET /api/v1/me/while-you-wait` on Analytics.API, signed in.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.
     - **Shows you love:** rated 4 or 5 stars, or followed or watched and not rated lower.

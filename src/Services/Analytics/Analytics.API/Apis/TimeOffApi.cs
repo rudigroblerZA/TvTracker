@@ -73,9 +73,10 @@ public static class TimeOffApi
     [System.ComponentModel.ImmutableObject(true)]
     public sealed record Shelf(IReadOnlyList<ShelfShow> Shows);
 
+    /// <param name="Dna">The show's DNA traits by key, when its document has them (While you wait compares them).</param>
     [System.ComponentModel.ImmutableObject(true)]
     public sealed record ShelfShow(Guid ShowId, string Title, string? PosterUrl, double? ExternalRating, IReadOnlyList<string> Genres,
-        int Episodes, int Minutes, string? Landing, GetsGoodTurn? Turn, bool Limited);
+        int Episodes, int Minutes, string? Landing, GetsGoodTurn? Turn, bool Limited, IReadOnlyDictionary<string, double>? Dna = null);
 
     public static void MapTimeOffApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/time-off", GetAsync).RequireFeature(FeatureFlags.TimeOff);
@@ -94,7 +95,7 @@ public static class TimeOffApi
         var overrun = Viewer.Overrun(budget);
         // The shelf (every finished show, its running time and its ending) is read once an hour, not per request: it
         // used to mean loading and deserializing several hundred documents for each visit.
-        var shelf = await cache.GetOrCreateAsync("time-off:shelf", async token => await ShelfAsync(db, now, token), ShelfCache, cancellationToken: ct);
+        var shelf = await GetShelfAsync(db, cache, now, ct);
         var started = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => w.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
         var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
 
@@ -116,6 +117,12 @@ public static class TimeOffApi
     }
 
     /// <summary>
+    /// The shelf from the cache, built when it's missing; shared with While you wait.
+    /// </summary>
+    internal static async Task<Shelf> GetShelfAsync(AnalyticsContext db, HybridCache cache, DateTimeOffset now, CancellationToken ct) =>
+        await cache.GetOrCreateAsync("time-off:shelf", async token => await ShelfAsync(db, now, token), ShelfCache, cancellationToken: ct);
+
+    /// <summary>
     /// Every ended show with a running time, and the parts of its document the assessment reads.
     /// </summary>
     private static async Task<Shelf> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
@@ -128,7 +135,8 @@ public static class TimeOffApi
             {
                 var document = insights.GetValueOrDefault(s.ShowId);
                 return new ShelfShow(s.ShowId, s.Title, s.PosterUrl, s.ExternalRating, s.Genres, runs[s.ShowId].Episodes, runs[s.ShowId].Minutes,
-                    document?.Landing?.Verdict, document?.GetsGood?.Turn, document?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true);
+                    document?.Landing?.Verdict, document?.GetsGood?.Turn, document?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true,
+                    document?.Dna?.Traits.ToDictionary(t => t.Key, t => t.Value));
             })
             .ToList());
     }

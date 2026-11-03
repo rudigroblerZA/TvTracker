@@ -817,6 +817,17 @@ public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? 
     int? SeasonNumber, DateOnly? Likely, DateOnly? Earliest, DateOnly? Latest, bool Overdue, double? Renewal, DateTimeOffset? LastAiredUtc);
 
 /// <summary>
+/// While you wait: for each show the user is caught up on with a return in view, finished shows that fit before it.
+/// </summary>
+public record WhileYouWait(int YourMinutesPerWeek, bool PaceAssumed, IReadOnlyList<Wait> Waits);
+
+public record Wait(Guid ShowId, string Title, string? PosterUrl, string Kind, DateOnly BackAt, int? SeasonNumber, int DaysLeft,
+    int BudgetMinutes, IReadOnlyList<WaitPick> Picks);
+
+public record WaitPick(Guid ShowId, string Title, string? PosterUrl, int Episodes, int Minutes, double Value, string? Landing,
+    double Alike, DateOnly FinishesAround, int DaysToSpare, IReadOnlyList<string> Reasons);
+
+/// <summary>
 /// A mixtape: three to five shows, and the shows that fit all of them.
 /// </summary>
 public record Mixtape(IReadOnlyList<ShowSummary> Shows, bool Indexed, IReadOnlyList<string> SharedGenres, IReadOnlyList<MixtapeMatch> Matches,

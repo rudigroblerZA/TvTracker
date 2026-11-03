@@ -74,6 +74,11 @@ public static class FeatureFlags
     public const string YearInTv = "year-in-tv";
     public const string EpisodeDuels = "episode-duels";
     public const string WaitingRoom = "waiting-room";
+
+    /// <summary>
+    /// While you wait: a finished show to watch start to end before each show you're caught up on is back.
+    /// </summary>
+    public const string WhileYouWait = "while-you-wait";
     public const string Mixtape = "mixtape";
     public const string WorthIt = "worth-it";
     public const string Plans = "plans";

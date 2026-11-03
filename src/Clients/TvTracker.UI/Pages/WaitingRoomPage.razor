@@ -8,7 +8,7 @@
 
 <AuthorizeView>
     <Authorized>
-        <p class="muted">Shows you're caught up on, and when each is back: the date when it's set, else a forecast from the show's own past waits.</p>
+        <p class="muted">Shows you're caught up on, and when each is back: the date when it's set, else a forecast from the show's own past waits.<Feature Flag="@FeatureFlags.WhileYouWait"><span>@(" ")<a href="while-you-wait">Something to watch while you wait →</a></span></Feature></p>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (room is null)
