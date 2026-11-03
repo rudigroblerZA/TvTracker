@@ -52,8 +52,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     follow and mark-watched from p50 ~50 ms to ~30 ms at 20 load-test users.
 - **Consuming:** an `IIntegrationEventHandler<T>` starts with `db.HasProcessedAsync(@event, nameof(Handler))`, and
   calls `db.MarkProcessed(...)` before saving. This is the inbox; redeliveries become no-ops.
-- **RabbitMQ:** one queue per service; a failing message is retried once, then dropped (no DLQ yet). Lost-event
-  healing is therefore done by periodic full syncs (tags daily), replays (catalog) or snapshots (user activity).
+- **RabbitMQ:** one queue per service. Periodic full syncs (tags daily), replays (catalog) and snapshots (user activity)
+  still heal what a lost event leaves wrong.
+- **Retries and dead letters** (`RabbitMQEventBus`): a message whose handler throws is acked and republished to a retry
+  queue, `{queue}.retry.1s`, `.10s`, then `.60s`, whose TTL dead-letters it back to that service's queue alone (the
+  default exchange), counting attempts in the `x-tvtracker-attempt` header. After the last it goes to
+  `tvtracker_dead_letters`, one queue for every service, with the queue it came from and the error in headers; a message
+  that can't be deserialized goes there at once.
+  - **Why:** a failing message was requeued once, at once, then dropped, so a database hiccup of a few hundred
+    milliseconds lost the event for good; nothing healed a lost season verdict, deletion step, list share or correction.
+  - **One shared queue:** queue names are the services' application names, which Catalog.API's `/ops` can't list
+    without the management API; one known queue gives the depth, and the origin header is all a replay needs.
+  - **Replay** sends each letter back to its own queue only (so other subscribers don't get it twice), with a fresh
+    attempt count: the `/ops` button (Development) or `POST /api/v1/ops/dead-letters/replay` on Catalog.API (app admins,
+    500 a call).
+  - **Order:** a retried event arrives after later ones; handlers already cope (the inbox, newest-wins copies), since
+    redeliveries were never ordered.
+  - **Tested** against RabbitMQ with two services on one event: a handler failing twice succeeded on its third try; one
+    always failing reached the dead letters after four, and the replay reached only its queue.
 - **User-activity snapshots:** Tracking (`ActivitySnapshotPublisher`) and Ratings (`RatingsSnapshotPublisher`) send
   every user's follows and watches, and ratings, as one event per user, 2 minutes after start and then daily.
   - **Why:** a lost watch or follow left Analytics' copy wrong for good. One user's follow, watch and unwatch from
@@ -1380,6 +1396,26 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Checked in flagd** over OFREP with the rule as written: plan free → off (TARGETING_MATCH), plus or family → on, no plan
   → on (DEFAULT).
 
+## Secrets
+
+- **Aspire secret parameters** (`Secret` in `AppHost.cs`): the Keycloak clients' secrets (`web-client-secret`,
+  `identity-admin-client-secret`, `mcp-client-secret`), the MCP gateway's key (`mcp-gateway-key`), the app admin's
+  password (`app-admin-password`) and Keycloak's console admin (`keycloak-admin-password`). Values come from
+  `Parameters:<name>` (user secrets, environment variables, azd environment secrets).
+  - **Development defaults in run mode only:** running locally, an unset parameter takes the old development value
+    (matching the realm file). A publish carries none of them: the manifest lists each as a required secret input with
+    no value, so a deployment must be given every one.
+- **Into Keycloak on start** (`RealmSecretsSeeder` in Identity.API): Keycloak imports the realm file only once, with
+  its development secrets, so Identity sets each client's secret and the app admin's password from the parameters,
+  signed in as the master realm's admin (Identity's own service account can't manage clients, and its secret is one of
+  those being set). A client already matching is left alone; the admin's password is reset each start, so the AppHost's
+  value is the one that holds.
+  - **Tested:** started with a new MCP client secret and admin password, the old values got 401 and the new ones a
+    token; restarted with the defaults, the development values worked again.
+  - **The console admin is Keycloak's own:** `KC_BOOTSTRAP_ADMIN_*` applies only when Keycloak's volume is created.
+    The sandbox's volume had lost its master `admin`; `kc.sh bootstrap-admin user` (with Keycloak stopped, on the same
+    volume) makes one again.
+
 ## Feature flags
 
 - **OpenFeature, served by flagd:** flags are in `TvTracker.AppHost/Flags/flagd.json`, mounted into the flagd
@@ -1388,8 +1424,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   feature by the same key. Every flag is a boolean.
 - **Services:** `AddFeatureFlags()` registers OpenFeature with the flagd provider (`ConnectionStrings:flagd`).
   `RequireFeature(flag)` on an endpoint answers 404 while the flag is off for the caller.
-  - **Provider cache off:** in OpenFeature.Providers.Flagd 0.8.0, every cached evaluation failed with a
-    NullReferenceException, and so silently returned the default. Uncached, each evaluation is one gRPC call to flagd.
+  - **Provider cache off:** in OpenFeature.Providers.Flagd 0.8.0 (still the latest), every cached evaluation failed
+    with a NullReferenceException, and so silently returned the default.
+  - **Our own cache instead** (`CachedFlags` in ServiceDefaults): answers are kept 5 s per flag and whole evaluation
+    context (targeting key, email, plan), used by `RequireFeature`, the plan sources and the per-request plan checks.
+    A gated request made two gRPC calls to flagd (the `plans` switch, then the feature); now neither on a hit. Turning a
+    flag off applies within 5 s (checked: a flag turned off in overrides.json answered 404 after 5 s). `/ops` lists
+    flags uncached.
 - **UI:** `FeatureFlagStore` evaluates through OpenFeature's `IFeatureClient`, which each host registers.
   - **Web app:** the flagd provider.
   - **Mobile app:** the OFREP provider, through the BFF's `/features` route to flagd's OFREP port. The phone only
@@ -1578,6 +1619,5 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Known gaps
 
 - There's no CI, and only Catalog and Analytics have tests.
-- There's no dead-letter queue.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
-- Development secrets are in `AppHost.cs` and the realm file.
+- The realm file still has the demo user (demo / demo); a shared environment should delete it.

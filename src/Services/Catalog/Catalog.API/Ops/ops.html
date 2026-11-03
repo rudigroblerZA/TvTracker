@@ -130,6 +130,9 @@ function render(data) {
       `${n(ix.current)} current · ${n(ix.stale)} stale · ${n(ix.missing)} missing<br>${esc(ix.model)} · last ${ago(ix.lastEmbeddedAtUtc)}`,
       meter([[ix.current, c.shows, "var(--good)"], [ix.stale, c.shows, "var(--warn)"]])),
     tile("Sync", n(c.showsDueForRefresh), `due for refresh · last sync ${ago(c.lastSyncedAtUtc)}`),
+    data.deadLetters == null ? tile("Dead letters", `<span class="down">—</span>`, "RabbitMQ unavailable")
+      : tile("Dead letters", data.deadLetters ? `<span class="down">${n(data.deadLetters)}</span>` : "0",
+          `events no service could handle after 3 retries${data.deadLetters ? `<br><button type="button" onclick="replayDeadLetters(this)">Replay to their queues</button>` : ""}`),
     a ? tile("Insights", `${n(a.showsWithInsights)}<span class="muted small"> / ${n(a.shows)}</span>`,
           `shows computed · ${ago(a.lastComputedAtUtc)}<br>${n(a.sharedCastLinks)} shared-cast links`,
           meter([[a.showsWithInsights, a.shows, "var(--accent)"]]))
@@ -240,6 +243,19 @@ function render(data) {
     <div class="small num">${n(b.processed)} / ${n(b.total)} · ${n(b.imported)} imported · ${n(b.alreadyInCatalog)} already there · ${n(b.notFound + b.failed)} skipped</div>
     ${b.lastImported ? `<div class="muted small clip">Last: ${esc(b.lastImported)}</div>` : ""}
     ${b.error ? `<div class="down small">${esc(b.error)}</div>` : ""}`;
+}
+
+async function replayDeadLetters(button) {
+  button.disabled = true;
+  try {
+    const response = await fetch("ops/dead-letters/replay", { method: "POST" });
+    if (!response.ok) throw new Error(`${response.status}`);
+    const replayed = await response.json();
+    button.replaceWith(Object.entries(replayed).map(([q, k]) => `${n(k)} to ${esc(q)}`).join(", ") || "nothing to replay");
+  } catch (e) {
+    button.replaceWith(`replay failed (${e.message})`);
+  }
+  refresh();
 }
 
 async function refresh() {
