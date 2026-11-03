@@ -37,7 +37,8 @@ public sealed class RabbitMQEventBusOptions
 /// <list type="bullet">
 /// <item><b>Delayed retries:</b> a message whose handler throws is acked and republished to a retry queue
 /// (<see cref="RabbitMQEventBusOptions.RetryDelays"/>: 1 s, 10 s, 60 s) whose TTL dead-letters it back to this
-/// service's queue alone, counting attempts in <see cref="AttemptHeader"/>. Before, it was requeued once at once and then
+/// service's queue alone, counting attempts in <see cref="AttemptHeader"/>. The original is acked only once the broker
+/// has confirmed the copy (publisher confirms), so nothing is lost between the two. Before, it was requeued once at once and then
 /// dropped, so a database hiccup of a few hundred milliseconds could lose an event for good.</item>
 /// <item><b>Dead letters:</b> after the last retry, or at once when it can't be read, a message goes to
 /// <see cref="DeadLetterQueue"/>, one queue shared by every service, with the queue it came from
@@ -89,6 +90,11 @@ public sealed class RabbitMQEventBus(
 
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private readonly ConcurrentBag<IChannel> _publishChannels = [];
+
+    /// <summary>
+    /// Channels with publisher confirms, for forwarding and replaying: the original is acked only once the copy is stored.
+    /// </summary>
+    private readonly ConcurrentBag<IChannel> _confirmChannels = [];
     private IConnection? _exchangeDeclaredOn;
     private readonly CancellationTokenSource _stopping = new();
     private IConnection? _connection;
@@ -223,6 +229,8 @@ public sealed class RabbitMQEventBus(
         using var activity = ActivitySource.StartActivity($"process {eventName}", ActivityKind.Consumer);
 
         IntegrationEvent? @event = null;
+        Exception? failure = null;
+        string? deadLetterReason = null;
         try
         {
             if (subscriptionInfo.Value.EventTypes.TryGetValue(eventName, out var eventType))
@@ -236,100 +244,167 @@ public sealed class RabbitMQEventBus(
                 if (@event is null)
                 {
                     // Unreadable now means unreadable on every retry.
-                    await ForwardAsync(args, eventName, DeadLetterQueue, attempt, $"Could not deserialize {eventName}");
-                    logger.LogError("Could not deserialize {EventName} {MessageId}; sent to {DeadLetters}", eventName,
-                        args.BasicProperties.MessageId, DeadLetterQueue);
-                    await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
-                    return;
+                    deadLetterReason = $"Could not deserialize {eventName}";
                 }
-
-                await using var scope = serviceProvider.CreateAsyncScope();
-                foreach (var handler in scope.ServiceProvider.GetKeyedServices<IIntegrationEventHandler>(eventType))
+                else
                 {
-                    await handler.HandleAsync(@event, _stopping.Token);
+                    await using var scope = serviceProvider.CreateAsyncScope();
+                    foreach (var handler in scope.ServiceProvider.GetKeyedServices<IIntegrationEventHandler>(eventType))
+                    {
+                        await handler.HandleAsync(@event, _stopping.Token);
+                    }
                 }
             }
             else
             {
                 logger.LogWarning("No subscription for {EventName}", eventName);
             }
-
-            await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
-        }
-        catch (Exception ex) when (!_stopping.IsCancellationRequested)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            var delays = options.Value.RetryDelays;
-            try
-            {
-                if (attempt < delays.Length)
-                {
-                    var next = RetryQueueName(QueueName(), delays[attempt]);
-                    await ForwardAsync(args, eventName, next, attempt + 1, error: null);
-                    logger.LogWarning(ex, "Error handling {EventName} {EventId} (attempt {Attempt}); retrying in {Delay}",
-                        eventName, @event?.Id, attempt + 1, delays[attempt]);
-                }
-                else
-                {
-                    await ForwardAsync(args, eventName, DeadLetterQueue, attempt, ex.ToString());
-                    logger.LogError(ex, "Error handling {EventName} {EventId} after {Attempts} attempts; sent to {DeadLetters}",
-                        eventName, @event?.Id, attempt + 1, DeadLetterQueue);
-                }
-                await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
-            }
-            catch (Exception forwardError)
-            {
-                // Couldn't park it: fall back to RabbitMQ's own redelivery rather than lose it at once.
-                var requeue = !args.Redelivered;
-                logger.LogError(forwardError, "Couldn't forward failed {EventName}; requeue: {Requeue}", eventName, requeue);
-                await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: requeue);
-            }
         }
         catch (Exception) when (_stopping.IsCancellationRequested)
         {
             // Shutting down mid-handler: put it back for the next start, without counting an attempt.
-            await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true);
+            await TrySettleAsync(channel, args, eventName, ack: false, requeue: true);
+            return;
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+        }
+
+        if (failure is null && deadLetterReason is null)
+        {
+            // Outside the handlers' try: an ack that fails (the channel closed) isn't a handler failure. The broker then
+            // redelivers the message, and the inbox makes that a no-op.
+            await TrySettleAsync(channel, args, eventName, ack: true, requeue: false);
+            return;
+        }
+
+        try
+        {
+            var delays = options.Value.RetryDelays;
+            if (failure is not null && attempt < delays.Length)
+            {
+                await ForwardAsync(args, eventName, RetryQueueName(QueueName(), delays[attempt]), attempt + 1, error: null);
+                logger.LogWarning(failure, "Error handling {EventName} {EventId} (attempt {Attempt}); retrying in {Delay}",
+                    eventName, @event?.Id, attempt + 1, delays[attempt]);
+            }
+            else
+            {
+                await ForwardAsync(args, eventName, DeadLetterQueue, attempt, failure?.ToString() ?? deadLetterReason);
+                logger.LogError(failure, "{Reason} {EventName} {MessageId} after {Attempts} attempts; sent to {DeadLetters}",
+                    failure is null ? deadLetterReason : "Error handling", eventName, args.BasicProperties.MessageId, attempt + 1,
+                    DeadLetterQueue);
+            }
+        }
+        catch (Exception forwardError)
+        {
+            // Couldn't park it (the broker didn't confirm the copy): fall back to RabbitMQ's own redelivery rather than
+            // lose it at once.
+            var requeue = !args.Redelivered;
+            logger.LogError(forwardError, "Couldn't forward failed {EventName}; requeue: {Requeue}", eventName, requeue);
+            await TrySettleAsync(channel, args, eventName, ack: false, requeue: requeue);
+            return;
+        }
+        // The broker has confirmed the copy, so the original can go.
+        await TrySettleAsync(channel, args, eventName, ack: true, requeue: false);
+    }
+
+    /// <summary>
+    /// Acks or nacks a delivery; on a closed channel the broker redelivers it anyway, so a failure is only logged.
+    /// </summary>
+    private async Task TrySettleAsync(IChannel channel, BasicDeliverEventArgs args, string eventName, bool ack, bool requeue)
+    {
+        try
+        {
+            if (ack)
+            {
+                await channel.BasicAckAsync(args.DeliveryTag, multiple: false);
+            }
+            else
+            {
+                await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: requeue);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Couldn't {Settle} {EventName}; RabbitMQ will redeliver it", ack ? "ack" : "nack", eventName);
         }
     }
 
     /// <summary>
     /// Republishes a received message to <paramref name="queue"/> through the default exchange (so only that queue gets it),
-    /// with its body, id and type, and the attempt count; a dead letter also gets the queue it came from and the error.
+    /// with the attempt count; a dead letter also gets the queue it came from and the error.
     /// </summary>
-    private async Task ForwardAsync(BasicDeliverEventArgs args, string eventName, string queue, int attempt, string? error)
+    private Task ForwardAsync(BasicDeliverEventArgs args, string eventName, string queue, int attempt, string? error)
     {
-        var headers = args.BasicProperties.Headers is { } existing ? new Dictionary<string, object?>(existing) : [];
-        headers[AttemptHeader] = attempt;
-        if (queue == DeadLetterQueue)
+        var properties = CopyProperties(args.BasicProperties, eventName, headers =>
         {
-            headers[QueueHeader] = QueueName();
-            headers[ErrorHeader] = error is { Length: > MaxErrorLength } ? error[..MaxErrorLength] : error;
-        }
-        var properties = new BasicProperties
-        {
-            DeliveryMode = DeliveryModes.Persistent,
-            MessageId = args.BasicProperties.MessageId,
-            Type = eventName,
-            ContentType = args.BasicProperties.ContentType ?? "application/json",
-            Headers = headers
-        };
-        await PublishRawAsync(queue, properties, args.Body, CancellationToken.None);
+            headers[AttemptHeader] = attempt;
+            if (queue == DeadLetterQueue)
+            {
+                headers[QueueHeader] = QueueName();
+                headers[ErrorHeader] = error is { Length: > MaxErrorLength } ? error[..MaxErrorLength] : error;
+            }
+        });
+        return PublishConfirmedAsync(queue, properties, args.Body, CancellationToken.None);
     }
 
-    private async Task PublishRawAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    /// <summary>
+    /// A persistent copy of a message's properties (id, type, content type, correlation, timestamp and headers), with its
+    /// headers changed by <paramref name="editHeaders"/>. Forwarding and replaying share it, so neither drops a property
+    /// the other keeps.
+    /// </summary>
+    private static BasicProperties CopyProperties(IReadOnlyBasicProperties source, string? type, Action<Dictionary<string, object?>> editHeaders)
+    {
+        var headers = source.Headers is { } existing ? new Dictionary<string, object?>(existing) : [];
+        editHeaders(headers);
+        return new BasicProperties
+        {
+            DeliveryMode = DeliveryModes.Persistent,
+            MessageId = source.MessageId,
+            Type = type ?? source.Type,
+            ContentType = source.ContentType ?? "application/json",
+            CorrelationId = source.CorrelationId,
+            Timestamp = source.Timestamp,
+            Headers = headers
+        };
+    }
+
+    /// <summary>
+    /// Publishes to a queue by name and waits for the broker to confirm it stored the message. Mandatory, so a queue that
+    /// doesn't exist (a renamed service) is an error rather than a silent drop. The original is acked only after this, so
+    /// a failure at the broker (a memory or disk alarm, a closed connection) can't lose the event between the two.
+    /// </summary>
+    private async Task PublishConfirmedAsync(string queue, BasicProperties properties, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
         var connection = await GetConnectionAsync(cancellationToken);
-        var channel = await RentPublishChannelAsync(connection, cancellationToken);
+        if (!_confirmChannels.TryTake(out var channel) || !channel.IsOpen)
+        {
+            if (channel is not null)
+            {
+                await channel.DisposeAsync();
+            }
+            channel = await connection.CreateChannelAsync(
+                new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true), cancellationToken);
+        }
         try
         {
-            await channel.BasicPublishAsync("", queue, mandatory: false, basicProperties: properties, body: body, cancellationToken: cancellationToken);
+            await channel.BasicPublishAsync("", queue, mandatory: true, basicProperties: properties, body: body, cancellationToken: cancellationToken);
         }
         catch
         {
             await channel.DisposeAsync();
             throw;
         }
-        await ReturnPublishChannelAsync(channel);
+        if (channel.IsOpen && _confirmChannels.Count < MaxIdlePublishChannels)
+        {
+            _confirmChannels.Add(channel);
+        }
+        else
+        {
+            await channel.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -351,7 +426,8 @@ public sealed class RabbitMQEventBus(
 
     /// <summary>
     /// Sends up to <paramref name="max"/> dead letters back to the queue each came from, with a fresh attempt count, and
-    /// says how many went to each. A letter without its queue stays where it is.
+    /// says how many went to each. A letter without its queue, or whose queue is gone (the broker returns it), stays in the
+    /// dead letters and is counted under <see cref="KeptKey"/>.
     /// </summary>
     public async Task<IReadOnlyDictionary<string, int>> ReplayDeadLettersAsync(int max, CancellationToken cancellationToken = default)
     {
@@ -381,31 +457,43 @@ public sealed class RabbitMQEventBus(
                 continue;
             }
 
-            var headers = letter.BasicProperties.Headers is { } existing ? new Dictionary<string, object?>(existing) : [];
-            headers.Remove(AttemptHeader);
-            headers.Remove(QueueHeader);
-            headers.Remove(ErrorHeader);
-            var properties = new BasicProperties
+            var properties = CopyProperties(letter.BasicProperties, type: null, headers =>
             {
-                DeliveryMode = DeliveryModes.Persistent,
-                MessageId = letter.BasicProperties.MessageId,
-                Type = letter.BasicProperties.Type,
-                ContentType = letter.BasicProperties.ContentType,
-                Headers = headers
-            };
-            await PublishRawAsync(queue, properties, letter.Body, cancellationToken);
+                headers.Remove(AttemptHeader);
+                headers.Remove(QueueHeader);
+                headers.Remove(ErrorHeader);
+            });
+            try
+            {
+                await PublishConfirmedAsync(queue, properties, letter.Body, cancellationToken);
+            }
+            catch (global::RabbitMQ.Client.Exceptions.PublishException ex)
+            {
+                logger.LogWarning(ex, "Dead letter for {Queue} wasn't accepted (is the queue gone?); kept", queue);
+                kept.Add(letter.DeliveryTag);
+                continue;
+            }
             await channel.BasicAckAsync(letter.DeliveryTag, multiple: false, cancellationToken);
             replayed[queue] = replayed.GetValueOrDefault(queue) + 1;
         }
 
-        // Released only now, so the loop doesn't take the same unroutable letter again.
+        // Released only now, so the loop doesn't take the same letter again.
         foreach (var tag in kept)
         {
             await channel.BasicNackAsync(tag, multiple: false, requeue: true, cancellationToken);
         }
+        if (kept.Count > 0)
+        {
+            replayed[KeptKey] = kept.Count;
+        }
         logger.LogInformation("Replayed dead letters: {Replayed}", replayed);
         return replayed;
     }
+
+    /// <summary>
+    /// In a replay's result: letters left in the dead letters, with no queue to go back to.
+    /// </summary>
+    public const string KeptKey = "(kept)";
 
     internal static string RetryQueueName(string queue, TimeSpan delay) =>
         $"{queue}.retry.{(delay.TotalSeconds >= 1 && delay.TotalSeconds % 1 == 0 ? $"{delay.TotalSeconds:0}s" : $"{delay.TotalMilliseconds:0}ms")}";
@@ -511,7 +599,7 @@ public sealed class RabbitMQEventBus(
     public async ValueTask DisposeAsync()
     {
         _stopping.Dispose();
-        while (_publishChannels.TryTake(out var channel))
+        while (_publishChannels.TryTake(out var channel) || _confirmChannels.TryTake(out channel))
         {
             await channel.DisposeAsync();
         }

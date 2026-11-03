@@ -47,13 +47,48 @@ public sealed class CachedFlags(IFeatureClient client, IMemoryCache cache)
     /// <summary>
     /// The flag and every attribute of the context, sorted, as one string.
     /// </summary>
-    internal static string KeyOf(string flag, EvaluationContext context)
+    public static string KeyOf(string flag, EvaluationContext context)
     {
         var key = new StringBuilder(flag).Append('\u001f').Append(context.TargetingKey);
         foreach (var (name, value) in context.AsDictionary().OrderBy(p => p.Key, StringComparer.Ordinal))
         {
-            key.Append('\u001f').Append(name).Append('=').Append(value.AsString ?? value.AsObject?.ToString());
+            Append(key.Append('\u001f').Append(name).Append('='), value);
         }
         return key.ToString();
+    }
+
+    /// <summary>
+    /// A value written out in full, lists and structures included, with its kind, so two contexts that differ in any
+    /// attribute never share a key (a type name would make every list look the same).
+    /// </summary>
+    private static void Append(StringBuilder key, Value value)
+    {
+        if (value.IsNull) key.Append('n');
+        else if (value.IsBoolean) key.Append('b').Append(value.AsBoolean);
+        else if (value.IsNumber) key.Append('d').Append(value.AsDouble?.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        else if (value.IsString) key.Append('s').Append(value.AsString!.Length).Append(':').Append(value.AsString);
+        else if (value.IsDateTime) key.Append('t').Append(value.AsDateTime?.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        else if (value.IsList)
+        {
+            key.Append('[');
+            foreach (var item in value.AsList!)
+            {
+                Append(key, item);
+                key.Append(',');
+            }
+            key.Append(']');
+        }
+        else if (value.IsStructure)
+        {
+            key.Append('{');
+            foreach (var (name, item) in value.AsStructure!.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                key.Append(name.Length).Append(':').Append(name).Append('=');
+                Append(key, item);
+                key.Append(',');
+            }
+            key.Append('}');
+        }
+        else key.Append('o').Append(value.AsObject);
     }
 }

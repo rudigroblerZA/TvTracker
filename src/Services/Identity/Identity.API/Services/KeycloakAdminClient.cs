@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Identity.API.Services;
 
 /// <summary>
 /// Calls the Keycloak admin API with the "tvtracker-identity-admin" service account
-/// (client credentials; it has the realm-management manage-users role).
+/// (client credentials; it has the realm-management manage-users role), or, for setting the realm's secrets
+/// (<see cref="RealmSecretsSeeder"/>), with a master-realm admin token from <see cref="GetMasterAdminTokenAsync"/>.
 /// </summary>
 public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration configuration, ILogger<KeycloakAdminClient> logger)
 {
@@ -70,6 +72,74 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         }
         created.EnsureSuccessStatusCode();
         return true;
+    }
+
+    /// <summary>
+    /// A token for the master realm's admin (password grant through admin-cli), which can manage clients.
+    /// </summary>
+    public async Task<string> GetMasterAdminTokenAsync(string username, string password, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"{BaseUrl}/realms/master/protocol/openid-connect/token", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["grant_type"] = "password", ["client_id"] = "admin-cli", ["username"] = username, ["password"] = password }),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken))?.AccessToken
+            ?? throw new InvalidOperationException("Keycloak returned no admin token.");
+    }
+
+    /// <summary>
+    /// Sets a confidential client's secret unless it already is that. Null when the realm has no such client, else whether
+    /// it changed.
+    /// </summary>
+    public async Task<bool?> SetClientSecretAsync(string token, string clientId, string secret, CancellationToken cancellationToken)
+    {
+        var clients = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/clients";
+        var found = await SendAsync<JsonArray>(HttpMethod.Get, $"{clients}?clientId={Uri.EscapeDataString(clientId)}", token, null, cancellationToken);
+        if (found?.FirstOrDefault() is not JsonObject client || client["id"]?.GetValue<string>() is not { } id)
+        {
+            return null;
+        }
+        var current = await SendAsync<JsonObject>(HttpMethod.Get, $"{clients}/{id}/client-secret", token, null, cancellationToken);
+        if (current?["value"]?.GetValue<string>() == secret)
+        {
+            return false;
+        }
+        client["secret"] = secret;
+        await SendAsync<JsonObject>(HttpMethod.Put, $"{clients}/{id}", token, client, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Resets a realm user's password. False when there's no such user.
+    /// </summary>
+    public async Task<bool> SetPasswordAsync(string token, string username, string password, CancellationToken cancellationToken)
+    {
+        var users = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/users";
+        var found = await SendAsync<JsonArray>(HttpMethod.Get, $"{users}?username={Uri.EscapeDataString(username)}&exact=true", token, null, cancellationToken);
+        if (found?.FirstOrDefault()?["id"]?.GetValue<string>() is not { } id)
+        {
+            return false;
+        }
+        await SendAsync<JsonObject>(HttpMethod.Put, $"{users}/{id}/reset-password", token,
+            new JsonObject { ["type"] = "password", ["value"] = password, ["temporary"] = false }, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// One admin API call with a bearer token; a GET's JSON body is returned, other methods return null.
+    /// </summary>
+    private async Task<T?> SendAsync<T>(HttpMethod method, string url, string token, JsonNode? body, CancellationToken cancellationToken)
+        where T : JsonNode
+    {
+        using var request = new HttpRequestMessage(method, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return method == HttpMethod.Get ? await response.Content.ReadFromJsonAsync<T>(cancellationToken) : null;
     }
 
     private async Task<string> GetAdminTokenAsync(CancellationToken cancellationToken)

@@ -117,10 +117,19 @@ public static class OpsApi
     {
         app.MapGet("/ops", (Branding brand) => Results.Text(OpsPage.Html(brand), "text/html; charset=utf-8")).ExcludeFromDescription();
         app.MapGet("/ops/stats", GetStatsAsync);
-        // The dashboard's own replay button; unsigned like the page, so Development only with it.
-        app.MapPost("/ops/dead-letters/replay", async (RabbitMQEventBus bus, CancellationToken ct) =>
-            TypedResults.Ok(await bus.ReplayDeadLettersAsync(MaxReplay, ct))).ExcludeFromDescription();
+        // The dashboard's own replay button; unsigned like the page, so Development only with it. It needs the page's
+        // header: a cross-site form or no-cors fetch can't send one, so another page open in the browser can't replay.
+        app.MapPost("/ops/dead-letters/replay", async Task<Results<Ok<IReadOnlyDictionary<string, int>>, BadRequest>> (
+                HttpRequest request, RabbitMQEventBus bus, CancellationToken ct) =>
+            request.Headers[OpsHeader] == "replay"
+                ? TypedResults.Ok(await bus.ReplayDeadLettersAsync(MaxReplay, ct))
+                : TypedResults.BadRequest()).ExcludeFromDescription();
     }
+
+    /// <summary>
+    /// The header the dashboard sends with its replay.
+    /// </summary>
+    private const string OpsHeader = "X-Ops-Action";
 
     /// <summary>
     /// Dead letters sent back per replay call; more than this is a reason to look at why before sending the rest.
@@ -152,22 +161,32 @@ public static class OpsApi
 
         // The other services' sections are optional: if one is down the page shows the rest.
         var analytics = FetchAsync(httpFactory, "analytics", "api/v1/ops/stats", logger, ct);
+        var deadLetters = CountDeadLettersAsync(bus, logger, ct);
         var bulkImport = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/bulk/current", logger, ct);
         var research = FetchAsync(httpFactory, "research", "api/v1/ops/stats", logger, ct);
         var tvmaze = FetchAsync(httpFactory, "catalog-sync", "api/v1/imports/tvmaze", logger, ct);
         var catalog = await GetCatalogStatsAsync(db, model.Id, universes, features, now, ct);
 
-        long? deadLetters = null;
+        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research, await tvmaze, await deadLetters);
+    }
+
+    /// <summary>
+    /// The dead-letter depth, started with the other sections and given 2 s: with RabbitMQ down, connecting would
+    /// otherwise hold the bus's connection lock (and the crossover publishes behind it) for the whole connect timeout.
+    /// </summary>
+    private static async Task<long?> CountDeadLettersAsync(RabbitMQEventBus bus, ILogger logger, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            deadLetters = await bus.DeadLetterCountAsync(ct);
+            return await bus.DeadLetterCountAsync(timeout.Token);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             logger.LogDebug(ex, "Couldn't count dead letters");
+            return null;
         }
-
-        return new OpsStats(now.UtcDateTime, catalog, await analytics, await bulkImport, await research, await tvmaze, deadLetters);
     }
 
     private static async Task<CatalogOpsStats> GetCatalogStatsAsync(
