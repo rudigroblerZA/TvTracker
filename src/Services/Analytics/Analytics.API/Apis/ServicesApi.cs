@@ -3,7 +3,6 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
-using OpenFeature;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 

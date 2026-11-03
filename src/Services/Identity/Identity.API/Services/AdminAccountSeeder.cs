@@ -1,9 +1,10 @@
 namespace Identity.API.Services;
 
 /// <summary>
-/// Makes sure the app's admin account (<c>Admin:Account</c>: username and password, set by the AppHost in development)
-/// exists in Keycloak. The realm file has it too, but Keycloak imports the realm only on its first start, so a realm
-/// made before the account was added gets it here. Its username is also in <c>Admin:Users</c>, which is what makes it
+/// Makes sure the app's admin account (<c>Admin:Account</c>: username and password, the AppHost's <c>app-admin-password</c>)
+/// exists in Keycloak with that password. The realm file has it too, but Keycloak imports the realm only on its first
+/// start, so a realm made before the account was added gets it here, and an existing account's password is reset to the
+/// configured one each start (the realm file's is the development value). Its username is also in <c>Admin:Users</c>, which is what makes it
 /// an admin of the app.
 /// </summary>
 public sealed class AdminAccountSeeder(KeycloakAdminClient keycloak, IConfiguration config, ILogger<AdminAccountSeeder> logger)

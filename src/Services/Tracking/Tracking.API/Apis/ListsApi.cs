@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using OpenFeature;
 using Tracking.API.Data;
 using TvTracker;
 using TvTracker.IntegrationEvents;

@@ -1412,10 +1412,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     (matching the realm file). A publish carries none of them: the manifest lists each as a required secret input with
     no value, so a deployment must be given every one.
 - **Into Keycloak on start** (`RealmSecretsSeeder` in Identity.API): Keycloak imports the realm file only once, with
-  its development secrets, so Identity sets each client's secret and the app admin's password from the parameters,
-  signed in as the master realm's admin (Identity's own service account can't manage clients, and its secret is one of
-  those being set). A client already matching is left alone; the admin's password is reset each start, so the AppHost's
-  value is the one that holds.
+  its development secrets, so Identity sets each client's secret from the parameters, signed in as the master realm's
+  admin (Identity's own service account can't manage clients, and its secret is one of those being set). A client already
+  matching is left alone. The app admin's password is `AdminAccountSeeder`'s: it creates the account, or resets an
+  existing one's password each start, with Identity's own service account, so the AppHost's value is the one that holds.
   - **Tested:** started with a new MCP client secret and admin password, the old values got 401 and the new ones a
     token; restarted with the defaults, the development values worked again.
   - **The console admin is Keycloak's own:** `KC_BOOTSTRAP_ADMIN_*` applies only when Keycloak's volume is created.

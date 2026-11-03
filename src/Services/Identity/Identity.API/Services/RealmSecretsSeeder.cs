@@ -1,8 +1,8 @@
 namespace Identity.API.Services;
 
 /// <summary>
-/// Puts the AppHost's secrets into Keycloak's realm on every start: each confidential client's secret
-/// (<c>Keycloak:ClientSecrets:{clientId}</c>) and the app admin's password (<c>Admin:Account</c>).
+/// Puts the AppHost's client secrets (<c>Keycloak:ClientSecrets:{clientId}</c>) into Keycloak's realm on every start. The
+/// app admin's password is <see cref="AdminAccountSeeder"/>'s, which resets it each start.
 /// <list type="bullet">
 /// <item><b>Why:</b> the realm file carries the development values and Keycloak imports it only on its first start, so a
 /// deployment's realm would otherwise keep secrets anyone can read in the repository. With this, the AppHost's secret
@@ -11,7 +11,7 @@ namespace Identity.API.Services;
 /// creates its client: Identity's own service account can manage users but not clients, and its secret is one of those
 /// being set.</item>
 /// <item><b>Idempotent:</b> a client whose secret already matches is left alone, so in development (values equal to the
-/// realm file's) nothing changes. The admin's password is reset each start, so the AppHost's value is the one that holds.</item>
+/// realm file's) nothing changes.</item>
 /// <item><b>Retried</b> every 30 s on any failure, 20 times (Keycloak still starting, a timeout, an error page); after that
 /// an error is logged, since every service using a changed secret gets 401 from Keycloak until Identity restarts.</item>
 /// </list>
@@ -47,11 +47,6 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
                             logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
                             break;
                     }
-                }
-                if (config["Admin:Account:Username"] is { Length: > 0 } username && config["Admin:Account:Password"] is { Length: > 0 } password)
-                {
-                    // No such user yet: AdminAccountSeeder creates it, with this password.
-                    await keycloak.SetPasswordAsync(token, username, password, stoppingToken);
                 }
                 return;
             }
