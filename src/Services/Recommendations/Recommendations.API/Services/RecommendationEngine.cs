@@ -234,7 +234,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             .ToListAsync(ct);
     }
 
-    private static double Weight(UserShowSignal s)
+    internal static double Weight(UserShowSignal s)
     {
         var weight = (s.Followed ? 1.0 : 0) + Math.Min(s.EpisodesWatched, 20) / 10.0;
         if (s.Rating is { } rating)
@@ -249,12 +249,12 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     /// <param name="DnaLed">The DNAs are close and share distinctive traits, so they make the better reason.</param>
     /// <param name="SharedTraits">Distinctive traits both shows have, strongest first ("drops all at once, big finales").</param>
     /// <param name="SharedNanogenre">The most specific nanogenre both shows are in ("Sports comedy"), the plainest reason there is.</param>
-    private sealed record ShowMatch(double Score, bool DnaLed, string? SharedTraits, string? SharedNanogenre = null);
+    internal sealed record ShowMatch(double Score, bool DnaLed, string? SharedTraits, string? SharedNanogenre = null);
 
     /// <summary>
     /// A show's DNA and nanogenres, by show.
     /// </summary>
-    private sealed record Extras(Dictionary<Guid, Dictionary<string, double>> Dna, Dictionary<Guid, List<string>> Nanogenres);
+    internal sealed record Extras(Dictionary<Guid, Dictionary<string, double>> Dna, Dictionary<Guid, List<string>> Nanogenres);
 
     /// <summary>
     /// Added to the content score for shared nanogenres (scaled by their overlap): a nanogenre is a whole group of shows
@@ -286,7 +286,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
     private const double DnaFloor = 0.65;
     private const double DnaCeiling = 0.95;
 
-    private static ShowMatch Match(ShowFeatures a, ShowFeatures b, Extras extras)
+    internal static ShowMatch Match(ShowFeatures a, ShowFeatures b, Extras extras)
     {
         var nanogenresA = extras.Nanogenres.GetValueOrDefault(a.ShowId) ?? [];
         var nanogenresB = extras.Nanogenres.GetValueOrDefault(b.ShowId) ?? [];
@@ -351,7 +351,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             await db.Nanogenres.AsNoTracking().Where(n => ids.Contains(n.ShowId)).ToDictionaryAsync(n => n.ShowId, n => n.Names, ct));
     }
 
-    private static double Similarity(ShowFeatures a, ShowFeatures b)
+    internal static double Similarity(ShowFeatures a, ShowFeatures b)
     {
         var providerRank = a.SimilarShowIds.IndexOf(b.ShowId);
         var providerScore = providerRank < 0 ? 0 : 1.0 - providerRank * 0.1;
@@ -362,7 +362,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
             + 0.1 * Jaccard(a.CastNames, b.CastNames);
     }
 
-    private static string ReasonFor(ShowFeatures target, ShowFeatures candidate)
+    internal static string ReasonFor(ShowFeatures target, ShowFeatures candidate)
     {
         if (target.SimilarShowIds.Contains(candidate.ShowId))
         {
@@ -373,7 +373,7 @@ public sealed class RecommendationEngine(RecommendationsContext db)
         return shared.Count > 0 ? $"Also {string.Join(" and ", shared.Take(2)).ToLowerInvariant()}" : "Similar themes";
     }
 
-    private static double Jaccard(IReadOnlyCollection<string> a, IReadOnlyCollection<string> b)
+    internal static double Jaccard(IReadOnlyCollection<string> a, IReadOnlyCollection<string> b)
     {
         if (a.Count == 0 || b.Count == 0)
         {

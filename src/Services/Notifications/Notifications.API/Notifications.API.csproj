@@ -21,4 +21,8 @@
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Notifications.UnitTests" />
+  </ItemGroup>
+
 </Project>
