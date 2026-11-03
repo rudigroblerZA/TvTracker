@@ -47,7 +47,7 @@ properties:
     ########################################
     ### Install CLIs, SDKs & Tools
     ########################################
-    ### Install .NET 10 SDK (global.json pins 10.0.100, rolling forward within 10.0)
+    ### Install .NET 10 SDK (global.json asks for 10.0.100 or any later 10.0 feature band, rollForward latestFeature)
     ### -------------------------------------
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: dotnetsdk
