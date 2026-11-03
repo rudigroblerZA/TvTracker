@@ -27,7 +27,34 @@ public class WhileYouWaitTests
         var likely = kind == "forecast" ? back : (DateOnly?)null;
         var show = new WaitingShowDto(Guid.NewGuid(), "Severance", null, null, kind, at, 3, likely, null, null, overdue, null, null);
 
-        Assert.Equal(inView, WhileYouWait.Awaited(show, Today) is not null);
+        Assert.Equal(inView, WhileYouWait.Awaited(show, Today, TimeZoneInfo.Utc) is not null);
+    }
+
+    [Fact]
+    public void A_premiere_is_dated_in_the_viewers_calendar()
+    {
+        // Sunday 21:00 in New York is 02:00 UTC on Monday; the viewer sees Sunday.
+        var newYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        var show = new WaitingShowDto(Guid.NewGuid(), "x", null, null, "season", new DateTimeOffset(2026, 11, 16, 2, 0, 0, TimeSpan.Zero), 2,
+            null, null, null, false, null, null);
+
+        var wait = WhileYouWait.Awaited(show, Today, newYork);
+
+        Assert.Equal(new DateOnly(2026, 11, 15), wait!.BackAt);
+    }
+
+    [Fact]
+    public void A_pick_that_fills_the_budget_still_finishes_in_time()
+    {
+        // 10 days at 100 minutes a week is 142.86 minutes: a 143-minute show would finish a day late, so the budget is 142.
+        var waits = new List<WhileYouWait.Wait> { new(Guid.NewGuid(), "x", null, "season", Today.AddDays(10), 2) };
+        var candidates = new List<TimeOffApi.Candidate> { Candidate("Short", 143, ["Drama"], null, 8.5), Candidate("Shorter", 140, ["Drama"], null, 8.5) };
+
+        var plan = WhileYouWait.Plan(waits, candidates, pace: 100, Today, _ => ["Drama"], _ => null);
+
+        Assert.Equal(142, plan[0].BudgetMinutes);
+        var pick = Assert.Single(plan[0].Picks);
+        Assert.Equal(("Shorter", 0), (pick.Title, pick.DaysToSpare));
     }
 
     [Fact]
@@ -41,7 +68,7 @@ public class WhileYouWaitTests
             new(silo, "Silo", null, "season", Today.AddDays(56), 3)           // 8 weeks = 80 h
         };
         var mystery = Dna((DnaTraits.Release, 0.0), (DnaTraits.Acclaim, 0.9), (DnaTraits.EpisodeLength, 1.0), (DnaTraits.SeasonSize, 0.2), (DnaTraits.Finales, 0.9));
-        var candidates = new List<WhileYouWait.Candidate>
+        var candidates = new List<TimeOffApi.Candidate>
         {
             Candidate("Dark", 26 * 60, ["Drama", "Mystery", "Science-Fiction"], mystery, 8.7),            // 26 h, alike, fits the first
             Candidate("Counterpart", 20 * 60, ["Drama", "Science-Fiction", "Thriller"], mystery, 8.1),   // 20 h, alike, fits the first
@@ -52,6 +79,9 @@ public class WhileYouWaitTests
 
         var plan = WhileYouWait.Plan(waits, candidates, pace: 600, Today,
             _ => ["Drama", "Mystery", "Science-Fiction", "Thriller"], _ => mystery);
+
+        // The taste line would repeat the genres Alike named, so only Alike's line shows; the rating is the pill.
+        Assert.DoesNotContain(plan[0].Picks[0].Reasons, r => r.StartsWith("Your kind of show") || r.StartsWith("Rated"));
 
         Assert.Equal(["Severance", "Silo"], plan.Select(w => w.Title));
         Assert.Equal(2400, plan[0].BudgetMinutes);
@@ -72,17 +102,18 @@ public class WhileYouWaitTests
     {
         var candidate = Candidate("x", 600, ["Drama", "Crime"], null, 8).Show;
 
-        var (alike, reasons) = WhileYouWait.Alike(["Drama", "Crime"], null, candidate);
+        var likeness = WhileYouWait.Alike(["Drama", "Crime"], null, candidate);
 
-        Assert.Equal(1, alike);
-        Assert.Equal(["Also drama, crime"], reasons);
+        Assert.Equal(1, likeness.Alike);
+        Assert.Equal(["Also drama, crime"], likeness.Reasons);
+        Assert.True(likeness.NamedGenres);
     }
 
     private static IReadOnlyDictionary<string, double> Dna(params (string Key, double Value)[] traits) => traits.ToDictionary(t => t.Key, t => t.Value);
 
-    private static WhileYouWait.Candidate Candidate(string title, int minutes, string[] genres, IReadOnlyDictionary<string, double>? dna, double rating)
+    private static TimeOffApi.Candidate Candidate(string title, int minutes, string[] genres, IReadOnlyDictionary<string, double>? dna, double rating)
     {
         var show = new TimeOffApi.ShelfShow(Guid.NewGuid(), title, null, rating, genres, minutes / 50, minutes, null, null, false, dna);
-        return new WhileYouWait.Candidate(show, ShowValue.Assess(rating, genres, null, null, false, []));
+        return new TimeOffApi.Candidate(show, ShowValue.Assess(rating, genres, null, null, false, ["Drama", "Mystery"]));
     }
 }

@@ -120,16 +120,25 @@ public static class CatchUpApi
     /// Minutes a week the user has watched lately, across all their shows (each episode at its runtime, each day capped
     /// at <see cref="MaxMinutesPerDay"/>).
     /// </summary>
-    internal static async Task<int> PaceAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
+    internal static async Task<int> PaceAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct) =>
+        (await PaceDetailsAsync(db, userId, now, ct)).MinutesPerWeek;
+
+    /// <param name="Watches">The marks the pace rests on; a pace of 0 with watches means episodes without running times.</param>
+    internal sealed record Pace(int MinutesPerWeek, int Watches);
+
+    /// <summary>
+    /// <see cref="PaceAsync"/> with the number of watches behind it, for callers that say why a pace is missing.
+    /// </summary>
+    internal static async Task<Pace> PaceDetailsAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
     {
         var since = now.UtcDateTime.AddDays(-7 * PaceWeeks);
         var days = await db.Watches.AsNoTracking()
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= since)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.WatchedAtUtc.Date, Minutes = e.RuntimeMinutes ?? 0 })
             .GroupBy(x => x.Date)
-            .Select(g => g.Sum(x => x.Minutes))
+            .Select(g => new { Minutes = g.Sum(x => x.Minutes), Count = g.Count() })
             .ToListAsync(ct);
-        return days.Sum(m => Math.Min(m, MaxMinutesPerDay)) / PaceWeeks;
+        return new Pace(days.Sum(d => Math.Min(d.Minutes, MaxMinutesPerDay)) / PaceWeeks, days.Sum(d => d.Count));
     }
 
     private static CatchUpDto? Build(ShowLoad load, NextPremiere? next, int pace, bool preferCut, DateTimeOffset now)

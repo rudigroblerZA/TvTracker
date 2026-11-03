@@ -32,7 +32,11 @@ internal static class ShowValue
 
     /// <param name="Landing">The <see cref="LandingVerdicts"/> verdict, for ended shows that have one.</param>
     /// <param name="SlowStart">Where a slow start turns, when it's <see cref="SlowStartMinutes"/> or more in.</param>
-    internal sealed record Assessment(double Value, IReadOnlyList<string> Reasons, string? Landing, GetsGoodTurn? SlowStart, bool Limited);
+    /// <param name="RatingReason">The "Rated 8.2" line in <paramref name="Reasons"/>, when there is one, so a caller showing the
+    /// rating another way can leave it out without matching its text.</param>
+    /// <param name="TasteReason">The "Your kind of show: …" line, likewise.</param>
+    internal sealed record Assessment(double Value, IReadOnlyList<string> Reasons, string? Landing, GetsGoodTurn? SlowStart, bool Limited,
+        string? RatingReason = null, string? TasteReason = null);
 
     /// <summary>
     /// Genres of the shows the user liked: rated 4 or 5 stars, or watched at least <see cref="FinishedShare"/> of. With
@@ -70,9 +74,12 @@ internal static class ShowValue
     {
         var reasons = new List<string>();
         var value = externalRating ?? UnratedValue;
+        string? ratingReason = null;
+        string? tasteReason = null;
         if (externalRating is { } rating)
         {
-            reasons.Add($"Rated {rating:0.0}");
+            ratingReason = $"Rated {rating:0.0}";
+            reasons.Add(ratingReason);
         }
 
         if (liked.Count > 0 && genres.Count > 0)
@@ -81,7 +88,8 @@ internal static class ShowValue
             value += TasteWeight * ((double)shared.Count / genres.Count - 0.5);
             if (shared.Count > 0)
             {
-                reasons.Add($"Your kind of show: {string.Join(", ", shared)}");
+                tasteReason = $"Your kind of show: {string.Join(", ", shared)}";
+                reasons.Add(tasteReason);
             }
         }
 
@@ -112,7 +120,7 @@ internal static class ShowValue
             reasons.Add($"Slow start: gets good at S{slowStart.SeasonNumber:00}E{slowStart.EpisodeNumber:00}, {Hours(slowStart.MinutesBefore)} in");
         }
 
-        return new Assessment(Math.Round(value, 2), reasons, landing, slowStart, limited);
+        return new Assessment(Math.Round(value, 2), reasons, landing, slowStart, limited, ratingReason, tasteReason);
     }
 
     /// <summary>

@@ -93,27 +93,42 @@ public static class TimeOffApi
         var now = time.GetUtcNow();
         var budget = hours * 60;
         var overrun = Viewer.Overrun(budget);
-        // The shelf (every finished show, its running time and its ending) is read once an hour, not per request: it
-        // used to mean loading and deserializing several hundred documents for each visit.
-        var shelf = await GetShelfAsync(db, cache, now, ct);
-        var started = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => w.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
-        var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
-
-        var candidates = shelf.Shows
-            .Where(s => !started.Contains(s.ShowId) && s.Minutes >= MinMinutes && s.Minutes <= budget + overrun)
-            .Select(s =>
-            {
-                var assessment = ShowValue.Assess(s.ExternalRating, s.Genres, s.Landing, s.Turn, s.Limited, liked);
-                return new TimeOffShowDto(s.ShowId, s.Title, s.PosterUrl, s.Episodes, s.Minutes, assessment.Value,
-                    assessment.Landing, assessment.Limited, assessment.Reasons);
-            })
-            .Where(c => c.Value >= MinValue && c.Landing is not LandingVerdicts.Fizzles)
+        var candidates = (await CandidatesAsync(db, cache, userId, now, ct))
+            .Where(c => c.Show.Minutes <= budget + overrun && c.Assessment.Value >= MinValue)
+            .Select(c => new TimeOffShowDto(c.Show.ShowId, c.Show.Title, c.Show.PosterUrl, c.Show.Episodes, c.Show.Minutes, c.Assessment.Value,
+                c.Assessment.Landing, c.Assessment.Limited, c.Assessment.Reasons))
             .OrderByDescending(c => c.Value)
             .ThenByDescending(c => c.Minutes)
             .ToList();
 
         var fits = candidates.Where(c => c.Minutes >= budget * MinFill).Take(MaxFits).ToList();
         return TypedResults.Ok(new TimeOffDto(budget, fits, Mix(candidates.Take(MixCandidates).ToList(), budget + overrun, fits)));
+    }
+
+    /// <summary>
+    /// A finished show the caller hasn't started, with how much it's worth to them.
+    /// </summary>
+    internal sealed record Candidate(ShelfShow Show, ShowValue.Assessment Assessment);
+
+    /// <summary>
+    /// The finished shows worth offering the caller, which Fits your time off and While you wait share: on the shelf, not
+    /// started (<paramref name="started"/> when the caller already knows, else from the watches), at least
+    /// <see cref="MinMinutes"/> long, assessed against the caller's liked genres, and not fizzling out at the end. Each
+    /// caller applies its own length and value cut.
+    /// </summary>
+    internal static async Task<List<Candidate>> CandidatesAsync(AnalyticsContext db, HybridCache cache, string userId, DateTimeOffset now,
+        CancellationToken ct, IReadOnlySet<Guid>? started = null)
+    {
+        // The shelf (every finished show, its running time and its ending) is read once an hour, not per request: it
+        // used to mean loading and deserializing several hundred documents for each visit.
+        var shelf = await GetShelfAsync(db, cache, now, ct);
+        started ??= (await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => w.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
+        var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
+        return shelf.Shows
+            .Where(s => !started.Contains(s.ShowId) && s.Minutes >= MinMinutes)
+            .Select(s => new Candidate(s, ShowValue.Assess(s.ExternalRating, s.Genres, s.Landing, s.Turn, s.Limited, liked)))
+            .Where(c => c.Assessment.Landing is not LandingVerdicts.Fizzles)
+            .ToList();
     }
 
     /// <summary>
