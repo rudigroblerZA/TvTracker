@@ -435,7 +435,7 @@
     "ask": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Ask the app: questions about shows answered by the local model with the app's MCP tools (signed in).", "name": "Ask the app", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
