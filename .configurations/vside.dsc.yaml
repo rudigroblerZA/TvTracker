@@ -47,15 +47,14 @@ properties:
     ########################################
     ### Install CLIs, SDKs & Tools
     ########################################
-    ### Install DotNET SDK Preview
+    ### Install .NET 10 SDK (global.json pins 10.0.100, rolling forward within 10.0)
     ### -------------------------------------
     - resource: Microsoft.WinGet.DSC/WinGetPackage
       id: dotnetsdk
       directives:
-        description: Install DotNET SDK Preview
-        allowPrerelease: true
+        description: Install .NET 10 SDK
       settings:
-        id: Microsoft.DotNet.SDK.Preview
+        id: Microsoft.DotNet.SDK.10
     ### Install Azure CLI
     ### -------------------------------------
     - resource: Microsoft.WinGet.DSC/WinGetPackage
