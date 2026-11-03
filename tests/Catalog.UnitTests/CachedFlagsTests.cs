@@ -53,6 +53,16 @@ public class CachedFlagsTests
     }
 
     [Fact]
+    public void Contexts_differing_only_in_a_list_get_different_keys()
+    {
+        static EvaluationContext With(params string[] groups) => EvaluationContext.Builder()
+            .SetTargetingKey("u").Set("groups", new Value(groups.Select(g => new Value(g)).ToList())).Build();
+
+        Assert.NotEqual(CachedFlags.KeyOf("ask", With("a")), CachedFlags.KeyOf("ask", With("b")));
+        Assert.Equal(CachedFlags.KeyOf("ask", With("a", "b")), CachedFlags.KeyOf("ask", With("a", "b")));
+    }
+
+    [Fact]
     public async Task An_unknown_flag_fails_open()
     {
         var (flags, _) = await BuildAsync([]);

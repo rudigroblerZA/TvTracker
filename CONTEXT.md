@@ -59,17 +59,23 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   default exchange), counting attempts in the `x-tvtracker-attempt` header. After the last it goes to
   `tvtracker_dead_letters`, one queue for every service, with the queue it came from and the error in headers; a message
   that can't be deserialized goes there at once.
+  - **Confirmed before acked:** forwards and replays go through channels with publisher confirms, mandatory, and the
+    original is acked only once the broker has stored the copy; a copy that isn't confirmed leaves the original to
+    RabbitMQ's redelivery. An ack that fails after the handlers ran is logged, not treated as a handler failure (the
+    broker redelivers, and the inbox makes that a no-op).
   - **Why:** a failing message was requeued once, at once, then dropped, so a database hiccup of a few hundred
     milliseconds lost the event for good; nothing healed a lost season verdict, deletion step, list share or correction.
   - **One shared queue:** queue names are the services' application names, which Catalog.API's `/ops` can't list
     without the management API; one known queue gives the depth, and the origin header is all a replay needs.
   - **Replay** sends each letter back to its own queue only (so other subscribers don't get it twice), with a fresh
     attempt count: the `/ops` button (Development) or `POST /api/v1/ops/dead-letters/replay` on Catalog.API (app admins,
-    500 a call).
+    500 a call). A letter whose queue is gone (a renamed service) is returned by the broker and kept, counted as
+    `(kept)`. The button's endpoint needs an `X-Ops-Action` header, which a cross-site form or no-cors fetch can't send.
   - **Order:** a retried event arrives after later ones; handlers already cope (the inbox, newest-wins copies), since
     redeliveries were never ordered.
   - **Tested** against RabbitMQ with two services on one event: a handler failing twice succeeded on its third try; one
-    always failing reached the dead letters after four, and the replay reached only its queue.
+    always failing reached the dead letters after four, and the replay reached only its queue; with that queue deleted, a
+    replay kept the letter.
 - **User-activity snapshots:** Tracking (`ActivitySnapshotPublisher`) and Ratings (`RatingsSnapshotPublisher`) send
   every user's follows and watches, and ratings, as one event per user, 2 minutes after start and then daily.
   - **Why:** a lost watch or follow left Analytics' copy wrong for good. One user's follow, watch and unwatch from

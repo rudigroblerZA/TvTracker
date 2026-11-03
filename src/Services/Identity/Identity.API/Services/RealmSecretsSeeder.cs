@@ -1,7 +1,3 @@
-using System.Net.Http.Headers;
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
-
 namespace Identity.API.Services;
 
 /// <summary>
@@ -16,15 +12,14 @@ namespace Identity.API.Services;
 /// being set.</item>
 /// <item><b>Idempotent:</b> a client whose secret already matches is left alone, so in development (values equal to the
 /// realm file's) nothing changes. The admin's password is reset each start, so the AppHost's value is the one that holds.</item>
-/// <item>Retried every 30 s until Keycloak answers; until then, services using a changed secret get 401 from Keycloak.</item>
+/// <item><b>Retried</b> every 30 s on any failure, 20 times (Keycloak still starting, a timeout, an error page); after that
+/// an error is logged, since every service using a changed secret gets 401 from Keycloak until Identity restarts.</item>
 /// </list>
 /// </summary>
-public sealed class RealmSecretsSeeder(HttpClient http, IConfiguration config, ILogger<RealmSecretsSeeder> logger) : BackgroundService
+public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
     private const int MaxAttempts = 20;
-
-    private string BaseUrl => (config["Identity:Url"] ?? throw new InvalidOperationException("Missing Identity:Url")).TrimEnd('/');
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -40,84 +35,37 @@ public sealed class RealmSecretsSeeder(HttpClient http, IConfiguration config, I
         {
             try
             {
-                var token = await SignInAsync(adminUser, adminPassword, stoppingToken);
+                var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
                 foreach (var (clientId, secret) in secrets)
                 {
-                    await SetClientSecretAsync(token, clientId, secret, stoppingToken);
+                    switch (await keycloak.SetClientSecretAsync(token, clientId, secret, stoppingToken))
+                    {
+                        case null:
+                            logger.LogInformation("Keycloak has no client {ClientId} yet; its secret is set when it's created", clientId);
+                            break;
+                        case true:
+                            logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
+                            break;
+                    }
                 }
                 if (config["Admin:Account:Username"] is { Length: > 0 } username && config["Admin:Account:Password"] is { Length: > 0 } password)
                 {
-                    await SetPasswordAsync(token, username, password, stoppingToken);
+                    // No such user yet: AdminAccountSeeder creates it, with this password.
+                    await keycloak.SetPasswordAsync(token, username, password, stoppingToken);
                 }
                 return;
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
+                if (attempt == MaxAttempts)
+                {
+                    logger.LogError(ex, "Gave up setting the realm's secrets in Keycloak after {Attempts} attempts; services whose "
+                        + "secret changed get 401 from Keycloak until Identity.API restarts", attempt);
+                    return;
+                }
                 logger.LogWarning(ex, "Couldn't set the realm's secrets in Keycloak (attempt {Attempt}); trying again", attempt);
                 await Task.Delay(RetryDelay, stoppingToken);
             }
         }
     }
-
-    private async Task<string> SignInAsync(string username, string password, CancellationToken ct)
-    {
-        using var response = await http.PostAsync($"{BaseUrl}/realms/master/protocol/openid-connect/token", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["grant_type"] = "password", ["client_id"] = "admin-cli", ["username"] = username, ["password"] = password }), ct);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<TokenResponse>(ct))?.AccessToken
-            ?? throw new HttpRequestException("Keycloak returned no admin token.");
-    }
-
-    /// <summary>
-    /// Sets a client's secret to <paramref name="secret"/> unless it already is; a client the realm lacks is skipped (the
-    /// MCP server creates its own).
-    /// </summary>
-    private async Task SetClientSecretAsync(string token, string clientId, string secret, CancellationToken ct)
-    {
-        var clients = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/clients";
-        var found = await SendAsync<JsonArray>(HttpMethod.Get, $"{clients}?clientId={Uri.EscapeDataString(clientId)}", token, null, ct);
-        if (found?.FirstOrDefault() is not JsonObject client || client["id"]?.GetValue<string>() is not { } id)
-        {
-            logger.LogInformation("Keycloak has no client {ClientId} yet; its secret is set when it's created", clientId);
-            return;
-        }
-
-        var current = await SendAsync<JsonObject>(HttpMethod.Get, $"{clients}/{id}/client-secret", token, null, ct);
-        if (current?["value"]?.GetValue<string>() == secret)
-        {
-            return;
-        }
-        client["secret"] = secret;
-        await SendAsync<JsonObject>(HttpMethod.Put, $"{clients}/{id}", token, client, ct);
-        logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
-    }
-
-    private async Task SetPasswordAsync(string token, string username, string password, CancellationToken ct)
-    {
-        var users = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/users";
-        var found = await SendAsync<JsonArray>(HttpMethod.Get, $"{users}?username={Uri.EscapeDataString(username)}&exact=true", token, null, ct);
-        if (found?.FirstOrDefault()?["id"]?.GetValue<string>() is not { } id)
-        {
-            return; // AdminAccountSeeder creates it, with this password
-        }
-        await SendAsync<JsonObject>(HttpMethod.Put, $"{users}/{id}/reset-password", token,
-            new JsonObject { ["type"] = "password", ["value"] = password, ["temporary"] = false }, ct);
-    }
-
-    private async Task<T?> SendAsync<T>(HttpMethod method, string url, string token, JsonNode? body, CancellationToken ct) where T : JsonNode
-    {
-        using var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (body is not null)
-        {
-            request.Content = JsonContent.Create(body);
-        }
-        using var response = await http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        return response.Content.Headers.ContentLength == 0 || method != HttpMethod.Get
-            ? null
-            : await response.Content.ReadFromJsonAsync<T>(ct);
-    }
-
-    private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);
 }

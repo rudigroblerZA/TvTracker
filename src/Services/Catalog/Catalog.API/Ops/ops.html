@@ -132,7 +132,7 @@ function render(data) {
     tile("Sync", n(c.showsDueForRefresh), `due for refresh · last sync ${ago(c.lastSyncedAtUtc)}`),
     data.deadLetters == null ? tile("Dead letters", `<span class="down">—</span>`, "RabbitMQ unavailable")
       : tile("Dead letters", data.deadLetters ? `<span class="down">${n(data.deadLetters)}</span>` : "0",
-          `events no service could handle after 3 retries${data.deadLetters ? `<br><button type="button" onclick="replayDeadLetters(this)">Replay to their queues</button>` : ""}`),
+          `events no service could handle after 3 retries${data.deadLetters ? `<br><button type="button" onclick="replayDeadLetters(this)">Replay to their queues</button>` : ""}${lastReplay ? `<br>Last replay: ${esc(lastReplay)}` : ""}`),
     a ? tile("Insights", `${n(a.showsWithInsights)}<span class="muted small"> / ${n(a.shows)}</span>`,
           `shows computed · ${ago(a.lastComputedAtUtc)}<br>${n(a.sharedCastLinks)} shared-cast links`,
           meter([[a.showsWithInsights, a.shows, "var(--accent)"]]))
@@ -245,15 +245,17 @@ function render(data) {
     ${b.error ? `<div class="down small">${esc(b.error)}</div>` : ""}`;
 }
 
+// Kept outside the tiles, which every refresh rebuilds, so the result stays on screen.
+let lastReplay = "";
 async function replayDeadLetters(button) {
   button.disabled = true;
   try {
-    const response = await fetch("ops/dead-letters/replay", { method: "POST" });
+    const response = await fetch("ops/dead-letters/replay", { method: "POST", headers: { "X-Ops-Action": "replay" } });
     if (!response.ok) throw new Error(`${response.status}`);
     const replayed = await response.json();
-    button.replaceWith(Object.entries(replayed).map(([q, k]) => `${n(k)} to ${esc(q)}`).join(", ") || "nothing to replay");
+    lastReplay = Object.entries(replayed).map(([q, k]) => q === "(kept)" ? `${n(k)} kept (no queue to go back to)` : `${n(k)} to ${q}`).join(", ") || "nothing to replay";
   } catch (e) {
-    button.replaceWith(`replay failed (${e.message})`);
+    lastReplay = `failed (${e.message})`;
   }
   refresh();
 }
