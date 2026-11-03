@@ -1,5 +1,4 @@
-using TvTracker;
-using TvTracker.EventBus;
+﻿using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Services;

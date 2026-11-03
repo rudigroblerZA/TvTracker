@@ -1,5 +1,5 @@
+﻿using Catalog.Data;
 using Catalog.SyncWorker.Providers;
-using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Catalog.SyncWorker;

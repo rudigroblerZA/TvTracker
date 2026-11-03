@@ -1,4 +1,4 @@
-using Catalog.API.Apis;
+﻿using Catalog.API.Apis;
 using Catalog.Data;
 using TvTracker.IntegrationEvents;
 
@@ -14,7 +14,10 @@ public class MakersRankingTests
 
     private static readonly Dictionary<Guid, string> Titles = new()
     {
-        [BreakingBad] = "Breaking Bad", [Saul] = "Better Call Saul", [Fleabag] = "Fleabag", [Office] = "The Office"
+        [BreakingBad] = "Breaking Bad",
+        [Saul] = "Better Call Saul",
+        [Fleabag] = "Fleabag",
+        [Office] = "The Office"
     };
 
     [Fact]
@@ -136,7 +139,10 @@ public class MakersRankingTests
     {
         var made = new PersonMadeShow
         {
-            PersonId = Gilligan, ShowExternalId = "x", Title = "x", Status = stored,
+            PersonId = Gilligan,
+            ShowExternalId = "x",
+            Title = "x",
+            Status = stored,
             Premiered = premiered is null ? null : DateOnly.Parse(premiered)
         };
 

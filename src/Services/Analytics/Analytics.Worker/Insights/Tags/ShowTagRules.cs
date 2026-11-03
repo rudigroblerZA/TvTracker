@@ -1,6 +1,5 @@
-using Analytics.Data;
+﻿using Analytics.Data;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 using static Analytics.Worker.Insights.InsightMath;
 
 namespace Analytics.Worker.Insights;

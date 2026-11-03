@@ -1,5 +1,4 @@
-using System.Net.Http.Json;
-using Analytics.Data;
+﻿using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Analytics.Worker;

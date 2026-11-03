@@ -1,5 +1,4 @@
-using System.Text.Json;
-using Analytics.Data;
+﻿using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;

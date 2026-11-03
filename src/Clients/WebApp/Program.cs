@@ -1,9 +1,8 @@
+﻿using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Http.Resilience;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using TvTracker.UI.Models;
 using TvTracker.UI.Services;
 using WebApp.Components;

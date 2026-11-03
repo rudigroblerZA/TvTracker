@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

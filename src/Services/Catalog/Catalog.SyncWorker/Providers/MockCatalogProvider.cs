@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Providers;

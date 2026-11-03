@@ -1,6 +1,5 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Analytics.Data;
-using TvTracker;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 

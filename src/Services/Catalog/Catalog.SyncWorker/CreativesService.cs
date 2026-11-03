@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.SyncWorker.Providers;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.Persistence;
@@ -142,8 +142,17 @@ public sealed class CreativesService(
                 db.MadeShows.RemoveRange(madeBefore[person.Id]);
                 db.MadeShows.AddRange((career.Made ?? []).Select(m => new PersonMadeShow
                 {
-                    PersonId = person.Id, ShowExternalId = m.ShowExternalId, Title = m.Title, PosterUrl = m.PosterUrl, Premiered = m.Premiered,
-                    Ended = m.Ended, Status = m.Status, Rating = m.Rating, Popularity = m.Popularity, Kind = m.Kind, Roles = m.Roles.ToList()
+                    PersonId = person.Id,
+                    ShowExternalId = m.ShowExternalId,
+                    Title = m.Title,
+                    PosterUrl = m.PosterUrl,
+                    Premiered = m.Premiered,
+                    Ended = m.Ended,
+                    Status = m.Status,
+                    Rating = m.Rating,
+                    Popularity = m.Popularity,
+                    Kind = m.Kind,
+                    Roles = m.Roles.ToList()
                 }));
             }
             person.CareerShows = career?.Shows;

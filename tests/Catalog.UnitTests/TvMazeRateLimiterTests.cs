@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Providers;
+﻿using Catalog.SyncWorker.Providers;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Catalog.UnitTests;
@@ -20,7 +20,7 @@ public class TvMazeRateLimiterTests
 
         Assert.Equal(TvMazeRateLimiter.BackgroundLimit, background.Count(t => t.IsCompletedSuccessfully));
         // Someone turning up still gets a call at once.
-        Assert.True(limiter.AcquireAsync(TvMazeLane.Interactive, default).IsCompletedSuccessfully);
+        Assert.True(limiter.AcquireAsync(TvMazeLane.Interactive, TestContext.Current.CancellationToken).IsCompletedSuccessfully);
         Assert.Equal((0, 3), limiter.Waiting);
     }
 
@@ -44,7 +44,7 @@ public class TvMazeRateLimiterTests
 
         var backfill = Acquire(limiter, TvMazeLane.Background, 13);
         time.Advance(TimeSpan.FromSeconds(1));
-        var search = limiter.AcquireAsync(TvMazeLane.Interactive, default);
+        var search = limiter.AcquireAsync(TvMazeLane.Interactive, TestContext.Current.CancellationToken);
         Assert.False(search.IsCompleted);
 
         time.Advance(TvMazeRateLimiter.Window);
@@ -59,10 +59,10 @@ public class TvMazeRateLimiterTests
     {
         var limiter = new TvMazeRateLimiter(time);
         Acquire(limiter, TvMazeLane.Interactive, TvMazeRateLimiter.PermitLimit);
-        var person = limiter.AcquireAsync(TvMazeLane.Interactive, default);
+        var person = limiter.AcquireAsync(TvMazeLane.Interactive, TestContext.Current.CancellationToken);
 
         time.Advance(TvMazeRateLimiter.Window);
-        var job = limiter.AcquireAsync(TvMazeLane.Background, default);
+        var job = limiter.AcquireAsync(TvMazeLane.Background, TestContext.Current.CancellationToken);
 
         Assert.True(person.IsCompletedSuccessfully);
         Assert.True(job.IsCompletedSuccessfully);
@@ -75,7 +75,7 @@ public class TvMazeRateLimiterTests
         Acquire(limiter, TvMazeLane.Background, TvMazeRateLimiter.BackgroundLimit);
         using var cancel = new CancellationTokenSource();
         var gaveUp = limiter.AcquireAsync(TvMazeLane.Background, cancel.Token);
-        var next = limiter.AcquireAsync(TvMazeLane.Background, default);
+        var next = limiter.AcquireAsync(TvMazeLane.Background, TestContext.Current.CancellationToken);
 
         cancel.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gaveUp);
@@ -92,7 +92,7 @@ public class TvMazeRateLimiterTests
         Acquire(limiter, TvMazeLane.Interactive, 9);
         time.Advance(TimeSpan.FromSeconds(5));
         Acquire(limiter, TvMazeLane.Interactive, 9);
-        var waiting = limiter.AcquireAsync(TvMazeLane.Interactive, default);
+        var waiting = limiter.AcquireAsync(TvMazeLane.Interactive, TestContext.Current.CancellationToken);
 
         // Five seconds later the first nine have left the window; the second nine haven't.
         time.Advance(TimeSpan.FromSeconds(5));

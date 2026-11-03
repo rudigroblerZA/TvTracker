@@ -1,4 +1,4 @@
-using Analytics.Data;
+﻿using Analytics.Data;
 using Analytics.Worker.Insights;
 using TvTracker.IntegrationEvents;
 
@@ -11,7 +11,11 @@ internal static class Build
 {
     public static ShowCopy Show(ShowStatus status = ShowStatus.Airing, double? rating = 8.0, params string[] genres) => new()
     {
-        ShowId = Guid.NewGuid(), Title = "Test show", Status = status, ExternalRating = rating, Genres = [.. genres]
+        ShowId = Guid.NewGuid(),
+        Title = "Test show",
+        Status = status,
+        ExternalRating = rating,
+        Genres = [.. genres]
     };
 
     /// <summary>
@@ -22,10 +26,16 @@ internal static class Build
 
     public static EpisodeCopy Episode(ShowCopy show, int season, int number, DateTimeOffset? airs, double? rating, string? title = null,
         int runtime = 45) => new()
-    {
-        EpisodeId = Guid.NewGuid(), ShowId = show.ShowId, SeasonNumber = season, EpisodeNumber = number,
-        Title = title ?? $"Episode title {season}.{number}", AirsAtUtc = airs, RuntimeMinutes = runtime, ExternalRating = rating
-    };
+        {
+            EpisodeId = Guid.NewGuid(),
+            ShowId = show.ShowId,
+            SeasonNumber = season,
+            EpisodeNumber = number,
+            Title = title ?? $"Episode title {season}.{number}",
+            AirsAtUtc = airs,
+            RuntimeMinutes = runtime,
+            ExternalRating = rating
+        };
 
     public static ShowInsightContext Context(DateTimeOffset now, ShowCopy show, IEnumerable<EpisodeCopy> episodes,
         IEnumerable<AnnouncedSeason>? announced = null) =>

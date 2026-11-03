@@ -1,8 +1,7 @@
-using Analytics.Data;
+﻿using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
-using TvTracker.Persistence;
 
 namespace Analytics.Worker.IntegrationEvents;
 
@@ -334,7 +333,11 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
         var addWatches = snapshotWatches.Values.Where(w => !watched.Contains(w.EpisodeId))
             .Select(w => new UserEpisodeWatch
             {
-                UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, WatchedAtUtc = w.WatchedAtUtc.UtcDateTime, RecordedAtUtc = takenAt
+                UserId = e.UserId,
+                EpisodeId = w.EpisodeId,
+                ShowId = w.ShowId,
+                WatchedAtUtc = w.WatchedAtUtc.UtcDateTime,
+                RecordedAtUtc = takenAt
             })
             .ToList();
         // By when the mark reached us, not the watch time the user gave: the phone's offline queue backdates those, and
@@ -436,7 +439,12 @@ public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEvent
         }
         db.EpisodeNotes.AddRange(incoming.Values.Select(n => new EpisodeNoteCopy
         {
-            EpisodeId = n.EpisodeId, ShowId = n.ShowId, Mark = n.Mark, Reason = n.Reason, SourceUrl = n.SourceUrl, TakenAtUtc = e.TakenAtUtc
+            EpisodeId = n.EpisodeId,
+            ShowId = n.ShowId,
+            Mark = n.Mark,
+            Reason = n.Reason,
+            SourceUrl = n.SourceUrl,
+            TakenAtUtc = e.TakenAtUtc
         }));
     }
 }

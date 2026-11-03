@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "src/TvTracker.AppHost/TvTracker.AppHost.csproj"
+  }
+}

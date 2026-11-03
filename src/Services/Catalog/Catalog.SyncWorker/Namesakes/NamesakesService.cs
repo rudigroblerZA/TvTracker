@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.SyncWorker.Providers;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,8 +99,18 @@ public sealed class NamesakesService(IServiceScopeFactory scopeFactory, TimeProv
             {
                 db.Namesakes.AddRange(namesakes.Select(n => new ShowNamesake
                 {
-                    ShowId = showId, ExternalId = n.ExternalId, Title = n.Title, PosterUrl = n.PosterUrl, Premiered = n.Premiered, Ended = n.Ended,
-                    Network = n.Network, Country = n.Country, Language = n.Language, Kind = n.Kind, Popularity = n.Popularity, Rating = n.Rating
+                    ShowId = showId,
+                    ExternalId = n.ExternalId,
+                    Title = n.Title,
+                    PosterUrl = n.PosterUrl,
+                    Premiered = n.Premiered,
+                    Ended = n.Ended,
+                    Network = n.Network,
+                    Country = n.Country,
+                    Language = n.Language,
+                    Kind = n.Kind,
+                    Popularity = n.Popularity,
+                    Rating = n.Rating
                 }));
                 db.NamesakeLookups.Add(new ShowNamesakeLookup { ShowId = showId, CheckedAtUtc = now, Country = country });
             }

@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker;
@@ -31,7 +31,15 @@ public static class ShowFactsApi
             .Take(Math.Clamp(limit, 1, MaxLimit))
             .Select(s => new
             {
-                s.Id, s.Title, s.PosterUrl, s.Source, s.ExternalId, s.Network, s.FirstAirDate, s.Status, s.Popularity,
+                s.Id,
+                s.Title,
+                s.PosterUrl,
+                s.Source,
+                s.ExternalId,
+                s.Network,
+                s.FirstAirDate,
+                s.Status,
+                s.Popularity,
                 Aired = db.Episodes.Count(e => e.ShowId == s.Id && e.SeasonNumber > 0 && e.AirsAtUtc != null && e.AirsAtUtc <= now)
             })
             .ToListAsync(ct);
