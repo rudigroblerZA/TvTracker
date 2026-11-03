@@ -819,7 +819,7 @@ public record WaitingShow(Guid ShowId, string Title, string? PosterUrl, string? 
 /// <summary>
 /// While you wait: for each show the user is caught up on with a return in view, finished shows that fit before it.
 /// </summary>
-public record WhileYouWait(int YourMinutesPerWeek, bool PaceAssumed, IReadOnlyList<Wait> Waits);
+public record WhileYouWait(int YourMinutesPerWeek, bool PaceAssumed, string? PaceAssumedBecause, IReadOnlyList<Wait> Waits);
 
 public record Wait(Guid ShowId, string Title, string? PosterUrl, string Kind, DateOnly BackAt, int? SeasonNumber, int DaysLeft,
     int BudgetMinutes, IReadOnlyList<WaitPick> Picks);

@@ -645,10 +645,16 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   already has, so it reads nothing new: the waiting room (`WaitingRoomApi.ComputeAsync`, shared for this), the catch-up
   planner's pace (`CatchUpApi.PaceAsync`) and Fits your time off's cached shelf (`TimeOffApi.GetShelfAsync`, which now
   carries each show's DNA).
-  - **A return in view:** a dated episode or premiere, or a forecast's likely date, 7 to 180 days away. Nearer, there's no
-    time to start anything; further, the forecast is too loose to plan on. An overdue forecast doesn't count.
-  - **The budget** is the days left at the viewer's pace; with no watches in 8 weeks, 300 minutes a week is assumed and
-    the page says so. A pick must fit: the point is to finish before the show is back.
+  - **A return in view:** a dated episode or premiere, or a forecast's likely date, 7 to 180 days away, counted in days of
+    the viewer's calendar (the profile time zone, `tz`, as Streaks does: a US evening premiere is the next day in UTC).
+    Nearer, there's no time to start anything; further, the forecast is too loose to plan on. An overdue forecast
+    doesn't count.
+  - **The budget** is the days left at the viewer's pace, rounded down so a show that fills it still finishes in time;
+    with no watches in 8 weeks (or only watches of episodes without running times, which the page tells apart), 300
+    minutes a week is assumed and the page says so. A pick must fit: the point is to finish before the show is back.
+  - **Shared candidates:** `TimeOffApi.CandidatesAsync` builds the assessed, unstarted, non-fizzling shelf for both Fits
+    your time off and this; each applies its own length and value cut (7.3 and 7.0). The waiting room hands back the
+    copies, documents and started set it loaded, so nothing is read twice.
   - **Alike** is half the genres' Jaccard overlap and half DNA similarity rescaled as Recommendations' affinity (0.65 → 0,
     0.95 → 1), each half standing alone when the other is missing. Score = value + 2 × alike, so a slightly worse show
     that's much more like the awaited one wins; under 0.35 alike the reason reads "a change of pace" instead, and such a
@@ -1351,10 +1357,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   offer shouldn't need a release). A flag in a plan carries a targeting rule (`FeatureFlags.PlanRule`) that turns it off
   when the context's `plan` is set and isn't one of the flag's plans, plus metadata naming them (`plans`, `name`). The
   offer is edited in flagd.json or on the flags page ("Plus & Family"), and the plan page lists it from the flags.
-- **The offer** (first cut, from the business plan): Plus and Family get 16 insights that read the viewer's own
+- **The offer** (first cut, from the business plan): Plus and Family get 18 insights that read the viewer's own
   history, plan their viewing or cost the most to run: essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
-  clock, Your services and forecasts. Everything about shows (DNA, gets good, endings, the grid, universes, the games
+  clock, Your services, forecasts, From the makers you love and While you wait. Everything about shows (DNA, gets good, endings, the grid, universes, the games
   and trivia) stays free: it's what brings people in.
 - **The plan in the flag context** (`IUserPlans`, used by `RequireFeature` and the UI's `FeatureFlagStore`): signed out is
   "free"; signed in, the plan Identity says the user gets (a family member's is "family"). Nothing while the `plans` flag

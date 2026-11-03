@@ -32,12 +32,19 @@ public static class WaitingRoomApi
         api.MapGet("/me/waiting", GetAsync).RequireFeature(FeatureFlags.WaitingRoom);
 
     private static async Task<Ok<WaitingRoomDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct) =>
-        TypedResults.Ok(new WaitingRoomDto(await ComputeAsync(db, user.GetUserId(), time.GetUtcNow(), ct)));
+        TypedResults.Ok(new WaitingRoomDto((await ComputeAsync(db, user.GetUserId(), time.GetUtcNow(), ct)).Shows));
+
+    /// <param name="Shows">Soonest back first.</param>
+    /// <param name="Copies">The caught-up shows' catalog copies (genres).</param>
+    /// <param name="Documents">Their insights documents (DNA), loaded for the forecasts.</param>
+    /// <param name="Started">Every show the caller has a watch on, from the progress aggregate.</param>
+    internal sealed record Room(List<WaitingShowDto> Shows, Dictionary<Guid, ShowCopy> Copies, Dictionary<Guid, ShowInsights> Documents,
+        HashSet<Guid> Started);
 
     /// <summary>
-    /// The caller's waiting room, soonest back first; shared with While you wait.
+    /// The caller's waiting room, with what it loaded on the way, so While you wait reads nothing twice.
     /// </summary>
-    internal static async Task<List<WaitingShowDto>> ComputeAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
+    internal static async Task<Room> ComputeAsync(AnalyticsContext db, string userId, DateTimeOffset now, CancellationToken ct)
     {
         // Caught up: every aired regular episode watched (the aggregate), on a show that's still running.
         var progress = await Viewer.ProgressAsync(db, userId, now, null, ct);
@@ -88,6 +95,6 @@ public static class WaitingRoomApi
             .ThenByDescending(s => s.LastAiredUtc)
             .ToList();
 
-        return result;
+        return new Room(result, shows, documents, progress.Keys.ToHashSet());
     }
 }

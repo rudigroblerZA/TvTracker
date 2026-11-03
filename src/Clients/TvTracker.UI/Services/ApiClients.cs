@@ -701,8 +701,8 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     /// <summary>
     /// While you wait: finished shows that fit before each show the user is caught up on is back; null while the flag is off.
     /// </summary>
-    public Task<WhileYouWait?> GetWhileYouWaitAsync(CancellationToken ct = default) =>
-        GetAsync<WhileYouWait>(ApiClients.Analytics, "api/v1/me/while-you-wait", ct, cacheForOffline: true);
+    public Task<WhileYouWait?> GetWhileYouWaitAsync(string? timeZone, CancellationToken ct = default) =>
+        GetAsync<WhileYouWait>(ApiClients.Analytics, "api/v1/me/while-you-wait" + (string.IsNullOrEmpty(timeZone) ? "" : $"?tz={Uri.EscapeDataString(timeZone)}"), ct, cacheForOffline: true);
 
     /// <summary>
     /// Network report cards, most shows first, with the whole catalog as the baseline.

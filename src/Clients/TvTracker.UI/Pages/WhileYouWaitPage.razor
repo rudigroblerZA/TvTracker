@@ -1,6 +1,7 @@
 @page "/while-you-wait"
 @attribute [RequiresFeature(FeatureFlags.WhileYouWait)]
 @inject AnalyticsClient Analytics
+@inject UserSession Session
 
 <PageTitle>While you wait · @Brand.AppName</PageTitle>
 
@@ -25,9 +26,12 @@
         else
         {
             <p class="muted small">
-                @(result.PaceAssumed
-                    ? $"You haven't watched anything in the last 8 weeks, so this assumes {Format.Hours(result.YourMinutesPerWeek)} a week."
-                    : $"At your pace of {Format.Hours(result.YourMinutesPerWeek)} a week over the last 8 weeks.")
+                @(result.PaceAssumedBecause switch
+                {
+                    "no-runtimes" => $"The episodes you've watched lately have no running times, so this assumes {Format.Hours(result.YourMinutesPerWeek)} a week.",
+                    "nothing-watched" => $"You haven't watched anything in the last 8 weeks, so this assumes {Format.Hours(result.YourMinutesPerWeek)} a week.",
+                    _ => $"At your pace of {Format.Hours(result.YourMinutesPerWeek)} a week over the last 8 weeks."
+                })
             </p>
             @foreach (var wait in result.Waits)
             {
@@ -82,7 +86,7 @@
         error = null;
         try
         {
-            result = await Analytics.GetWhileYouWaitAsync();
+            result = await Analytics.GetWhileYouWaitAsync(Session.Profile?.TimeZone);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
