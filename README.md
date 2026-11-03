@@ -1223,7 +1223,8 @@ How events flow:
     it returns, at your own pace over the last 8 weeks (5 hours a week assumed when you've watched nothing lately). Picks
     are chosen for how alike they are to the show you're waiting for, by genres and show DNA, then by how much they're
     worth your time; each says when you'd finish and how many days you'd have to spare, and a show picked for one wait
-    isn't offered for the next. Shows that fizzle out at the end aren't picked.
+    isn't offered for the next. Shows that fizzle out at the end aren't picked, and a pick that isn't like the show ("a
+    change of pace") has to be worth 7.5 or more.
     - **API:** `GET /api/v1/me/while-you-wait` on Analytics.API, signed in.
   - **Reunion radar** (`/reunions`, linked from For you): shows where two or more actors from shows you love work
     together again.

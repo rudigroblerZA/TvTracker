@@ -88,7 +88,8 @@ public static class WhileYouWaitApi
 /// when they've watched nothing lately), and a pick must fit it: the point is to finish before the show is back.</item>
 /// <item><b>Alike</b> is half the genres' Jaccard overlap and half the DNA similarity rescaled as Recommendations does (0.65 → 0,
 /// 0.95 → 1), each half standing alone when the other is unknown. A pick's score is its value plus <see cref="AlikeWeight"/>
-/// × alike, so a slightly worse show that's much more like the awaited one wins.</item>
+/// × alike, so a slightly worse show that's much more like the awaited one wins. A pick under <see cref="MinAlikeToName"/> alike is
+/// "a change of pace" and must be worth <see cref="MinValueForChangeOfPace"/> or more.</item>
 /// <item><b>Each pick once:</b> waits are planned soonest first, and a show picked for one isn't offered for the next.</item>
 /// </list>
 /// </summary>
@@ -103,9 +104,12 @@ internal static class WhileYouWait
     public const int PicksPerWait = 3;
 
     /// <summary>
-    /// Below this, two shows aren't called alike in the reasons.
+    /// Below this, two shows aren't called alike in the reasons, and the pick is "a change of pace", which has to be at
+    /// least <see cref="MinValueForChangeOfPace"/> to be offered at all: a filler nothing like the show should be good.
     /// </summary>
     public const double MinAlikeToName = 0.35;
+
+    public const double MinValueForChangeOfPace = 7.5;
 
     public sealed record Wait(Guid ShowId, string Title, string? PosterUrl, string Kind, DateOnly BackAt, int? SeasonNumber);
 
@@ -147,6 +151,7 @@ internal static class WhileYouWait
                         var (alike, reasons) = Alike(genres, dna, c.Show);
                         return (Candidate: c, Alike: alike, Reasons: reasons, Score: c.Assessment.Value + AlikeWeight * alike);
                     })
+                    .Where(x => x.Alike >= MinAlikeToName || x.Candidate.Assessment.Value >= MinValueForChangeOfPace)
                     .OrderByDescending(x => x.Score).ThenByDescending(x => x.Candidate.Show.Minutes)
                     .Take(PicksPerWait)
                     .Select(x =>

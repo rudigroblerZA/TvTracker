@@ -651,7 +651,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     the page says so. A pick must fit: the point is to finish before the show is back.
   - **Alike** is half the genres' Jaccard overlap and half DNA similarity rescaled as Recommendations' affinity (0.65 → 0,
     0.95 → 1), each half standing alone when the other is missing. Score = value + 2 × alike, so a slightly worse show
-    that's much more like the awaited one wins; under 0.35 alike the reason reads "a change of pace" instead.
+    that's much more like the awaited one wins; under 0.35 alike the reason reads "a change of pace" instead, and such a
+    pick needs a value of 7.5 or more (demo's 141-minute budget before Rings of Power was offering a 7.0 short).
   - **Each pick once:** waits are planned soonest first and a show picked for one isn't offered for the next, so two
     waits don't both get Dark.
   - **Tested** in `WhileYouWaitTests` (Severance and Silo against Dark, Counterpart, Friends and The Office).
