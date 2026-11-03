@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using Catalog.API.Services;
@@ -156,7 +156,14 @@ public static class PuzzleApi
         var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.Id))
             .Select(s => new
             {
-                s.Id, s.Title, s.PosterUrl, s.FirstAirDate, s.Network, s.Genres, s.Keywords, s.Status,
+                s.Id,
+                s.Title,
+                s.PosterUrl,
+                s.FirstAirDate,
+                s.Network,
+                s.Genres,
+                s.Keywords,
+                s.Status,
                 Seasons = s.Episodes.Where(e => e.SeasonNumber > 0 && e.AirsAtUtc <= now).Select(e => e.SeasonNumber).Distinct().Count(),
                 Cast = s.Cast.OrderBy(c => c.Order).Take(8).Select(c => new { c.Person.Name, c.Character }).ToList()
             })

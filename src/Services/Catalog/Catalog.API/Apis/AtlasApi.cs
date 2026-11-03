@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -123,7 +123,16 @@ public static class AtlasApi
         var all = await db.Settings.AsNoTracking().Where(s => showIds.Contains(s.ShowId))
             .Join(db.Shows, s => s.ShowId, show => show.Id, (s, show) => new
             {
-                s.Kind, s.PlaceId, s.Name, s.Country, s.Latitude, s.Longitude, show.Id, show.Title, show.PosterUrl, show.Popularity
+                s.Kind,
+                s.PlaceId,
+                s.Name,
+                s.Country,
+                s.Latitude,
+                s.Longitude,
+                show.Id,
+                show.Title,
+                show.PosterUrl,
+                show.Popularity
             })
             .ToListAsync(ct);
         var rows = all.Where(r => r.Kind == kind).ToList();

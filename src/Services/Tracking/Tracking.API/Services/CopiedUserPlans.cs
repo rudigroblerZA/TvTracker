@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using OpenFeature;
-using TvTracker;
 using Tracking.API.Data;
+using TvTracker;
 
 namespace Tracking.API.Services;
 

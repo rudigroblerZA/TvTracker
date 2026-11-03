@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.IntegrationEvents;
@@ -96,7 +96,11 @@ public sealed class NanogenreService(
             await db.Nanogenres.ExecuteDeleteAsync(ct);
             db.Nanogenres.AddRange(found.Select(n => new Nanogenre
             {
-                Slug = n.Slug, Name = n.Name, Source = n.Source, ShowCount = n.ShowIds.Count, ComputedAtUtc = computedAt
+                Slug = n.Slug,
+                Name = n.Name,
+                Source = n.Source,
+                ShowCount = n.ShowIds.Count,
+                ComputedAtUtc = computedAt
             }));
 
             var updates = new List<(Guid ShowId, List<string> Slugs)>();

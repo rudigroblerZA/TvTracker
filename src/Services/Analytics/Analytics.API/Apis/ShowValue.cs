@@ -1,4 +1,4 @@
-using Analytics.Data;
+﻿using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Analytics.API.Apis;
@@ -102,14 +102,14 @@ internal static class ShowValue
             _ => 0
         };
         if (landing switch
-            {
-                LandingVerdicts.Sticks => "Sticks the landing",
-                LandingVerdicts.GreatFinale => "Great finale",
-                LandingVerdicts.WeakerLastSeason => "Weaker last season",
-                LandingVerdicts.FinaleLetsDown => "The finale lets it down",
-                LandingVerdicts.Fizzles => "Fizzles out at the end",
-                _ => null
-            } is { } ending)
+        {
+            LandingVerdicts.Sticks => "Sticks the landing",
+            LandingVerdicts.GreatFinale => "Great finale",
+            LandingVerdicts.WeakerLastSeason => "Weaker last season",
+            LandingVerdicts.FinaleLetsDown => "The finale lets it down",
+            LandingVerdicts.Fizzles => "Fizzles out at the end",
+            _ => null
+        } is { } ending)
         {
             reasons.Add(ending);
         }

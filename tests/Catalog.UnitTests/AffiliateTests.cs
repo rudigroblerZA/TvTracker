@@ -1,4 +1,4 @@
-using Catalog.API.Apis;
+﻿using Catalog.API.Apis;
 using Catalog.API.Services;
 
 namespace Catalog.UnitTests;
@@ -10,13 +10,20 @@ public class AffiliateTests
 {
     private static readonly AffiliateProgram Netflix = new()
     {
-        Name = "netflix-us", Services = ["Netflix"], Regions = ["US"],
-        Template = "https://network.example/c/123?u={url}&subId1={click}", PostbackKey = "s3cret", Currency = "USD"
+        Name = "netflix-us",
+        Services = ["Netflix"],
+        Regions = ["US"],
+        Template = "https://network.example/c/123?u={url}&subId1={click}",
+        PostbackKey = "s3cret",
+        Currency = "USD"
     };
 
     private static readonly AffiliateProgram Prime = new()
     {
-        Name = "prime", Services = ["Prime Video", "Amazon Prime Video"], Template = "https://network.example/p?dest={url}&sid={click}", Currency = "GBP"
+        Name = "prime",
+        Services = ["Prime Video", "Amazon Prime Video"],
+        Template = "https://network.example/p?dest={url}&sid={click}",
+        Currency = "GBP"
     };
 
     private static readonly AffiliateOptions Options = new() { Programs = [Netflix, Prime] };

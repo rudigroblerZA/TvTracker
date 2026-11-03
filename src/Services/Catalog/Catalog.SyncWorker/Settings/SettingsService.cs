@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -111,7 +111,13 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
             {
                 db.Settings.AddRange(places[show.ExternalId].Select(p => new ShowSetting
                 {
-                    ShowId = show.Id, Kind = p.Kind, PlaceId = p.PlaceId, Name = p.Name, Country = p.Country, Latitude = p.Latitude, Longitude = p.Longitude
+                    ShowId = show.Id,
+                    Kind = p.Kind,
+                    PlaceId = p.PlaceId,
+                    Name = p.Name,
+                    Country = p.Country,
+                    Latitude = p.Latitude,
+                    Longitude = p.Longitude
                 }));
                 db.SettingLookups.Add(new ShowSettingLookup { ShowId = show.Id, CheckedAtUtc = now });
             }

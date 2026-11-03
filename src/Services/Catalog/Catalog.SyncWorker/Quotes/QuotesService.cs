@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalog.SyncWorker.Quotes;
@@ -129,8 +129,13 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
 
         var quotes = parsed.Select((q, i) => new Quote
         {
-            Id = Guid.CreateVersion7(), ShowId = next.ShowId, SeasonNumber = q.Season, EpisodeNumber = q.Episode, Position = i,
-            Speakers = q.Lines.Select(l => l.Speaker).ToList(), Lines = q.Lines.Select(l => l.Text).ToList()
+            Id = Guid.CreateVersion7(),
+            ShowId = next.ShowId,
+            SeasonNumber = q.Season,
+            EpisodeNumber = q.Episode,
+            Position = i,
+            Speakers = q.Lines.Select(l => l.Speaker).ToList(),
+            Lines = q.Lines.Select(l => l.Text).ToList()
         }).ToList();
         await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {

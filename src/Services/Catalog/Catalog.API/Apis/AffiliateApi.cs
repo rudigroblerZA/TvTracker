@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Claims;
 using Catalog.API.Services;
 using Catalog.Data;
@@ -195,7 +195,14 @@ public static class AffiliateApi
                 .Where(c => c.ReceivedAtUtc >= start)
                 .Join(db.OutboundClicks, c => c.ClickId, k => k.Id, (c, k) => new
                 {
-                    c.ReceivedAtUtc, k.ShowId, k.Service, k.Surface, k.Plan, c.Program, c.Amount, c.Currency
+                    c.ReceivedAtUtc,
+                    k.ShowId,
+                    k.Service,
+                    k.Surface,
+                    k.Plan,
+                    c.Program,
+                    c.Amount,
+                    c.Currency
                 })
                 .ToListAsync(ct))
             .Select(c => new ConversionRow(DateOnly.FromDateTime(c.ReceivedAtUtc), c.ShowId, c.Service, c.Surface, c.Plan, c.Program, c.Amount,

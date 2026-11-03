@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -123,7 +123,11 @@ public static class TvClockApi
         };
         var thresholds = new Dictionary<string, double>
         {
-            ["night-owl"] = 0.35, ["early-bird"] = 0.30, ["lunch-break"] = 0.30, ["prime-time"] = 0.50, ["weekend-binger"] = 0.55,
+            ["night-owl"] = 0.35,
+            ["early-bird"] = 0.30,
+            ["lunch-break"] = 0.30,
+            ["prime-time"] = 0.50,
+            ["weekend-binger"] = 0.55,
             ["weeknight-regular"] = 0.85
         };
         // Strongest first: by how far past its threshold, relative to it.

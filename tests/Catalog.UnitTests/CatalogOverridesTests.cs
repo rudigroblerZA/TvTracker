@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.SyncWorker;
 using Catalog.SyncWorker.Providers;
 using TvTracker.IntegrationEvents;
@@ -67,7 +67,11 @@ public class CatalogOverridesTests
 
     private static CatalogOverride Override(Guid? episodeId, string field, string value, int minute) => new()
     {
-        Id = Guid.NewGuid(), ShowId = Guid.NewGuid(), EpisodeId = episodeId, Field = field, Value = value,
+        Id = Guid.NewGuid(),
+        ShowId = Guid.NewGuid(),
+        EpisodeId = episodeId,
+        Field = field,
+        Value = value,
         CreatedAtUtc = new DateTime(2026, 10, 1, 12, minute, 0, DateTimeKind.Utc)
     };
 
