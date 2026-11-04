@@ -3,19 +3,6 @@
   <!-- Unit tests of Analytics' rules: the shared copy rules, the worker's show insights (built from in-memory episodes),
        and the API's on-request calculations (streaks, the essential cut, show value). No database or network. -->
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Data\Analytics.Data.csproj" />
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.API\Analytics.API.csproj" />

@@ -38,14 +38,17 @@ public class MatchTests
         shows.Where(s => s.Dna is not null).ToDictionary(s => s.Show.ShowId, s => s.Dna!),
         shows.Where(s => s.Nanogenres is not null).ToDictionary(s => s.Show.ShowId, s => s.Nanogenres!.ToList()));
 
-    // Same genres and keywords, not on each other's provider lists: content 0.3 × 1 + 0.2 × 1 = 0.5.
     private static readonly string[] Comedy = ["Comedy"];
     private static readonly string[] ScriptedEnglish = ["scripted", "english"];
+
+    // Same genres and keywords, not on each other's provider lists: content 0.3 × 1 + 0.2 × 1 = 0.5. xUnit makes a new
+    // instance per test, so each test gets its own pair.
+    private readonly ShowFeatures a = Show("A", Comedy, ScriptedEnglish);
+    private readonly ShowFeatures b = Show("B", Comedy, ScriptedEnglish);
 
     [Fact]
     public void Without_DNA_the_affinity_is_middling()
     {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
         var match = RecommendationEngine.Match(a, b, Extras());
 
         Assert.Equal(0.5 * 0.75, match.Score, 6);
@@ -55,10 +58,12 @@ public class MatchTests
     [Fact]
     public void DNA_scales_the_content_score_from_half_to_whole()
     {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
 
-        // Identical DNA: similarity 1, full affinity.
-        Assert.Equal(0.5, RecommendationEngine.Match(a, b, Extras((a, Dna(), null), (b, Dna(), null))).Score, 6);
+        // Identical DNA: similarity 1, full affinity. Its traits are all typical (hour-long, weekly, recent), which says
+        // nothing, so it makes no DNA reason.
+        var identical = RecommendationEngine.Match(a, b, Extras((a, Dna(), null), (b, Dna(), null)));
+        Assert.Equal(0.5, identical.Score, 6);
+        Assert.False(identical.DnaLed);
 
         // Similarity 0.8 rescales to an affinity of 0.5 (0.65 → 0, 0.95 → 1).
         Assert.Equal(0.5 * 0.75, RecommendationEngine.Match(a, b, Extras((a, Every(0.4), null), (b, Every(0.6), null))).Score, 6);
@@ -70,10 +75,9 @@ public class MatchTests
     [Fact]
     public void DNA_never_makes_a_show_about_something_else_similar()
     {
-        var a = Show("A", Comedy, ScriptedEnglish);
-        var b = Show("B", ["Crime"], ["documentary"]);
+        var other = Show("B", ["Crime"], ["documentary"]);
 
-        Assert.Equal(0, RecommendationEngine.Match(a, b, Extras((a, Dna(), null), (b, Dna(), null))).Score);
+        Assert.Equal(0, RecommendationEngine.Match(a, other, Extras((a, Dna(), null), (other, Dna(), null))).Score);
     }
 
     [Fact]
@@ -94,7 +98,6 @@ public class MatchTests
     [Fact]
     public void A_close_DNA_names_the_distinctive_traits_both_share()
     {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
         var dna = Dna((DnaTraits.Release, 1));
 
         var match = RecommendationEngine.Match(a, b, Extras((a, dna, null), (b, dna, null)));
@@ -104,18 +107,8 @@ public class MatchTests
     }
 
     [Fact]
-    public void Typical_traits_alone_make_no_DNA_reason()
-    {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
-
-        // Hour-long, weekly and recent are typical, so saying so tells nothing.
-        Assert.False(RecommendationEngine.Match(a, b, Extras((a, Dna(), null), (b, Dna(), null))).DnaLed);
-    }
-
-    [Fact]
     public void A_shared_nanogenre_is_a_bonus_on_top_of_content()
     {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
         var match = RecommendationEngine.Match(a, b, Extras((a, null, ["Sports comedy"]), (b, null, ["Sports comedy"])));
 
         Assert.Equal((0.5 + 0.25) * 0.75, match.Score, 6);
@@ -125,7 +118,6 @@ public class MatchTests
     [Fact]
     public void A_pair_in_no_nanogenre_loses_nothing()
     {
-        var (a, b) = (Show("A", Comedy, ScriptedEnglish), Show("B", Comedy, ScriptedEnglish));
 
         Assert.Equal(RecommendationEngine.Match(a, b, Extras()).Score,
             RecommendationEngine.Match(a, b, Extras((a, null, ["Sports comedy"]), (b, null, ["Medical drama"]))).Score, 6);
@@ -136,10 +128,10 @@ public class MatchTests
     {
         var first = Guid.NewGuid();
         var third = Guid.NewGuid();
-        var a = Show("A", [], [], first, Guid.NewGuid(), third);
+        var show = Show("A", [], [], first, Guid.NewGuid(), third);
 
-        Assert.Equal(0.4, RecommendationEngine.Similarity(a, new ShowFeatures { ShowId = first, Title = "First" }), 6);
-        Assert.Equal(0.4 * 0.8, RecommendationEngine.Similarity(a, new ShowFeatures { ShowId = third, Title = "Third" }), 6);
+        Assert.Equal(0.4, RecommendationEngine.Similarity(show, new ShowFeatures { ShowId = first, Title = "First" }), 6);
+        Assert.Equal(0.4 * 0.8, RecommendationEngine.Similarity(show, new ShowFeatures { ShowId = third, Title = "Third" }), 6);
     }
 
     [Fact]
@@ -152,11 +144,11 @@ public class MatchTests
     [Fact]
     public void Reasons_say_what_the_shows_share()
     {
-        var b = Show("B", ["Drama", "Crime"], []);
-        var a = Show("Breaking Bad", ["Crime", "Drama", "Thriller"], [], b.ShowId);
+        var candidate = Show("B", ["Drama", "Crime"], []);
+        var target = Show("Breaking Bad", ["Crime", "Drama", "Thriller"], [], candidate.ShowId);
 
-        Assert.Equal("Often watched with Breaking Bad", RecommendationEngine.ReasonFor(a, b));
-        Assert.Equal("Also drama and crime", RecommendationEngine.ReasonFor(Show("X", ["Crime", "Drama"], []), b));
-        Assert.Equal("Similar themes", RecommendationEngine.ReasonFor(Show("Y", ["Comedy"], []), b));
+        Assert.Equal("Often watched with Breaking Bad", RecommendationEngine.ReasonFor(target, candidate));
+        Assert.Equal("Also drama and crime", RecommendationEngine.ReasonFor(Show("X", ["Crime", "Drama"], []), candidate));
+        Assert.Equal("Similar themes", RecommendationEngine.ReasonFor(Show("Y", ["Comedy"], []), candidate));
     }
 }
