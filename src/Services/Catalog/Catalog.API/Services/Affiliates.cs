@@ -24,7 +24,8 @@ public sealed class AffiliateProgram
     public string Name { get; set; } = "";
 
     /// <summary>
-    /// Provider names as the catalog lists them ("Netflix"), compared ignoring case.
+    /// Provider names as the catalog lists them ("Netflix"), compared ignoring case; <c>*</c> covers every service (the
+    /// development test network).
     /// </summary>
     public List<string> Services { get; set; } = [];
 
@@ -34,7 +35,7 @@ public sealed class AffiliateProgram
     public List<string> Regions { get; set; } = [];
 
     /// <summary>
-    /// The tracked link, https only: <c>{url}</c> is the service's address (escaped) and <c>{click}</c> the click id the
+    /// The tracked link, https only (or http to this machine, for the development test network): <c>{url}</c> is the service's address (escaped) and <c>{click}</c> the click id the
     /// network passes back, e.g. <c>https://network.example/c/123?u={url}&amp;subId1={click}</c>.
     /// </summary>
     public string Template { get; set; } = "";
@@ -61,8 +62,13 @@ public static class AffiliateLinks
     /// </summary>
     public static AffiliateProgram? For(AffiliateOptions options, string service, string region) =>
         options.Programs.FirstOrDefault(p => IsValid(p)
-            && p.Services.Contains(service, StringComparer.OrdinalIgnoreCase)
+            && (p.Services.Contains(service, StringComparer.OrdinalIgnoreCase) || p.Services.Contains(AnyService))
             && (p.Regions.Count == 0 || p.Regions.Contains(region, StringComparer.OrdinalIgnoreCase)));
+
+    /// <summary>
+    /// In <see cref="AffiliateProgram.Services"/>, every service.
+    /// </summary>
+    public const string AnyService = "*";
 
     /// <summary>
     /// The program's tracked link for <paramref name="url"/> and the click.
@@ -71,13 +77,33 @@ public static class AffiliateLinks
         program.Template.Replace("{url}", Uri.EscapeDataString(url)).Replace("{click}", clickId.ToString("N"));
 
     /// <summary>
-    /// A name, a service, a currency code, and a template that gives an absolute https address: anything else would send
-    /// people somewhere broken, so an invalid program is skipped (and shown as such in the report).
+    /// A name, a service, a currency code, and a template that gives an absolute https address (or http to this machine,
+    /// as the development test network's is): anything else would send people somewhere broken, so an invalid program is
+    /// skipped (and shown as such in the report).
     /// </summary>
     public static bool IsValid(AffiliateProgram program) =>
         program.Name.Length is > 0 and <= 64 && program.Services.Count > 0 && program.Currency.Length == 3
-        && Uri.TryCreate(Wrap(program, "https://example.org/", Guid.Empty), UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
-        && uri.Host.Length > 0;
+        && Uri.TryCreate(Wrap(program, "https://example.org/", Guid.Empty), UriKind.Absolute, out var uri) && uri.Host.Length > 0
+        && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback));
+
+    /// <summary>
+    /// The development test network (<c>Affiliates:TestNetwork:Url</c> and <c>:Key</c>, set by the AppHost with
+    /// <c>Affiliates:TestNetwork=true</c>): every service, every region, its tracked link a page in the web app that can
+    /// report a pretend sale through the real postback before sending the viewer on. Null when not configured.
+    /// </summary>
+    public static AffiliateProgram? TestNetwork(IConfiguration configuration) =>
+        configuration["Affiliates:TestNetwork:Url"] is { Length: > 0 } url && configuration["Affiliates:TestNetwork:Key"] is { Length: > 0 } key
+            ? new AffiliateProgram
+            {
+                Name = TestNetworkName,
+                Services = [AnyService],
+                Template = url.TrimEnd('/') + "/dev/affiliate-network?u={url}&click={click}",
+                PostbackKey = key,
+                Currency = "USD"
+            }
+            : null;
+
+    public const string TestNetworkName = "test-network";
 
     /// <summary>
     /// Whether a postback's key is the program's, compared in constant time.

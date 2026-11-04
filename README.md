@@ -517,6 +517,15 @@ link opens the web app's address in the browser and is counted there, as a signe
   `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
   key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
   counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
+- **Trying it locally:** run the AppHost with the test network on, turn the `affiliates` flag on, and click any
+  where-to-watch link. The click goes through a pretend network page in the web app, where **Report a sale** sends a
+  commission through the real postback and **Continue to the service** sends you on. The click and the sale then show
+  in `/settings/affiliates` (sign in as `admin`). Real programs you've configured still win for their services.
+
+  ```bash
+  dotnet run --project src/TvTracker.AppHost -- --Affiliates:TestNetwork true
+  ```
+
 - **Privacy:** a click keeps the show, service, link, region, where it was clicked and the plan, never who clicked:
   no user id, address or browser. Nothing about clicks is in the data export or needs deleting with an account.
 
