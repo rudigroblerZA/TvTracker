@@ -538,13 +538,16 @@ Useful local addresses:
 
 ### Unit tests
 
-Catalog and Analytics have unit tests of their rules (title matching, crossovers, Wikiquote parsing, overrides, streaks,
-the essential cut, forecasts, and the worker's gets-good, landing and season-verdict stages). They need no database,
-network or running AppHost:
+Catalog, Analytics, Recommendations and Notifications have unit tests of their rules (title matching, crossovers,
+Wikiquote parsing, overrides, streaks, the essential cut, forecasts, the worker's gets-good, landing and season-verdict
+stages, how recommendations are matched, quiet hours and the weekly digest). They need no database, network or running
+AppHost:
 
 ```bash
 dotnet test tests/Catalog.UnitTests
 dotnet test tests/Analytics.UnitTests
+dotnet test tests/Recommendations.UnitTests
+dotnet test tests/Notifications.UnitTests
 ```
 
 ### Backing up development data

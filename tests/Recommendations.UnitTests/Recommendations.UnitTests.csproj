@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of Recommendations' scoring rules: a signal's weight, content similarity, the nanogenre bonus and DNA as
+       a multiplier on the content score (CONTEXT.md, Recommendations). No database or network. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
+  </ItemGroup>
+
+</Project>

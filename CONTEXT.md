@@ -1607,7 +1607,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Tests
 
-- **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`, xUnit v3): no database,
+- **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`,
+  `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, xUnit v3): no database,
   network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
@@ -1616,7 +1617,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
   overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, the TVmaze budget
   (the two-lane limiter on a fake clock, the change rule and the refresh schedule) and the makers ranking; Analytics' copy rules, streaks, the
-  essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages.
+  essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages;
+  Recommendations' matching (DNA as a 0.5-1 multiplier, kind and language, the nanogenre bonus, reasons) and signal
+  weights; Notifications' quiet hours (time zones, a daylight-saving gap), when a digest is due, which preference an
+  alert follows, and the verdict, crossover and digest texts.
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
 - **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
@@ -1624,6 +1628,6 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Known gaps
 
-- There's no CI, and only Catalog and Analytics have tests.
+- There's no CI, and only Catalog, Analytics, Recommendations and Notifications have tests.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - The realm file still has the demo user (demo / demo); a shared environment should delete it.

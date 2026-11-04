@@ -110,7 +110,7 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
             ScheduledForUtc = sendAt
         });
 
-    private static bool Wants(NotificationPreferences pref, NotificationKind kind) => kind switch
+    internal static bool Wants(NotificationPreferences pref, NotificationKind kind) => kind switch
     {
         NotificationKind.NewEpisode => pref.NewEpisodes,
         NotificationKind.NewSeason => pref.NewSeasons,
