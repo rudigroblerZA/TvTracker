@@ -58,7 +58,6 @@ public class MatchTests
     [Fact]
     public void DNA_scales_the_content_score_from_half_to_whole()
     {
-
         // Identical DNA: similarity 1, full affinity. Its traits are all typical (hour-long, weekly, recent), which says
         // nothing, so it makes no DNA reason.
         var identical = RecommendationEngine.Match(a, b, Extras((a, Dna(), null), (b, Dna(), null)));
@@ -83,16 +82,15 @@ public class MatchTests
     [Fact]
     public void Another_kind_of_show_weakens_the_affinity_most_and_another_language_a_little()
     {
-        var drama = Show("A", Comedy, ScriptedEnglish);
         var reality = Show("B", Comedy, ["reality", "english"]);
         var korean = Show("C", Comedy, ["scripted", "korean"]);
         // Keywords overlap a third: content 0.3 + 0.2 / 3.
         var content = 0.3 + 0.2 / 3;
 
         Assert.Equal(content * (0.5 + 0.5 * 0.4),
-            RecommendationEngine.Match(drama, reality, Extras((drama, Dna(), null), (reality, Dna(), null))).Score, 6);
+            RecommendationEngine.Match(a, reality, Extras((a, Dna(), null), (reality, Dna(), null))).Score, 6);
         Assert.Equal(content * (0.5 + 0.5 * 0.8),
-            RecommendationEngine.Match(drama, korean, Extras((drama, Dna(), null), (korean, Dna(), null))).Score, 6);
+            RecommendationEngine.Match(a, korean, Extras((a, Dna(), null), (korean, Dna(), null))).Score, 6);
     }
 
     [Fact]
@@ -118,7 +116,6 @@ public class MatchTests
     [Fact]
     public void A_pair_in_no_nanogenre_loses_nothing()
     {
-
         Assert.Equal(RecommendationEngine.Match(a, b, Extras()).Score,
             RecommendationEngine.Match(a, b, Extras((a, null, ["Sports comedy"]), (b, null, ["Medical drama"]))).Score, 6);
     }
