@@ -476,7 +476,7 @@ if (!string.IsNullOrEmpty(webPublicUrl))
 // Affiliates:TestNetwork=true (running locally only): a pretend affiliate network covering every service, so affiliate
 // links, postbacks and the report can be tried without a real program. Where-to-watch clicks go through the web app's
 // /dev/affiliate-network page, which can report a sale (TestAffiliateNetwork, AffiliateLinks.TestNetwork).
-if (!builder.ExecutionContext.IsPublishMode && builder.Configuration.GetValue<bool>("Affiliates:TestNetwork"))
+if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configuration["Affiliates:TestNetwork"], "true", StringComparison.OrdinalIgnoreCase))
 {
     const string testNetworkKey = "test-network-key";
     catalogApi

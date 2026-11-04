@@ -1,5 +1,6 @@
 ﻿using Catalog.API.Apis;
 using Catalog.API.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace Catalog.UnitTests;
 
@@ -58,6 +59,31 @@ public class AffiliateTests
 
         Assert.False(AffiliateLinks.IsValid(program));
         Assert.Null(AffiliateLinks.For(new AffiliateOptions { Programs = [program] }, "Netflix", "US"));
+    }
+
+    [Theory]
+    [InlineData("http://localhost:5120/dev/affiliate-network?u={url}&click={click}", true)]
+    [InlineData("http://127.0.0.1:5120/n?u={url}", true)]
+    [InlineData("http://network.example/n?u={url}", false)]
+    public void Http_is_only_for_this_machine(string template, bool valid) =>
+        Assert.Equal(valid, AffiliateLinks.IsValid(new AffiliateProgram { Name = "t", Services = [AffiliateLinks.AnyService], Template = template }));
+
+    [Fact]
+    public void The_test_network_covers_every_service_after_real_programs()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Affiliates:TestNetwork:Url"] = "http://localhost:5120/",
+            ["Affiliates:TestNetwork:Key"] = "k"
+        }).Build();
+        var test = AffiliateLinks.TestNetwork(config)!;
+        var options = new AffiliateOptions { Programs = [Netflix, test] };
+
+        Assert.Equal("netflix-us", AffiliateLinks.For(options, "Netflix", "US")?.Name);
+        Assert.Equal(AffiliateLinks.TestNetworkName, AffiliateLinks.For(options, "Max", "GB")?.Name);
+        Assert.Equal("http://localhost:5120/dev/affiliate-network?u=https%3A%2F%2Fmax.com%2F&click=" + Guid.Empty.ToString("N"),
+            AffiliateLinks.Wrap(test, "https://max.com/", Guid.Empty));
+        Assert.Null(AffiliateLinks.TestNetwork(new ConfigurationBuilder().Build()));
     }
 
     [Fact]
