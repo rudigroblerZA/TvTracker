@@ -116,6 +116,26 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// In development, say once per address where the web app is reached from outside this machine (a forwarded preview,
+// a tunnel): that's the WebApp__PublicUrl sign-in needs there (SignInThroughWebApp).
+if (app.Environment.IsDevelopment() && publicUrl is null)
+{
+    var seen = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+    var origins = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("PublicAddress");
+    app.Use((http, next) =>
+    {
+        var forwardedHost = http.Request.Headers["X-Forwarded-Host"].FirstOrDefault();
+        var host = forwardedHost ?? http.Request.Host.Host;
+        if (host is { Length: > 0 } && host is not ("localhost" or "127.0.0.1" or "[::1]") && seen.TryAdd(host, true))
+        {
+            origins.LogWarning("Reached from outside at Host {Host}, X-Forwarded-Host {ForwardedHost}, X-Forwarded-Proto {ForwardedProto}; " +
+                "set WebApp__PublicUrl to that address for sign-in to work there",
+                http.Request.Host.Value, forwardedHost, http.Request.Headers["X-Forwarded-Proto"].FirstOrDefault());
+        }
+        return next(http);
+    });
+}
+
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
