@@ -1422,6 +1422,22 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     The sandbox's volume had lost its master `admin`; `kc.sh bootstrap-admin user` (with Keycloak stopped, on the same
     volume) makes one again.
 
+## Sign-in through one address
+
+- **For a web app reached through one forwarded address** (a cloud session's preview, a tunnel), where the browser can't
+  reach Keycloak's `localhost:8080`: with `WebApp:PublicUrl` set on the AppHost (`WebApp__PublicUrl`), the web app proxies
+  Keycloak's login pages (`/realms/tvtracker/…`, `/resources/…`, `SignInThroughWebApp`) with `X-Forwarded-*` naming that
+  address (Keycloak reads them, `KC_PROXY_HEADERS=xforwarded`), and points the browser's sign-in and sign-out redirects at
+  it. The token exchange and discovery still go to Keycloak directly, so tokens keep Keycloak's own issuer and the
+  services validate them unchanged. Pushed authorization is off in this mode, since the handler would build the
+  authorize address itself. Identity.API adds `{PublicUrl}/*` to the web client's allowed redirects on start.
+- **Framing:** Keycloak's `X-Frame-Options` and CSP are dropped on the way through, in case the preview frames the page.
+- **Finding the address:** in development, the web app logs a warning the first time it's reached at a host other than
+  localhost.
+- **Not yet checked end to end:** no preview reached the web app in the sandbox, so a full sign-in through a forwarded
+  address hasn't been seen working; a frame on another site may also block the sign-in cookies.
+- Unset, nothing changes: the browser signs in at Keycloak's own address, as before.
+
 ## Feature flags
 
 - **OpenFeature, served by flagd:** flags are in `TvTracker.AppHost/Flags/flagd.json`, mounted into the flagd
