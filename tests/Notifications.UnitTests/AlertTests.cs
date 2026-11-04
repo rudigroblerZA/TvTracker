@@ -60,6 +60,7 @@ public class AlertTests
     {
         Assert.StartsWith("Airs across Chicago Fire and Chicago Med, starting tomorrow.",
             CrossoverNotificationHandler.CrossoverText(Crossover(TimeSpan.FromHours(20), "Chicago Fire", "Chicago Med"), Now));
+        // Two parts on one show (a two-parter) name it once.
         Assert.StartsWith("Airs across Chicago Fire, starting today.",
             CrossoverNotificationHandler.CrossoverText(Crossover(TimeSpan.FromHours(-1), "Chicago Fire", "Chicago Fire"), Now));
     }

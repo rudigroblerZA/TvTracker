@@ -3,19 +3,6 @@
   <!-- Unit tests of Notifications' rules: quiet hours, when a weekly digest is due, which preference an alert follows,
        and the texts of season verdicts, crossovers and the digest. No database or network. -->
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Notifications\Notifications.API\Notifications.API.csproj" />
   </ItemGroup>

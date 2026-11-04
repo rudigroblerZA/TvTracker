@@ -3,18 +3,8 @@
   <!-- Unit tests of the catalog's pure rules: title keys, character and franchise matching, crossovers, Wikiquote
        parsing, overrides, where-to-watch links and the presumed-ended status. No database or network. -->
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
