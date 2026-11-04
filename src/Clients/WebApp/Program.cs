@@ -20,6 +20,11 @@ builder.Services.AddHttpClient("keycloak");
 
 // Sign-in with Keycloak: an auth cookie for the browser, tokens kept server-side.
 var authority = IdentitySettings.GetAuthority(builder.Configuration);
+var publicUrl = SignInThroughWebApp.PublicUrl(builder.Configuration);
+if (publicUrl is not null)
+{
+    SignInThroughWebApp.AddProxy(builder.Services, builder.Configuration["Identity:Url"]!, publicUrl);
+}
 builder.Services
     .AddAuthentication(options =>
     {
@@ -72,6 +77,11 @@ builder.Services
                 await store.RemoveAsync(userId);
             }
         };
+
+        if (publicUrl is not null)
+        {
+            SignInThroughWebApp.Apply(options, authority, publicUrl);
+        }
     });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
@@ -112,6 +122,11 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+
+if (publicUrl is not null)
+{
+    app.MapReverseProxy();
+}
 
 app.MapGet("/account/login", (string? returnUrl) =>
     TypedResults.Challenge(new AuthenticationProperties { RedirectUri = SafeReturnUrl(returnUrl) }));
