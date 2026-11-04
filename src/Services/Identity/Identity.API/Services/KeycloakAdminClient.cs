@@ -80,20 +80,60 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// </summary>
     public async Task<bool?> SetClientSecretAsync(string token, string clientId, string secret, CancellationToken cancellationToken)
     {
-        var clients = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/clients";
-        var (_, found) = await SendAsync<JsonArray>(HttpMethod.Get, $"{clients}?clientId={Uri.EscapeDataString(clientId)}", token, null, cancellationToken);
-        if (found?.FirstOrDefault() is not JsonObject client || client["id"]?.GetValue<string>() is not { } id)
+        if (await FindClientAsync(token, clientId, cancellationToken) is not var (client, id))
         {
             return null;
         }
-        var (_, current) = await SendAsync<JsonObject>(HttpMethod.Get, $"{clients}/{id}/client-secret", token, null, cancellationToken);
+        var (_, current) = await SendAsync<JsonObject>(HttpMethod.Get, $"{Clients}/{id}/client-secret", token, null, cancellationToken);
         if (current?["value"]?.GetValue<string>() == secret)
         {
             return false;
         }
         client["secret"] = secret;
-        await SendAsync<JsonNode>(HttpMethod.Put, $"{clients}/{id}", token, client, cancellationToken);
+        await SendAsync<JsonNode>(HttpMethod.Put, $"{Clients}/{id}", token, client, cancellationToken);
         return true;
+    }
+
+    /// <summary>
+    /// Adds <paramref name="pattern"/> to a client's allowed redirect and post-logout redirect addresses unless it's
+    /// there. Null when the realm has no such client, else whether it changed.
+    /// </summary>
+    public async Task<bool?> AllowRedirectAsync(string token, string clientId, string pattern, CancellationToken cancellationToken)
+    {
+        if (await FindClientAsync(token, clientId, cancellationToken) is not var (client, id))
+        {
+            return null;
+        }
+        var redirects = client["redirectUris"] as JsonArray ?? [];
+        var attributes = client["attributes"] as JsonObject ?? [];
+        // Keycloak keeps post-logout addresses as one attribute, separated by "##".
+        var logouts = (attributes["post.logout.redirect.uris"]?.GetValue<string>() ?? "").Split("##", StringSplitOptions.RemoveEmptyEntries).ToList();
+        var known = redirects.Any(r => r?.GetValue<string>() == pattern);
+        if (known && logouts.Contains(pattern))
+        {
+            return false;
+        }
+        if (!known)
+        {
+            redirects.Add(pattern);
+        }
+        if (!logouts.Contains(pattern))
+        {
+            logouts.Add(pattern);
+        }
+        client["redirectUris"] = redirects.DeepClone();
+        attributes["post.logout.redirect.uris"] = string.Join("##", logouts);
+        client["attributes"] = attributes.DeepClone();
+        await SendAsync<JsonNode>(HttpMethod.Put, $"{Clients}/{id}", token, client, cancellationToken);
+        return true;
+    }
+
+    private string Clients => $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/clients";
+
+    private async Task<(JsonObject Client, string Id)?> FindClientAsync(string token, string clientId, CancellationToken cancellationToken)
+    {
+        var (_, found) = await SendAsync<JsonArray>(HttpMethod.Get, $"{Clients}?clientId={Uri.EscapeDataString(clientId)}", token, null, cancellationToken);
+        return found?.FirstOrDefault() is JsonObject client && client["id"]?.GetValue<string>() is { } id ? (client, id) : null;
     }
 
     private async Task<string?> FindUserIdAsync(string token, string username, CancellationToken cancellationToken)

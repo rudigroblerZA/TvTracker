@@ -64,6 +64,8 @@ var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26
     .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
     .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", keycloakAdminPassword)
     .WithEnvironment("KC_HEALTH_ENABLED", "true")
+    // The web app can proxy the login pages (WebApp:PublicUrl below); Keycloak builds their links from X-Forwarded-*.
+    .WithEnvironment("KC_PROXY_HEADERS", "xforwarded")
     .WithVolume("tvtracker-keycloak-data", "/opt/keycloak/data")
     .WithBindMount("./Realms", "/opt/keycloak/data/import", isReadOnly: true)
     .WithHttpEndpoint(port: 8080, targetPort: 8080, name: "http")
@@ -439,7 +441,16 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(researchApi)
     .WithReference(assistantApi);
 
-builder.AddProject<Projects.WebApp>("webapp")
+// WebApp:PublicUrl: the web app's address when it's reached through one forwarded address only (a cloud session's
+// preview), where the browser can't reach Keycloak. Sign-in then goes through the web app (SignInThroughWebApp), and
+// Identity.API allows that address as a redirect. Unset, the browser signs in at Keycloak's address.
+var webPublicUrl = builder.Configuration["WebApp:PublicUrl"];
+if (!string.IsNullOrEmpty(webPublicUrl))
+{
+    identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
+}
+
+var webApp = builder.AddProject<Projects.WebApp>("webapp")
     .WithEnvironment("Branding__AppName", appName)
     .WithExternalHttpEndpoints()
     .WithReference(flagd)
@@ -457,5 +468,9 @@ builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(socialApi)
     .WithReference(researchApi)
     .WithReference(assistantApi);
+if (!string.IsNullOrEmpty(webPublicUrl))
+{
+    webApp.WithEnvironment("WebApp__PublicUrl", webPublicUrl);
+}
 
 builder.Build().Run();
