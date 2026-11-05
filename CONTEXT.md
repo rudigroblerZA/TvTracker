@@ -645,7 +645,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     rating of every show the caller rated.
   - **Picks:** Σ agreement × (stars − 3) over twins who rated it 4+, so 5 stars counts twice 4; shows the caller rated,
     follows or watched are left out.
-  - **Dev data:** the load-test users' ratings are random 3-5 stars, so twins there are mechanical, not meaningful.
+  - **Dev data:** the load-test runner's ratings are random 3-5 stars, so twins among `load-` users are mechanical. The
+    `seed` command (`Seeder` in LoadGen) gives its users stars from a quality per show (a hash of its id, the same for
+    everyone), their persona's taste for its genres and noise, so twins among seeded users agree the way people do.
 - **Network report cards** (`NetworkReportList`, table `network_reports`): per network with 5+ catalog shows, from the
   provider's data and the shows' documents, so the privacy rule doesn't apply. A `*` row is the whole catalog, the
   baseline each figure is compared with.

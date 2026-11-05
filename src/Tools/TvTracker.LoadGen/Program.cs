@@ -130,6 +130,29 @@ run.SetAction(async (parse, ct) =>
     return stats.ErrorCount > 0 ? 2 : 0;
 });
 
+var monthsOption = new Option<int>("--months") { Description = "How far back the oldest watches go", DefaultValueFactory = _ => 12 };
+var seedOption = new Option<int>("--seed") { Description = "Random seed: the same seed gives the same data", DefaultValueFactory = _ => 1 };
+
+var seed = new Command("seed", "Create users (as setup does) and give them a realistic, dated history: follows, watches, statuses, ratings, a few comments and follows between them")
+{
+    adminUserOption, adminPasswordOption, monthsOption, seedOption
+};
+seed.SetAction(async (parse, ct) =>
+{
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
+    var admin = await keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
+    await keycloak.EnsureClientAsync(admin, ct);
+    var count = parse.GetValue(usersOption);
+    for (var i = 1; i <= count; i++)
+    {
+        await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct);
+    }
+    var options = new SeedOptions(parse.GetValue(bffOption)!, count, parse.GetValue(passwordOption)!, parse.GetValue(prefixOption)!,
+        Math.Clamp(parse.GetValue(monthsOption), 1, 120), parse.GetValue(seedOption));
+    return await new Seeder(http, keycloak, options, i => Username(parse, i)).RunAsync(ct);
+});
+
 var cleanup = new Command("cleanup", "Delete the load-test users and everything they did, through the app's own account deletion")
 {
     adminUserOption, adminPasswordOption
@@ -163,7 +186,7 @@ cleanup.SetAction(async (parse, ct) =>
 
 var root = new RootCommand("Generate load against a running TV Tracker AppHost with load-test users")
 {
-    setup, run, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
+    setup, run, seed, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
 };
 
 try
