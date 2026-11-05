@@ -29,6 +29,17 @@ public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int Lates
 public static class Viewer
 {
     /// <summary>
+    /// The viewer's time zone, from the profile's IANA id the client sends (<c>tz</c>); UTC when it's missing or unknown.
+    /// </summary>
+    public static TimeZoneInfo Zone(string? tz) =>
+        tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+
+    /// <summary>
+    /// The date <paramref name="at"/> falls on in the viewer's calendar.
+    /// </summary>
+    public static DateOnly LocalDate(DateTimeOffset at, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
+
+    /// <summary>
     /// Progress per show, for the given shows or (null) every show the viewer has watched. One query: aired regular
     /// episodes left-joined to the viewer's watches, grouped by show.
     /// </summary>

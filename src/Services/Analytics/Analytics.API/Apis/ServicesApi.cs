@@ -177,7 +177,7 @@ public static class ServicesApi
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= from)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, e.RuntimeMinutes })
             .ToListAsync(ct);
-        var bulk = watches.GroupBy(w => (w.ShowId, w.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).Select(g => g.Key).ToHashSet();
+        var bulk = CopyRules.BulkMarks(watches, w => w.ShowId, w => w.WatchedAtUtc);
         var watched = watches.Where(w => !bulk.Contains((w.ShowId, w.WatchedAtUtc)))
             .GroupBy(w => w.ShowId)
             .ToDictionary(g => g.Key, g => (Minutes: g.Sum(w => w.RuntimeMinutes ?? 0), Episodes: g.Count()));

@@ -22,10 +22,9 @@ public sealed class WorthItInsight : IShowInsight
     private const int MinRatedEpisodes = 5;
 
     /// <summary>
-    /// A turn this far in costs <see cref="SlowStartPoints"/>; past <see cref="VerySlowStartMinutes"/>, twice that.
+    /// A turn <see cref="InsightRules.SlowStartMinutes"/> in costs <see cref="SlowStartPoints"/>; past
+    /// <see cref="VerySlowStartMinutes"/>, twice that.
     /// </summary>
-    private const int SlowStartMinutes = 180;
-
     private const int VerySlowStartMinutes = 600;
     private const double SlowStartPoints = -0.15;
     private const double GoodStartPoints = 0.1;
@@ -50,7 +49,7 @@ public sealed class WorthItInsight : IShowInsight
 
         var factors = new List<WorthItFactor>();
 
-        if (insights.GetsGood is { Turn: { MinutesBefore: >= SlowStartMinutes } turn })
+        if (insights.GetsGood is { Turn: { MinutesBefore: >= InsightRules.SlowStartMinutes } turn })
         {
             factors.Add(new(WorthItFactors.Start, turn.MinutesBefore >= VerySlowStartMinutes ? 2 * SlowStartPoints : SlowStartPoints,
                 $"Slow start: gets good at S{turn.SeasonNumber:00}E{turn.EpisodeNumber:00}, {Hours(turn.MinutesBefore)} in"));
@@ -63,7 +62,7 @@ public sealed class WorthItInsight : IShowInsight
         // Regular seasons only, so specials don't dilute the share.
         if (insights.Patterns?.Arc is { DeclineFromSeason: { } declineFrom })
         {
-            var seasons = show.SeasonStats.Where(s => s.Number > 0).ToList();
+            var seasons = show.RegularSeasonStats;
             var total = seasons.Sum(s => s.RuntimeMinutes);
             var after = seasons.Where(s => s.Number >= declineFrom).Sum(s => s.RuntimeMinutes);
             if (total > 0 && after > 0)
@@ -74,7 +73,7 @@ public sealed class WorthItInsight : IShowInsight
             }
         }
 
-        if (insights.Landing is { } landing && Ending(landing.Verdict) is { } ending)
+        if (LandingVerdicts.Ending(insights.Landing?.Verdict) is { } ending)
         {
             factors.Add(new(WorthItFactors.Ending, ending.Points, ending.Text));
         }
@@ -94,18 +93,5 @@ public sealed class WorthItInsight : IShowInsight
         return new WorthIt(score, WorthItScale.Verdict(score), rating, value, factors, insights.Run.RuntimeMinutes,
             !show.Show.HasEnded());
     }
-
-    /// <summary>
-    /// The ending's points, as the backlog and time off weigh it (Analytics.API's ShowValue).
-    /// </summary>
-    private static (double Points, string Text)? Ending(string verdict) => verdict switch
-    {
-        LandingVerdicts.Sticks => (0.3, "Sticks the landing"),
-        LandingVerdicts.GreatFinale => (0.3, "Great finale"),
-        LandingVerdicts.WeakerLastSeason => (-0.1, "Weaker last season"),
-        LandingVerdicts.FinaleLetsDown => (-0.3, "The finale lets it down"),
-        LandingVerdicts.Fizzles => (-0.5, "Fizzles out at the end"),
-        _ => null
-    };
 
 }

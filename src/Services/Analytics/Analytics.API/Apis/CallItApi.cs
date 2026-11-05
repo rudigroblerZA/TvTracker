@@ -89,7 +89,7 @@ public static class CallItApi
             crowd = await CrowdAsync(db, showId, mine.SeasonNumber, ct);
         }
 
-        var premieres = await PremieresAsync(db, [showId], now, ct);
+        var premieres = await PremieresAsync(db, [showId], ct);
         var past = calls.Where(c => c != mine).OrderByDescending(c => c.SeasonNumber)
             .Select(c => ToDto(c, show, premieres.GetValueOrDefault((showId, c.SeasonNumber)), now)).ToList();
         return TypedResults.Ok(new ShowCallDto(open?.Number, open?.PremieresAtUtc, mine?.Rating, model, crowd, past));
@@ -124,7 +124,7 @@ public static class CallItApi
 
         // The panel after a call, from what's already here: the crowd is the one thing left to ask for.
         var crowd = await CrowdAsync(db, showId, open.Number, ct);
-        var premieres = await PremieresAsync(db, [showId], now, ct);
+        var premieres = await PremieresAsync(db, [showId], ct);
         var past = (await db.SeasonCalls.AsNoTracking().Where(c => c.UserId == userId && c.ShowId == showId && c.SeasonNumber != open.Number).ToListAsync(ct))
             .OrderByDescending(c => c.SeasonNumber)
             .Select(c => ToDto(c, show, premieres.GetValueOrDefault((showId, c.SeasonNumber)), now)).ToList();
@@ -155,7 +155,7 @@ public static class CallItApi
 
         // The next season of each followed running show: the one after the latest to air.
         var latest = await db.Episodes.AsNoTracking()
-            .Where(e => followed.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
+            .AiredRegular(now).Where(e => followed.Contains(e.ShowId))
             .GroupBy(e => e.ShowId).Select(g => new { ShowId = g.Key, Season = g.Max(e => e.SeasonNumber) })
             .ToDictionaryAsync(g => g.ShowId, g => g.Season, ct);
         var called = calls.Select(c => (c.ShowId, c.SeasonNumber)).ToHashSet();
@@ -164,7 +164,7 @@ public static class CallItApi
             .Where(c => !called.Contains((c.ShowId, c.Season)))
             .ToList();
 
-        var premieres = await PremieresAsync(db, showIds, now, ct);
+        var premieres = await PremieresAsync(db, showIds, ct);
         var suggestions = candidates
             .Select(c => new CallDto(c.ShowId, shows[c.ShowId].Title, shows[c.ShowId].PosterUrl, c.Season, 0, null, null, "open", null,
                 premieres.GetValueOrDefault((c.ShowId, c.Season))))
@@ -207,7 +207,7 @@ public static class CallItApi
     private static async Task<(int Number, DateTimeOffset? PremieresAtUtc)> OpenSeasonAsync(AnalyticsContext db, Guid showId, DateTimeOffset now,
         CancellationToken ct)
     {
-        var season = await db.Episodes.AsNoTracking().Where(e => e.ShowId == showId && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
+        var season = await db.Episodes.AsNoTracking().AiredRegular(now).Where(e => e.ShowId == showId)
             .MaxAsync(e => (int?)e.SeasonNumber, ct) ?? 0;
         var premiere = await db.Episodes.AsNoTracking().Where(e => e.ShowId == showId && e.SeasonNumber == season + 1 && e.AirsAtUtc != null)
             .MinAsync(e => e.AirsAtUtc, ct);
@@ -218,7 +218,7 @@ public static class CallItApi
     /// Each season's first dated episode, for the given shows.
     /// </summary>
     private static async Task<Dictionary<(Guid, int), DateTimeOffset?>> PremieresAsync(AnalyticsContext db, IReadOnlyCollection<Guid> showIds,
-        DateTimeOffset now, CancellationToken ct) =>
+        CancellationToken ct) =>
         (await db.Episodes.AsNoTracking().Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc != null)
             .GroupBy(e => new { e.ShowId, e.SeasonNumber })
             .Select(g => new { g.Key.ShowId, g.Key.SeasonNumber, First = g.Min(e => e.AirsAtUtc)!.Value })

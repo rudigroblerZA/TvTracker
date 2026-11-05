@@ -57,7 +57,7 @@ public static class TvLifeApi
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["born"] = [$"Use a year from {EarliestBirthYear} to {now.Year}."] });
         }
         var userId = user.GetUserId();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = Viewer.Zone(tz);
 
         // Every catalog show's first and last regular episode, from one aggregate.
         var runs = await db.Episodes.AsNoTracking().AiredRegular(now)
@@ -71,7 +71,7 @@ public static class TvLifeApi
             .Where(w => w.UserId == userId)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, Minutes = e.RuntimeMinutes ?? 0 })
             .ToListAsync(ct);
-        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).Select(g => g.Key).ToHashSet();
+        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r => (r.ShowId, Year: TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone).Year, r.Minutes))
             .ToList();

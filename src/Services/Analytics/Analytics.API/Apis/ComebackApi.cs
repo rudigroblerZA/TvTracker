@@ -98,7 +98,12 @@ public static class ComebackApi
             .OrderByDescending(g => g.Last)
             .ToListAsync(ct);
 
-        var loads = await ShowLoads.LoadAsync(db, userId, paused.Select(p => p.ShowId).ToList(), now, withInsights: true, ct);
+        // Finished shows have nothing left to go back to, so they're left out before loading (one aggregate), rather than
+        // loading every episode, watch and document of a long history to drop them in Build.
+        var ids = paused.Select(p => p.ShowId).ToList();
+        var progress = await Viewer.ProgressAsync(db, userId, now, ids, ct);
+        ids = ids.Where(id => progress.GetValueOrDefault(id) is not { AllWatched: true }).ToList();
+        var loads = await ShowLoads.LoadAsync(db, userId, ids, now, withInsights: true, ct);
         return paused.Select(p => loads.GetValueOrDefault(p.ShowId)).OfType<ShowLoad>()
             .Select(load => Build(load, now)).OfType<ComebackDto>().ToList();
     }

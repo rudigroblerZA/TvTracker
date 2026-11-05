@@ -362,14 +362,19 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   must read the same way live in one place, after each had been written out in a dozen places with drift.
   - **`CopyRules`:** `AiredRegular(now)` (aired, season 0 left out, as Tracking counts), `HasEnded()` (Ended or
     Cancelled: TVmaze never says Cancelled, the mock provider does, and half the code checked only Ended), `BulkMark`
-    and `BulkMarks(...)` (8+ of a show's episodes at one moment). The worker's `ShowInsightContext` has `RegularAired`
+    and `BulkMarks(...)` (8+ of a show's episodes at one moment; generic, for projected watch rows too), and `Ended()` /
+    `Running()` for queries. The worker's `ShowInsightContext` has `RegularAired`
     and `RegularSeasonStats`; a show's run, its tags (bingeable, limited series, long-running, quick episodes) and
     completion now leave specials out, as the API and Tracking always did.
   - **`InsightDocuments`:** the documents' JSON contract: one `JsonSerializerOptions` for writing and reading, typed
     `Read`, and `Paths` (jsonb keys derived with `nameof`), used by every reader that selects a part of a document by
     path (tags, the verdict list, the scorer, the publications). A renamed record parameter now breaks the build, not
     the SQL silently.
-  - **In the API, `Viewer`** (`Apis/Viewer.cs`): `ProgressAsync`, one SQL aggregate per show of aired regular
+  - **Endings and slow starts:** `LandingVerdicts.Ending` (points and reason text) and `InsightRules.SlowStartMinutes` are
+    the one table both the API's `ShowValue` and the worker's worth-it score read, so the backlog, time off and the score
+    can't weigh an ending differently.
+  - **In the API, `Viewer`** (`Apis/Viewer.cs`): `Zone(tz)` and `LocalDate`, the viewer's calendar for every endpoint
+    that takes `tz`; `ProgressAsync`, one SQL aggregate per show of aired regular
     episodes left-joined to the caller's watches (aired, watched, latest watched, minutes left, last aired and
     watched), shared by Will you finish it?, the waiting room, Known faces and Your taste. Before it, the per-show
     "will you finish it?" loaded every aired episode of every show the viewer had ever watched on each show-page

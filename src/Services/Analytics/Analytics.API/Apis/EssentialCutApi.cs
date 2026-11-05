@@ -344,8 +344,7 @@ public static class EssentialCutApi
         }
 
         // Everything after the last watched episode (episodes skipped earlier on don't count as still to watch).
-        var last = aired.FindLastIndex(e => watched.Contains(e.EpisodeId));
-        var remaining = aired.Skip(last + 1).ToList();
+        var (_, remaining) = Viewer.Split(aired, watched);
         var remainingKept = remaining.Where(e => decisions[e.EpisodeId].Keep).ToList();
         var next = remainingKept.FirstOrDefault();
         return new CutProgressDto(

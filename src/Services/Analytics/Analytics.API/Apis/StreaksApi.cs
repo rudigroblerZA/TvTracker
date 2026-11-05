@@ -70,9 +70,9 @@ public static class StreaksApi
         CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow();
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        var today = Viewer.LocalDate(now, zone);
 
         var rows = await db.Watches.AsNoTracking().Where(w => w.UserId == userId).ToListAsync(ct);
         var bulk = CopyRules.BulkMarks(rows);
@@ -105,7 +105,7 @@ public static class StreaksApi
             {
                 keptUp.Add(new KeptUpDto(show.Key, "", null, run.Current, run.Longest, run.Latest!.Season, run.Latest.Episode));
                 due.AddRange(run.Due.Select(d => new StreakDueDto(show.Key, "", null, d.Episode.Season, d.Episode.Episode,
-                    DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(d.Deadline, zone).DateTime), run.Current)));
+                    Viewer.LocalDate(d.Deadline, zone), run.Current)));
             }
             if (run.Longest >= MinKeptUp && (best is null || run.Longest > best.Longest))
             {

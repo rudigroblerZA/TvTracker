@@ -194,6 +194,21 @@ public static class LandingVerdicts
     /// A finale in line with the show, at the end of one of its weakest seasons.
     /// </summary>
     public const string WeakerLastSeason = "weaker-last-season";
+
+    /// <summary>
+    /// What an ending is worth on the rating's scale, and how a reason says it: one table, so the backlog and time off
+    /// (Analytics.API's ShowValue) and the worth-it score weigh an ending alike. "As it ran" and no verdict are worth
+    /// nothing.
+    /// </summary>
+    public static (double Points, string Text)? Ending(string? verdict) => verdict switch
+    {
+        Sticks => (0.3, "Sticks the landing"),
+        GreatFinale => (0.3, "Great finale"),
+        WeakerLastSeason => (-0.1, "Weaker last season"),
+        FinaleLetsDown => (-0.3, "The finale lets it down"),
+        Fizzles => (-0.5, "Fizzles out at the end"),
+        _ => null
+    };
 }
 
 /// <summary>
@@ -462,6 +477,12 @@ public static class InsightRules
     /// A season counts as a decline from the peak when it's at least this far below it (0-10 scale).
     /// </summary>
     public const double DeclineMargin = 0.3;
+
+    /// <summary>
+    /// A show that gets good this many minutes in (or later) has a slow start worth warning about, in the backlog, time
+    /// off and the worth-it score alike.
+    /// </summary>
+    public const int SlowStartMinutes = 180;
 }
 
 /// <summary>

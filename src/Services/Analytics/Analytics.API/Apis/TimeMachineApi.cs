@@ -75,8 +75,8 @@ public static class TimeMachineApi
         ClaimsPrincipal user, AnalyticsContext db, HybridCache cache, TimeProvider time, DateOnly? date = null, string? tz = null,
         CancellationToken ct = default)
     {
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(time.GetUtcNow(), zone).DateTime);
+        var zone = Viewer.Zone(tz);
+        var today = Viewer.LocalDate(time.GetUtcNow(), zone);
         if (date is { } asked && (asked < Earliest || asked >= today))
         {
             return TypedResults.BadRequest($"Pick a date from {Earliest:yyyy} up to yesterday.");
@@ -208,7 +208,7 @@ public static class TimeMachineApi
     /// </summary>
     private static DateOnly WeekOf(EpisodeCopy episode, TimeZoneInfo zone, List<DateOnly> middles)
     {
-        var aired = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(episode.AirsAtUtc!.Value, zone).DateTime);
+        var aired = Viewer.LocalDate(episode.AirsAtUtc!.Value, zone);
         return middles.MinBy(m => Math.Abs(m.DayNumber - aired.DayNumber));
     }
 }

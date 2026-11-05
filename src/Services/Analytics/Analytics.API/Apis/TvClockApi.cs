@@ -76,7 +76,7 @@ public static class TvClockApi
         CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow().UtcDateTime;
         var from = now.AddYears(-1);
 
@@ -84,7 +84,7 @@ public static class TvClockApi
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= from)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, e.RuntimeMinutes })
             .ToListAsync(ct);
-        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).Select(g => g.Key).ToHashSet();
+        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r =>
             {

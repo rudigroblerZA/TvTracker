@@ -142,7 +142,7 @@ public static class TimeOffApi
     /// </summary>
     private static async Task<Shelf> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
     {
-        var ended = await db.Shows.AsNoTracking().Where(s => s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled).ToListAsync(ct);
+        var ended = await db.Shows.AsNoTracking().Ended().ToListAsync(ct);
         var runs = await ShowValue.RunTimesAsync(db, ended.Select(s => s.ShowId).ToList(), now, ct);
         var insights = await ShowDocuments.LoadAsync(db, runs.Keys.ToList(), ct);
         return new Shelf(ended.Where(s => runs.ContainsKey(s.ShowId))
