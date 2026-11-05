@@ -700,7 +700,7 @@ public record HolidayShow(Guid ShowId, string Title, string? PosterUrl);
 /// </summary>
 public record ResearchWorkspace(Guid ShowId, string Title, DateTime? GatheredAtUtc, string? Draft, DateTime? DraftingSinceUtc, string? DraftProblem,
     IReadOnlyList<ResearchSourceItem> Sources, IReadOnlyList<ResearchFact> Facts, SavedResearch? Saved, IReadOnlyList<ResearchVersion> Versions,
-    IReadOnlyList<string> Notes, string Model, bool TmdbConfigured);
+    IReadOnlyList<string> Notes, string Model, bool TmdbConfigured, DateTime? AssistantPreparedAtUtc = null, string? AssistantReason = null);
 
 /// <param name="Number">How drafts and the insight cite it, while it's included.</param>
 /// <param name="Mark">"essential" or "skippable".</param>
@@ -710,11 +710,17 @@ public record EpisodeNote(Guid EpisodeId, int SeasonNumber, int EpisodeNumber, s
 /// <summary>
 /// What to research next (Research.API's queue).
 /// </summary>
-public record ResearchQueue(IReadOnlyList<QueuedShow> Unresearched, IReadOnlyList<DisagreeingShow> Disagreements, DateTime? CheckedAtUtc);
+public record ResearchQueue(IReadOnlyList<QueuedShow> Unresearched, IReadOnlyList<DisagreeingShow> Disagreements, DateTime? CheckedAtUtc,
+    IReadOnlyList<RefreshShow>? Refresh = null);
+
+/// <param name="Reasons">"new-season", "wikidata", "old".</param>
+/// <param name="Prepared">The research assistant has gathered and drafted for it since the last save.</param>
+public record RefreshShow(Guid ShowId, string Title, int Rank, int Version, DateTime SavedAtUtc, IReadOnlyList<string> Reasons, bool Prepared);
 
 /// <param name="Rank">Its place among the catalog's most popular.</param>
 /// <param name="Started">Gathered or drafted, not saved.</param>
-public record QueuedShow(Guid ShowId, string Title, string? PosterUrl, int Rank, string? Network, int? Year, bool Started);
+/// <param name="Prepared">The research assistant gathered and drafted for it.</param>
+public record QueuedShow(Guid ShowId, string Title, string? PosterUrl, int Rank, string? Network, int? Year, bool Started, bool Prepared = false);
 
 public record DisagreeingShow(Guid ShowId, string Title, int Rank, bool Researched, string WikidataUrl, IReadOnlyList<Disagreement> Fields);
 

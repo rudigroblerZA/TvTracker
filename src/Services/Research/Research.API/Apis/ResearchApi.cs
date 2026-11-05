@@ -21,9 +21,11 @@ public record VersionDto(int Version, DateTime SavedAtUtc, string SavedBy);
 /// <param name="Notes">What gathering couldn't do (no Wikidata item, no TMDB key, a source that didn't answer).</param>
 /// <param name="DraftingSinceUtc">Set while the model drafts in the background; the page checks back until it clears.</param>
 /// <param name="DraftProblem">Why the last draft failed.</param>
+/// <param name="AssistantPreparedAtUtc">When the research assistant last gathered and drafted for it; null if it never did.</param>
+/// <param name="AssistantReason">Why it picked the show (<see cref="RefreshReasons"/>).</param>
 public record WorkspaceDto(Guid ShowId, string Title, DateTime? GatheredAtUtc, string? Draft, DateTime? DraftingSinceUtc, string? DraftProblem, IReadOnlyList<SourceDto> Sources,
     IReadOnlyList<FactDto> Facts, SavedResearchDto? Saved, IReadOnlyList<VersionDto> Versions, IReadOnlyList<string> Notes,
-    string Model, bool TmdbConfigured);
+    string Model, bool TmdbConfigured, DateTime? AssistantPreparedAtUtc = null, string? AssistantReason = null);
 
 public record SavedFact(string Key, string Value, Guid? SourceId);
 
@@ -129,6 +131,19 @@ public static partial class ResearchApi
             return TypedResults.NotFound();
         }
 
+        var notes = await GatherSourcesAsync(db, show, wikimedia, tmdb, time.GetUtcNow().UtcDateTime, ct);
+        return TypedResults.Ok(await WorkspaceAsync(db, show, notes, drafter, tmdb, ct));
+    }
+
+    /// <summary>
+    /// Reads Wikidata, Wikipedia and (with a key) TMDB for the show, replacing what an earlier gather found (pages added
+    /// by address stay), and saves; what couldn't be read comes back as notes. Shared by the gather endpoint and the
+    /// research assistant.
+    /// </summary>
+    internal static async Task<List<string>> GatherSourcesAsync(ResearchContext db, CatalogShow show, WikimediaSource wikimedia, TmdbSource tmdb,
+        DateTime now, CancellationToken ct)
+    {
+        var showId = show.Id;
         var (found, notes) = await wikimedia.GatherAsync(show, ct);
         if (!tmdb.Configured)
         {
@@ -153,7 +168,6 @@ public static partial class ResearchApi
             }
         }
 
-        var now = time.GetUtcNow().UtcDateTime;
         var dossier = await EnsureDossierAsync(db, show, now, ct);
         dossier.GatheredAtUtc = now;
         var gatheredKinds = SourceKinds.Gathered.ToArray();
@@ -166,7 +180,7 @@ public static partial class ResearchApi
             AddSource(db, showId, source, now);
         }
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await WorkspaceAsync(db, show, notes, drafter, tmdb, ct));
+        return notes;
     }
 
     private static async Task<Results<Ok<WorkspaceDto>, NotFound, ValidationProblem>> AddSourceAsync(
@@ -340,6 +354,7 @@ public static partial class ResearchApi
             Facts = JsonSerializer.Serialize(facts.OrderBy(f => ResearchFacts.All.ToList().FindIndex(d => d.Key == f.Key)), Json),
             Sources = JsonSerializer.Serialize(sources.Select(s => new SavedSource(s.Number, s.Source.Id, s.Source.Kind, s.Source.Title, s.Source.Url, s.Source.RetrievedAtUtc)), Json),
             SavedAtUtc = now,
+            SeasonsAtSave = RefreshReasons.Seasons(show),
             SavedById = user.FindFirstValue("sub"),
             SavedByName = user.FindFirstValue("name") ?? user.FindFirstValue("preferred_username") ?? "a moderator"
         };
@@ -403,13 +418,14 @@ public static partial class ResearchApi
             sources.OrderBy(s => numbers.GetValueOrDefault(s.Id, int.MaxValue)).ThenBy(s => s.RetrievedAtUtc)
                 .Select(s => new SourceDto(s.Id, numbers.TryGetValue(s.Id, out var n) ? n : null, s.Kind, s.Url, s.Title, s.Excerpt, s.Included, s.RetrievedAtUtc))
                 .ToList(),
-            facts, saved is null ? null : ToDto(saved), versions, notes, drafter.Model, tmdb.Configured);
+            facts, saved is null ? null : ToDto(saved), versions, notes, drafter.Model, tmdb.Configured,
+            dossier?.AssistantPreparedAtUtc, dossier?.AssistantReason);
     }
 
     /// <summary>
     /// Included sources numbered as drafts and saves cite them: Wikidata, Wikipedia, TMDB, then pages by when added.
     /// </summary>
-    private static List<(int Number, ResearchSource Source)> Number(IEnumerable<ResearchSource> sources) =>
+    internal static List<(int Number, ResearchSource Source)> Number(IEnumerable<ResearchSource> sources) =>
         sources.Where(s => s.Included)
             .OrderBy(s => Array.IndexOf(KindOrder, s.Kind)).ThenBy(s => s.RetrievedAtUtc)
             .Select((s, i) => (i + 1, s))
@@ -434,7 +450,7 @@ public static partial class ResearchApi
         }
     }
 
-    private static async Task<Dossier> EnsureDossierAsync(ResearchContext db, CatalogShow show, DateTime now, CancellationToken ct)
+    internal static async Task<Dossier> EnsureDossierAsync(ResearchContext db, CatalogShow show, DateTime now, CancellationToken ct)
     {
         var dossier = await db.Dossiers.FindAsync([show.Id], ct);
         if (dossier is null)

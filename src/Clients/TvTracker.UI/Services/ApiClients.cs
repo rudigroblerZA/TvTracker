@@ -992,6 +992,12 @@ public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<ResearchQueue?> GetQueueAsync(CancellationToken ct = default) =>
         GetAsync<ResearchQueue>(ApiClients.Research, "api/v1/research/queue", ct);
 
+    /// <summary>
+    /// Starts the research assistant's run now.
+    /// </summary>
+    public Task RunAssistantAsync(CancellationToken ct = default) =>
+        SendAsync(ApiClients.Research, HttpMethod.Post, "api/v1/research/assistant/run", null, ct);
+
     public Task<ResearchWorkspace?> GatherAsync(Guid showId, CancellationToken ct = default) =>
         SendAsync<ResearchWorkspace>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/gather", null, ct);
 

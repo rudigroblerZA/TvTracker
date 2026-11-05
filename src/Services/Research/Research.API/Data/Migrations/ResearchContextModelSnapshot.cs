@@ -17,7 +17,7 @@ namespace Research.API.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -65,6 +65,12 @@ namespace Research.API.Data.Migrations
                 {
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AssistantPreparedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AssistantReason")
+                        .HasColumnType("text");
 
                     b.Property<string>("Draft")
                         .HasColumnType("text");
@@ -231,6 +237,9 @@ namespace Research.API.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<int?>("SeasonsAtSave")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");

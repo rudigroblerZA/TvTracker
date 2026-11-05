@@ -808,6 +808,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Counting:** `COUNT(DISTINCT ?win)` with the English label optional, so a win whose award has no English label
     still counts (it just isn't named), and labels don't multiply wins.
   - **Isolated:** an awards query failure keeps the stored `show_awards` and still saves the day's `catalog_checks`.
+- **Research assistant** (`ResearchAssistant`, `research-assistant` flag): the legwork without the judgement. Every 6
+  hours (first 10 minutes after start, or at once on a moderator's "Run now") it takes 3 shows from the top of the queue,
+  gathers their sources (the gather endpoint's own code, `GatherSourcesAsync`) and queues a draft on `DraftQueue`, a
+  minute apart. The dossier records when and why (`AssistantPreparedAtUtc`, `AssistantReason`), and the workspace and
+  queue say "prepared".
+  - **Never saves** (a decision): the saved record overrides catalog fields and is what the show page trusts, so a
+    moderator checks the facts and the draft against the sources; a small CPU model misreads sources often enough
+    (see Ask the app).
+  - **Never over a moderator's work:** it picks a show with no workspace at all, or saved research due a refresh whose
+    workspace hasn't changed since the save (the save stamps `UpdatedAtUtc`; any gather, edit or draft moves it). A show
+    it prepared isn't picked again until it's saved.
+  - **Three a run, a minute apart:** Wikidata limits the sandbox's shared address hard, and each draft takes a minute or
+    more on a CPU, one at a time.
+- **Due a refresh** (`RefreshReasons`, `RefreshQueue`): saved research among the 300 most popular shows is due when the
+  catalog now has more regular seasons with episodes than when it was saved (`SavedResearch.SeasonsAtSave`, migration
+  `ResearchAssistant`), when the daily Wikidata check disagrees about the show, or when it's over a year old. Versions
+  saved before seasons were kept go by the other two. Each saved show's current seasons come from Catalog.API's show
+  detail, 8 at a time, when the queue is read.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
@@ -1629,7 +1647,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Tests
 
 - **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`,
-  `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, xUnit v3): no database,
+  `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, `tests/Research.UnitTests`, xUnit v3): no database,
   network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
@@ -1641,7 +1659,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages;
   Recommendations' matching (DNA as a 0.5-1 multiplier, kind and language, the nanogenre bonus, reasons) and signal
   weights; Notifications' quiet hours (time zones, a daylight-saving gap), when a digest is due, which preference an
-  alert follows, and the verdict, crossover and digest texts.
+  alert follows, and the verdict, crossover and digest texts; Research's refresh rule and when the research assistant
+  leaves a workspace alone.
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
 - **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
@@ -1649,6 +1668,6 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Known gaps
 
-- There's no CI, and only Catalog, Analytics, Recommendations and Notifications have tests.
+- There's no CI, and only Catalog, Analytics, Recommendations, Notifications and Research have tests.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - The realm file still has the demo user (demo / demo); a shared environment should delete it.

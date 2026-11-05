@@ -732,6 +732,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `holiday-episodes` | `/holidays`, its line on Home when a holiday is near and its link on Insights, and its endpoints |
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
+| `research-assistant` | The research assistant's runs (checked once a run), its "Run now" endpoint and the section on `/research` |
 | `ask` | `/ask`, its Insights card, and Assistant.API's endpoints |
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
@@ -1129,7 +1130,15 @@ How events flow:
       - **Wikidata disagrees:** popular shows where Wikidata's network, premiere date or (ended shows) episode count
         differs from the catalog's, with both values and a link to the Wikidata item. Saving research with the right
         value overrides the catalog's, and the show drops off after the next check.
-      - **Popular, not researched yet:** the catalog's most popular shows with no saved research, marked when started.
+      - **Due a refresh:** saved research that may be out of date: a new season since it was saved, Wikidata now
+        disagreeing with the catalog, or saved over a year ago.
+      - **Popular, not researched yet:** the catalog's most popular shows with no saved research, marked when started
+        or prepared.
+      - **Research assistant** (`research-assistant` flag): a few times a day it takes the top of the queue (research due
+        a refresh, then popular shows with none), gathers the sources and drafts the insight, so a moderator opens a
+        prepared workspace that says so. It never saves, and it leaves alone any show whose workspace someone has changed
+        since its last save. **Run now** on `/research` starts a run at once (`POST /api/v1/research/assistant/run`);
+        drafts take a few minutes each.
       - **How:** Research.API checks the 300 most popular shows against Wikidata after start and daily (one SPARQL query
         per 100 shows, by TVmaze id); a network matches when one name contains the other ("HBO" and "HBO Max") or by
         initials ("American Broadcasting Company" and ABC), a premiere when within a day at Wikidata's precision (a
