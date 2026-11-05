@@ -9,7 +9,7 @@ namespace Research.API.Services;
 /// drafts at once. The dossier says it's drafting until the result (or the problem) is stored; the page checks back.
 /// A restart loses queued drafts, and a dossier left "drafting" for more than <see cref="Stale"/> can be drafted again.
 /// </summary>
-public sealed class DraftQueue(IServiceScopeFactory scopes, InsightDrafter drafter, TimeProvider time, ILogger<DraftQueue> logger) : BackgroundService
+public sealed class DraftQueue(IServiceScopeFactory scopes, InsightDrafter drafter, ILogger<DraftQueue> logger) : BackgroundService
 {
     public static readonly TimeSpan Stale = TimeSpan.FromMinutes(15);
 
@@ -31,8 +31,8 @@ public sealed class DraftQueue(IServiceScopeFactory scopes, InsightDrafter draft
                 {
                     dossier.Draft = draft ?? dossier.Draft;
                     dossier.DraftProblem = problem;
+                    // Not a change to the workspace: whoever asked for the draft stamped it then.
                     dossier.DraftingSinceUtc = null;
-                    dossier.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
                     await db.SaveChangesAsync(stoppingToken);
                 }
             }

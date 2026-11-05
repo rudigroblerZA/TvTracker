@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Research.API.Data;
 using Research.API.Services;
 using TvTracker;
@@ -53,7 +54,8 @@ public static class ResearchQueueApi
     }
 
     private static async Task<Results<Ok<ResearchQueueDto>, NotFound>> GetQueueAsync(
-        ClaimsPrincipal user, Researchers researchers, ResearchContext db, CatalogReader catalog, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal user, Researchers researchers, ResearchContext db, CatalogReader catalog, IMemoryCache cache, TimeProvider time,
+        ILoggerFactory loggers, CancellationToken ct)
     {
         if (!researchers.Allowed(user))
         {
@@ -61,14 +63,18 @@ public static class ResearchQueueApi
         }
 
         var saved = (await db.Saved.Select(s => s.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
-        var dossiers = await db.Dossiers.AsNoTracking().ToDictionaryAsync(d => d.ShowId, d => d.AssistantPreparedAtUtc is not null, ct);
+        // Started: someone has worked on it. Prepared: the assistant's preparation is the last change to it.
+        var dossiers = await db.Dossiers.AsNoTracking()
+            .Select(d => new Dossier { ShowId = d.ShowId, ShowTitle = d.ShowTitle, UpdatedAtUtc = d.UpdatedAtUtc, AssistantPreparedAtUtc = d.AssistantPreparedAtUtc })
+            .ToDictionaryAsync(d => d.ShowId, ct);
         var popular = await catalog.GetPopularFactsAsync(CatalogChecks.Popular, ct);
         var unresearched = popular
             .Select((s, i) => (Show: s, Rank: i + 1))
             .Where(x => !saved.Contains(x.Show.Id))
             .Take(MaxUnresearched)
             .Select(x => new QueuedShowDto(x.Show.Id, x.Show.Title, x.Show.PosterUrl, x.Rank, x.Show.Network, x.Show.FirstAirDate?.Year,
-                dossiers.ContainsKey(x.Show.Id), dossiers.GetValueOrDefault(x.Show.Id)))
+                dossiers.TryGetValue(x.Show.Id, out var d) && d.UpdatedAtUtc > DateTime.UnixEpoch && !ResearchAssistant.PreparedLast(d),
+                d is not null && ResearchAssistant.PreparedLast(d)))
             .ToList();
 
         var checks = await db.CatalogChecks.AsNoTracking().ToListAsync(ct);
@@ -80,7 +86,8 @@ public static class ResearchQueueApi
                 g.Select(c => new DisagreementDto(c.Field, c.CatalogValue, c.WikidataValue)).ToList()))
             .ToList();
 
-        var refresh = await RefreshQueue.ComputeAsync(db, catalog, popular, time.GetUtcNow().UtcDateTime, ct);
+        var refresh = await RefreshQueue.ComputeAsync(db, catalog, cache, popular, time.GetUtcNow().UtcDateTime,
+            loggers.CreateLogger(nameof(ResearchQueueApi)), ct);
         return TypedResults.Ok(new ResearchQueueDto(unresearched, disagreements, checks.Count > 0 ? checks.Max(c => c.CheckedAtUtc) : null, refresh));
     }
 }

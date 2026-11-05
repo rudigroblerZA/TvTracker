@@ -816,16 +816,24 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Never saves** (a decision): the saved record overrides catalog fields and is what the show page trusts, so a
     moderator checks the facts and the draft against the sources; a small CPU model misreads sources often enough
     (see Ask the app).
-  - **Never over a moderator's work:** it picks a show with no workspace at all, or saved research due a refresh whose
-    workspace hasn't changed since the save (the save stamps `UpdatedAtUtc`; any gather, edit or draft moves it). A show
-    it prepared isn't picked again until it's saved.
-  - **Three a run, a minute apart:** Wikidata limits the sandbox's shared address hard, and each draft takes a minute or
-    more on a CPU, one at a time.
+  - **Whose change is whose:** a workspace's `UpdatedAtUtc` moves only for a moderator's change (gather, a source
+    added, included or removed, a draft asked for or edited, a save) or when the assistant finishes preparing it, which
+    stamps the same moment as `AssistantPreparedAtUtc`. The assistant's own gather and a draft finishing in the background
+    don't move it. So "prepared" means the assistant's preparation is the last change (`PreparedLast`), and an attempt
+    that fails part way leaves the workspace as it was, to be tried again next run (a workspace it made but never
+    finished reads as never changed, `UnixEpoch`, and stays out of the "in progress" list).
+  - **Never over a moderator's work:** it picks a show with no workspace anyone has worked on, or saved research due a
+    refresh whose workspace hasn't changed since the save, and with no draft running; it reads the workspace again just
+    before preparing, since a run spends minutes between shows. A show it prepared isn't picked again until it's saved.
+  - **Three a run, a minute apart,** whatever happened to the show before: Wikidata limits the sandbox's shared address
+    hard, and each draft takes a minute or more on a CPU, one at a time.
 - **Due a refresh** (`RefreshReasons`, `RefreshQueue`): saved research among the 300 most popular shows is due when the
   catalog now has more regular seasons with episodes than when it was saved (`SavedResearch.SeasonsAtSave`, migration
-  `ResearchAssistant`), when the daily Wikidata check disagrees about the show, or when it's over a year old. Versions
-  saved before seasons were kept go by the other two. Each saved show's current seasons come from Catalog.API's show
-  detail, 8 at a time, when the queue is read.
+  `ResearchAssistant`), when a Wikidata check made after the save disagrees about a field the saved research didn't
+  settle, or when it's over a year old. A moderator who saved a network or premiere has judged Wikidata's (a streaming
+  home against a first broadcaster), so the daily check doesn't raise it again after every save. Versions saved before
+  seasons were kept go by the other two. Each saved show's current seasons come from Catalog.API's show detail, cached an
+  hour per show; a show it can't read is judged without them rather than failing the queue.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
