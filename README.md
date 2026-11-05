@@ -630,6 +630,30 @@ dotnet run -- cleanup                          # delete the users and everything
 - A first run on a laptop-class sandbox: 5 users at 300 ms think time with writes gave about 55 req/s, p95 ~110 ms
   once warm (the first seconds are slower while caches fill), and no errors.
 
+#### Demo data
+
+`seed` fills the app with users who look like people, so insights, the social feed and the figures that need 5 or more
+users behind them have something to show:
+
+```bash
+cd src/Tools/TvTracker.LoadGen
+dotnet run -- seed --prefix seed- --users 40             # seed-0001 … seed-0040, password load-test
+dotnet run -- seed --prefix seed- --users 40 --months 24 --seed 7
+dotnet run -- cleanup --prefix seed-                     # remove them and everything they did
+```
+
+- **Each user** gets a name, a time zone and a taste (crime, comedy, genre, prestige drama, animation or easy viewing),
+  and follows 8 to 20 shows, most in those genres: some finished, some still watching, some stopped part way, some
+  only planned, with the status to match.
+- **Dated history:** watches go through Bring your history's import, so each keeps its time: evenings in the user's
+  zone, an episode every few days with the odd binge, going back `--months` (default 12), and never before an episode
+  aired.
+- **Ratings that agree:** stars follow a quality each show has for everyone, the user's taste for its genres and a
+  little noise (lower for a show they stopped), so taste twins and the community figures look real. Some episodes are
+  rated too, a few get a short comment, and each user follows a few of the others.
+- **Once per user:** a user who already has watches is skipped, so running it again only seeds new users. The same
+  `--seed`, users and catalog give the same data.
+
 ### MCP server (internal queries)
 
 `mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the

@@ -46,6 +46,9 @@ dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
 # Ask the running app questions ("landman insights") from Claude Code, over its MCP server
 claude mcp add --transport http tvtracker http://localhost:5112/mcp
 
+# Demo data while the AppHost runs: users with a dated, realistic history (cleanup --prefix seed- removes them)
+dotnet run --project src/Tools/TvTracker.LoadGen -- seed --prefix seed- --users 40
+
 # Load while the AppHost runs (setup once; cleanup deletes the users and their data)
 dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
