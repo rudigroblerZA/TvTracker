@@ -102,7 +102,8 @@ public static partial class ResearchApi
         {
             return TypedResults.NotFound();
         }
-        var dossiers = await db.Dossiers.AsNoTracking().OrderByDescending(d => d.UpdatedAtUtc).Take(200).ToListAsync(ct);
+        var dossiers = await db.Dossiers.AsNoTracking().Where(d => d.UpdatedAtUtc > DateTime.UnixEpoch)
+            .OrderByDescending(d => d.UpdatedAtUtc).Take(200).ToListAsync(ct);
         var ids = dossiers.Select(d => d.ShowId).ToList();
         var latest = await db.Saved.AsNoTracking().Where(s => ids.Contains(s.ShowId))
             .GroupBy(s => s.ShowId).Select(g => g.OrderByDescending(s => s.Version).Select(s => new { s.ShowId, s.Version, s.SavedAtUtc }).First())
@@ -138,10 +139,11 @@ public static partial class ResearchApi
     /// <summary>
     /// Reads Wikidata, Wikipedia and (with a key) TMDB for the show, replacing what an earlier gather found (pages added
     /// by address stay), and saves; what couldn't be read comes back as notes. Shared by the gather endpoint and the
-    /// research assistant.
+    /// research assistant. The assistant's gather (<paramref name="byModerator"/> false) doesn't stamp the workspace as
+    /// changed: only a moderator's changes, and the assistant's finished preparation, do (see <see cref="ResearchAssistant"/>).
     /// </summary>
     internal static async Task<List<string>> GatherSourcesAsync(ResearchContext db, CatalogShow show, WikimediaSource wikimedia, TmdbSource tmdb,
-        DateTime now, CancellationToken ct)
+        DateTime now, CancellationToken ct, bool byModerator = true)
     {
         var showId = show.Id;
         var (found, notes) = await wikimedia.GatherAsync(show, ct);
@@ -168,7 +170,7 @@ public static partial class ResearchApi
             }
         }
 
-        var dossier = await EnsureDossierAsync(db, show, now, ct);
+        var dossier = await EnsureDossierAsync(db, show, now, ct, touch: byModerator);
         dossier.GatheredAtUtc = now;
         var gatheredKinds = SourceKinds.Gathered.ToArray();
         var stale = await db.Sources.Where(s => s.ShowId == showId && gatheredKinds.Contains(s.Kind)).ToListAsync(ct);
@@ -206,19 +208,21 @@ public static partial class ResearchApi
     }
 
     private static async Task<Results<NoContent, NotFound>> IncludeAsync(
-        Guid showId, Guid sourceId, IncludeRequest request, ClaimsPrincipal user, Researchers researchers, ResearchContext db, CancellationToken ct)
+        Guid showId, Guid sourceId, IncludeRequest request, ClaimsPrincipal user, Researchers researchers, ResearchContext db, TimeProvider time,
+        CancellationToken ct)
     {
         if (!researchers.Allowed(user) || await db.Sources.SingleOrDefaultAsync(s => s.Id == sourceId && s.ShowId == showId, ct) is not { } source)
         {
             return TypedResults.NotFound();
         }
         source.Included = request.Included;
+        await TouchAsync(db, showId, time, ct);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
     }
 
     private static async Task<Results<NoContent, NotFound>> RemoveSourceAsync(
-        Guid showId, Guid sourceId, ClaimsPrincipal user, Researchers researchers, ResearchContext db, CancellationToken ct)
+        Guid showId, Guid sourceId, ClaimsPrincipal user, Researchers researchers, ResearchContext db, TimeProvider time, CancellationToken ct)
     {
         if (!researchers.Allowed(user) || await db.Sources.SingleOrDefaultAsync(s => s.Id == sourceId && s.ShowId == showId, ct) is not { } source)
         {
@@ -226,6 +230,7 @@ public static partial class ResearchApi
         }
         db.Candidates.RemoveRange(await db.Candidates.Where(c => c.SourceId == sourceId).ToListAsync(ct));
         db.Sources.Remove(source);
+        await TouchAsync(db, showId, time, ct);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
     }
@@ -254,6 +259,7 @@ public static partial class ResearchApi
 
         dossier.DraftingSinceUtc = now;
         dossier.DraftProblem = null;
+        dossier.UpdatedAtUtc = now;
         await db.SaveChangesAsync(ct);
         drafts.Enqueue(showId, dossier.ShowTitle, numbered);
         return TypedResults.Accepted((string?)null);
@@ -419,7 +425,7 @@ public static partial class ResearchApi
                 .Select(s => new SourceDto(s.Id, numbers.TryGetValue(s.Id, out var n) ? n : null, s.Kind, s.Url, s.Title, s.Excerpt, s.Included, s.RetrievedAtUtc))
                 .ToList(),
             facts, saved is null ? null : ToDto(saved), versions, notes, drafter.Model, tmdb.Configured,
-            dossier?.AssistantPreparedAtUtc, dossier?.AssistantReason);
+            dossier is not null && ResearchAssistant.PreparedLast(dossier) ? dossier.AssistantPreparedAtUtc : null, dossier?.AssistantReason);
     }
 
     /// <summary>
@@ -450,17 +456,30 @@ public static partial class ResearchApi
         }
     }
 
-    internal static async Task<Dossier> EnsureDossierAsync(ResearchContext db, CatalogShow show, DateTime now, CancellationToken ct)
+    /// <param name="touch">Stamp the workspace as changed now (a moderator's change); a new one made without it reads as
+    /// never changed (<see cref="DateTime.UnixEpoch"/>), so the assistant can try it again.</param>
+    internal static async Task<Dossier> EnsureDossierAsync(ResearchContext db, CatalogShow show, DateTime now, CancellationToken ct, bool touch = true)
     {
         var dossier = await db.Dossiers.FindAsync([show.Id], ct);
         if (dossier is null)
         {
-            dossier = new Dossier { ShowId = show.Id, ShowTitle = show.Title };
+            dossier = new Dossier { ShowId = show.Id, ShowTitle = show.Title, UpdatedAtUtc = DateTime.UnixEpoch };
             db.Dossiers.Add(dossier);
         }
         dossier.ShowTitle = show.Title;
-        dossier.UpdatedAtUtc = now;
+        if (touch)
+        {
+            dossier.UpdatedAtUtc = now;
+        }
         return dossier;
+    }
+
+    private static async Task TouchAsync(ResearchContext db, Guid showId, TimeProvider time, CancellationToken ct)
+    {
+        if (await db.Dossiers.FindAsync([showId], ct) is { } dossier)
+        {
+            dossier.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        }
     }
 
     private static Task<SavedResearch?> LatestAsync(ResearchContext db, Guid showId, CancellationToken ct) =>

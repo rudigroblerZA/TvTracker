@@ -48,4 +48,35 @@ public class RefreshTests
         Assert.True(ResearchAssistant.Untouched(new Dossier { ShowTitle = "Silo", UpdatedAtUtc = saved }, saved));
         Assert.False(ResearchAssistant.Untouched(new Dossier { ShowTitle = "Silo", UpdatedAtUtc = saved.AddHours(1) }, saved));
     }
+
+    [Fact]
+    public void Wikidata_counts_only_after_the_save_and_for_fields_the_research_left_open()
+    {
+        var saved = Now.AddDays(-10);
+        HashSet<string> none = [], network = ["network"];
+
+        // Yesterday's check, from before the save, says nothing about the research saved since.
+        Assert.False(RefreshReasons.WikidataDisagrees([("network", saved.AddHours(-1))], saved, none));
+        Assert.True(RefreshReasons.WikidataDisagrees([("network", saved.AddDays(1))], saved, none));
+        // A moderator who saved a network has judged Wikidata's, even keeping the catalog's.
+        Assert.False(RefreshReasons.WikidataDisagrees([("network", saved.AddDays(1))], saved, network));
+        Assert.True(RefreshReasons.WikidataDisagrees([("network", saved.AddDays(1)), ("premiered", saved.AddDays(1))], saved, network));
+    }
+
+    [Fact]
+    public void Prepared_means_the_assistants_preparation_is_the_last_change()
+    {
+        var at = Now.AddHours(-2);
+        Assert.True(ResearchAssistant.PreparedLast(new Dossier { ShowTitle = "Silo", AssistantPreparedAtUtc = at, UpdatedAtUtc = at }));
+        // A moderator gathered or edited since: the work is theirs now.
+        Assert.False(ResearchAssistant.PreparedLast(new Dossier { ShowTitle = "Silo", AssistantPreparedAtUtc = at, UpdatedAtUtc = at.AddMinutes(5) }));
+        Assert.False(ResearchAssistant.PreparedLast(new Dossier { ShowTitle = "Silo", UpdatedAtUtc = at }));
+    }
+
+    [Fact]
+    public void A_workspace_no_one_has_changed_reads_as_untouched_with_nothing_saved()
+    {
+        Assert.True(ResearchAssistant.Untouched(new Dossier { ShowTitle = "Silo", UpdatedAtUtc = DateTime.UnixEpoch }, DateTime.UnixEpoch));
+        Assert.False(ResearchAssistant.Untouched(new Dossier { ShowTitle = "Silo", UpdatedAtUtc = Now }, DateTime.UnixEpoch));
+    }
 }
