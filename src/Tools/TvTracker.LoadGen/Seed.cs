@@ -89,7 +89,12 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
             seeded.Add((token, userId, rng));
         }
 
-        // Follows between the users seeded now, three to six each.
+        // Social knows a person once they've visited it (or Identity's profile event has arrived, which can lag), so each
+        // seeded user visits first; then follows between them, three to six each.
+        foreach (var (token, _, _) in seeded)
+        {
+            await SendAsync(token, HttpMethod.Get, "/social/api/v1/me/social", null, ct);
+        }
         foreach (var (token, userId, rng) in seeded)
         {
             foreach (var other in seeded.Where(s => s.UserId != userId).OrderBy(_ => rng.Next()).Take(rng.Next(3, 7)))
