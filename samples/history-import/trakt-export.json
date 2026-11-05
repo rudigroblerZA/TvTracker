@@ -1,0 +1,290 @@
+{
+  "history": [
+    {
+      "id": 9000,
+      "watched_at": "2024-11-02T21:15:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 1,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9001,
+      "watched_at": "2024-11-04T21:22:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 2,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9002,
+      "watched_at": "2024-11-06T21:36:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 3,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9003,
+      "watched_at": "2024-11-08T21:57:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 4,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9004,
+      "watched_at": "2024-11-10T22:25:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 5,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9005,
+      "watched_at": "2024-11-12T23:00:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 6,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9006,
+      "watched_at": "2024-11-14T23:42:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 7,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9007,
+      "watched_at": "2024-11-17T00:31:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 8,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9008,
+      "watched_at": "2024-11-19T01:27:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 9,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    },
+    {
+      "id": 9009,
+      "watched_at": "2024-11-21T02:30:00.000Z",
+      "action": "watch",
+      "type": "episode",
+      "episode": {
+        "season": 1,
+        "number": 10,
+        "title": null
+      },
+      "show": {
+        "title": "Better Call Saul",
+        "year": 2015,
+        "ids": {
+          "tvdb": 273181,
+          "slug": "better-call-saul"
+        }
+      }
+    }
+  ],
+  "watched": [
+    {
+      "plays": 1,
+      "last_watched_at": "2023-06-01T20:00:00.000Z",
+      "show": {
+        "title": "Lost",
+        "year": 2004,
+        "ids": {
+          "tvdb": 73739,
+          "slug": "lost"
+        }
+      },
+      "seasons": [
+        {
+          "number": 1,
+          "episodes": [
+            {
+              "number": 1,
+              "plays": 1,
+              "last_watched_at": "2023-05-02T20:00:00.000Z"
+            },
+            {
+              "number": 2,
+              "plays": 1,
+              "last_watched_at": "2023-05-03T20:00:00.000Z"
+            },
+            {
+              "number": 3,
+              "plays": 1,
+              "last_watched_at": "2023-05-04T20:00:00.000Z"
+            },
+            {
+              "number": 4,
+              "plays": 1,
+              "last_watched_at": "2023-05-05T20:00:00.000Z"
+            },
+            {
+              "number": 5,
+              "plays": 1,
+              "last_watched_at": "2023-05-06T20:00:00.000Z"
+            },
+            {
+              "number": 6,
+              "plays": 1,
+              "last_watched_at": "2023-05-07T20:00:00.000Z"
+            },
+            {
+              "number": 7,
+              "plays": 1,
+              "last_watched_at": "2023-05-08T20:00:00.000Z"
+            },
+            {
+              "number": 8,
+              "plays": 1,
+              "last_watched_at": "2023-05-09T20:00:00.000Z"
+            },
+            {
+              "number": 9,
+              "plays": 1,
+              "last_watched_at": "2023-05-10T20:00:00.000Z"
+            },
+            {
+              "number": 10,
+              "plays": 1,
+              "last_watched_at": "2023-05-11T20:00:00.000Z"
+            },
+            {
+              "number": 11,
+              "plays": 1,
+              "last_watched_at": "2023-05-12T20:00:00.000Z"
+            },
+            {
+              "number": 12,
+              "plays": 1,
+              "last_watched_at": "2023-05-13T20:00:00.000Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "watchlist": [
+    {
+      "rank": 1,
+      "listed_at": "2025-01-10T08:00:00.000Z",
+      "type": "show",
+      "show": {
+        "title": "Silo",
+        "year": 2023,
+        "ids": {
+          "tvdb": 403245,
+          "slug": "silo"
+        }
+      }
+    }
+  ]
+}
