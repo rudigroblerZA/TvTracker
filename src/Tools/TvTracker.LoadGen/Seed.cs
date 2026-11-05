@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 
 namespace TvTracker.LoadGen;
 
 /// <param name="Months">How far back the oldest watches go.</param>
-/// <param name="Seed">The random seed: the same seed, users and catalog give the same data.</param>
+/// <param name="Seed">The random seed: the same seed and catalog give each user the same name, persona, zone and shows;
+/// watch dates are counted back from when it runs, so they, and what follows from them, differ from day to day.</param>
 public sealed record SeedOptions(string BffUrl, int Users, string Password, string Prefix, int Months, int Seed);
 
 /// <summary>
@@ -24,8 +24,10 @@ public sealed record SeedOptions(string BffUrl, int Users, string Password, stri
 /// persona's liking for its genres, and a little noise, lower when the user stopped. Random 3-5 stars made taste twins
 /// mechanical; these agree the way people do.</item>
 /// <item><b>A few posts and follows:</b> a short comment on some watched episodes (through moderation, so no links), and
-/// each user follows a few others.</item>
-/// <item><b>Once:</b> a user with any watches is skipped, so seeding again adds only new users.</item>
+/// each user follows a few of the others, earlier runs' included.</item>
+/// <item><b>Once:</b> the display name is set last, as the mark of a finished user; a user who has it is skipped, so
+/// seeding again adds only new users, and one a failed run left half done is finished (imports, follows and ratings
+/// are idempotent; a comment may be posted again).</item>
 /// </list>
 /// </summary>
 public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions options, Func<int, string> username)
@@ -39,7 +41,7 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         new("genre", ["Science-Fiction", "Fantasy", "Supernatural", "Horror", "Adventure"]),
         new("prestige", ["Drama", "History", "Legal", "War"]),
         new("animation", ["Anime", "Comedy", "Adventure", "Fantasy"]),
-        new("easy", ["Reality", "Food", "Travel", "Comedy"])
+        new("easy", ["Food", "Travel", "Nature", "Comedy"])   // reality is a TVmaze type, not a genre
     ];
 
     private static readonly string[] FirstNames =
@@ -65,54 +67,68 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
 
     public async Task<int> RunAsync(CancellationToken ct)
     {
-        var first = await SignInAsync(username(1), ct);
-        var catalog = await CatalogAsync(first.Token, ct);
+        var catalog = await CatalogAsync(await SignInAsync(username(1), ct), ct);
         if (catalog.Count < 20)
         {
             throw new CliException($"Only {catalog.Count} shows came back from the catalog through {options.BffUrl}; import more first.");
         }
         Console.WriteLine($"{catalog.Count} shows to choose from; seeding {options.Users} users with seed {options.Seed}.");
 
-        var seeded = new List<(string Token, string UserId, Random Rng)>();
-        var skipped = 0;
+        var seeded = new List<int>();
         for (var i = 1; i <= options.Users; i++)
         {
             var rng = new Random(options.Seed * 7919 + i);
-            var (token, userId) = await SignInAsync(username(i), ct);
-            if (await WatchedAsync(token, ct) > 0)
-            {
-                skipped++;
-                continue;
-            }
+            // A user takes seconds; one token (15 minutes) is plenty for it.
+            var token = await SignInAsync(username(i), ct);
             var summary = await SeedUserAsync(token, i, rng, catalog, ct);
-            Console.WriteLine($"{username(i)}: {summary}");
-            seeded.Add((token, userId, rng));
+            if (summary is not null)
+            {
+                Console.WriteLine($"{username(i)}: {summary}");
+                seeded.Add(i);
+            }
         }
 
-        // Social knows a person once they've visited it (or Identity's profile event has arrived, which can lag), so each
-        // seeded user visits first; then follows between them, three to six each.
-        foreach (var (token, _, _) in seeded)
+        // Fresh tokens: the seeding above can outlast one. Social knows a person once they've visited it (Identity's
+        // profile event can lag behind the watches), so everyone visits, which also gives their id; then each user
+        // seeded now follows three to six of all the users, earlier runs' included.
+        var people = new List<(int Index, string Token, string UserId)>();
+        for (var i = 1; i <= options.Users; i++)
         {
-            await SendAsync(token, HttpMethod.Get, "/social/api/v1/me/social", null, ct);
+            var token = await SignInAsync(username(i), ct);
+            using var me = await GetJsonAsync(token, "/social/api/v1/me/social", ct);
+            if (me?.RootElement.GetProperty("userId").GetString() is { } userId)
+            {
+                people.Add((i, token, userId));
+            }
         }
-        foreach (var (token, userId, rng) in seeded)
+        foreach (var (index, token, userId) in people.Where(p => seeded.Contains(p.Index)))
         {
-            foreach (var other in seeded.Where(s => s.UserId != userId).OrderBy(_ => rng.Next()).Take(rng.Next(3, 7)))
+            var rng = new Random(options.Seed * 104729 + index);
+            foreach (var other in people.Where(p => p.UserId != userId).OrderBy(_ => rng.Next()).Take(rng.Next(3, 7)))
             {
                 await SendAsync(token, HttpMethod.Post, $"/social/api/v1/people/{other.UserId}/follow", null, ct);
             }
         }
+        var skipped = options.Users - seeded.Count;
         Console.WriteLine($"Seeded {seeded.Count} users{(skipped > 0 ? $", skipped {skipped} already seeded" : "")}.");
         return 0;
     }
 
-    private async Task<string> SeedUserAsync(string token, int index, Random rng, List<Show> catalog, CancellationToken ct)
+    /// <summary>
+    /// Seeds one user, or returns null when they're done already (their profile has the name this seed gives them).
+    /// </summary>
+    private async Task<string?> SeedUserAsync(string token, int index, Random rng, List<Show> catalog, CancellationToken ct)
     {
         var persona = Personas[rng.Next(Personas.Length)];
         var zone = TimeZoneInfo.FindSystemTimeZoneById(Zones[rng.Next(Zones.Length)]);
         var name = $"{FirstNames[(index - 1) % FirstNames.Length]} {(char)('A' + rng.Next(26))}.";
-        await SendAsync(token, HttpMethod.Put, "/identity/api/v1/profile",
-            new { displayName = name, avatarUrl = (string?)null, timeZone = zone.Id, region = "US", language = "en" }, ct);
+        using (var profile = await GetJsonAsync(token, "/identity/api/v1/profile", ct))
+        {
+            if (profile?.RootElement.GetProperty("displayName").GetString() == name)
+            {
+                return null;
+            }
+        }
 
         double Affinity(Show show) => show.Genres.Count(persona.Genres.Contains) / (double)Math.Max(1, show.Genres.Length);
         var picks = catalog
@@ -133,17 +149,32 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
                 : roll < 0.5 ? (2, 1.0)                                                   // finished
                 : roll < 0.85 ? (0, 0.2 + rng.NextDouble() * 0.7)                         // watching
                 : (4, 0.05 + rng.NextDouble() * 0.35);                                    // stopped
-            await SendAsync(token, HttpMethod.Post, $"/tracking/api/v1/follows/{show.Id}", new { status }, ct);
 
             var watches = History(aired.Take((int)Math.Round(aired.Count * share)).ToList(), zone, now, rng);
+            if (status == 2 && watches.Count < aired.Count)
+            {
+                status = 0;   // the evenings ran out before the episodes did: still watching
+            }
+            // Watches first: the import follows a new show from its first watch, so the follow keeps that date.
             foreach (var chunk in watches.Chunk(500))
             {
-                await SendAsync(token, HttpMethod.Post, "/tracking/api/v1/watched/import",
+                var answer = await SendAsync(token, HttpMethod.Post, "/tracking/api/v1/watched/import",
                     new { watches = chunk.Select(w => new { episodeId = w.Episode.Id, watchedAtUtc = w.At }) }, ct);
+                if (answer == 404)
+                {
+                    throw new CliException("The history import answered 404: turn the history-import flag on (Flags/flagd.json or the flags page).");
+                }
+                watched += answer is >= 200 and < 300 ? chunk.Length : 0;
             }
-            watched += watches.Count;
-            // The import follows a new show as watching; put back what this user did with it.
-            await SendAsync(token, HttpMethod.Put, $"/tracking/api/v1/follows/{show.Id}/status", new { status }, ct);
+            if (watches.Count == 0)
+            {
+                await SendAsync(token, HttpMethod.Post, $"/tracking/api/v1/follows/{show.Id}", new { status }, ct);
+            }
+            else
+            {
+                // The import follows a new show as watching; put back what this user did with it.
+                await SendAsync(token, HttpMethod.Put, $"/tracking/api/v1/follows/{show.Id}/status", new { status }, ct);
+            }
 
             if (watches.Count >= 3 && rng.NextDouble() < 0.75)
             {
@@ -164,6 +195,9 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
                 commented++;
             }
         }
+        // Last, as the mark that this user is done.
+        await SendAsync(token, HttpMethod.Put, "/identity/api/v1/profile",
+            new { displayName = name, avatarUrl = (string?)null, timeZone = zone.Id, region = "US", language = "en" }, ct);
         return $"{name}, {persona.Name}, {zone.Id}: {picks.Count} shows, {watched} watches, {rated} rated, {commented} comments";
     }
 
@@ -238,7 +272,8 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
     }
 
     /// <summary>
-    /// A show's dated regular episodes in order, loaded once for every user.
+    /// A show's dated regular episodes in order, every season (a show is only finished with all of them), loaded once
+    /// for every user.
     /// </summary>
     private Task<List<Episode>> EpisodesAsync(string token, Guid showId, CancellationToken ct)
     {
@@ -259,7 +294,7 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
                 return [];
             }
             var list = new List<Episode>();
-            foreach (var season in show.RootElement.GetProperty("seasons").EnumerateArray().Select(s => s.GetProperty("number").GetInt32()).Where(n => n > 0).Order().Take(6))
+            foreach (var season in show.RootElement.GetProperty("seasons").EnumerateArray().Select(s => s.GetProperty("number").GetInt32()).Where(n => n > 0).Order())
             {
                 using var detail = await GetJsonAsync(token, $"/catalog/api/v1/shows/{showId}/seasons/{season}", ct);
                 if (detail is null)
@@ -275,21 +310,8 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         }
     }
 
-    private async Task<int> WatchedAsync(string token, CancellationToken ct)
-    {
-        using var stats = await GetJsonAsync(token, "/tracking/api/v1/stats", ct);
-        return stats?.RootElement.TryGetProperty("episodesWatched", out var n) == true ? n.GetInt32() : 0;
-    }
-
-    private async Task<(string Token, string UserId)> SignInAsync(string name, CancellationToken ct)
-    {
-        var (token, _) = await keycloak.SignInAsync(name, options.Password, ct);
-        // The user's id is the token's subject; the social follows need it.
-        var payload = token.Split('.')[1].Replace('-', '+').Replace('_', '/');
-        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-        using var claims = JsonDocument.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(payload)));
-        return (token, claims.RootElement.GetProperty("sub").GetString()!);
-    }
+    private async Task<string> SignInAsync(string name, CancellationToken ct) =>
+        (await keycloak.SignInAsync(name, options.Password, ct)).Token;
 
     private async Task<JsonDocument?> GetJsonAsync(string token, string path, CancellationToken ct)
     {
@@ -299,7 +321,10 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         return response.IsSuccessStatusCode ? JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct)) : null;
     }
 
-    private async Task SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken ct)
+    /// <summary>
+    /// Sends a request and returns its status; failures other than 409 (already there) are written to stderr.
+    /// </summary>
+    private async Task<int> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(method, options.BffUrl.TrimEnd('/') + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -312,6 +337,7 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         {
             Console.Error.WriteLine($"  {method} {path}: {(int)response.StatusCode} {Shorten(await response.Content.ReadAsStringAsync(ct))}");
         }
+        return (int)response.StatusCode;
     }
 
     private static string Shorten(string text) => text.Length <= 160 ? text : string.Concat(text.AsSpan(0, 160), "…");

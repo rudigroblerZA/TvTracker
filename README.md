@@ -651,8 +651,9 @@ dotnet run -- cleanup --prefix seed-                     # remove them and every
 - **Ratings that agree:** stars follow a quality each show has for everyone, the user's taste for its genres and a
   little noise (lower for a show they stopped), so taste twins and the community figures look real. Some episodes are
   rated too, a few get a short comment, and each user follows a few of the others.
-- **Once per user:** a user who already has watches is skipped, so running it again only seeds new users. The same
-  `--seed`, users and catalog give the same data.
+- **Once per user:** a user's display name is set last, as the mark that they're done, so running it again only seeds
+  new users (and finishes one a failed run left half done); new users also follow earlier ones. The same `--seed` and
+  catalog give each user the same name, taste and shows; watch dates count back from the day it runs.
 
 ### MCP server (internal queries)
 
