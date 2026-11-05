@@ -44,7 +44,7 @@ public sealed class GetsGoodInsight : IShowInsight
 
     private static GetsGood? GetsGoodFor(ShowInsightContext show)
     {
-        var aired = show.Aired.Where(e => e.SeasonNumber > 0).OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
+        var aired = show.RegularAired.OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
         var rated = aired.Where(e => e.ExternalRating is not null).Take(OpeningRun).ToList();
         if (!show.WellRated || rated.Count < MinRatedEpisodes)
         {

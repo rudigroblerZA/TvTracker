@@ -34,8 +34,6 @@ public static class InsightDocuments
         public static readonly string SeasonVerdict = Name(nameof(ShowInsights.SeasonVerdict));
         public static readonly string Number = Name(nameof(Analytics.Data.SeasonVerdict.Number));
         public static readonly string FinaleAiredAtUtc = Name(nameof(Analytics.Data.SeasonVerdict.FinaleAiredAtUtc));
-        public static readonly string Landing = Name(nameof(ShowInsights.Landing));
-        public static readonly string WorthIt = Name(nameof(ShowInsights.WorthIt));
         public static readonly string Key = Name(nameof(ShowTag.Key));
         public static readonly string Value = Name(nameof(DnaTrait.Value));
 

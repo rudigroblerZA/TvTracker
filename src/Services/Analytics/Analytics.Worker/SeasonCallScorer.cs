@@ -29,10 +29,10 @@ public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILo
         var now = time.GetUtcNow();
         var showIds = open.Select(o => o.ShowId).Distinct().ToList();
         var ended = (await db.Shows.AsNoTracking()
-            .Where(s => showIds.Contains(s.ShowId) && (s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled))
+            .Ended().Where(s => showIds.Contains(s.ShowId))
             .Select(s => s.ShowId).ToListAsync(ct)).ToHashSet();
         var episodes = (await db.Episodes.AsNoTracking()
-                .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc <= now)
+                .AiredRegular(now).Where(e => showIds.Contains(e.ShowId))
                 .Select(e => new { e.ShowId, e.SeasonNumber, e.ExternalRating })
                 .ToListAsync(ct))
             .ToLookup(e => e.ShowId);

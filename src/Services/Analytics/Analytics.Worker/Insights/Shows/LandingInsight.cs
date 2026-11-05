@@ -41,7 +41,7 @@ public sealed class LandingInsight : IShowInsight
 
         // In air order, so the finale is the last regular episode to air, even if one was held back or numbered out of
         // order; episodes that aired together (a streaming drop) go by number.
-        var aired = show.Aired.Where(e => e.SeasonNumber > 0)
+        var aired = show.RegularAired
             .OrderBy(e => e.AirsAtUtc).ThenBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
         var rated = aired.Where(e => e.ExternalRating is not null).ToList();
         if (rated.Count < MinRatedEpisodes || rated.Count < aired.Count * MinRatedShare || aired[^1].ExternalRating is not { } finale)

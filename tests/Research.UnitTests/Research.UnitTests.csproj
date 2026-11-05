@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of Research's rules: when saved research is due a refresh, and when the research assistant leaves a
+       workspace alone. No database or network. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Research\Research.API\Research.API.csproj" />
+  </ItemGroup>
+
+</Project>

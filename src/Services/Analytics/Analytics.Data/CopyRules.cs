@@ -26,8 +26,23 @@ public static class CopyRules
     public static bool HasEnded(this ShowCopy show) => show.Status is ShowStatus.Ended or ShowStatus.Cancelled;
 
     /// <summary>
+    /// <see cref="HasEnded"/> in a query: the shows that are over, and those that aren't.
+    /// </summary>
+    public static IQueryable<ShowCopy> Ended(this IQueryable<ShowCopy> shows) =>
+        shows.Where(s => s.Status == ShowStatus.Ended || s.Status == ShowStatus.Cancelled);
+
+    public static IQueryable<ShowCopy> Running(this IQueryable<ShowCopy> shows) =>
+        shows.Where(s => s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled);
+
+    /// <summary>
     /// The (show, moment) pairs of a user's bulk marks: <see cref="BulkMark"/> or more episodes of one show at one time.
     /// </summary>
     public static HashSet<(Guid ShowId, DateTime WatchedAtUtc)> BulkMarks(IEnumerable<UserEpisodeWatch> watches) =>
-        watches.GroupBy(w => (w.ShowId, w.WatchedAtUtc)).Where(g => g.Count() >= BulkMark).Select(g => g.Key).ToHashSet();
+        BulkMarks(watches, w => w.ShowId, w => w.WatchedAtUtc);
+
+    /// <summary>
+    /// The same, for watch rows projected with their show and time.
+    /// </summary>
+    public static HashSet<(Guid ShowId, DateTime WatchedAtUtc)> BulkMarks<T>(IEnumerable<T> watches, Func<T, Guid> show, Func<T, DateTime> at) =>
+        watches.GroupBy(w => (show(w), at(w))).Where(g => g.Count() >= BulkMark).Select(g => g.Key).ToHashSet();
 }

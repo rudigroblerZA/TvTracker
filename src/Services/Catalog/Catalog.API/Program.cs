@@ -64,6 +64,11 @@ builder.Services.AddSingleton<Crossovers>();
 
 // Affiliate programs (none by default); read on each click, so an edited appsettings file applies without a restart.
 builder.Services.Configure<AffiliateOptions>(builder.Configuration.GetSection("Affiliates"));
+// The development test network, last, so a real program for a service still wins.
+if (AffiliateLinks.TestNetwork(builder.Configuration) is { } testNetwork)
+{
+    builder.Services.PostConfigure<AffiliateOptions>(options => options.Programs.Add(testNetwork));
+}
 
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
 builder.AddRabbitMQEventBus("eventbus");

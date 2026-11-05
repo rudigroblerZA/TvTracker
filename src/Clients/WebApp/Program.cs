@@ -194,6 +194,8 @@ app.MapGet("/go/{showId:guid}", async (Guid showId, string provider, int type, s
     return Results.Redirect($"/shows/{showId}");
 });
 
+TestAffiliateNetwork.Map(app);
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(typeof(TvTracker.UI.Routes).Assembly);

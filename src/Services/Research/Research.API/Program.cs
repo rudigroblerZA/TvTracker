@@ -25,6 +25,8 @@ builder.Services.AddSingleton<Researchers>();
 builder.Services.AddSingleton<InsightDrafter>();
 builder.Services.AddSingleton<DraftQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DraftQueue>());
+builder.Services.AddSingleton<ResearchAssistant>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ResearchAssistant>());
 builder.Services.AddSingleton<WebPageSource>();
 
 // Shows come from Catalog.API like any client's; saved catalog fields go to the sync worker's overrides.

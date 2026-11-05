@@ -83,9 +83,9 @@ public static class YearInTvApi
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int? year = null, string? tz = null, CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow();
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        var today = Viewer.LocalDate(now, zone);
 
         var rows = await db.Watches.AsNoTracking()
             .Where(w => w.UserId == userId)
@@ -102,8 +102,8 @@ public static class YearInTvApi
             })
             .ToListAsync(ct);
 
-        var bulk = rows.GroupBy(r => (r.ShowId, r.WatchedAtUtc)).Where(g => g.Count() >= CopyRules.BulkMark).SelectMany(g => g).ToHashSet();
-        var watches = rows.Where(r => !bulk.Contains(r))
+        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
+        var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r => new Watch(r.ShowId, r.EpisodeId, r.WatchedAtUtc,
                 DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone)),
                 r.RuntimeMinutes ?? 0, r.SeasonNumber, r.EpisodeNumber, r.Title, r.ExternalRating))
@@ -113,7 +113,7 @@ public static class YearInTvApi
 
         var inYear = watches.Where(w => w.Day.Year == shown).ToList();
         var lastYear = watches.Where(w => w.Day.Year == shown - 1).ToList();
-        var bulkInYear = rows.Count(r => bulk.Contains(r)
+        var bulkInYear = rows.Count(r => bulk.Contains((r.ShowId, r.WatchedAtUtc))
             && TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone).Year == shown);
 
         var showIds = inYear.Select(w => w.ShowId).Concat(lastYear.Select(w => w.ShowId)).Distinct().ToList();
@@ -222,7 +222,7 @@ public static class YearInTvApi
             }
             var seen = watched[id].Select(w => w.EpisodeId).ToHashSet();
             var all = episodes.All(e => seen.Contains(e.EpisodeId));
-            var ended = shows[id].Status is ShowStatus.Ended or ShowStatus.Cancelled;
+            var ended = shows[id].HasEnded();
             if (all && yearEpisodes.Contains(episodes[^1].EpisodeId))
             {
                 (ended ? finished : caughtUp).Add(id);

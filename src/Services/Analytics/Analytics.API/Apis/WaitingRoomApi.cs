@@ -50,7 +50,7 @@ public static class WaitingRoomApi
         var progress = await Viewer.ProgressAsync(db, userId, now, null, ct);
         var allWatched = progress.Values.Where(p => p.AllWatched).Select(p => p.ShowId).ToList();
         var shows = await db.Shows.AsNoTracking()
-            .Where(s => allWatched.Contains(s.ShowId) && s.Status != ShowStatus.Ended && s.Status != ShowStatus.Cancelled)
+            .Running().Where(s => allWatched.Contains(s.ShowId))
             .ToDictionaryAsync(s => s.ShowId, ct);
         var caughtUp = shows.Keys.ToList();
         var upcoming = (await db.Episodes.AsNoTracking()

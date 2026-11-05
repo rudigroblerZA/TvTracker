@@ -55,7 +55,7 @@ public sealed class DnaInsight : IShowInsight
         }
 
         // Regular seasons only: specials (season 0) would skew season sizes and gaps.
-        var aired = show.Aired.Where(e => e.SeasonNumber > 0).ToList();
+        var aired = show.RegularAired;
         if (aired.Count < MinAiredEpisodes)
         {
             return insights with { Dna = null };

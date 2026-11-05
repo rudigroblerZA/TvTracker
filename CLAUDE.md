@@ -33,11 +33,12 @@ dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --o
 scripts/backup.sh
 scripts/restore.sh backups/<timestamp>
 
-# Unit tests (Catalog, Analytics, Recommendations and Notifications; no database, network or AppHost needed)
+# Unit tests (Catalog, Analytics, Recommendations, Notifications and Research; no database, network or AppHost needed)
 dotnet test tests/Catalog.UnitTests
 dotnet test tests/Analytics.UnitTests
 dotnet test tests/Recommendations.UnitTests
 dotnet test tests/Notifications.UnitTests
+dotnet test tests/Research.UnitTests
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
@@ -50,7 +51,7 @@ dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
 ```
 
-Unit tests cover Catalog's, Analytics', Recommendations' and Notifications' pure rules (`tests/`); there's no CI, and
+Unit tests cover Catalog's, Analytics', Recommendations', Notifications' and Research's pure rules (`tests/`); there's no CI, and
 the other services have none yet.
 Run the tests, then verify changes by building, running the AppHost and checking endpoints, the database or the UI.
 A rule documented in CONTEXT.md with examples gets a test with those examples. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.

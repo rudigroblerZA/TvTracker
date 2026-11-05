@@ -21,17 +21,12 @@ internal static class ShowValue
     private const double TasteWeight = 0.6;
 
     /// <summary>
-    /// A turn this far in (or further) is worth warning about.
-    /// </summary>
-    public const int SlowStartMinutes = 180;
-
-    /// <summary>
     /// A show watched this far (of what's aired) counts as one the user liked.
     /// </summary>
     private const double FinishedShare = 0.8;
 
     /// <param name="Landing">The <see cref="LandingVerdicts"/> verdict, for ended shows that have one.</param>
-    /// <param name="SlowStart">Where a slow start turns, when it's <see cref="SlowStartMinutes"/> or more in.</param>
+    /// <param name="SlowStart">Where a slow start turns, when it's <see cref="InsightRules.SlowStartMinutes"/> or more in.</param>
     /// <param name="RatingReason">The "Rated 8.2" line in <paramref name="Reasons"/>, when there is one, so a caller showing the
     /// rating another way can leave it out without matching its text.</param>
     /// <param name="TasteReason">The "Your kind of show: …" line, likewise.</param>
@@ -93,28 +88,13 @@ internal static class ShowValue
             }
         }
 
-        value += landing switch
+        if (LandingVerdicts.Ending(landing) is { } ending)
         {
-            LandingVerdicts.Sticks or LandingVerdicts.GreatFinale => 0.3,
-            LandingVerdicts.WeakerLastSeason => -0.1,
-            LandingVerdicts.FinaleLetsDown => -0.3,
-            LandingVerdicts.Fizzles => -0.5,
-            _ => 0
-        };
-        if (landing switch
-        {
-            LandingVerdicts.Sticks => "Sticks the landing",
-            LandingVerdicts.GreatFinale => "Great finale",
-            LandingVerdicts.WeakerLastSeason => "Weaker last season",
-            LandingVerdicts.FinaleLetsDown => "The finale lets it down",
-            LandingVerdicts.Fizzles => "Fizzles out at the end",
-            _ => null
-        } is { } ending)
-        {
-            reasons.Add(ending);
+            value += ending.Points;
+            reasons.Add(ending.Text);
         }
 
-        var slowStart = turn is { MinutesBefore: >= SlowStartMinutes } ? turn : null;
+        var slowStart = turn is { MinutesBefore: >= InsightRules.SlowStartMinutes } ? turn : null;
         if (slowStart is not null)
         {
             reasons.Add($"Slow start: gets good at S{slowStart.SeasonNumber:00}E{slowStart.EpisodeNumber:00}, {Hours(slowStart.MinutesBefore)} in");

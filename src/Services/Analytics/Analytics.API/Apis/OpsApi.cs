@@ -59,8 +59,8 @@ public static class OpsApi
         var now = time.GetUtcNow();
 
         var links = await db.Database
-            .SqlQueryRaw<ShowLinks>(
-                "SELECT \"ShowId\", COALESCE(jsonb_array_length(\"Document\"->'sharedCast'), 0) AS \"Links\" FROM show_insights")
+            .SqlQuery<ShowLinks>(
+                $"SELECT \"ShowId\", COALESCE(jsonb_array_length(\"Document\"->{InsightDocuments.Paths.SharedCast}), 0) AS \"Links\" FROM show_insights")
             .ToListAsync(ct);
         var connectedIds = links.Where(l => l.Links > 0).OrderByDescending(l => l.Links).Take(5).ToList();
         var titles = await db.Shows
@@ -112,13 +112,14 @@ public static class OpsApi
     {
         // One pass over the documents; the parts are JSON objects when present and null otherwise.
         var parts = await db.Database
-            .SqlQueryRaw<DocumentParts>(
-                "SELECT COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'dna') = 'object')::int AS \"Dna\", " +
-                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'getsGood'->'turn') = 'object')::int AS \"Turns\", " +
-                "COUNT(*) FILTER (WHERE (\"Document\"->'getsGood'->>'fromTheStart') = 'true')::int AS \"FromTheStart\", " +
-                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'outlook') = 'object')::int AS \"Forecasts\", " +
-                "COUNT(*) FILTER (WHERE jsonb_typeof(\"Document\"->'seasonVerdict') = 'object')::int AS \"Verdicts\" " +
-                "FROM show_insights")
+            .SqlQuery<DocumentParts>($"""
+                SELECT COUNT(*) FILTER (WHERE jsonb_typeof("Document"->{InsightDocuments.Paths.Dna}) = 'object')::int AS "Dna",
+                       COUNT(*) FILTER (WHERE jsonb_typeof("Document"->{InsightDocuments.Paths.GetsGood}->{InsightDocuments.Paths.Turn}) = 'object')::int AS "Turns",
+                       COUNT(*) FILTER (WHERE ("Document"->{InsightDocuments.Paths.GetsGood}->>{InsightDocuments.Paths.FromTheStart}) = 'true')::int AS "FromTheStart",
+                       COUNT(*) FILTER (WHERE jsonb_typeof("Document"->{InsightDocuments.Paths.Outlook}) = 'object')::int AS "Forecasts",
+                       COUNT(*) FILTER (WHERE jsonb_typeof("Document"->{InsightDocuments.Paths.SeasonVerdict}) = 'object')::int AS "Verdicts"
+                FROM show_insights
+                """)
             .SingleAsync(ct);
 
         return new OpsComputed(parts.Dna, parts.Turns, parts.FromTheStart, parts.Forecasts,

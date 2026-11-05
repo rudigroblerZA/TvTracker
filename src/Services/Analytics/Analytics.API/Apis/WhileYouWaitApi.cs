@@ -48,8 +48,8 @@ public static class WhileYouWaitApi
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
-        var today = WhileYouWait.LocalDate(now, zone);
+        var zone = Viewer.Zone(tz);
+        var today = Viewer.LocalDate(now, zone);
 
         var room = await WaitingRoomApi.ComputeAsync(db, userId, now, ct);
         var waiting = room.Shows.Select(w => WhileYouWait.Awaited(w, today, zone)).OfType<WhileYouWait.Wait>().ToList();
@@ -107,8 +107,6 @@ internal static class WhileYouWait
 
     public sealed record Wait(Guid ShowId, string Title, string? PosterUrl, string Kind, DateOnly BackAt, int? SeasonNumber);
 
-    public static DateOnly LocalDate(DateTimeOffset at, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
-
     /// <summary>
     /// A waiting-room entry with a return in view, else null. A dated return is read in the caller's calendar.
     /// </summary>
@@ -116,7 +114,7 @@ internal static class WhileYouWait
     {
         DateOnly? back = w.Kind switch
         {
-            "episode" or "season" when w.BackAtUtc is { } at => LocalDate(at, zone),
+            "episode" or "season" when w.BackAtUtc is { } at => Viewer.LocalDate(at, zone),
             "forecast" when !w.Overdue => w.Likely,
             _ => null
         };

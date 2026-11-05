@@ -61,7 +61,7 @@ public static class TasteApi
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow();
-        var zone = tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = Viewer.Zone(tz);
 
         var showRatings = await db.ShowRatings.AsNoTracking()
             .Where(r => r.UserId == userId)

@@ -61,6 +61,7 @@ public static class FeatureFlags
     public const string Makers = "makers";
     public const string MakersForYou = "makers-for-you";
     public const string Research = "research";
+    public const string ResearchAssistant = "research-assistant";
     public const string Ask = "ask";
     public const string SeasonVerdict = "season-verdict";
     public const string CharacterTrail = "character-trail";

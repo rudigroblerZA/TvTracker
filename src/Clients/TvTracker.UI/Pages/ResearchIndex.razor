@@ -21,6 +21,37 @@
         {
             @if (queue is not null)
             {
+                <Feature Flag="@FeatureFlags.ResearchAssistant">
+                    <section aria-labelledby="assistant-title">
+                        <div class="section-head">
+                            <h2 id="assistant-title">Research assistant</h2>
+                            <button type="button" class="btn" disabled="@assistantStarted" @onclick="RunAssistantAsync">@(assistantStarted ? "Started" : "Run now")</button>
+                        </div>
+                        <p class="muted small">
+                            A few times a day it gathers sources and drafts the insight for the top of this queue: research due a
+                            refresh, then popular shows with none. It never saves, and it leaves alone any show someone is working on.
+                            Shows it prepared are marked "prepared"; drafts take a few minutes each.
+                        </p>
+                    </section>
+                </Feature>
+
+                @if (queue.Refresh is { Count: > 0 } refresh)
+                {
+                    <section aria-labelledby="refresh-title">
+                        <h2 id="refresh-title">Due a refresh</h2>
+                        <p class="muted small">Saved research that may be out of date: a new season since it was saved, Wikidata disagreeing with the catalog, or over a year old.</p>
+                        <ul class="research-list">
+                            @foreach (var show in refresh)
+                            {
+                                <li @key="show.ShowId">
+                                    <a href="research/@show.ShowId"><strong>@show.Title</strong></a>
+                                    <span class="muted small">@($" · #{show.Rank} · version {show.Version}, saved {Format.Relative(show.SavedAtUtc)} · {string.Join(", ", show.Reasons.Select(ReasonLabel))}{(show.Prepared ? " · prepared" : "")}")</span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
                 <section aria-labelledby="disagree-title">
                     <h2 id="disagree-title">Wikidata disagrees</h2>
                     <p class="muted small">
@@ -58,7 +89,7 @@
                         {
                             <li @key="show.ShowId">
                                 <a href="research/@show.ShowId"><strong>@show.Title</strong></a>
-                                <span class="muted small">@($" · #{show.Rank}{(show.Network is { } n ? $" · {n}" : "")}{(show.Year is { } y ? $" · {y}" : "")}{(show.Started ? " · started" : "")}")</span>
+                                <span class="muted small">@($" · #{show.Rank}{(show.Network is { } n ? $" · {n}" : "")}{(show.Year is { } y ? $" · {y}" : "")}{(show.Prepared ? " · prepared" : show.Started ? " · started" : "")}")</span>
                             </li>
                         }
                     </ul>
@@ -100,6 +131,28 @@
     };
     private bool notModerator;
     private string? error;
+    private bool assistantStarted;
+
+    private static string ReasonLabel(string reason) => reason switch
+    {
+        "new-season" => "new season",
+        "wikidata" => "Wikidata disagrees",
+        "old" => "over a year old",
+        _ => reason
+    };
+
+    private async Task RunAssistantAsync()
+    {
+        try
+        {
+            await Research.RunAssistantAsync();
+            assistantStarted = true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

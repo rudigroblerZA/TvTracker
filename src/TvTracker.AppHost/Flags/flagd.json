@@ -444,6 +444,12 @@
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
       "metadata": { "description": "Research: moderators enrich a show from Wikidata, Wikipedia, TMDB and pasted pages, with a model-drafted insight; the saved research shows on the show page and overrides catalog fields." }
+    },
+    "research-assistant": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Research assistant: a few times a day, gathers sources and queues a draft for the top of the research queue (research due a refresh, then popular unresearched shows), for a moderator to review and save. It never saves." }
     }
   }
 }

@@ -30,6 +30,17 @@ public class Dossier
     public DateTime? GatheredAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// When the research assistant (<see cref="Services.ResearchAssistant"/>) last gathered and queued a draft for it; a
+    /// moderator still reviews and saves.
+    /// </summary>
+    public DateTime? AssistantPreparedAtUtc { get; set; }
+
+    /// <summary>
+    /// Why the assistant picked it (<see cref="Services.RefreshReasons"/>, or "unresearched").
+    /// </summary>
+    public string? AssistantReason { get; set; }
 }
 
 /// <summary>
@@ -118,6 +129,12 @@ public class SavedResearch
     public required string Sources { get; set; }
 
     public DateTime SavedAtUtc { get; set; }
+
+    /// <summary>
+    /// The catalog's regular seasons when it was saved, so a season that arrives later marks the research for a refresh.
+    /// Null for versions saved before this was kept.
+    /// </summary>
+    public int? SeasonsAtSave { get; set; }
 
     /// <summary>
     /// Keycloak id of the moderator who saved it; cleared when their account is deleted.

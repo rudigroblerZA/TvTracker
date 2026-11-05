@@ -31,6 +31,13 @@
                 }
             </p>
 
+            @if (ws.AssistantPreparedAtUtc is { } prepared && (ws.Saved is null || prepared > ws.Saved.SavedAtUtc))
+            {
+                <p class="research-notice">
+                    @($"The research assistant gathered these sources and drafted the insight {Format.Relative(prepared)}{AssistantWhy(ws.AssistantReason)}. Check the facts and the draft against the sources before saving: nothing is saved until you do.")
+                </p>
+            }
+
             @if (notice is not null)
             {
                 <p class="research-notice" role="status">@notice</p>
@@ -190,6 +197,15 @@
 </AuthorizeView>
 
 @code {
+    private static string AssistantWhy(string? reason) => reason switch
+    {
+        "new-season" => ", because a new season has arrived since the last save",
+        "wikidata" => ", because Wikidata now disagrees with the catalog",
+        "old" => ", because the saved research is over a year old",
+        "unresearched" => ", because it's a popular show with no research yet",
+        _ => ""
+    };
+
     [Parameter] public Guid ShowId { get; set; }
 
     private sealed class Choice
