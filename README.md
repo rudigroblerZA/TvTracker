@@ -374,6 +374,8 @@ episodes and lose the dates.
   export says you'd planned or stopped get that status; shows with watches are followed from their first watch.
 - **API:** `POST /api/v1/history/resolve` (Catalog.API, signed in, up to 10 shows a call) and
   `POST /api/v1/watched/import` (Tracking.API, up to 500 watches with their times).
+- **Sample files to try it with** are in `samples/history-import/`: a TV Time archive, TV Time Out files, a Trakt export
+  and a CSV by title, all made up, with real TheTVDB ids.
 
 **Streaks** (`/streaks`, from Insights and Up Next; `streaks` flag; free, signed in): days and weeks in a row with
 something watched, and the shows you keep up with as they air: each new episode watched within 7 days of airing,
