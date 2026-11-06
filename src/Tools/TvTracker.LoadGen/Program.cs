@@ -131,7 +131,7 @@ run.SetAction(async (parse, ct) =>
 });
 
 var monthsOption = new Option<int>("--months") { Description = "How far back the oldest watches go", DefaultValueFactory = _ => 12 };
-var seedOption = new Option<int>("--seed") { Description = "Random seed: the same seed gives the same data", DefaultValueFactory = _ => 1 };
+var seedOption = new Option<int>("--seed") { Description = "Random seed: the same seed gives each user the same name, taste and shows (watch dates count back from today)", DefaultValueFactory = _ => 1 };
 
 var seed = new Command("seed", "Create users (as setup does) and give them a realistic, dated history: follows, watches, statuses, ratings, a few comments and follows between them")
 {
@@ -150,7 +150,8 @@ seed.SetAction(async (parse, ct) =>
     }
     var options = new SeedOptions(parse.GetValue(bffOption)!, count, parse.GetValue(passwordOption)!, parse.GetValue(prefixOption)!,
         Math.Clamp(parse.GetValue(monthsOption), 1, 120), parse.GetValue(seedOption));
-    return await new Seeder(http, keycloak, options, i => Username(parse, i)).RunAsync(ct);
+    return await new Seeder(http, keycloak, options, i => Username(parse, i),
+        ct => keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct)).RunAsync(ct);
 });
 
 var cleanup = new Command("cleanup", "Delete the load-test users and everything they did, through the app's own account deletion")
