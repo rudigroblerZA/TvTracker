@@ -163,7 +163,7 @@ cleanup.SetAction(async (parse, ct) =>
     using var http = new HttpClient();
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
     var admin = await keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
-    var usernames = await keycloak.FindUsersAsync(admin, parse.GetValue(prefixOption)!, ct);
+    var usernames = (await keycloak.FindUsersAsync(admin, parse.GetValue(prefixOption)!, ct)).Select(u => u.Username).ToList();
     var deleted = 0;
     foreach (var username in usernames)
     {

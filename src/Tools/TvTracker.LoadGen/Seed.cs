@@ -26,9 +26,9 @@ public sealed record SeedOptions(string BffUrl, int Users, string Password, stri
 /// mechanical; these agree the way people do.</item>
 /// <item><b>A few posts and follows:</b> a short comment on some watched episodes (through moderation, so no links), and
 /// each user follows a few of the others with the prefix, earlier runs' included (Keycloak lists them).</item>
-/// <item><b>Once:</b> the display name is set last, as the mark of a finished user: a name of the seeder's shape for
-/// that user's number (whatever the seed), so seeding again, with any seed, adds only new users, and one a failed run
-/// left half done is finished (imports, follows and ratings are idempotent; a comment may be posted again).</item>
+/// <item><b>Once:</b> the display name keeps the state: while seeding it names the seed, and the plain name, set only
+/// once every write went through, marks a finished user. Seeding again, with any seed, skips finished users and finishes
+/// a half-done one with its own seed (imports, follows and ratings are idempotent; a comment may be posted again).</item>
 /// <item><b>Tokens</b> are renewed as they near expiry (15 minutes), so a slow run doesn't go on with 401s.</item>
 /// </list>
 /// </summary>
@@ -94,7 +94,8 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
 
     public async Task<int> RunAsync(CancellationToken ct)
     {
-        var catalog = await CatalogAsync(SessionFor(1), ct);
+        var users = Enumerable.Range(1, options.Users).Select(i => new Session(keycloak, username(i), options.Password)).ToList();
+        var catalog = await CatalogAsync(users[0], ct);
         if (catalog.Count < 20)
         {
             throw new CliException($"Only {catalog.Count} shows came back from the catalog through {options.BffUrl}; import more first.");
@@ -105,8 +106,7 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         int skipped = 0, unfinished = 0;
         for (var i = 1; i <= options.Users; i++)
         {
-            var user = SessionFor(i);
-            var (summary, done) = await SeedUserAsync(user, i, new Random(options.Seed * 7919 + i), catalog, ct);
+            var (summary, done) = await SeedUserAsync(users[i - 1], i, catalog, ct);
             if (summary is null)
             {
                 skipped++;
@@ -115,7 +115,7 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
             Console.WriteLine($"{username(i)}: {summary}{(done ? "" : " (not finished: run again to finish)")}");
             if (done)
             {
-                seeded.Add((i, user));
+                seeded.Add((i, users[i - 1]));
             }
             else
             {
@@ -134,47 +134,75 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
 
     /// <summary>
     /// Each user seeded now follows three to six of everyone with the prefix (Keycloak's ids are the users' ids), earlier
-    /// runs' included. Social knows a person once they've visited it (Identity's profile event can lag behind the
-    /// watches), so the new users visit first; earlier ones visited in their own run.
+    /// runs' included. Every seeded user visited Social while being seeded, so Social knows them; a prefixed user it
+    /// doesn't know (made by setup and never seeded) answers 404 and is passed over for the next.
     /// </summary>
     private async Task FollowEachOtherAsync(List<(int Index, Session User)> seeded, CancellationToken ct)
     {
-        foreach (var (_, user) in seeded)
-        {
-            await SendAsync(user, HttpMethod.Get, "/social/api/v1/me/social", null, ct);
-        }
-        var everyone = await keycloak.FindUserIdsAsync(await adminToken(ct), options.Prefix, ct);
+        var everyone = await keycloak.FindUsersAsync(await adminToken(ct), options.Prefix, ct);
         foreach (var (index, user) in seeded)
         {
             var rng = new Random(options.Seed * 104729 + index);
             var me = username(index);
-            foreach (var (_, id) in everyone.Where(u => !string.Equals(u.Username, me, StringComparison.OrdinalIgnoreCase)).OrderBy(_ => rng.Next()).Take(rng.Next(3, 7)))
+            var wanted = rng.Next(3, 7);
+            foreach (var (_, id) in everyone.Where(u => !string.Equals(u.Username, me, StringComparison.OrdinalIgnoreCase)).OrderBy(_ => rng.Next()))
             {
-                await SendAsync(user, HttpMethod.Post, $"/social/api/v1/people/{id}/follow", null, ct);
+                if (wanted == 0)
+                {
+                    break;
+                }
+                if (await SendAsync(user, HttpMethod.Post, $"/social/api/v1/people/{id}/follow", null, ct, quiet: 404) is >= 200 and < 300 or 409)
+                {
+                    wanted--;
+                }
             }
         }
     }
 
-    private Session SessionFor(int index) => new(keycloak, username(index), options.Password);
-
     /// <summary>
-    /// Seeds one user and says whether they're done (the profile, the mark, was saved); no summary when they were done
-    /// already, which their profile's name says: the seeder's shape for this number, whatever seed gave it.
+    /// Seeds one user and says whether they're done; no summary when they were done already. The profile's name keeps
+    /// the state: while seeding it carries the seed ("Ava K. (seeding, seed 1)"), so a rerun with any seed finishes
+    /// the same picks; once every write has gone through it's the plain name, the mark that they're done.
     /// </summary>
-    private async Task<(string? Summary, bool Done)> SeedUserAsync(Session user, int index, Random rng, List<Show> catalog, CancellationToken ct)
+    private async Task<(string? Summary, bool Done)> SeedUserAsync(Session user, int index, List<Show> catalog, CancellationToken ct)
     {
-        var persona = Personas[rng.Next(Personas.Length)];
-        var zone = TimeZoneInfo.FindSystemTimeZoneById(Zones[rng.Next(Zones.Length)]);
         var first = FirstNames[(index - 1) % FirstNames.Length];
-        var name = $"{first} {(char)('A' + rng.Next(26))}.";
+        var seed = options.Seed;
         using (var profile = await GetJsonAsync(user, "/identity/api/v1/profile", ct))
         {
-            if (profile?.RootElement.GetProperty("displayName").GetString() is { } current &&
-                Regex.IsMatch(current, $"^{Regex.Escape(first)} [A-Z]\\.$"))
+            var current = profile?.RootElement.GetProperty("displayName").GetString() ?? "";
+            if (Regex.IsMatch(current, $"^{Regex.Escape(first)} [A-Z]\\.$"))
             {
                 return (null, true);
             }
+            if (Regex.Match(current, $"^{Regex.Escape(first)} [A-Z]\\. \\(seeding, seed (-?\\d+)\\)$") is { Success: true } started)
+            {
+                seed = int.Parse(started.Groups[1].Value, CultureInfo.InvariantCulture);
+            }
         }
+
+        var rng = new Random(seed * 7919 + index);
+        var persona = Personas[rng.Next(Personas.Length)];
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(Zones[rng.Next(Zones.Length)]);
+        var name = $"{first} {(char)('A' + rng.Next(26))}.";
+
+        // Every write must go through (409, already there, counts) for the user to be done; a rerun repeats what failed.
+        var failures = 0;
+        async Task<int> WriteAsync(HttpMethod method, string path, object? body, int? quiet = null)
+        {
+            var code = await SendAsync(user, method, path, body, ct, quiet);
+            if (code is not (>= 200 and < 300 or 409) && code != quiet)
+            {
+                failures++;
+            }
+            return code;
+        }
+        Task<int> ProfileAsync(string displayName) => WriteAsync(HttpMethod.Put, "/identity/api/v1/profile",
+            new { displayName, avatarUrl = (string?)null, timeZone = zone.Id, region = "US", language = "en" });
+
+        await ProfileAsync($"{name} (seeding, seed {seed})");
+        // Social knows a person once they've visited it (Identity's profile event can lag far behind the watches).
+        await WriteAsync(HttpMethod.Get, "/social/api/v1/me/social", null);
 
         double Affinity(Show show) => show.Genres.Count(persona.Genres.Contains) / (double)Math.Max(1, show.Genres.Length);
         var picks = catalog
@@ -204,46 +232,54 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
             // Watches first: the import follows a new show from its first watch, so the follow keeps that date.
             foreach (var chunk in watches.Chunk(500))
             {
-                var (code, body) = await PostAsync(user, "/tracking/api/v1/watched/import",
-                    new { watches = chunk.Select(w => new { episodeId = w.Episode.Id, watchedAtUtc = w.At }) }, ct);
-                if (code == 404)
+                if (await WriteAsync(HttpMethod.Post, "/tracking/api/v1/watched/import",
+                        new { watches = chunk.Select(w => new { episodeId = w.Episode.Id, watchedAtUtc = w.At }) }) == 404)
                 {
                     throw new CliException("The history import answered 404: turn the history-import flag on (Flags/flagd.json or the flags page).");
                 }
-                // What Tracking recorded: episodes it already had are skipped, and ones its copy lacks are dropped.
-                watched += body?.RootElement.TryGetProperty("added", out var added) == true ? added.GetInt32() : 0;
-                body?.Dispose();
             }
+            // What Tracking has (episodes its copy lacks are dropped), which ratings and comments stay within.
+            var recorded = new HashSet<Guid>();
+            if (watches.Count > 0)
+            {
+                using var progress = await GetJsonAsync(user, $"/tracking/api/v1/progress/{show.Id}", ct);
+                if (progress?.RootElement.TryGetProperty("watchedEpisodeIds", out var ids) == true)
+                {
+                    recorded.UnionWith(ids.EnumerateArray().Select(e => e.GetGuid()));
+                }
+            }
+            watches = watches.Where(w => recorded.Contains(w.Episode.Id)).ToList();
+            watched += watches.Count;
+
             // The import follows a new show as watching (dated by its first watch), so put back what this user did with
             // it; a show the import didn't follow (nothing recorded) is followed now.
-            if (watches.Count == 0 || await SendAsync(user, HttpMethod.Put, $"/tracking/api/v1/follows/{show.Id}/status", new { status }, ct) == 404)
+            if (watches.Count == 0 || await WriteAsync(HttpMethod.Put, $"/tracking/api/v1/follows/{show.Id}/status", new { status }, quiet: 404) == 404)
             {
-                await SendAsync(user, HttpMethod.Post, $"/tracking/api/v1/follows/{show.Id}", new { status }, ct);
+                await WriteAsync(HttpMethod.Post, $"/tracking/api/v1/follows/{show.Id}", new { status });
             }
 
             if (watches.Count >= 3 && rng.NextDouble() < 0.75)
             {
                 var stars = Stars(show, Affinity(show), status == 4, rng);
-                await SendAsync(user, HttpMethod.Put, $"/ratings/api/v1/shows/{show.Id}/rating", new { stars }, ct);
+                await WriteAsync(HttpMethod.Put, $"/ratings/api/v1/shows/{show.Id}/rating", new { stars });
                 rated++;
                 foreach (var (episode, _) in watches.OrderBy(_ => rng.Next()).Take(rng.Next(0, 3)))
                 {
                     var episodeStars = Math.Clamp(stars + rng.Next(-1, 2), 1, 5);
-                    await SendAsync(user, HttpMethod.Put, $"/ratings/api/v1/episodes/{episode.Id}/rating", new { showId = show.Id, stars = episodeStars }, ct);
+                    await WriteAsync(HttpMethod.Put, $"/ratings/api/v1/episodes/{episode.Id}/rating", new { showId = show.Id, stars = episodeStars });
                 }
             }
             if (watches.Count > 0 && rng.NextDouble() < 0.15 && commented < 4)
             {
                 var (episode, _) = watches[rng.Next(watches.Count)];
-                await SendAsync(user, HttpMethod.Post, $"/ratings/api/v1/episodes/{episode.Id}/comments",
-                    new { showId = show.Id, text = Comments[rng.Next(Comments.Length)], isSpoiler = false }, ct);
+                await WriteAsync(HttpMethod.Post, $"/ratings/api/v1/episodes/{episode.Id}/comments",
+                    new { showId = show.Id, text = Comments[rng.Next(Comments.Length)], isSpoiler = false });
                 commented++;
             }
         }
-        // Last, as the mark that this user is done.
-        var saved = await SendAsync(user, HttpMethod.Put, "/identity/api/v1/profile",
-            new { displayName = name, avatarUrl = (string?)null, timeZone = zone.Id, region = "US", language = "en" }, ct);
-        return ($"{name}, {persona.Name}, {zone.Id}: {picks.Count} shows, {watched} watches, {rated} rated, {commented} comments", saved is >= 200 and < 300);
+        // Last, and only when everything went through, the mark that this user is done.
+        var done = failures == 0 && await ProfileAsync(name) is >= 200 and < 300;
+        return ($"{name}, {persona.Name}, {zone.Id}: {picks.Count} shows, {watched} watches, {rated} rated, {commented} comments", done);
     }
 
     /// <summary>
@@ -351,6 +387,12 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
                 using var detail = await GetJsonAsync(user, $"/catalog/api/v1/shows/{showId}/seasons/{season}", ct);
                 if (detail is null)
                 {
+                    // Not kept: the next user to pick the show loads it again, rather than every user getting it cut short.
+                    Console.Error.WriteLine($"  GET season {season} of {showId} failed; the show counts as unfinished this time.");
+                    lock (episodes)
+                    {
+                        episodes.Remove(showId);
+                    }
                     return new(list, false);
                 }
                 list.AddRange(detail.RootElement.GetProperty("episodes").EnumerateArray()
@@ -370,21 +412,11 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
         return response.IsSuccessStatusCode ? JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct)) : null;
     }
 
-    private async Task<int> SendAsync(Session user, HttpMethod method, string path, object? body, CancellationToken ct)
-    {
-        var (code, json) = await RequestAsync(user, method, path, body, ct);
-        json?.Dispose();
-        return code;
-    }
-
-    private Task<(int Code, JsonDocument? Body)> PostAsync(Session user, string path, object body, CancellationToken ct) =>
-        RequestAsync(user, HttpMethod.Post, path, body, ct);
-
     /// <summary>
-    /// Sends a request and returns its status, and its JSON body when it worked; failures other than 409 (already
-    /// there) are written to stderr.
+    /// Sends a request and returns its status; failures other than 409 (already there) and <paramref name="quiet"/>
+    /// (an answer the caller expects) are written to stderr.
     /// </summary>
-    private async Task<(int Code, JsonDocument? Body)> RequestAsync(Session user, HttpMethod method, string path, object? body, CancellationToken ct)
+    private async Task<int> SendAsync(Session user, HttpMethod method, string path, object? body, CancellationToken ct, int? quiet = null)
     {
         using var request = new HttpRequestMessage(method, options.BffUrl.TrimEnd('/') + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await user.TokenAsync(ct));
@@ -393,16 +425,12 @@ public sealed class Seeder(HttpClient http, Keycloak keycloak, SeedOptions optio
             request.Content = JsonContent.Create(body);
         }
         using var response = await http.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
+        var code = (int)response.StatusCode;
+        if (!response.IsSuccessStatusCode && code != 409 && code != quiet)
         {
-            if ((int)response.StatusCode != 409)
-            {
-                Console.Error.WriteLine($"  {method} {path}: {(int)response.StatusCode} {Shorten(text)}");
-            }
-            return ((int)response.StatusCode, null);
+            Console.Error.WriteLine($"  {method} {path}: {code} {Shorten(await response.Content.ReadAsStringAsync(ct))}");
         }
-        return ((int)response.StatusCode, text.Length > 0 && response.Content.Headers.ContentType?.MediaType?.Contains("json") == true ? JsonDocument.Parse(text) : null);
+        return code;
     }
 
     private static string Shorten(string text) => text.Length <= 160 ? text : string.Concat(text.AsSpan(0, 160), "…");
