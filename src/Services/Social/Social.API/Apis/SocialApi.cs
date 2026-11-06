@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Social.API.Data;
 using TvTracker;
 
@@ -404,7 +405,8 @@ public static class SocialApi
 
     /// <summary>
     /// The caller's profile. Identity sends names for everyone, but a caller can arrive here first; their token's name
-    /// stands in until Identity's event or snapshot arrives.
+    /// stands in until Identity's event or snapshot arrives. The event (or a second request of theirs) can create the
+    /// profile at the same moment; the insert that loses reads the winner's, rather than answering 500.
     /// </summary>
     private static async Task<Profile> EnsureProfileAsync(ClaimsPrincipal user, SocialContext db, TimeProvider time, Branding brand, CancellationToken ct)
     {
@@ -421,7 +423,17 @@ public static class SocialApi
             UpdatedAtUtc = time.GetUtcNow().UtcDateTime
         };
         db.Profiles.Add(profile);
-        await db.SaveChangesAsync(ct);
-        return profile;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return profile;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Identity's profile event made the profile between the look-up and the save (a first visit right after
+            // sign-up or a name change): theirs stands, with the name Identity sent.
+            db.Entry(profile).State = EntityState.Detached;
+            return await db.Profiles.SingleAsync(p => p.UserId == id, ct);
+        }
     }
 }
