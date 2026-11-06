@@ -23,8 +23,7 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
     private static readonly string[] DiscoverLists = ["hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable", "fan-favorites"];
 
-    private string? token;
-    private DateTimeOffset refreshAt;
+    private readonly Session session = new(keycloak, username, options.Password, options.BffUrl);
 
     public async Task RunAsync(CancellationToken ct)
     {
@@ -142,17 +141,7 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
     private async Task<HttpResponseMessage?> SendRawAsync(HttpMethod method, string service, string name, string path, object? body, CancellationToken ct)
     {
-        if (token is null || DateTimeOffset.UtcNow >= refreshAt)
-        {
-            (token, refreshAt) = await keycloak.SignInAsync(username, options.Password, ct);
-        }
-
-        using var request = new HttpRequestMessage(method, options.BffUrl.TrimEnd('/') + path);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (body is not null)
-        {
-            request.Content = JsonContent.Create(body);
-        }
+        using var request = await session.RequestAsync(method, path, body, ct);
         var label = $"{method.Method} {service} {name}";
         var watch = Stopwatch.StartNew();
         try

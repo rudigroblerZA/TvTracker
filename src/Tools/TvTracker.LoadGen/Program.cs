@@ -33,17 +33,9 @@ setup.SetAction(async (parse, ct) =>
 {
     using var http = new HttpClient();
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
-    var admin = await keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
-    Console.WriteLine(await keycloak.EnsureClientAsync(admin, ct) ? $"Created client {Keycloak.ClientId}." : $"Client {Keycloak.ClientId} exists.");
-    var created = 0;
+    var (clientCreated, created) = await EnsureUsersAsync(parse, keycloak, ct);
+    Console.WriteLine(clientCreated ? $"Created client {Keycloak.ClientId}." : $"Client {Keycloak.ClientId} exists.");
     var count = parse.GetValue(usersOption);
-    for (var i = 1; i <= count; i++)
-    {
-        if (await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct))
-        {
-            created++;
-        }
-    }
     Console.WriteLine($"{created} users created, {count - created} already there ({Username(parse, 1)} … {Username(parse, count)}).");
     return 0;
 });
@@ -141,17 +133,10 @@ seed.SetAction(async (parse, ct) =>
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
-    var admin = await keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
-    await keycloak.EnsureClientAsync(admin, ct);
-    var count = parse.GetValue(usersOption);
-    for (var i = 1; i <= count; i++)
-    {
-        await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct);
-    }
-    var options = new SeedOptions(parse.GetValue(bffOption)!, count, parse.GetValue(passwordOption)!, parse.GetValue(prefixOption)!,
+    await EnsureUsersAsync(parse, keycloak, ct);
+    var options = new SeedOptions(parse.GetValue(bffOption)!, parse.GetValue(usersOption), parse.GetValue(passwordOption)!, parse.GetValue(prefixOption)!,
         Math.Clamp(parse.GetValue(monthsOption), 1, 120), parse.GetValue(seedOption));
-    return await new Seeder(http, keycloak, options, i => Username(parse, i),
-        ct => keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct)).RunAsync(ct);
+    return await new Seeder(http, keycloak, options, i => Username(parse, i), ct => AdminTokenAsync(parse, keycloak, ct)).RunAsync(ct);
 });
 
 var cleanup = new Command("cleanup", "Delete the load-test users and everything they did, through the app's own account deletion")
@@ -162,7 +147,7 @@ cleanup.SetAction(async (parse, ct) =>
 {
     using var http = new HttpClient();
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
-    var admin = await keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
+    var admin = await AdminTokenAsync(parse, keycloak, ct);
     var usernames = (await keycloak.FindUsersAsync(admin, parse.GetValue(prefixOption)!, ct)).Select(u => u.Username).ToList();
     var deleted = 0;
     foreach (var username in usernames)
@@ -207,6 +192,25 @@ catch (HttpRequestException ex)
 }
 
 string Username(ParseResult parse, int i) => $"{parse.GetValue(prefixOption)}{i:0000}";
+
+Task<string> AdminTokenAsync(ParseResult parse, Keycloak keycloak, CancellationToken ct) =>
+    keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
+
+// The load-test client and users 1..--users (safe to repeat): whether the client was made, and how many users were.
+async Task<(bool ClientCreated, int UsersCreated)> EnsureUsersAsync(ParseResult parse, Keycloak keycloak, CancellationToken ct)
+{
+    var admin = await AdminTokenAsync(parse, keycloak, ct);
+    var clientCreated = await keycloak.EnsureClientAsync(admin, ct);
+    var created = 0;
+    for (var i = 1; i <= parse.GetValue(usersOption); i++)
+    {
+        if (await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct))
+        {
+            created++;
+        }
+    }
+    return (clientCreated, created);
+}
 
 static TimeSpan ParseDuration(string text)
 {
