@@ -112,20 +112,14 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
         return true;
     }
 
-    public async Task<List<string>> FindUsersAsync(string adminToken, string prefix, CancellationToken ct)
-    {
-        var users = await AdminGetAsync<List<UserRepresentation>>(adminToken, $"users?search={Uri.EscapeDataString(prefix)}&max=10000", ct);
-        return users.Select(u => u.Username).Where(u => u.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).Order().ToList();
-    }
-
     /// <summary>
     /// The users with the prefix and their ids (Keycloak's id is the token's subject, the id every service uses).
     /// </summary>
-    public async Task<List<(string Username, string Id)>> FindUserIdsAsync(string adminToken, string prefix, CancellationToken ct)
+    public async Task<List<(string Username, string Id)>> FindUsersAsync(string adminToken, string prefix, CancellationToken ct)
     {
         var users = await AdminGetAsync<List<UserRepresentation>>(adminToken, $"users?search={Uri.EscapeDataString(prefix)}&max=10000", ct);
-        return users.Where(u => u.Id is not null && u.Username.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(u => (u.Username, u.Id!)).OrderBy(u => u.Username).ToList();
+        return users.Where(u => u.Username.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(u => (u.Username, u.Id)).OrderBy(u => u.Username).ToList();
     }
 
     private async Task<T> AdminGetAsync<T>(string token, string path, CancellationToken ct)
@@ -150,5 +144,5 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
 
     private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken, [property: JsonPropertyName("expires_in")] int ExpiresIn);
 
-    private sealed record UserRepresentation(string Username, string? Id = null);
+    private sealed record UserRepresentation(string Username, string Id);
 }
