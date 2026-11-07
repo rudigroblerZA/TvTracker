@@ -812,7 +812,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 
 ### Plans
 
-Free, Plus and Family, behind the `plans` flag. The plumbing for paid features is in place; payment isn't yet (BACKLOG F1).
+Free, Plus and Family, behind the `plans` flag. Plus and Family are bought on `/settings/plan` through a payment
+provider; in development that's a test provider, and a real one is still to come (BACKLOG F1).
 
 - **Insights by plan:** Plus and Family add 18 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
@@ -835,6 +836,25 @@ Free, Plus and Family, behind the `plans` flag. The plumbing for paid features i
     `DELETE /api/v1/me/family/members/{userId}`, `DELETE /api/v1/me/family/membership`,
     `GET /api/v1/family/invites/{token}` and `POST /api/v1/family/join` (`{"token":…}`; 409 with the reason when the
     family is full, ended, or you're in another).
+- **Buying** (`payments` flag): each paid plan's card on `/settings/plan` has its price by the month and by the year,
+  for your profile's region. Plus is $2.99 a month or $29.99 a year, Family $4.99 or $49.99; other regions' prices are
+  set in `Payments:Prices` on Identity.API. A purchase takes you to the provider's checkout and back, and the plan
+  changes as soon as the provider confirms the payment (within seconds). One subscription at a time: to switch between
+  Plus and Family, cancel and buy the other.
+  - **Cancelling:** you keep the plan until the period you paid for ends, then go back to Free (nothing you made goes),
+    and you can take the cancellation back until then. If a renewal never arrives, the plan ends 3 days after the period
+    (`Payments:GraceDays`).
+  - **Receipts** are in your data export, with the subscription. Deleting your account stops the subscription at once
+    and deletes the payment records here (the provider keeps its own for its books).
+  - **Trying it locally:** the AppHost turns on the test provider. "Buy" goes to the web app's `/dev/payments` page,
+    which charges nothing; "Pay" sends Identity a signed webhook as a real provider would. Its subscription page
+    (linked from your plan) renews it or ends it at once, to try a renewal or a period's end.
+  - **Admins** can still set anyone's plan on `/settings/plans`; a subscription ending moves back only the plan it paid
+    for.
+  - **API** (Identity): `GET /api/v1/plans/prices`, `GET /api/v1/me/subscription` (204 without one),
+    `POST /api/v1/me/checkout` (`{"plan": "plus" | "family", "interval": "month" | "year"}`, the checkout's address
+    back; 409 with a subscription running, 503 with no provider), `POST /api/v1/me/subscription/cancel` and
+    `/resume`, and the providers' `POST /api/v1/payments/webhooks/{provider}` (signed; 400 otherwise).
 - **Where it shows:** `/settings/plan` compares the plans and shows yours. If a plan has a list limit again, the lists
   page says "2 of 3 lists on Free" and turns Create off at it. Lists and sharing still go through the plan's
   `MaxLists` and `ShareLists`, so a plan can get a limit back without new plumbing.
