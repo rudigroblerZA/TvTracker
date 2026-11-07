@@ -70,7 +70,9 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
                     {
                         return Refuse(e, session.UserId, session.CompletedAtUtc is not null ? "its checkout was already paid" : "another subscription is running");
                     }
+                    session.CompletedAtUtc = now.UtcDateTime;
                     subscription = Start(provider, e, session, now);
+                    db.Subscriptions.Add(subscription);
                 }
                 else if (subscription.Status == SubscriptionStatus.Ended && await RunningAsync(subscription.UserId, subscription.Id, ct))
                 {
@@ -134,10 +136,12 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         return LedgerResult.Refused;
     }
 
-    private Subscription Start(string provider, PaymentEvent e, CheckoutSession session, DateTimeOffset now)
-    {
-        session.CompletedAtUtc = now.UtcDateTime;
-        var subscription = new Subscription
+    /// <summary>
+    /// The subscription a checkout's first payment starts, at the checkout's plan, interval and price, with nothing paid
+    /// yet: that payment's <see cref="PaidThrough"/> gives it its first period.
+    /// </summary>
+    internal static Subscription Start(string provider, PaymentEvent e, CheckoutSession session, DateTimeOffset now) =>
+        new()
         {
             Id = Guid.CreateVersion7(),
             UserId = session.UserId,
@@ -148,14 +152,18 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
             Amount = session.Amount,
             Currency = session.Currency,
             Status = SubscriptionStatus.Active,
-            // Nothing paid yet: the payment that starts it (PaidAsync) extends this by one period, or to the provider's date.
             CurrentPeriodEndUtc = now.UtcDateTime,
             CreatedAtUtc = now.UtcDateTime,
             UpdatedAtUtc = now.UtcDateTime
         };
-        db.Subscriptions.Add(subscription);
-        return subscription;
-    }
+
+    /// <summary>
+    /// Where a payment leaves the paid period: the provider's date when it gives one, else one interval on from the
+    /// period's end (from now, once it's past: a lapsed subscription paid again starts afresh). A payment never shortens
+    /// what was already paid.
+    /// </summary>
+    internal static DateTime PaidThrough(DateTime periodEndUtc, DateTime? providerEndUtc, string interval, DateTime nowUtc) =>
+        Max(periodEndUtc, providerEndUtc ?? PlanPrices.PeriodEnd(Max(periodEndUtc, nowUtc), interval));
 
     /// <summary>
     /// Extends the paid period and keeps a receipt; a subscription <paramref name="starting"/> (new, or back after ending)
@@ -163,8 +171,7 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
     /// </summary>
     private async Task PaidAsync(Subscription subscription, PaymentEvent e, bool starting, DateTimeOffset now, CancellationToken ct)
     {
-        var periodEnd = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(Max(subscription.CurrentPeriodEndUtc, now.UtcDateTime), subscription.Interval);
-        subscription.CurrentPeriodEndUtc = Max(subscription.CurrentPeriodEndUtc, periodEnd);
+        subscription.CurrentPeriodEndUtc = PaidThrough(subscription.CurrentPeriodEndUtc, e.PeriodEndUtc, subscription.Interval, now.UtcDateTime);
         subscription.Status = SubscriptionStatus.Active;
         subscription.EndedAtUtc = null;
         subscription.UpdatedAtUtc = now.UtcDateTime;

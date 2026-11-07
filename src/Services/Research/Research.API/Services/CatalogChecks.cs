@@ -179,8 +179,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
                     _ => started.Date.ToString("yyyy")
                 });
             }
-            if (show.Status is ShowStatus.Ended or ShowStatus.Cancelled && w.Episodes is { } count
-                && Math.Abs(count - show.AiredEpisodes) > Math.Max(2, count * 0.1))
+            if (show.Status is ShowStatus.Ended or ShowStatus.Cancelled && w.Episodes is { } count && !SameEpisodes(count, show.AiredEpisodes))
             {
                 Differs("episodes", show.AiredEpisodes.ToString(CultureInfo.InvariantCulture), count.ToString(CultureInfo.InvariantCulture));
             }
@@ -305,7 +304,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
     /// <summary>
     /// The earliest of Wikidata's starts ("2012-10-01T00:00:00Z@10|…"), with its precision.
     /// </summary>
-    private static WikidataDate? Earliest(string? starts) =>
+    internal static WikidataDate? Earliest(string? starts) =>
         (starts ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries)
             .Select(s => s.Split('@'))
             .Where(p => p.Length == 2 && DateTime.TryParse(p[0], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out _))
@@ -323,6 +322,11 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         10 => aired.Year == wikidata.Date.Year && aired.Month == wikidata.Date.Month,
         _ => aired.Year == wikidata.Date.Year
     };
+
+    /// <summary>
+    /// Episode counts that agree: within 2 or 10% of Wikidata's, since it counts specials and double episodes its own way.
+    /// </summary>
+    internal static bool SameEpisodes(int wikidata, int catalog) => Math.Abs(wikidata - catalog) <= Math.Max(2, wikidata * 0.1);
 
     private static readonly HashSet<string> MinorWords = new(StringComparer.OrdinalIgnoreCase) { "the", "of", "and" };
 

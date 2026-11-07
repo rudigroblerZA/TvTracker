@@ -116,4 +116,35 @@ public class PaymentTests
         subscription.Status = SubscriptionStatus.Ended;
         Assert.False(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime.AddDays(30), graceDays: 3));
     }
+
+    [Fact]
+    public void A_first_payment_pays_one_period_and_each_renewal_one_more()
+    {
+        var session = new CheckoutSession
+        {
+            UserId = "u", Provider = "test", Plan = Plans.Plus, Interval = PlanPrices.Month, Amount = 2.99m, Currency = "USD"
+        };
+        var subscription = SubscriptionLedger.Start("test", new PaymentEvent("evt_1", PaymentEventKind.Paid, "sub_1"), session, Now);
+
+        // Bought on 7 November, it renews on 7 December (a start already a period out made it 7 January).
+        var first = SubscriptionLedger.PaidThrough(subscription.CurrentPeriodEndUtc, null, PlanPrices.Month, Now.UtcDateTime);
+        Assert.Equal(new DateTime(2026, 12, 7, 12, 0, 0), first);
+        // Renewed a day early, the month runs on from the period's end, not from the payment.
+        Assert.Equal(new DateTime(2027, 1, 7, 12, 0, 0),
+            SubscriptionLedger.PaidThrough(first, null, PlanPrices.Month, first.AddDays(-1)));
+        Assert.Equal(new DateTime(2027, 11, 7, 12, 0, 0),
+            SubscriptionLedger.PaidThrough(Now.UtcDateTime, null, PlanPrices.Year, Now.UtcDateTime));
+    }
+
+    [Fact]
+    public void A_lapsed_subscription_paid_again_starts_afresh_and_no_payment_shortens_a_period()
+    {
+        var lapsedAt = Now.UtcDateTime.AddDays(-20);
+        Assert.Equal(Now.UtcDateTime.AddMonths(1), SubscriptionLedger.PaidThrough(lapsedAt, null, PlanPrices.Month, Now.UtcDateTime));
+
+        // The provider's own date stands, unless it's before what's already paid (a late or reordered event).
+        var paid = Now.UtcDateTime.AddDays(10);
+        Assert.Equal(paid.AddDays(30), SubscriptionLedger.PaidThrough(paid, paid.AddDays(30), PlanPrices.Month, Now.UtcDateTime));
+        Assert.Equal(paid, SubscriptionLedger.PaidThrough(paid, Now.UtcDateTime, PlanPrices.Month, Now.UtcDateTime));
+    }
 }

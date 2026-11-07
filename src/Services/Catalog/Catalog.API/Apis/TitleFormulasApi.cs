@@ -74,7 +74,7 @@ public static partial class TitleFormulasApi
         "seventh", "eighth", "ninth", "tenth", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "final", "last", "un", "deux", "trois", "uno", "dos", "tres", "eins", "zwei", "drei"
     ];
 
-    private sealed record TitleRow(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title);
+    internal sealed record TitleRow(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber, string Title);
 
     /// <summary>
     /// A title split into words: <paramref name="Keys"/> for matching, <paramref name="Raw"/> as written, aligned.
@@ -124,8 +124,7 @@ public static partial class TitleFormulasApi
                 .ToListAsync(token);
             var formulas = rows.GroupBy(r => r.ShowId)
                 .Where(g => g.GroupBy(r => r.SeasonNumber).All(season => season.Count() <= ShowRules.DailySeason))
-                .Select(g => Find(g.Key, g.Where(r => !string.IsNullOrWhiteSpace(r.Title) && !Placeholder().IsMatch(r.Title.Trim()))
-                    .OrderBy(r => r.SeasonNumber).ThenBy(r => r.EpisodeNumber).ToList()))
+                .Select(g => Formula(g.Key, g))
                 .OfType<TitleFormulaDto>()
                 .ToDictionary(f => f.ShowId);
             var ids = formulas.Keys.ToList();
@@ -136,10 +135,12 @@ public static partial class TitleFormulasApi
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
     /// <summary>
-    /// A show's formula, or null when its titles don't follow one.
+    /// A show's formula from its regular episodes' titles, placeholders left out, or null when they don't follow one.
     /// </summary>
-    private static TitleFormulaDto? Find(Guid showId, List<TitleRow> rows)
+    internal static TitleFormulaDto? Formula(Guid showId, IEnumerable<TitleRow> rows)
     {
+        rows = rows.Where(r => !string.IsNullOrWhiteSpace(r.Title) && !Placeholder().IsMatch(r.Title.Trim()))
+            .OrderBy(r => r.SeasonNumber).ThenBy(r => r.EpisodeNumber);
         // Titles that are only punctuation have no words: they're no more a title than a blank one.
         var episodes = rows.Select(e => (Row: e, Tokens: Split(e.Title))).Where(e => e.Tokens.Keys.Length > 0).ToList();
         if (episodes.Count < MinTitled)

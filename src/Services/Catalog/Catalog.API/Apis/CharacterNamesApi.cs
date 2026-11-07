@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using Catalog.API.Services;
 using Catalog.Data;
@@ -125,15 +124,18 @@ public static partial class CharacterNamesApi
         }
 
         var index = await LoadAsync(db, cache, ct);
-        var key = TitleCase(cleaned);
-        var firsts = index.Entries.Where(e => e.First == key).ToList();
+        var key = Key(cleaned);
+        var firsts = index.Entries.Where(e => e.First.Equals(cleaned, StringComparison.OrdinalIgnoreCase)).ToList();
         // Only decades with enough characters for a place to mean something (the 1950s have a few dozen).
         var decades = firsts.Where(e => e.Year is not null).GroupBy(e => e.Year!.Value / 10 * 10)
             .Where(g => index.DecadeSizes[g.Key] >= MinDecadeCharacters).OrderBy(g => g.Key)
             .Select(g => new NameDecadeDto(g.Key, g.Count(), index.DecadeRanks[g.Key][key]))
             .ToList();
-        return TypedResults.Ok(new NameReportDto(key, firsts.Count, index.Ranks.TryGetValue(key, out var rank) ? rank : null,
-            Characters(firsts, MaxCharacters), Characters(index.Entries.Where(e => e.Last == key), MaxSurnames), decades));
+        var lasts = index.Entries.Where(e => e.Last.Equals(cleaned, StringComparison.OrdinalIgnoreCase)).ToList();
+        // The name as the credits write it ("McNulty", whatever was typed).
+        var written = firsts.FirstOrDefault()?.First ?? lasts.FirstOrDefault()?.Last ?? Written(cleaned);
+        return TypedResults.Ok(new NameReportDto(written, firsts.Count, index.Ranks.TryGetValue(key, out var rank) ? rank : null,
+            Characters(firsts, MaxCharacters), Characters(lasts, MaxSurnames), decades));
     }
 
     private static List<NamedCharacterDto> Characters(IEnumerable<Entry> entries, int take) => entries
@@ -142,18 +144,18 @@ public static partial class CharacterNamesApi
         .Select(e => new NamedCharacterDto(e.Character, e.PersonId, e.Actor, e.ShowId, e.Title, e.PosterUrl, e.Year))
         .ToList();
 
-    private static List<NameCountDto> Top(IEnumerable<Entry> entries, int take) => entries.GroupBy(e => e.First)
+    private static List<NameCountDto> Top(IEnumerable<Entry> entries, int take) => entries.GroupBy(e => e.First, StringComparer.OrdinalIgnoreCase)
         .Select(g => new NameCountDto(g.Key, g.Count()))
         .OrderByDescending(n => n.Count).ThenBy(n => n.Name, StringComparer.Ordinal)
         .Take(take)
         .ToList();
 
     /// <summary>
-    /// Places by count, with ties sharing a place (two names with 40 characters are both 7th).
+    /// Places by count, with ties sharing a place (two names with 40 characters are both 7th), by <see cref="Key"/>.
     /// </summary>
     private static Dictionary<string, int> Ranks(IEnumerable<Entry> entries)
     {
-        var counts = entries.GroupBy(e => e.First).Select(g => (Name: g.Key, Count: g.Count())).OrderByDescending(n => n.Count).ToList();
+        var counts = entries.GroupBy(e => Key(e.First)).Select(g => (Name: g.Key, Count: g.Count())).OrderByDescending(n => n.Count).ToList();
         var ranks = new Dictionary<string, int>();
         for (var i = 0; i < counts.Count; i++)
         {
@@ -163,7 +165,7 @@ public static partial class CharacterNamesApi
     }
 
     private static async Task<Index> LoadAsync(CatalogContext db, HybridCache cache, CancellationToken ct) =>
-        await cache.GetOrCreateAsync("character-names", async token =>
+        await cache.GetOrCreateAsync("character-names-v2", async token =>
         {
             var credits = await db.CastCredits.AsNoTracking()
                 .Join(db.People, c => c.PersonId, p => p.Id, (c, p) => new CreditRow(c.PersonId, p.Name, p.Gender, c.Character, c.ShowExternalId,
@@ -195,7 +197,7 @@ public static partial class CharacterNamesApi
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
     /// <summary>
-    /// A character's first and last name, title-cased, or null when it doesn't read as a person's name.
+    /// A character's first and last name as written (<see cref="Written"/>), or null when it doesn't read as a person's name.
     /// </summary>
     internal static (string First, string Last)? Parse(string character)
     {
@@ -213,11 +215,35 @@ public static partial class CharacterNamesApi
         {
             return null;
         }
-        return (TitleCase(words[0]), TitleCase(words[^1]));
+        return (Written(words[0]), Written(words[^1]));
     }
 
-    private static string TitleCase(string word) =>
-        string.Concat(word[..1].ToUpper(CultureInfo.InvariantCulture), word[1..].ToLower(CultureInfo.InvariantCulture));
+    /// <summary>
+    /// A name the way names are written: as given when it mixes cases ("McNulty", "DeMarco"), else each part capitalised
+    /// ("O'BRIEN" is "O'Brien", "mary-kate" "Mary-Kate"). Matching ignores case (<see cref="Key"/>), so this is only for
+    /// showing.
+    /// </summary>
+    private static string Written(string word)
+    {
+        if (word.Skip(1).Any(char.IsUpper) && word.Any(char.IsLower))
+        {
+            return word;
+        }
+        var chars = word.ToLowerInvariant().ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (i == 0 || chars[i - 1] is '-' or '\'' or '’')
+            {
+                chars[i] = char.ToUpperInvariant(chars[i]);
+            }
+        }
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// What names are counted and looked up by: case aside, "Mcnulty" and "McNulty" are one name.
+    /// </summary>
+    private static string Key(string name) => name.ToLowerInvariant();
 
     [GeneratedRegex("\"[^\"]*\"|“[^”]*”|\\([^)]*\\)")]
     private static partial Regex Quoted();
