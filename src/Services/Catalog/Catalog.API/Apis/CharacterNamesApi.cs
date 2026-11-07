@@ -8,7 +8,7 @@ using TvTracker;
 
 namespace Catalog.API.Apis;
 
-/// <param name="Name">The first name as searched, in title case.</param>
+/// <param name="Name">The name as the credits most often write it ("McNulty", whatever was typed), else as typed, capitalised.</param>
 /// <param name="Count">Characters with it as their first name.</param>
 /// <param name="Rank">Its place among all first names (1 is the most common), or null when no character has it.</param>
 /// <param name="Characters">The most popular shows' characters with that first name.</param>
@@ -89,8 +89,10 @@ public static partial class CharacterNamesApi
     private sealed record Entry(string First, string Last, string Character, Guid PersonId, string Actor, string? Gender, Guid? ShowId,
         string Title, string? PosterUrl, int? Year, double Popularity);
 
-    private sealed record Index(List<Entry> Entries, Dictionary<string, int> Ranks, Dictionary<int, Dictionary<string, int>> DecadeRanks,
-        Dictionary<int, int> DecadeSizes);
+    /// <param name="Spellings">Each name's one spelling, by <see cref="Key"/>: the entries carry it, so everything else
+    /// compares names exactly.</param>
+    private sealed record Index(List<Entry> Entries, Dictionary<string, string> Spellings, Dictionary<string, int> Ranks,
+        Dictionary<int, Dictionary<string, int>> DecadeRanks, Dictionary<int, int> DecadeSizes);
 
     private sealed record CreditRow(Guid PersonId, string Actor, string? Gender, string? Character, string ShowExternalId, Guid? ShowId, string Title,
         string? PosterUrl, DateOnly? Premiered, double Popularity);
@@ -124,18 +126,15 @@ public static partial class CharacterNamesApi
         }
 
         var index = await LoadAsync(db, cache, ct);
-        var key = Key(cleaned);
-        var firsts = index.Entries.Where(e => e.First.Equals(cleaned, StringComparison.OrdinalIgnoreCase)).ToList();
+        var spelling = index.Spellings.GetValueOrDefault(Key(cleaned)) ?? Written(cleaned);
+        var firsts = index.Entries.Where(e => e.First == spelling).ToList();
         // Only decades with enough characters for a place to mean something (the 1950s have a few dozen).
         var decades = firsts.Where(e => e.Year is not null).GroupBy(e => e.Year!.Value / 10 * 10)
             .Where(g => index.DecadeSizes[g.Key] >= MinDecadeCharacters).OrderBy(g => g.Key)
-            .Select(g => new NameDecadeDto(g.Key, g.Count(), index.DecadeRanks[g.Key][key]))
+            .Select(g => new NameDecadeDto(g.Key, g.Count(), index.DecadeRanks[g.Key][spelling]))
             .ToList();
-        var lasts = index.Entries.Where(e => e.Last.Equals(cleaned, StringComparison.OrdinalIgnoreCase)).ToList();
-        // The name as the credits write it ("McNulty", whatever was typed).
-        var written = firsts.FirstOrDefault()?.First ?? lasts.FirstOrDefault()?.Last ?? Written(cleaned);
-        return TypedResults.Ok(new NameReportDto(written, firsts.Count, index.Ranks.TryGetValue(key, out var rank) ? rank : null,
-            Characters(firsts, MaxCharacters), Characters(lasts, MaxSurnames), decades));
+        return TypedResults.Ok(new NameReportDto(spelling, firsts.Count, index.Ranks.TryGetValue(spelling, out var rank) ? rank : null,
+            Characters(firsts, MaxCharacters), Characters(index.Entries.Where(e => e.Last == spelling), MaxSurnames), decades));
     }
 
     private static List<NamedCharacterDto> Characters(IEnumerable<Entry> entries, int take) => entries
@@ -144,18 +143,18 @@ public static partial class CharacterNamesApi
         .Select(e => new NamedCharacterDto(e.Character, e.PersonId, e.Actor, e.ShowId, e.Title, e.PosterUrl, e.Year))
         .ToList();
 
-    private static List<NameCountDto> Top(IEnumerable<Entry> entries, int take) => entries.GroupBy(e => e.First, StringComparer.OrdinalIgnoreCase)
+    private static List<NameCountDto> Top(IEnumerable<Entry> entries, int take) => entries.GroupBy(e => e.First)
         .Select(g => new NameCountDto(g.Key, g.Count()))
         .OrderByDescending(n => n.Count).ThenBy(n => n.Name, StringComparer.Ordinal)
         .Take(take)
         .ToList();
 
     /// <summary>
-    /// Places by count, with ties sharing a place (two names with 40 characters are both 7th), by <see cref="Key"/>.
+    /// Places by count, with ties sharing a place (two names with 40 characters are both 7th).
     /// </summary>
     private static Dictionary<string, int> Ranks(IEnumerable<Entry> entries)
     {
-        var counts = entries.GroupBy(e => Key(e.First)).Select(g => (Name: g.Key, Count: g.Count())).OrderByDescending(n => n.Count).ToList();
+        var counts = entries.GroupBy(e => e.First).Select(g => (Name: g.Key, Count: g.Count())).OrderByDescending(n => n.Count).ToList();
         var ranks = new Dictionary<string, int>();
         for (var i = 0; i < counts.Count; i++)
         {
@@ -165,7 +164,7 @@ public static partial class CharacterNamesApi
     }
 
     private static async Task<Index> LoadAsync(CatalogContext db, HybridCache cache, CancellationToken ct) =>
-        await cache.GetOrCreateAsync("character-names-v2", async token =>
+        await cache.GetOrCreateAsync("character-names-v3", async token =>
         {
             var credits = await db.CastCredits.AsNoTracking()
                 .Join(db.People, c => c.PersonId, p => p.Id, (c, p) => new CreditRow(c.PersonId, p.Name, p.Gender, c.Character, c.ShowExternalId,
@@ -192,8 +191,13 @@ public static partial class CharacterNamesApi
                     row.Premiered?.Year, row.Popularity));
             }
 
+            // One spelling per name, the most common (ties alphabetically, so a rebuild gives the same), whichever way a
+            // credit wrote it: "Deandre" from a credit in capitals and "DeAndre" are one name, shown as most write it.
+            var spellings = Spellings(entries.SelectMany(e => new[] { e.First, e.Last }));
+            entries = entries.Select(e => e with { First = spellings[Key(e.First)], Last = spellings[Key(e.Last)] }).ToList();
+
             var decades = entries.Where(e => e.Year is not null).GroupBy(e => e.Year!.Value / 10 * 10).ToList();
-            return new Index(entries, Ranks(entries), decades.ToDictionary(g => g.Key, g => Ranks(g)), decades.ToDictionary(g => g.Key, g => g.Count()));
+            return new Index(entries, spellings, Ranks(entries), decades.ToDictionary(g => g.Key, g => Ranks(g)), decades.ToDictionary(g => g.Key, g => g.Count()));
         }, new HybridCacheEntryOptions { Expiration = CacheFor, LocalCacheExpiration = CacheFor }, cancellationToken: ct);
 
     /// <summary>
@@ -219,9 +223,9 @@ public static partial class CharacterNamesApi
     }
 
     /// <summary>
-    /// A name the way names are written: as given when it mixes cases ("McNulty", "DeMarco"), else each part capitalised
-    /// ("O'BRIEN" is "O'Brien", "mary-kate" "Mary-Kate"). Matching ignores case (<see cref="Key"/>), so this is only for
-    /// showing.
+    /// A name the way names are written: as given when it mixes cases ("McNulty", "DeMarco"), else each part capitalised:
+    /// after a hyphen ("mary-kate" is "Mary-Kate"), and after an apostrophe only behind a single letter ("O'BRIEN" is
+    /// "O'Brien", "MA'AM" "Ma'am"). The index then shows each name as most credits write it (<see cref="Key"/>).
     /// </summary>
     private static string Written(string word)
     {
@@ -232,7 +236,7 @@ public static partial class CharacterNamesApi
         var chars = word.ToLowerInvariant().ToCharArray();
         for (var i = 0; i < chars.Length; i++)
         {
-            if (i == 0 || chars[i - 1] is '-' or '\'' or '’')
+            if (i == 0 || chars[i - 1] == '-' || i == 2 && chars[1] is '\'' or '’')
             {
                 chars[i] = char.ToUpperInvariant(chars[i]);
             }
@@ -241,9 +245,17 @@ public static partial class CharacterNamesApi
     }
 
     /// <summary>
-    /// What names are counted and looked up by: case aside, "Mcnulty" and "McNulty" are one name.
+    /// Each name's most common spelling, by <see cref="Key"/>; a tie goes to the first in ordinal order, so a rebuild of the
+    /// index spells it the same.
     /// </summary>
-    private static string Key(string name) => name.ToLowerInvariant();
+    internal static Dictionary<string, string> Spellings(IEnumerable<string> names) => names
+        .GroupBy(Key)
+        .ToDictionary(g => g.Key, g => g.GroupBy(w => w).OrderByDescending(w => w.Count()).ThenBy(w => w.Key, StringComparer.Ordinal).First().Key);
+
+    /// <summary>
+    /// What makes two spellings one name: case aside, "Mcnulty" and "McNulty" are one.
+    /// </summary>
+    internal static string Key(string name) => name.ToLowerInvariant();
 
     [GeneratedRegex("\"[^\"]*\"|“[^”]*”|\\([^)]*\\)")]
     private static partial Regex Quoted();

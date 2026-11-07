@@ -139,7 +139,7 @@ public static partial class TitleFormulasApi
     /// </summary>
     internal static TitleFormulaDto? Formula(Guid showId, IEnumerable<TitleRow> rows)
     {
-        rows = rows.Where(r => !string.IsNullOrWhiteSpace(r.Title) && !Placeholder().IsMatch(r.Title.Trim()))
+        rows = rows.Where(r => r.SeasonNumber > 0 && !string.IsNullOrWhiteSpace(r.Title) && !Placeholder().IsMatch(r.Title.Trim()))
             .OrderBy(r => r.SeasonNumber).ThenBy(r => r.EpisodeNumber);
         // Titles that are only punctuation have no words: they're no more a title than a blank one.
         var episodes = rows.Select(e => (Row: e, Tokens: Split(e.Title))).Where(e => e.Tokens.Keys.Length > 0).ToList();

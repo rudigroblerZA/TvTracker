@@ -61,8 +61,20 @@ public class ShowFactsTests
     [InlineData("Robert Baratheon Jr.", "Robert", "Baratheon")]
     [InlineData("Mary-Kate O'Brien", "Mary-Kate", "O'Brien")]
     [InlineData("MARY-KATE O'BRIEN", "Mary-Kate", "O'Brien")]    // shouted, then written as names are
+    [InlineData("KA'ALA D'ANGELO", "Ka'ala", "D'Angelo")]        // a capital after an apostrophe only behind one letter
     public void A_character_reads_as_first_and_last_name(string character, string first, string last) =>
         Assert.Equal((first, last), CharacterNamesApi.Parse(character));
+
+    [Fact]
+    public void A_name_is_shown_as_most_credits_spell_it()
+    {
+        // A credit in capitals reads "Deandre"; most write "DeAndre", and that's the one spelling.
+        var spellings = CharacterNamesApi.Spellings(["Deandre", "DeAndre", "DeAndre", "Jimmy"]);
+        Assert.Equal("DeAndre", spellings[CharacterNamesApi.Key("DEANDRE")]);
+        Assert.Equal(2, spellings.Count);
+        // A tie is settled the same way every time, whatever order the rows came in.
+        Assert.Equal(CharacterNamesApi.Spellings(["McNulty", "Mcnulty"])["mcnulty"], CharacterNamesApi.Spellings(["Mcnulty", "McNulty"])["mcnulty"]);
+    }
 
     [Theory]
     [InlineData("Bartender")]       // one word can't be told from a name
