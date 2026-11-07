@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace TvTracker.Persistence;
@@ -17,53 +16,21 @@ namespace TvTracker.Persistence;
 /// Before this, nothing deleted from either: after two weeks of development use, Catalog's outbox held 8,645 rows
 /// (45 MB) and Social's inbox 27,117.
 /// </summary>
-public sealed class IntegrationEventRetention(IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<IntegrationEventRetention> logger)
-    : BackgroundService
+public sealed class IntegrationEventRetention(IServiceScopeFactory scopes, TimeProvider time, ILogger<IntegrationEventRetention> logger)
+    : PeriodicTrim(scopes, time, logger)
 {
     public const int OutboxDays = 7;
     public const int InboxDays = 30;
 
-    private const int Batch = 5000;
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
-    private static readonly TimeSpan FirstRunDelay = TimeSpan.FromMinutes(2);
+    protected override TimeSpan Interval => TimeSpan.FromHours(1);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await Task.Delay(FirstRunDelay, time, stoppingToken);
-        using var timer = new PeriodicTimer(Interval, time);
-        do
-        {
-            try
-            {
-                await TrimAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex, "Trimming the outbox and inbox failed; trying again in an hour");
-            }
-        }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
-    }
+    protected override TimeSpan FirstRunDelay => TimeSpan.FromMinutes(2);
 
-    private async Task TrimAsync(CancellationToken ct)
+    protected override async Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(
+        IServiceProvider services, DateTime nowUtc, int batch, CancellationToken ct)
     {
-        var now = time.GetUtcNow().UtcDateTime;
-        var (outbox, inbox) = (0, 0);
-        while (true)
-        {
-            // A fresh scope per batch, so the change tracker doesn't grow over a long first trim.
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var (o, i) = await scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>()
-                .TrimAsync(now.AddDays(-OutboxDays), now.AddDays(-InboxDays), Batch, ct);
-            (outbox, inbox) = (outbox + o, inbox + i);
-            if (o < Batch && i < Batch)
-            {
-                break;
-            }
-        }
-        if (outbox + inbox > 0)
-        {
-            logger.LogInformation("Trimmed {Outbox} published outbox rows and {Inbox} inbox rows", outbox, inbox);
-        }
+        var (outbox, inbox) = await services.GetRequiredService<IIntegrationEventOutbox>()
+            .TrimAsync(nowUtc.AddDays(-OutboxDays), nowUtc.AddDays(-InboxDays), batch, ct);
+        return [("published outbox rows", outbox), ("inbox rows", inbox)];
     }
 }

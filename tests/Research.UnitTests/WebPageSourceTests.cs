@@ -48,6 +48,15 @@ public class WebPageSourceTests
     }
 
     [Fact]
+    public void A_bypass_list_covering_common_names_still_finds_the_proxy()
+    {
+        // NO_PROXY with example.com or a whole suffix such as .com mustn't hide the proxy itself.
+        var proxy = new WebProxy("http://127.0.0.1:37121", BypassOnLocal: true, BypassList: [@"example\.com", @".*\.com$"]);
+
+        Assert.True(WebPageSource.IsProxy(proxy, new DnsEndPoint("127.0.0.1", 37121)));
+    }
+
+    [Fact]
     public async Task An_https_page_through_a_loopback_proxy_is_let_through()
     {
         // The tunnel to the proxy is attempted (nothing listens, so the OS refuses it), not stopped by the check.

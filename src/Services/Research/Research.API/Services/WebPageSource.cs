@@ -133,11 +133,13 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     /// <summary>
     /// Whether this connection is to the configured proxy (for http or https pages) rather than to a page's host.
     /// Not judged from the request: for an https page the handler opens a tunnel, and the request it connects for then
-    /// names the proxy itself, which the proxy's own bypass list (localhost) would wave off.
+    /// names the proxy itself, which the proxy's own bypass list (localhost) would wave off. The proxy is found by asking
+    /// for a name under the reserved <c>.invalid</c> domain, which no bypass list names short of "everything" (and then
+    /// nothing goes through the proxy to recognise).
     /// </summary>
     internal static bool IsProxy(IWebProxy? proxy, DnsEndPoint endpoint) =>
         proxy is not null && new[] { "http", "https" }.Any(scheme =>
-            new Uri($"{scheme}://example.com/") is var probe && !proxy.IsBypassed(probe) && proxy.GetProxy(probe) is { } via
+            new Uri($"{scheme}://proxy-probe.invalid/") is var probe && !proxy.IsBypassed(probe) && proxy.GetProxy(probe) is { } via
             && string.Equals(via.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && via.Port == endpoint.Port);
 
     private sealed class NotPublicException() : IOException("The address isn't on the public web.");

@@ -203,7 +203,7 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
         foreach (var prefs in candidates.Where(p => IsDue(p, now)))
         {
             // Per user, so a flag targeted at some users holds the digest back from the others only; one held back
-            // isn't stamped, so it goes out the first run after the flag turns on for them.
+            // isn't stamped, so it goes out on the first run of their digest day (from their hour) with the flag on.
             if (!await flags.IsEnabledAsync(FeatureFlags.WeeklyDigest, FeatureFlags.ContextForUser(prefs.UserId, prefs.Email), ct))
             {
                 continue;

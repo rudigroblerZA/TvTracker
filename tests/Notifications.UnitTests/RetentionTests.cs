@@ -5,7 +5,7 @@ namespace Notifications.UnitTests;
 
 /// <summary>
 /// What the daily trim keeps: read items for 90 days, unread ones for a year, finished deliveries for a month, and
-/// pending deliveries whatever their age.
+/// pending deliveries whatever their age (and, in the trim itself, the items they belong to).
 /// </summary>
 public class RetentionTests
 {
@@ -24,15 +24,17 @@ public class RetentionTests
         new() { UserId = "u", Status = status, ScheduledForUtc = Now.AddDays(-scheduledDaysAgo) };
 
     [Fact]
-    public void Read_items_go_after_90_days_and_unread_ones_after_a_year()
+    public void Read_items_go_after_90_days_and_any_item_after_a_year()
     {
-        var expired = InboxRetention.ExpiredItems(Now).Compile();
+        var read = InboxRetention.ReadLongAgo(Now).Compile();
+        var old = InboxRetention.CreatedLongAgo(Now).Compile();
+        bool Expired(InboxItem item) => read(item) || old(item);
 
-        Assert.False(expired(Item(createdDaysAgo: 200, readDaysAgo: 89)));
-        Assert.True(expired(Item(createdDaysAgo: 200, readDaysAgo: 91)));
-        Assert.False(expired(Item(createdDaysAgo: 364, readDaysAgo: null)));
-        Assert.True(expired(Item(createdDaysAgo: 366, readDaysAgo: null)));
-        Assert.True(expired(Item(createdDaysAgo: 366, readDaysAgo: 1)));
+        Assert.False(Expired(Item(createdDaysAgo: 200, readDaysAgo: 89)));
+        Assert.True(Expired(Item(createdDaysAgo: 200, readDaysAgo: 91)));
+        Assert.False(Expired(Item(createdDaysAgo: 364, readDaysAgo: null)));
+        Assert.True(Expired(Item(createdDaysAgo: 366, readDaysAgo: null)));
+        Assert.True(Expired(Item(createdDaysAgo: 366, readDaysAgo: 1)));
     }
 
     [Fact]

@@ -58,7 +58,8 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
 /// check and for the inbox items' source.</item>
 /// <item><b>Preference:</b> its own, "season verdicts" (existing users started with their "new seasons" value).</item>
 /// <item><b>Flag:</b> evaluated per follower by the fan-out, so a flag targeted at some users holds the verdict back
-/// from the others only; a follower it's off for doesn't get this one later.</item>
+/// from the others only. While it held anyone back the verdict isn't marked processed, though it's sent only once, so
+/// they get it only if it's redelivered.</item>
 /// </list>
 /// </summary>
 public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut)
@@ -73,14 +74,17 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
             return;
         }
 
-        await fanOut.NotifyFollowersAsync(verdict, new NotificationContent(
+        var result = await fanOut.NotifyFollowersAsync(verdict, new NotificationContent(
             NotificationKind.SeasonVerdict, e.ShowId, null,
             $"{e.ShowTitle}: how season {e.SeasonNumber} did",
             SeasonVerdictText(e),
             $"/shows/{e.ShowId}", FeatureFlags.SeasonVerdict), ct);
 
-        db.MarkProcessed(verdict, nameof(AnalyticsNotificationHandlers));
-        await db.SaveChangesAsync(ct);
+        if (result.HeldBack == 0)
+        {
+            db.MarkProcessed(verdict, nameof(AnalyticsNotificationHandlers));
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>
@@ -124,7 +128,8 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
 /// <item><b>When, not a date:</b> the text says how many days away it starts, since one text goes to followers in
 /// every time zone and a US evening is the next day in UTC.</item>
 /// <item><b>Preference:</b> "new episodes", since it's about episodes airing.</item>
-/// <item><b>Flag:</b> per follower, as for verdicts.</item>
+/// <item><b>Flag:</b> per follower, as for verdicts. While it held anyone back the crossover isn't marked processed,
+/// so an hourly re-send after the flag turns on reaches them; those already told are skipped by the fan-out.</item>
 /// </list>
 /// </summary>
 public sealed class CrossoverNotificationHandler(NotificationsContext db, NotificationFanOut fanOut, TimeProvider time)
@@ -140,14 +145,18 @@ public sealed class CrossoverNotificationHandler(NotificationsContext db, Notifi
         }
 
         var body = CrossoverText(e, time.GetUtcNow());
+        var heldBack = 0;
         foreach (var show in e.Parts.Select(p => p.ShowId).Distinct())
         {
-            await fanOut.NotifyFollowersAsync(crossover, new NotificationContent(
-                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}", FeatureFlags.CrossoverAlerts), ct);
+            heldBack += (await fanOut.NotifyFollowersAsync(crossover, new NotificationContent(
+                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}", FeatureFlags.CrossoverAlerts), ct)).HeldBack;
         }
 
-        db.MarkProcessed(crossover, nameof(CrossoverNotificationHandler));
-        await db.SaveChangesAsync(ct);
+        if (heldBack == 0)
+        {
+            db.MarkProcessed(crossover, nameof(CrossoverNotificationHandler));
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>

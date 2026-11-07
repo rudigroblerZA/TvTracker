@@ -166,6 +166,11 @@ namespace Notifications.API.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("ReadAtUtc")
+                        .HasFilter("\"ReadAtUtc\" IS NOT NULL");
+
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "SourceEventId")

@@ -781,8 +781,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     - **Checked where it connects:** the handler's `ConnectCallback` resolves the host once, refuses it unless every
       address is public, and connects to exactly those, so a host that changes its DNS answer after a check (DNS
       rebinding) can't reach a private one. The earlier check stays for its message.
-    - **The proxy is let through:** in the sandbox every fetch goes through the environment's proxy, whose address is
-      private, so a connection to the proxy configured for that request passes; the proxy does its own lookups.
+    - **The proxy is let through:** in the sandbox every fetch goes through the environment's proxy, on a loopback
+      address, so a connection to the configured proxy passes; the proxy does its own lookups. It's recognised by its
+      own address (found by asking for a `.invalid` name), not from the request: for an https page the tunnel's request
+      names the proxy, which its localhost bypass waved off, and the first version refused every page.
   - **Plain HTTP clients:** the standard resilience handler retried Wikipedia's 429s until its 30 s total timeout and
     failed the whole gather. Each source has one try, and a failure leaves that source out.
 - **Drafts in the background** (`DraftQueue`): Model Runner's small CPU model (qwen3 0.6B) took 92 s for Breaking Bad,
@@ -844,7 +846,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
 - **In the data export:** those versions and notes, while the account exists (`ExportApi`, signed in, not behind the
-  flag; most people have none). Identity references Research for it, the one service that also references Identity
+  flag; most people have none). A token without a user gets 401: a null id would match every deleted moderator's work. Identity references Research for it, the one service that also references Identity
   (for plans); the AppHost still starts, since neither waits for the other.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
   and a source.
@@ -949,14 +951,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Migrations:** the digest's settings needed columns, so Notifications moved off `EnsureCreated` (baseline
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
 - **Flags per person:** the digest, season verdicts and crossover alerts check their flag for each recipient
-  (`FeatureFlags.ContextForUser`: their id and email, as a request of theirs would carry), through `CachedFlags`, so a
-  flag aimed at some users holds the alert back from the others only. Before, each was checked once without a user, so
-  targeting couldn't apply. A follower it's off for doesn't get that alert later; a held-back digest isn't stamped, so
-  it goes on the first run after the flag turns on.
-- **Inbox retention** (`InboxRetention`, daily, batches of 5,000): inbox items read 90+ days ago or created a year
-  ago, and finished deliveries scheduled 30+ days ago (pending ones stay). Before this, both were deleted only with the
-  account. Nothing reads further back: the digest reads since the last one, and the fan-out's "already told" check
-  covers redeliveries and crossovers re-sent for 14 days.
+  (`FeatureFlags.ContextForUser`), through `CachedFlags`, 16 at a time (one flagd round trip each, so a large show's
+  fan-out doesn't wait on thousands in a row), so a flag aimed at some users holds the alert back from the others only.
+  Before, each was checked once without a user, so targeting couldn't apply.
+  - **Target by user id:** the context has the user's id and, when Notifications has it, their email, which comes with
+    registration and profile changes but not the daily snapshot; a user who registered before Notifications kept
+    emails has none here. Rules for these alerts should go by `targetingKey`.
+  - **Held back, then sent:** while the flag held anyone back, the event isn't marked processed, so a crossover's hourly
+    re-send reaches them once it turns on (those already told are skipped); a verdict is sent once, so only a
+    redelivery would. A held-back digest isn't stamped, so it goes on their next digest day with the flag on.
+- **Inbox retention** (`InboxRetention` on `PeriodicTrim`, the loop it shares with `IntegrationEventRetention`; daily,
+  batches of 5,000): inbox items read 90+ days ago or created a year ago, and finished deliveries scheduled 30+ days
+  ago. An item with a delivery still pending is kept, as is the delivery, since the worker still owes it. Each rule is
+  its own delete on its own index (migration `InboxRetentionIndexes`), so a batch doesn't scan the inbox. Before this,
+  both were deleted only with the account. Nothing reads further back: the digest reads since the last one, and the
+  fan-out's "already told" check covers redeliveries and crossovers re-sent for 14 days.
 
 ## Where the cast went next
 
