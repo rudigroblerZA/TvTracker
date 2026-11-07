@@ -11,7 +11,8 @@ that shows it), what done looks like, its priority and its size.
 ## Now
 
 Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
-November 2026; CONTEXT.md has the decisions.
+November 2026, then inbox retention (R4), research in the data export (S5), pinned page fetches (S6), a season-verdict
+preference (D2) and per-follower flags (T3); CONTEXT.md has the decisions.
 
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
@@ -78,15 +79,7 @@ So the rest of the list reads in proportion:
 
 ## Reliability
 
-### R4. Inbox and delivery retention in Notifications
-
-**P3 · S**
-
-- **Why:** `InboxItem` and `Delivery` rows (`NotificationsContext.cs:79,116`) are deleted only with the account, so a
-  long-time follower's inbox grows forever.
-- **What:** delete inbox items read more than 90 days ago (or any older than a year), and sent deliveries older than
-  30 days.
-- **Done when:** a scheduled pass trims both; README says how long the inbox keeps items.
+Nothing open.
 
 ## Security
 
@@ -130,25 +123,6 @@ So the rest of the list reads in proportion:
 - **Done when:** a load-test user hammering writes gets 429s with `Retry-After`, and normal use (`tvtracker-load run`)
   sees none.
 
-### S5. Research in the data export
-
-**P3 · S**
-
-- **Why:** saved research versions record the moderator's id and name, but the export only asks tracking, ratings,
-  recommendations, notifications and social (`ProfileApi.cs:32`). Account deletion already handles Research.
-- **What:** `GET /api/v1/me/export` on Research.API (versions the user saved), added to `ExportSources`.
-- **Done when:** a moderator's export lists their saved versions.
-
-### S6. Pin the address a researcher's page is fetched from
-
-**P3 · S**
-
-- **Why:** `WebPageSource` checks a host's addresses before connecting, so a host that changes its DNS answer between
-  the check and the connection (DNS rebinding) could reach a private address. The class comment says so. It's
-  moderator-only, which keeps the risk low.
-- **What:** do the check inside `SocketsHttpHandler.ConnectCallback`, connecting to the address that was checked.
-- **Done when:** the check and the connection use the same resolved address.
-
 ## Performance
 
 ### P3. Fewer calls per show page
@@ -182,16 +156,6 @@ So the rest of the list reads in proportion:
   - Show "6 of 10" in Up Next and the calendar.
 - **Done when:** a weekly season with its planned count aired gets its verdict three days after the finale; the
   quiet-period rule stays for seasons without a count.
-
-### D2. A notification preference of its own for season verdicts
-
-**P3 · S** (Notifications has migrations now)
-
-- **Why:** verdicts use the "new seasons" preference (CONTEXT.md, Season verdict), so you can't have one without the
-  other.
-- **What:** a `SeasonVerdicts` preference column, defaulting to the user's "new seasons" value, with its toggle in
-  Settings.
-- **Done when:** turning verdicts off stops them without stopping new-season notifications.
 
 ## Features
 
@@ -242,14 +206,6 @@ All the features from the review have shipped; new ideas go here.
   doesn't.
 - **What:** one `StableId.From(string key)` in a shared library, used by both. Changing the verdict ids re-notifies
   live verdicts, so switch when none is fresh.
-
-### T3. Per-follower flag targeting for notifications
-
-**P3 · S**
-
-- **Why:** the season-verdict handler evaluates its flag once, without a user (`Handlers.cs`, `AnalyticsNotificationHandlers`),
-  so a flag targeted at some users can't hold notifications back from the others.
-- **What:** evaluate per recipient in `NotificationFanOut`, using `FeatureFlags.ContextFor`'s keys.
 
 ## Operations
 

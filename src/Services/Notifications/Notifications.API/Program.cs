@@ -42,6 +42,7 @@ builder.Services.AddHostedService<DeliveryWorker>();
 builder.Services.AddHttpClient<CatalogSchedule>(http => http.BaseAddress = new Uri("https+http://catalog-api/"));
 builder.Services.AddScoped<WeeklyDigest>();
 builder.Services.AddHostedService<DigestWorker>();
+builder.Services.AddHostedService<InboxRetention>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

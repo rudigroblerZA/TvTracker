@@ -12,8 +12,13 @@ namespace Research.API.Services;
 /// The server fetches it on a moderator's behalf, so only public web addresses are allowed: http(s) on the standard
 /// ports, to hosts that resolve only to public IP addresses (no loopback, private, link-local or carrier-grade NAT
 /// ranges), checked again at every redirect (at most 3). Pages are capped at 2 MB, HTML or plain text only, 15 s.
-/// The check is on the name's addresses before connecting, so a host that changes its DNS answer between the check and
-/// the request (DNS rebinding) isn't caught; the requests go through the environment's proxy where there is one.
+/// </para>
+/// <para>
+/// <b>Checked where it connects:</b> the connection itself (<see cref="CreateHandler"/>'s connect callback) resolves the
+/// host once, refuses it unless every address is public, and connects to exactly those addresses, so a host that changes
+/// its DNS answer between a check and the connection (DNS rebinding) can't reach a private one. The check before the
+/// request stays for its clearer message. Through a proxy (the environment's, where there is one) the connection is to
+/// the proxy, which is allowed as configured infrastructure, and the proxy does its own lookups.
 /// </para>
 /// </summary>
 public sealed class WebPageSource(ILogger<WebPageSource> logger)
@@ -21,7 +26,7 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     private const int MaxBytes = 2 * 1024 * 1024;
 
     // Its own client: no automatic redirects (each is checked), and none of the standard resilience retries.
-    private static readonly HttpClient Http = new(new SocketsHttpHandler { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.All })
+    private static readonly HttpClient Http = new(CreateHandler(HttpClient.DefaultProxy))
     {
         Timeout = TimeSpan.FromSeconds(15),
         DefaultRequestHeaders = { { "User-Agent", "TvTracker-research/1.0 (+https://github.com/rudigroblerZA/TvTracker)" } }
@@ -44,7 +49,24 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
                 return (null, problem);
             }
 
-            using var response = await Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+            HttpResponseMessage response;
+            try
+            {
+                response = await Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+            }
+            catch (HttpRequestException ex) when (ex.InnerException is NotPublicException)
+            {
+                return (null, "That address isn't on the public web.");
+            }
+            catch (HttpRequestException)
+            {
+                return (null, $"{uri.Host} couldn't be reached.");
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return (null, $"{uri.Host} took too long to answer.");
+            }
+            using var _ = response;
             if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location)
             {
                 uri = new Uri(uri, location);
@@ -76,6 +98,49 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
         }
         return (null, "The page redirected too many times.");
     }
+
+    /// <summary>
+    /// The handler: no automatic redirects, and a connect step that only reaches public addresses (or the proxy).
+    /// </summary>
+    internal static SocketsHttpHandler CreateHandler(IWebProxy? proxy) => new()
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.All,
+        UseProxy = proxy is not null,
+        Proxy = proxy,
+        ConnectCallback = async (context, ct) =>
+        {
+            var endpoint = context.DnsEndPoint;
+            var addresses = IPAddress.TryParse(endpoint.Host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(endpoint.Host, ct);
+            if (!IsProxy(proxy, endpoint) && (addresses.Length == 0 || !addresses.All(IsPublic)))
+            {
+                throw new NotPublicException();
+            }
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            try
+            {
+                await socket.ConnectAsync(addresses, endpoint.Port, ct);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+    };
+
+    /// <summary>
+    /// Whether this connection is to the configured proxy (for http or https pages) rather than to a page's host.
+    /// Not judged from the request: for an https page the handler opens a tunnel, and the request it connects for then
+    /// names the proxy itself, which the proxy's own bypass list (localhost) would wave off.
+    /// </summary>
+    internal static bool IsProxy(IWebProxy? proxy, DnsEndPoint endpoint) =>
+        proxy is not null && new[] { "http", "https" }.Any(scheme =>
+            new Uri($"{scheme}://example.com/") is var probe && !proxy.IsBypassed(probe) && proxy.GetProxy(probe) is { } via
+            && string.Equals(via.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && via.Port == endpoint.Port);
+
+    private sealed class NotPublicException() : IOException("The address isn't on the public web.");
 
     private static async Task<string?> CheckAsync(Uri uri, CancellationToken ct)
     {

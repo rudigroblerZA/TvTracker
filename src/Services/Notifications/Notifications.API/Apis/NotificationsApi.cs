@@ -20,7 +20,8 @@ public record PreferencesDto(
     string TimeZone,
     bool WeeklyDigest = false,
     DayOfWeek DigestDay = DayOfWeek.Sunday,
-    int DigestHour = 9);
+    int DigestHour = 9,
+    bool SeasonVerdicts = true);
 
 public record UpdatePreferencesRequest(
     bool NewEpisodes,
@@ -33,7 +34,8 @@ public record UpdatePreferencesRequest(
     TimeOnly? QuietHoursEnd,
     bool? WeeklyDigest = null,
     DayOfWeek? DigestDay = null,
-    int? DigestHour = null);
+    int? DigestHour = null,
+    bool? SeasonVerdicts = null);
 
 /// <summary>
 /// A digest as it would go out now (see <see cref="WeeklyDigest"/>).
@@ -109,6 +111,7 @@ public static class NotificationsApi
         prefs.WeeklyDigest = request.WeeklyDigest ?? prefs.WeeklyDigest;
         prefs.DigestDay = request.DigestDay ?? prefs.DigestDay;
         prefs.DigestHour = request.DigestHour is { } hour ? Math.Clamp(hour, 0, 23) : prefs.DigestHour;
+        prefs.SeasonVerdicts = request.SeasonVerdicts ?? prefs.SeasonVerdicts;
         prefs.Email = user.GetEmail() ?? prefs.Email;
         prefs.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -277,7 +280,7 @@ public static class NotificationsApi
 
     private static PreferencesDto ToDto(NotificationPreferences p) =>
         new(p.NewEpisodes, p.NewSeasons, p.StatusChanges, p.PushEnabled, p.WebPushEnabled, p.EmailEnabled,
-            p.Email, p.QuietHoursStart, p.QuietHoursEnd, p.TimeZone, p.WeeklyDigest, p.DigestDay, p.DigestHour);
+            p.Email, p.QuietHoursStart, p.QuietHoursEnd, p.TimeZone, p.WeeklyDigest, p.DigestDay, p.DigestHour, p.SeasonVerdicts);
 
     /// <summary>
     /// This week's digest for the caller as it would go out now, whether or not they've turned it on.

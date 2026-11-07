@@ -76,6 +76,9 @@
                         <legend>Tell me about</legend>
                         <label class="checkbox"><input type="checkbox" @bind="prefs.NewEpisodes" /> New episodes of shows I follow</label>
                         <label class="checkbox"><input type="checkbox" @bind="prefs.NewSeasons" /> New seasons</label>
+                        <Feature Flag="@FeatureFlags.SeasonVerdict">
+                            <label class="checkbox"><input type="checkbox" @bind="prefs.SeasonVerdicts" /> How a season did, once it ends</label>
+                        </Feature>
                         <label class="checkbox"><input type="checkbox" @bind="prefs.StatusChanges" /> Renewals, cancellations and endings</label>
                     </fieldset>
                     <fieldset>
@@ -386,7 +389,8 @@
                     QuietHoursEnd = p.QuietHoursEnd,
                     WeeklyDigest = p.WeeklyDigest,
                     DigestDay = p.DigestDay,
-                    DigestHour = p.DigestHour
+                    DigestHour = p.DigestHour,
+                    SeasonVerdicts = p.SeasonVerdicts
                 };
             }
             devices = await Notifications.GetDevicesAsync();
@@ -420,7 +424,7 @@
     {
         await Notifications.UpdatePreferencesAsync(new UpdateNotificationPreferences(
             prefs!.NewEpisodes, prefs.NewSeasons, prefs.StatusChanges, prefs.PushEnabled, prefs.WebPushEnabled,
-            prefs.EmailEnabled, prefs.QuietHoursStart, prefs.QuietHoursEnd, prefs.WeeklyDigest, prefs.DigestDay, prefs.DigestHour));
+            prefs.EmailEnabled, prefs.QuietHoursStart, prefs.QuietHoursEnd, prefs.WeeklyDigest, prefs.DigestDay, prefs.DigestHour, prefs.SeasonVerdicts));
         saved = "Notification settings saved.";
     });
 
@@ -486,5 +490,6 @@
         public bool WeeklyDigest { get; set; }
         public DayOfWeek DigestDay { get; set; }
         public int DigestHour { get; set; }
+        public bool SeasonVerdicts { get; set; }
     }
 }

@@ -22,7 +22,7 @@ builder.Services.AddHostedService<RealmSecretsSeeder>();
 builder.Services.AddHostedService<AdminAccountSeeder>();
 
 // Used by the data export to collect each service's data for the user.
-foreach (var source in new[] { "tracking", "ratings", "recommendations", "notifications", "social", "analytics" })
+foreach (var source in ProfileApi.ExportSources)
 {
     builder.Services.AddHttpClient(source, client => client.BaseAddress = new Uri($"https+http://{source}-api/"));
 }

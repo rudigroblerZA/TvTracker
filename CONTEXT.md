@@ -778,6 +778,11 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **TMDB** only with `Research:TmdbApiKey`.
   - **Pages by address** (`WebPageSource`): fetched on a moderator's behalf, so only public addresses, checked again
     at each redirect.
+    - **Checked where it connects:** the handler's `ConnectCallback` resolves the host once, refuses it unless every
+      address is public, and connects to exactly those, so a host that changes its DNS answer after a check (DNS
+      rebinding) can't reach a private one. The earlier check stays for its message.
+    - **The proxy is let through:** in the sandbox every fetch goes through the environment's proxy, whose address is
+      private, so a connection to the proxy configured for that request passes; the proxy does its own lookups.
   - **Plain HTTP clients:** the standard resilience handler retried Wikipedia's 429s until its 30 s total timeout and
     failed the whole gather. Each source has one try, and a failure leaves that source out.
 - **Drafts in the background** (`DraftQueue`): Model Runner's small CPU model (qwen3 0.6B) took 92 s for Breaking Bad,
@@ -838,6 +843,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   hour per show; a show it can't read is judged without them rather than failing the queue.
 - **Deleted moderators:** their name comes off the versions they saved and the notes they wrote ("a former
   moderator"); the research stays.
+- **In the data export:** those versions and notes, while the account exists (`ExportApi`, signed in, not behind the
+  flag; most people have none). Identity references Research for it, the one service that also references Identity
+  (for plans); the AppHost still starts, since neither waits for the other.
 - **Episode notes** (`EpisodeNotesApi`): a moderator marks an episode essential or skippable, with a reason viewers see
   and a source.
   - **Apply at once, outside versions:** a note is a judgement about one episode, not part of the show's record, and
@@ -924,9 +932,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     every season of the last six weeks.
   - **History:** it was briefly sent on every run for a week (then two days), because the pipeline saved documents
     before their events, so a run that failed in between lost the verdict for good. The pipeline now saves them together.
-- **Notifications:** under the "new seasons" preference. Notifications has migrations now (since the weekly digest),
-  so a preference of its own is a column away (BACKLOG D2). The flag is checked once per event, without a user, so it can't target
-  some followers only.
+- **Notifications:** a preference of its own (`SeasonVerdicts`, migration `SeasonVerdictPreference`), filled from each
+  user's "new seasons", which verdicts followed until then. The flag is checked per follower in the fan-out (see
+  Weekly digest, Flags per person).
 
 ## Weekly digest
 
@@ -940,7 +948,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   sends nothing but counts as sent.
 - **Migrations:** the digest's settings needed columns, so Notifications moved off `EnsureCreated` (baseline
   `InitialCreate`, diffed with `pg_dump -s` against the live database: identical apart from EF's history table).
-- **Flag:** checked once per run without a user, so it can't target some users only.
+- **Flags per person:** the digest, season verdicts and crossover alerts check their flag for each recipient
+  (`FeatureFlags.ContextForUser`: their id and email, as a request of theirs would carry), through `CachedFlags`, so a
+  flag aimed at some users holds the alert back from the others only. Before, each was checked once without a user, so
+  targeting couldn't apply. A follower it's off for doesn't get that alert later; a held-back digest isn't stamped, so
+  it goes on the first run after the flag turns on.
+- **Inbox retention** (`InboxRetention`, daily, batches of 5,000): inbox items read 90+ days ago or created a year
+  ago, and finished deliveries scheduled 30+ days ago (pending ones stay). Before this, both were deleted only with the
+  account. Nothing reads further back: the digest reads since the last one, and the fan-out's "already told" check
+  covers redeliveries and crossovers re-sent for 14 days.
 
 ## Where the cast went next
 
