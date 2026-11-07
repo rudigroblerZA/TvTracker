@@ -113,6 +113,14 @@ public class Subscription
 
     public required string Plan { get; set; }
     public required string Interval { get; set; }
+
+    /// <summary>
+    /// The price per period, from its checkout: a renewal's receipt when the provider's event doesn't state one.
+    /// </summary>
+    public decimal Amount { get; set; }
+
+    public string Currency { get; set; } = "USD";
+
     public SubscriptionStatus Status { get; set; }
     public DateTime CurrentPeriodEndUtc { get; set; }
 
@@ -231,6 +239,8 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(s => s.ProviderSubscriptionId).HasMaxLength(128);
             entity.Property(s => s.Plan).HasMaxLength(16);
             entity.Property(s => s.Interval).HasMaxLength(8);
+            entity.Property(s => s.Amount).HasPrecision(10, 2);
+            entity.Property(s => s.Currency).HasMaxLength(3);
             entity.HasIndex(s => new { s.Provider, s.ProviderSubscriptionId }).IsUnique();
             entity.HasIndex(s => s.UserId);
             entity.HasIndex(s => s.CurrentPeriodEndUtc).HasFilter($"\"Status\" = {(int)SubscriptionStatus.Active}");

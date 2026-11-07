@@ -1375,11 +1375,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Signed, fresh, anonymous:** the webhook endpoint needs no token, and isn't behind the flags (a payment taken must be
   recorded); each provider checks its own signature. The test provider signs like Stripe (`t=…,v1=HMAC-SHA256`), refused
   5 minutes either side of now, so a captured call can't be replayed later.
-- **Ending moves back only what it paid for:** when a subscription ends, the plan falls to Free only while it's still
-  that subscription's plan and no other active one pays; an admin's change in between stands. Families follow through
-  `PlanState`, as with an admin's change.
-- **A lost "ended" heals** (`SubscriptionLapse`, hourly): an active subscription whose period ended more than
-  `Payments:GraceDays` (3) ago is ended. The grace covers a renewal a day or two late, so nobody loses Plus meanwhile.
+- **One running, one per checkout:** a checkout session starts one subscription, and a payment that would start or
+  revive one beside another that's running is refused (409 to the provider, logged as one to refund): a double click on
+  Pay, two checkouts paid at once, or a late renewal of an ended subscription after buying another.
+- **The plan moves when a subscription starts or comes back,** not at each renewal, so an admin's change in between
+  stands; an ending moves it back to Free only while it's still that subscription's plan and nothing else pays.
+  Families follow through `PlanState`, as with an admin's change.
+- **Receipts carry the price paid:** the provider's amount, else the subscription's own (`Subscription.Amount` and
+  `Currency`, kept from its checkout; migration `SubscriptionPrice`), so a renewal that doesn't state one is right.
+- **A lost "ended" heals** (`SubscriptionLapse`, hourly, each subscription on its own so one failure doesn't hold up the
+  rest): a renewing subscription whose period ended more than `Payments:GraceDays` (3) ago is ended, the grace covering a
+  renewal a day or two late; a cancelled one ends as soon as its period does, the date the plan page gave.
 - **Cancel and resume** call the provider, then record it, so the page shows it at once; the provider's webhook that
   follows is a no-op.
 - **One at a time:** a second checkout with a subscription running is 409; switching plans is cancel, then buy. Proration
@@ -1389,9 +1395,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   amount here.
 - **The test provider** (`TestPaymentProvider` in Identity and the web app's `/dev/payments`, both development only, with
   `Payments:Test:WebhookSecret` from the AppHost): its checkout pays by posting a signed webhook, and its subscription
-  page renews or ends one at once. It keeps no state of its own.
-- **Deletion and export:** deleting an account stops its subscriptions at the provider at once and deletes the payment
-  rows; the export carries the subscription and every receipt.
+  page renews or ends one at once. It keeps no state of its own. Its pages are linked relative to the page the buyer is
+  on (and `Payments:ReturnUrl` is `/settings/plan`), so the browser keeps the origin it signed in on, http or https, and
+  its cookie. Its signature check takes any number of `v1` values (a rotating secret), and anything malformed is a 400.
+- **Deletion and export:** deleting an account first stops its subscriptions at the provider (before the login goes, so
+  a failure leaves the account whole; a provider that's down is logged to stop by hand), then removes the payment rows in
+  the same save as the profile. The export carries the subscription and every receipt.
 
 ## Your services
 

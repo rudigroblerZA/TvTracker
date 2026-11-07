@@ -94,8 +94,10 @@ public static class ProfileApi
     {
         var userId = user.GetUserId();
 
+        // Subscriptions first, so a failure before the login goes leaves the account whole to try again.
+        await PaymentsApi.StopSubscriptionsAsync(db, payments, userId, loggers.CreateLogger(typeof(ProfileApi)), ct);
         await keycloak.DeleteUserAsync(userId, ct);
-        await PaymentsApi.ForgetAsync(db, payments, userId, loggers.CreateLogger(typeof(ProfileApi)), ct);
+        await PaymentsApi.RemoveRecordsAsync(db, userId, ct);
 
         var profile = await db.Profiles.FindAsync([userId], ct);
         if (profile is not null)

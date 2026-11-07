@@ -491,14 +491,12 @@ if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configurati
 // TestPaymentProvider page in the web app). A deployment names a real provider instead; none is built yet.
 if (!builder.ExecutionContext.IsPublishMode)
 {
+    // The test pages are linked relative to the page the buyer is on, so the browser keeps the origin (http or https)
+    // it signed in on and its sign-in cookie.
     var paymentsSecret = Secret("payments-test-webhook-secret", "tvtracker-payments-dev-secret");
-    var webAddress = string.IsNullOrEmpty(webPublicUrl)
-        ? ReferenceExpression.Create($"{webApp.GetEndpoint("http")}")
-        : ReferenceExpression.Create($"{webPublicUrl.TrimEnd('/')}");
     identityApi
         .WithEnvironment("Payments__Provider", "test")
-        .WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webAddress}/settings/plan"))
-        .WithEnvironment("Payments__Test__CheckoutUrl", webAddress)
+        .WithEnvironment("Payments__ReturnUrl", "/settings/plan")
         .WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
     webApp.WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
 }

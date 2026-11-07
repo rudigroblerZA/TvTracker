@@ -49,6 +49,31 @@ public class PaymentTests
     }
 
     [Fact]
+    public void A_rotating_secret_signs_twice_and_either_signature_counts()
+    {
+        var t = Now.ToUnixTimeSeconds();
+        var old = TestPaymentProvider.Sign(Paid, "old-secret", Now).Split(",v1=")[1];
+        var current = TestPaymentProvider.Sign(Paid, Secret, Now).Split(",v1=")[1];
+        var headers = new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = $"t={t},v1={old},v1={current}" };
+
+        Assert.NotNull(Provider().ReadWebhook(Paid, headers, Now));
+    }
+
+    [Fact]
+    public void Malformed_headers_and_bodies_are_refused_not_errors()
+    {
+        var provider = Provider();
+        var t = Now.ToUnixTimeSeconds();
+        const string notJson = "{not json";
+        const string badSession = """{"id":"evt_4","type":"payment.succeeded","subscription":"sub_1","session":"not-a-guid"}""";
+
+        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = $"t={t},t={t},v1=ab" }, Now));
+        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = "t=99999999999999999999,v1=ab" }, Now));
+        Assert.Null(provider.ReadWebhook(notJson, Signed(notJson, Now), Now));
+        Assert.Null(provider.ReadWebhook(badSession, Signed(badSession, Now), Now));
+    }
+
+    [Fact]
     public void Only_the_events_the_app_acts_on_are_read()
     {
         const string ended = """{"id":"evt_2","type":"subscription.ended","subscription":"sub_1"}""";
@@ -72,7 +97,7 @@ public class PaymentTests
     }
 
     [Fact]
-    public void A_subscription_lapses_only_after_its_grace_period()
+    public void A_renewing_subscription_lapses_after_its_grace_period_and_a_cancelled_one_at_its_end()
     {
         var subscription = new Subscription
         {
@@ -82,6 +107,11 @@ public class PaymentTests
 
         Assert.False(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime, graceDays: 3));
         Assert.True(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime.AddDays(2), graceDays: 3));
+
+        // Cancelled, it ends when its period does: no renewal is coming to wait for.
+        subscription.CancelAtPeriodEnd = true;
+        Assert.True(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime, graceDays: 3));
+        subscription.CancelAtPeriodEnd = false;
         subscription.Status = SubscriptionStatus.Ended;
         Assert.False(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime.AddDays(30), graceDays: 3));
     }
