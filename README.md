@@ -1533,7 +1533,7 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
   and new episodes counted per show.
 - **Preview:** "Preview this week's digest" in Settings shows it as it would go out now.
 - **Flag:** checked per person, so a `weekly-digest` flag aimed at some people sends only theirs; anyone it's off for
-  gets theirs on the first run after it turns on.
+  gets theirs on their next digest day after it turns on.
 - **Sending:** checked every 15 minutes; at most one in six days, and a week with nothing in it sends nothing. Links
   in the email go to `Digest:BaseUrl` (the web app, `https://localhost:7120` by default). Like other email, it logs
   until `Email:*` is configured.

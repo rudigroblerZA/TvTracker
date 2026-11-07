@@ -226,6 +226,9 @@ public class NotificationsContext(DbContextOptions<NotificationsContext> options
             entity.ToTable("inbox");
             entity.HasIndex(i => new { i.UserId, i.CreatedAtUtc });
             entity.HasIndex(i => new { i.UserId, i.SourceEventId }).IsUnique();
+            // For the retention's two rules (InboxRetention).
+            entity.HasIndex(i => i.CreatedAtUtc);
+            entity.HasIndex(i => i.ReadAtUtc).HasFilter("\"ReadAtUtc\" IS NOT NULL");
             entity.Property(i => i.UserId).HasMaxLength(64);
             entity.Property(i => i.Title).HasMaxLength(256);
             entity.Property(i => i.Body).HasMaxLength(1024);

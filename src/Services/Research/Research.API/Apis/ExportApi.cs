@@ -22,9 +22,14 @@ public static class ExportApi
     public static void MapExportApi(this IEndpointRouteBuilder app) =>
         app.MapGet("/api/v1/me/export", ExportAsync).RequireAuthorization();
 
-    private static async Task<Ok<ResearchExport>> ExportAsync(ClaimsPrincipal user, ResearchContext db, CancellationToken ct)
+    private static async Task<Results<Ok<ResearchExport>, UnauthorizedHttpResult>> ExportAsync(ClaimsPrincipal user, ResearchContext db, CancellationToken ct)
     {
-        var id = user.FindFirstValue("sub");
+        // A token with no user (client credentials) has no export, and a null id would match what deleted moderators
+        // left behind (their ids are cleared).
+        if (user.FindFirstValue("sub") is not { } id)
+        {
+            return TypedResults.Unauthorized();
+        }
         var versions = await db.Saved.AsNoTracking()
             .Where(s => s.SavedById == id)
             .OrderBy(s => s.SavedAtUtc)
