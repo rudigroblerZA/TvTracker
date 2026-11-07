@@ -53,13 +53,13 @@ public sealed class SubscriptionLapse(IServiceScopeFactory scopes, TimeProvider 
         var ledger = scope.ServiceProvider.GetRequiredService<SubscriptionLedger>();
         var outbox = scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>();
         var now = time.GetUtcNow();
-        var renewingBefore = now.UtcDateTime.AddDays(-options.Value.GraceDays);
-        // The same rule as Lapsed, as a query.
-        var lapsed = await db.Subscriptions
-            .Where(s => s.Status == SubscriptionStatus.Active
-                && (s.CancelAtPeriodEnd ? s.CurrentPeriodEndUtc < now.UtcDateTime : s.CurrentPeriodEndUtc < renewingBefore))
+        // Every active one past its period end (a range on the period index), then Lapsed alone decides.
+        var lapsed = (await db.Subscriptions.AsNoTracking()
+                .Where(s => s.Status == SubscriptionStatus.Active && s.CurrentPeriodEndUtc < now.UtcDateTime)
+                .ToListAsync(ct))
+            .Where(s => Lapsed(s, now.UtcDateTime, options.Value.GraceDays))
             .Select(s => s.Id)
-            .ToListAsync(ct);
+            .ToList();
         foreach (var id in lapsed)
         {
             try

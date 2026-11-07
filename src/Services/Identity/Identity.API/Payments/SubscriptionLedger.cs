@@ -58,6 +58,8 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         switch (e.Kind)
         {
             case PaymentEventKind.Paid:
+                // A new subscription, or an ended one paid again: either moves the plan; a renewal doesn't.
+                var starting = subscription is null || subscription.Status == SubscriptionStatus.Ended;
                 if (subscription is null)
                 {
                     if (e.SessionId is not { } id || await db.CheckoutSessions.FindAsync([id], ct) is not { } session || session.Provider != provider)
@@ -74,7 +76,7 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
                 {
                     return Refuse(e, subscription.UserId, "it ended and another subscription is running");
                 }
-                await PaidAsync(subscription, e, now, ct);
+                await PaidAsync(subscription, e, starting, now, ct);
                 break;
             case PaymentEventKind.CancelScheduled or PaymentEventKind.Resumed when subscription is not null:
                 subscription.CancelAtPeriodEnd = e.Kind == PaymentEventKind.CancelScheduled;
@@ -92,10 +94,13 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg)
         {
-            // The same event delivered twice at once: the other delivery applied it.
-            return LedgerResult.Duplicate;
+            // Two payments starting subscriptions for one user at once: the database's one-running index caught the
+            // second, past RunningAsync's check. Anything else is the same event delivered twice at once.
+            return pg.ConstraintName == IdentityContext.OneRunningSubscription
+                ? Refuse(e, subscription?.UserId ?? "", "another subscription started at the same moment")
+                : LedgerResult.Duplicate;
         }
         await outbox.PublishAddedAsync(ct);
         logger.LogInformation("Payment event {Event} ({Kind}) applied to subscription {Subscription}", e.Id, e.Kind, e.SubscriptionId);
@@ -114,8 +119,7 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         subscription.Status = SubscriptionStatus.Ended;
         subscription.EndedAtUtc = now.UtcDateTime;
         subscription.UpdatedAtUtc = now.UtcDateTime;
-        var stillPaid = await db.Subscriptions.AnyAsync(s => s.UserId == subscription.UserId && s.Id != subscription.Id && s.Status == SubscriptionStatus.Active, ct);
-        if (!stillPaid && await db.Profiles.FindAsync([subscription.UserId], ct) is { } profile && profile.Plan == subscription.Plan)
+        if (!await RunningAsync(subscription.UserId, subscription.Id, ct) && await db.Profiles.FindAsync([subscription.UserId], ct) is { } profile && profile.Plan == subscription.Plan)
         {
             await PlanState.SetPaidPlanAsync(db, outbox, profile, Plans.Free, now, ct);
         }
@@ -143,9 +147,9 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
             Interval = session.Interval,
             Amount = session.Amount,
             Currency = session.Currency,
-            // Ended until its first payment is applied, which starts it (and moves the plan).
-            Status = SubscriptionStatus.Ended,
-            CurrentPeriodEndUtc = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(now.UtcDateTime, session.Interval),
+            Status = SubscriptionStatus.Active,
+            // Nothing paid yet: the payment that starts it (PaidAsync) extends this by one period, or to the provider's date.
+            CurrentPeriodEndUtc = now.UtcDateTime,
             CreatedAtUtc = now.UtcDateTime,
             UpdatedAtUtc = now.UtcDateTime
         };
@@ -154,11 +158,11 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
     }
 
     /// <summary>
-    /// Extends the paid period and keeps a receipt; a subscription starting or coming back also moves the plan to its own.
+    /// Extends the paid period and keeps a receipt; a subscription <paramref name="starting"/> (new, or back after ending)
+    /// also moves the plan to its own.
     /// </summary>
-    private async Task PaidAsync(Subscription subscription, PaymentEvent e, DateTimeOffset now, CancellationToken ct)
+    private async Task PaidAsync(Subscription subscription, PaymentEvent e, bool starting, DateTimeOffset now, CancellationToken ct)
     {
-        var starting = subscription.Status == SubscriptionStatus.Ended;
         var periodEnd = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(Max(subscription.CurrentPeriodEndUtc, now.UtcDateTime), subscription.Interval);
         subscription.CurrentPeriodEndUtc = Max(subscription.CurrentPeriodEndUtc, periodEnd);
         subscription.Status = SubscriptionStatus.Active;

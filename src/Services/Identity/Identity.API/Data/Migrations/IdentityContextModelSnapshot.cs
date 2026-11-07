@@ -255,6 +255,10 @@ namespace Identity.API.Data.Migrations
                     b.HasIndex("Provider", "ProviderSubscriptionId")
                         .IsUnique();
 
+                    b.HasIndex(new[] { "UserId" }, "IX_subscriptions_UserId_Running")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 0");
+
                     b.ToTable("subscriptions", (string)null);
                 });
 

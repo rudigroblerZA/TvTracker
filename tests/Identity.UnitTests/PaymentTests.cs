@@ -3,6 +3,7 @@ using Identity.API.Payments;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using TvTracker.Payments;
 using TvTracker.IntegrationEvents;
 
 namespace Identity.UnitTests;
@@ -17,10 +18,10 @@ public class PaymentTests
     private static readonly DateTimeOffset Now = new(2026, 11, 7, 12, 0, 0, TimeSpan.Zero);
 
     private static TestPaymentProvider Provider() =>
-        new(Options.Create(new PaymentOptions { Test = new TestProviderOptions { WebhookSecret = Secret, CheckoutUrl = "http://localhost:5000" } }));
+        new(Options.Create(new PaymentOptions { Test = new TestProviderOptions { WebhookSecret = Secret } }));
 
     private static HeaderDictionary Signed(string body, DateTimeOffset at, string secret = Secret) =>
-        new() { [TestPaymentProvider.SignatureHeader] = TestPaymentProvider.Sign(body, secret, at) };
+        new() { [PaymentSignature.Header] = PaymentSignature.Sign(body, secret, at) };
 
     private const string Paid = """{"id":"evt_1","type":"payment.succeeded","subscription":"sub_1","session":"0199a3b2-0000-7000-8000-000000000001","payment":"pay_1","amount":2.99,"currency":"USD"}""";
 
@@ -52,9 +53,9 @@ public class PaymentTests
     public void A_rotating_secret_signs_twice_and_either_signature_counts()
     {
         var t = Now.ToUnixTimeSeconds();
-        var old = TestPaymentProvider.Sign(Paid, "old-secret", Now).Split(",v1=")[1];
-        var current = TestPaymentProvider.Sign(Paid, Secret, Now).Split(",v1=")[1];
-        var headers = new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = $"t={t},v1={old},v1={current}" };
+        var old = PaymentSignature.Sign(Paid, "old-secret", Now).Split(",v1=")[1];
+        var current = PaymentSignature.Sign(Paid, Secret, Now).Split(",v1=")[1];
+        var headers = new HeaderDictionary { [PaymentSignature.Header] = $"t={t},v1={old},v1={current}" };
 
         Assert.NotNull(Provider().ReadWebhook(Paid, headers, Now));
     }
@@ -67,8 +68,8 @@ public class PaymentTests
         const string notJson = "{not json";
         const string badSession = """{"id":"evt_4","type":"payment.succeeded","subscription":"sub_1","session":"not-a-guid"}""";
 
-        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = $"t={t},t={t},v1=ab" }, Now));
-        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [TestPaymentProvider.SignatureHeader] = "t=99999999999999999999,v1=ab" }, Now));
+        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [PaymentSignature.Header] = $"t={t},t={t},v1=ab" }, Now));
+        Assert.Null(provider.ReadWebhook(Paid, new HeaderDictionary { [PaymentSignature.Header] = "t=99999999999999999999,v1=ab" }, Now));
         Assert.Null(provider.ReadWebhook(notJson, Signed(notJson, Now), Now));
         Assert.Null(provider.ReadWebhook(badSession, Signed(badSession, Now), Now));
     }
