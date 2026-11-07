@@ -16,4 +16,9 @@
     <ProjectReference Include="..\TvTracker.UI\TvTracker.UI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The test payment provider's webhook signature, shared with Identity, which checks it. -->
+    <Compile Include="..\..\Services\Identity\Identity.API\Payments\PaymentSignature.cs" Link="Services\PaymentSignature.cs" />
+  </ItemGroup>
+
 </Project>

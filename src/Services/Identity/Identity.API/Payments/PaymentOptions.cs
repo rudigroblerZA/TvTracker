@@ -34,15 +34,11 @@ public sealed class PaymentOptions
 }
 
 /// <summary>
-/// The development stand-in for a provider (<see cref="TestPaymentProvider"/>): its checkout page is the web app's
+/// The development stand-in for a provider (<see cref="TestPaymentProvider"/>): its checkout is the web app's
 /// <c>/dev/payments</c>, which signs its webhooks with the shared secret.
 /// </summary>
 public sealed class TestProviderOptions
 {
-    /// <summary>
-    /// The web app's address for the test pages; unset, they're linked relative to wherever the app is open.
-    /// </summary>
-    public string? CheckoutUrl { get; set; }
     public string? WebhookSecret { get; set; }
 }
 

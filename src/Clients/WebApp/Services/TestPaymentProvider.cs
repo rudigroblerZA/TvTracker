@@ -1,8 +1,8 @@
-using System.Globalization;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using TvTracker.IntegrationEvents;
+using TvTracker.Payments;
 using TvTracker.UI.Services;
 
 namespace WebApp.Services;
@@ -31,10 +31,9 @@ public static class TestPaymentProvider
 
         app.MapGet($"{Path}/checkout", (string? session, string? plan, string? interval, string? amount, string? currency) =>
             Page("Checkout", $"""
-                <p>{E(Name(plan))} by the {E(interval)}: <strong>{E(currency)} {E(amount)}</strong></p>
+                <p>{E(Plans.Name(plan ?? ""))} by the {E(interval)}: <strong>{E(currency)} {E(amount)}</strong></p>
                 <form method="post" action="{Path}/pay" class="card">
-                  <input type="hidden" name="session" value="{E(session)}"><input type="hidden" name="interval" value="{E(interval)}">
-                  <input type="hidden" name="amount" value="{E(amount)}"><input type="hidden" name="currency" value="{E(currency)}">
+                  <input type="hidden" name="session" value="{E(session)}">
                   <button type="submit">Pay (test)</button>
                 </form>
                 <p><a href="/settings/plan">Cancel and go back</a></p>
@@ -43,17 +42,14 @@ public static class TestPaymentProvider
         app.MapPost($"{Path}/pay", async (HttpRequest request, IHttpClientFactory clients, CancellationToken ct) =>
         {
             var form = await request.ReadFormAsync(ct);
-            var interval = form["interval"].ToString();
+            // Only the session: Identity takes the price and the period from the checkout it made.
             var outcome = await SendAsync(clients, secret, new
             {
                 id = $"evt_{Guid.NewGuid():N}",
                 type = "payment.succeeded",
                 session = Guid.TryParse(form["session"], out var id) ? id : (Guid?)null,
                 subscription = $"sub_{Guid.NewGuid():N}",
-                payment = $"pay_{Guid.NewGuid():N}",
-                amount = decimal.TryParse(form["amount"], CultureInfo.InvariantCulture, out var amount) ? amount : (decimal?)null,
-                currency = form["currency"].ToString(),
-                periodEndUtc = interval == "year" ? DateTime.UtcNow.AddYears(1) : DateTime.UtcNow.AddMonths(1)
+                payment = $"pay_{Guid.NewGuid():N}"
             }, ct);
             return outcome is null ? Results.Redirect("/settings/plan") : Page("Checkout", $"<p class=\"outcome\">{E(outcome)}</p>");
         }).DisableAntiforgery();
@@ -91,13 +87,11 @@ public static class TestPaymentProvider
     private static async Task<string?> SendAsync(IHttpClientFactory clients, string secret, object e, CancellationToken ct)
     {
         var body = JsonSerializer.Serialize(e, JsonSerializerOptions.Web);
-        var t = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
-        var signature = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes($"{t}.{body}")));
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/payments/webhooks/test")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")
         };
-        request.Headers.Add("TvTracker-Signature", $"t={t},v1={signature}");
+        request.Headers.Add(PaymentSignature.Header, PaymentSignature.Sign(body, secret, DateTimeOffset.UtcNow));
         try
         {
             using var response = await clients.CreateClient(ApiClients.Identity).SendAsync(request, ct);
@@ -108,8 +102,6 @@ public static class TestPaymentProvider
             return $"Identity couldn't be reached: {ex.Message}";
         }
     }
-
-    private static string Name(string? plan) => plan switch { "plus" => "Plus", "family" => "Family", _ => plan ?? "" };
 
     private static string E(string? text) => WebUtility.HtmlEncode(text ?? "");
 

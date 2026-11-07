@@ -1377,7 +1377,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   5 minutes either side of now, so a captured call can't be replayed later.
 - **One running, one per checkout:** a checkout session starts one subscription, and a payment that would start or
   revive one beside another that's running is refused (409 to the provider, logged as one to refund): a double click on
-  Pay, two checkouts paid at once, or a late renewal of an ended subscription after buying another.
+  Pay, two checkouts paid at once, or a late renewal of an ended subscription after buying another. The ledger checks
+  first for a clear answer, and a partial unique index (`IX_subscriptions_UserId_Running`, migration
+  `OneRunningSubscription`) holds it when two payments race past the check; that index's violation reads as refused,
+  any other as the same event twice.
 - **The plan moves when a subscription starts or comes back,** not at each renewal, so an admin's change in between
   stands; an ending moves it back to Free only while it's still that subscription's plan and nothing else pays.
   Families follow through `PlanState`, as with an admin's change.
@@ -1394,10 +1397,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   $2.99/$29.99 and Family $4.99/$49.99). A real provider's price list must match, since checkouts are made for the
   amount here.
 - **The test provider** (`TestPaymentProvider` in Identity and the web app's `/dev/payments`, both development only, with
-  `Payments:Test:WebhookSecret` from the AppHost): its checkout pays by posting a signed webhook, and its subscription
-  page renews or ends one at once. It keeps no state of its own. Its pages are linked relative to the page the buyer is
-  on (and `Payments:ReturnUrl` is `/settings/plan`), so the browser keeps the origin it signed in on, http or https, and
-  its cookie. Its signature check takes any number of `v1` values (a rotating secret), and anything malformed is a 400.
+  `Payments:Test:WebhookSecret` from the AppHost): its checkout pays by posting a signed webhook naming only the
+  session (the price and period are the checkout's), and its subscription page renews or ends one at once. It keeps no
+  state of its own. Its pages are linked relative to the page the buyer is on (and `Payments:ReturnUrl` is
+  `/settings/plan`), so the browser keeps the origin it signed in on, http or https, and its cookie. The signature
+  (`PaymentSignature`, one file linked into the web app, so the sender and the checker can't drift) takes any number
+  of `v1` values (a rotating secret), and anything malformed is a 400.
+- **The lapse rule is `SubscriptionLapse.Lapsed`:** the job loads the active subscriptions past their period end (a range
+  on the period index) and lets it decide, so the rule is written once.
 - **Deletion and export:** deleting an account first stops its subscriptions at the provider (before the login goes, so
   a failure leaves the account whole; a provider that's down is logged to stop by hand), then removes the payment rows in
   the same save as the profile. The export carries the subscription and every receipt.

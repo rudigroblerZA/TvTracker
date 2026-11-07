@@ -31,7 +31,7 @@
                     <section class="panel">
                         <p>
                             <span>@($"{Plans.Name(sub.Plan)} by the {sub.Interval}, ")</span>
-                            <strong>@(sub.CancelAtPeriodEnd ? $"ends on {sub.CurrentPeriodEndUtc:d MMM yyyy}" : $"renews on {sub.CurrentPeriodEndUtc:d MMM yyyy}")</strong>
+                            <strong>@($"{(sub.CancelAtPeriodEnd ? "ends" : "renews")} on {sub.CurrentPeriodEndUtc:d MMM yyyy}")</strong>
                             <span>.</span>
                         </p>
                         @if (sub.CancelAtPeriodEnd)
@@ -132,7 +132,7 @@
     private bool CanBuy => prices?.Provider is not null && subscription is not { Active: true };
 
     private string Money(decimal amount) => prices!.Currency == "USD"
-        ? amount.ToString("$0.00", System.Globalization.CultureInfo.InvariantCulture)
+        ? Format.Usd(amount)
         : $"{prices.Currency} {amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}";
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -142,14 +142,20 @@
         error = null;
         try
         {
-            plan = await Identity.GetMyPlanAsync();
-            if (await Flags.IsEnabledAsync(FeatureFlags.Payments))
-            {
-                prices = await Identity.GetPlanPricesAsync();
-                subscription = await Identity.GetSubscriptionAsync();
-            }
+            // Two rounds: the plan, the flag and the plans' insights together, then prices and subscription together.
+            var planTask = Identity.GetMyPlanAsync();
+            var paymentsTask = Flags.IsEnabledAsync(FeatureFlags.Payments);
             // Which insights each plan has comes from the flags (flagd.json and the flags page), not from code.
-            features = await Flags.PlanFeaturesAsync();
+            var featuresTask = Flags.PlanFeaturesAsync();
+            if (await paymentsTask)
+            {
+                var pricesTask = Identity.GetPlanPricesAsync();
+                var subscriptionTask = Identity.GetSubscriptionAsync();
+                await Task.WhenAll(pricesTask, subscriptionTask);
+                (prices, subscription) = (pricesTask.Result, subscriptionTask.Result);
+            }
+            plan = await planTask;
+            features = await featuresTask;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

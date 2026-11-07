@@ -206,7 +206,7 @@ public static class PaymentsApi
         db.CheckoutSessions.RemoveRange(await db.CheckoutSessions.Where(c => c.UserId == userId).ToListAsync(ct));
     }
 
-    private static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>
+    internal static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>
         new(s.Plan, s.Interval, s.Status == SubscriptionStatus.Active, s.CancelAtPeriodEnd, s.CurrentPeriodEndUtc, s.EndedAtUtc, s.Provider,
             s.Status == SubscriptionStatus.Active ? providers.Named(s.Provider)?.ManageUrl(s) : null);
 }

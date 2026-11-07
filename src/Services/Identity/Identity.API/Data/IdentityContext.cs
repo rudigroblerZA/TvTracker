@@ -170,6 +170,11 @@ public class ProcessedPaymentEvent
 
 public class IdentityContext(DbContextOptions<IdentityContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
+    /// <summary>
+    /// The unique index that holds a user to one running subscription, whatever races the code's own check.
+    /// </summary>
+    public const string OneRunningSubscription = "IX_subscriptions_UserId_Running";
+
     public DbSet<UserProfile> Profiles => Set<UserProfile>();
     public DbSet<Family> Families => Set<Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
@@ -243,6 +248,7 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(s => s.Currency).HasMaxLength(3);
             entity.HasIndex(s => new { s.Provider, s.ProviderSubscriptionId }).IsUnique();
             entity.HasIndex(s => s.UserId);
+            entity.HasIndex(s => s.UserId, OneRunningSubscription).IsUnique().HasFilter($"\"Status\" = {(int)SubscriptionStatus.Active}");
             entity.HasIndex(s => s.CurrentPeriodEndUtc).HasFilter($"\"Status\" = {(int)SubscriptionStatus.Active}");
         });
 

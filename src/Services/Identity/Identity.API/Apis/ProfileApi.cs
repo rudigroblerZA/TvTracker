@@ -125,7 +125,7 @@ public static class ProfileApi
     /// </summary>
     private static async Task<IResult> ExportAsync(
         HttpContext httpContext, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox,
-        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, CancellationToken ct)
+        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, PaymentProviders payments, CancellationToken ct)
     {
         var logger = loggerFactory.CreateLogger("Identity.API.Export");
         var profile = await GetOrCreateProfileAsync(user, db, outbox, ct);
@@ -138,7 +138,7 @@ public static class ProfileApi
             ["payments"] = new JsonObject
             {
                 ["subscription"] = JsonSerializer.SerializeToNode(await PaymentsApi.LatestAsync(db, profile.UserId, ct) is { } s
-                    ? new { s.Plan, s.Interval, Active = s.Status == SubscriptionStatus.Active, s.CancelAtPeriodEnd, s.CurrentPeriodEndUtc, s.CreatedAtUtc, s.EndedAtUtc, s.Provider }
+                    ? PaymentsApi.ToDto(s, payments)
                     : null),
                 ["receipts"] = JsonSerializer.SerializeToNode(await PaymentsApi.ReceiptsAsync(db, profile.UserId, ct))
             }
