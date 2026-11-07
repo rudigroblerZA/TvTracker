@@ -12,6 +12,12 @@ public class NotificationPreferences
     public bool NewSeasons { get; set; } = true;
     public bool StatusChanges { get; set; } = true;
 
+    /// <summary>
+    /// How a season did once it ends (Analytics' verdict). Its own switch since it's news of a different kind from a
+    /// new season; existing users got their "new seasons" value, which verdicts followed before.
+    /// </summary>
+    public bool SeasonVerdicts { get; set; } = true;
+
     // How
     public bool PushEnabled { get; set; } = true;
     public bool WebPushEnabled { get; set; } = true;

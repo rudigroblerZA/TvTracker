@@ -57,5 +57,6 @@ app.MapResearchApi();
 app.MapEpisodeNotesApi();
 app.MapResearchQueueApi();
 app.MapAwardsApi();
+app.MapExportApi();
 
 app.Run();

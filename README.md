@@ -1120,9 +1120,11 @@ How events flow:
       has ended, a later season is listed or announced, or the whole season dropped at once; otherwise once it's been
       quiet for twice its usual gap between episodes (14 days for a weekly show).
     - **Where:** the first highlight on the show page; "Seasons that just ended" on Insights; and once, as a
-      notification to the show's followers, under the "new seasons" preference.
+      notification to the show's followers, with its own switch in Settings → Notifications ("How a season did, once
+      it ends"; it started as your "new seasons" setting).
     - **API:** the show document's `seasonVerdict`, and `GET /api/v1/insights/season-verdicts?limit=` (Analytics.API).
-      Behind the `season-verdict` flag, which also stops the notifications.
+      Behind the `season-verdict` flag, which also stops the notifications (checked for each follower, so a flag
+      aimed at some people holds them back from the others only).
   - **Holiday episodes** (`/holidays`; on Home within 3 weeks of a holiday, and linked from Insights): Halloween,
     Thanksgiving, Christmas and the holidays, New Year's Eve and Valentine's Day.
     - **From your shows** (signed in): every holiday episode of the shows you follow, placed against how far you are:
@@ -1145,7 +1147,8 @@ How events flow:
       1. **Gather:** Wikidata (found by the show's TVmaze id), the Wikipedia article's summary, and TMDB when
          `Research:TmdbApiKey` is set. Gathering again replaces those and keeps pages added by hand.
       2. **Add pages:** any public web page (a review, an interview); its text is read and kept as a source. Private
-         and local addresses are refused.
+         and local addresses are refused, on the address actually connected to (a name that resolves somewhere else
+         at the last moment can't get round it).
       3. **Pick the facts:** for each fact, the catalog's value, a source's, or your own. Summary, network and premiere
          date follow TVmaze until you pick a value for them.
       4. **Write the insight:** "Draft with the model" asks the local model (Model Runner's chat model,
@@ -1183,6 +1186,9 @@ How events flow:
       `GET /api/v1/research/{id}/episode-notes`, `PUT|DELETE /api/v1/research/{id}/episode-notes/{episodeId}`
       (`{ "mark": "essential" | "skippable", "reason", "sourceUrl" }`). Anyone else gets 404. Behind the `research`
       flag (and `episode-notes` for the notes).
+    - **Your data:** the research versions you saved and the episode notes you wrote are in your data export
+      (`GET /api/v1/me/export` on Research.API, gathered by Identity's), and your name comes off them when you delete
+      your account.
   - **Ask** (`/ask`, signed in; linked from Insights): questions about shows in plain words ("Landman
     insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
     things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
@@ -1517,12 +1523,17 @@ Keycloak users are kept, since Keycloak has its own volume.
 
 Until configured, each notification channel logs what it would have sent (visible in the Aspire dashboard logs); the in-app inbox always works.
 
+**How long the inbox keeps things:** an item goes 90 days after you read it, and an unread one after a year. The log of
+what was sent by phone, browser or email (each delivery) is kept for 30 days. A daily pass trims both.
+
 **Weekly digest** (`weekly-digest` flag; Settings → Notifications): one email a week instead of an email per alert, on
 the day and from the hour you pick, in your time zone. Phone and browser alerts carry on.
 - **What's in it:** "Coming up this week", the next 7 days of episodes of the shows you follow and haven't muted, with
   premieres marked; and what you were told since the last digest: crossovers, how seasons did, new seasons and endings,
   and new episodes counted per show.
 - **Preview:** "Preview this week's digest" in Settings shows it as it would go out now.
+- **Flag:** checked per person, so a `weekly-digest` flag aimed at some people sends only theirs; anyone it's off for
+  gets theirs on the first run after it turns on.
 - **Sending:** checked every 15 minutes; at most one in six days, and a week with nothing in it sends nothing. Links
   in the email go to `Digest:BaseUrl` (the web app, `https://localhost:7120` by default). Like other email, it logs
   until `Email:*` is configured.

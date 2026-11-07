@@ -1,16 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
+using TvTracker;
 using TvTracker.EventBus;
 
 namespace Notifications.API.Services;
 
-public record NotificationContent(NotificationKind Kind, Guid ShowId, Guid? EpisodeId, string Title, string Body, string Link);
+/// <param name="Flag">A feature flag the alert is behind, evaluated per follower (their id and email, as a request
+/// of theirs would be), so a flag targeted at some users holds it back from the others only.</param>
+public record NotificationContent(NotificationKind Kind, Guid ShowId, Guid? EpisodeId, string Title, string Body, string Link, string? Flag = null);
 
 /// <summary>
 /// Turns one catalog event into an inbox item per interested follower plus one queued delivery per channel.
 /// The delivery worker sends the deliveries; this only writes rows, in batches.
 /// </summary>
-public sealed class NotificationFanOut(NotificationsContext db, TimeProvider time, ILogger<NotificationFanOut> logger)
+public sealed class NotificationFanOut(NotificationsContext db, CachedFlags flags, TimeProvider time, ILogger<NotificationFanOut> logger)
 {
     private const int BatchSize = 500;
 
@@ -53,7 +56,8 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
             foreach (var userId in batch)
             {
                 var pref = prefs.GetValueOrDefault(userId) ?? new NotificationPreferences { UserId = userId };
-                if (!Wants(pref, content.Kind))
+                if (!Wants(pref, content.Kind)
+                    || content.Flag is { } flag && !await flags.IsEnabledAsync(flag, FeatureFlags.ContextForUser(userId, pref.Email), ct))
                 {
                     continue;
                 }
@@ -114,7 +118,7 @@ public sealed class NotificationFanOut(NotificationsContext db, TimeProvider tim
     {
         NotificationKind.NewEpisode => pref.NewEpisodes,
         NotificationKind.NewSeason => pref.NewSeasons,
-        NotificationKind.SeasonVerdict => pref.NewSeasons,
+        NotificationKind.SeasonVerdict => pref.SeasonVerdicts,
         NotificationKind.Crossover => pref.NewEpisodes,
         NotificationKind.StatusChange => pref.StatusChanges,
         _ => false

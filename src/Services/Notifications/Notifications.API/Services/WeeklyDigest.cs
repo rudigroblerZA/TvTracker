@@ -5,7 +5,6 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
-using OpenFeature;
 using TvTracker;
 
 namespace Notifications.API.Services;
@@ -191,12 +190,7 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
     private async Task SendDueAsync(CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
-        // Checked once a run, without a user: it can't target some users only.
-        if (!await scope.ServiceProvider.GetRequiredService<IFeatureClient>()
-                .GetBooleanValueAsync(FeatureFlags.WeeklyDigest, FeatureFlags.DefaultValue, cancellationToken: ct))
-        {
-            return;
-        }
+        var flags = scope.ServiceProvider.GetRequiredService<CachedFlags>();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsContext>();
         var digests = scope.ServiceProvider.GetRequiredService<WeeklyDigest>();
         var now = time.GetUtcNow().UtcDateTime;
@@ -208,6 +202,12 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
         var sent = 0;
         foreach (var prefs in candidates.Where(p => IsDue(p, now)))
         {
+            // Per user, so a flag targeted at some users holds the digest back from the others only; one held back
+            // isn't stamped, so it goes out the first run after the flag turns on for them.
+            if (!await flags.IsEnabledAsync(FeatureFlags.WeeklyDigest, FeatureFlags.ContextForUser(prefs.UserId, prefs.Email), ct))
+            {
+                continue;
+            }
             try
             {
                 var digest = await digests.BuildAsync(prefs, ct);

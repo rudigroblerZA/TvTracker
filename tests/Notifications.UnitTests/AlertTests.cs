@@ -11,12 +11,18 @@ namespace Notifications.UnitTests;
 public class AlertTests
 {
     [Fact]
-    public void Verdicts_follow_new_seasons_and_crossovers_new_episodes()
+    public void Verdicts_have_their_own_switch_and_crossovers_follow_new_episodes()
     {
         var noSeasons = new NotificationPreferences { UserId = "u", NewSeasons = false };
+        var noVerdicts = new NotificationPreferences { UserId = "u", SeasonVerdicts = false };
         var noEpisodes = new NotificationPreferences { UserId = "u", NewEpisodes = false };
 
-        Assert.False(NotificationFanOut.Wants(noSeasons, NotificationKind.SeasonVerdict));
+        // Turning verdicts off stops them without stopping new seasons, and the other way round.
+        Assert.False(NotificationFanOut.Wants(noVerdicts, NotificationKind.SeasonVerdict));
+        Assert.True(NotificationFanOut.Wants(noVerdicts, NotificationKind.NewSeason));
+        Assert.True(NotificationFanOut.Wants(noSeasons, NotificationKind.SeasonVerdict));
+        Assert.False(NotificationFanOut.Wants(noSeasons, NotificationKind.NewSeason));
+
         Assert.True(NotificationFanOut.Wants(noSeasons, NotificationKind.Crossover));
         Assert.False(NotificationFanOut.Wants(noEpisodes, NotificationKind.Crossover));
         Assert.True(NotificationFanOut.Wants(noEpisodes, NotificationKind.SeasonVerdict));

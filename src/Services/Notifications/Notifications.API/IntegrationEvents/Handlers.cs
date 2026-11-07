@@ -2,7 +2,6 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using Notifications.API.Services;
-using OpenFeature;
 using TvTracker;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
@@ -57,21 +56,19 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
 /// the show's document for a run. Each send has its own event Id but the same
 /// <see cref="SeasonVerdictIntegrationEvent.VerdictId"/>, which stands in as the event's identity here, for the inbox
 /// check and for the inbox items' source.</item>
-/// <item><b>Preference:</b> "new seasons", which is about a show's seasons; a preference of its own would need a new
-/// column, and this service still uses EnsureCreated.</item>
-/// <item><b>Flag:</b> evaluated without a user, so it can't target some followers only. A verdict that arrives while
-/// it's off isn't marked processed, but it isn't sent again either, so it's dropped.</item>
+/// <item><b>Preference:</b> its own, "season verdicts" (existing users started with their "new seasons" value).</item>
+/// <item><b>Flag:</b> evaluated per follower by the fan-out, so a flag targeted at some users holds the verdict back
+/// from the others only; a follower it's off for doesn't get this one later.</item>
 /// </list>
 /// </summary>
-public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut, IFeatureClient flags)
+public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut)
     : IIntegrationEventHandler<SeasonVerdictIntegrationEvent>
 {
     public async Task HandleAsync(SeasonVerdictIntegrationEvent e, CancellationToken ct)
     {
         // Events sent before VerdictId existed keep their own Id.
         var verdict = e.VerdictId == Guid.Empty ? e : e with { Id = e.VerdictId };
-        if (await db.HasProcessedAsync(verdict, nameof(AnalyticsNotificationHandlers), ct)
-            || !await flags.GetBooleanValueAsync(FeatureFlags.SeasonVerdict, FeatureFlags.DefaultValue, cancellationToken: ct))
+        if (await db.HasProcessedAsync(verdict, nameof(AnalyticsNotificationHandlers), ct))
         {
             return;
         }
@@ -80,7 +77,7 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
             NotificationKind.SeasonVerdict, e.ShowId, null,
             $"{e.ShowTitle}: how season {e.SeasonNumber} did",
             SeasonVerdictText(e),
-            $"/shows/{e.ShowId}"), ct);
+            $"/shows/{e.ShowId}", FeatureFlags.SeasonVerdict), ct);
 
         db.MarkProcessed(verdict, nameof(AnalyticsNotificationHandlers));
         await db.SaveChangesAsync(ct);
@@ -127,17 +124,17 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
 /// <item><b>When, not a date:</b> the text says how many days away it starts, since one text goes to followers in
 /// every time zone and a US evening is the next day in UTC.</item>
 /// <item><b>Preference:</b> "new episodes", since it's about episodes airing.</item>
+/// <item><b>Flag:</b> per follower, as for verdicts.</item>
 /// </list>
 /// </summary>
-public sealed class CrossoverNotificationHandler(NotificationsContext db, NotificationFanOut fanOut, IFeatureClient flags, TimeProvider time)
+public sealed class CrossoverNotificationHandler(NotificationsContext db, NotificationFanOut fanOut, TimeProvider time)
     : IIntegrationEventHandler<CrossoverScheduledIntegrationEvent>
 {
     public async Task HandleAsync(CrossoverScheduledIntegrationEvent e, CancellationToken ct)
     {
         var crossover = e with { Id = e.CrossoverId };
         if (e.Parts.Count == 0
-            || await db.HasProcessedAsync(crossover, nameof(CrossoverNotificationHandler), ct)
-            || !await flags.GetBooleanValueAsync(FeatureFlags.CrossoverAlerts, FeatureFlags.DefaultValue, cancellationToken: ct))
+            || await db.HasProcessedAsync(crossover, nameof(CrossoverNotificationHandler), ct))
         {
             return;
         }
@@ -146,7 +143,7 @@ public sealed class CrossoverNotificationHandler(NotificationsContext db, Notifi
         foreach (var show in e.Parts.Select(p => p.ShowId).Distinct())
         {
             await fanOut.NotifyFollowersAsync(crossover, new NotificationContent(
-                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}"), ct);
+                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}", FeatureFlags.CrossoverAlerts), ct);
         }
 
         db.MarkProcessed(crossover, nameof(CrossoverNotificationHandler));

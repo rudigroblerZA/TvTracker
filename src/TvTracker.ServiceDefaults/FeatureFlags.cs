@@ -130,19 +130,29 @@ public static class FeatureFlags
     /// known, goes in as <see cref="PlanAttribute"/>, so a flag can be part of some plans only (the caller works it out:
     /// <see cref="FreePlan"/> when signed out, and nothing while the <see cref="Plans"/> flag is off).
     /// </summary>
-    public static EvaluationContext ContextFor(ClaimsPrincipal? user, string? plan = null)
+    public static EvaluationContext ContextFor(ClaimsPrincipal? user, string? plan = null) =>
+        user?.Identity?.IsAuthenticated == true
+            ? Context((user.FindFirst("sub") ?? user.FindFirst(ClaimTypes.NameIdentifier))?.Value,
+                (user.FindFirst("email") ?? user.FindFirst(ClaimTypes.Email))?.Value, plan)
+            : Context(null, null, plan);
+
+    /// <summary>
+    /// The same context for a user known by id rather than by a request's claims: a background job acting for them
+    /// (Notifications deciding, per follower, whether a flagged alert goes out).
+    /// </summary>
+    public static EvaluationContext ContextForUser(string userId, string? email = null, string? plan = null) =>
+        Context(userId, email, plan);
+
+    private static EvaluationContext Context(string? userId, string? email, string? plan)
     {
         var context = EvaluationContext.Builder();
-        if (user?.Identity?.IsAuthenticated == true)
+        if (userId is not null)
         {
-            if ((user.FindFirst("sub") ?? user.FindFirst(ClaimTypes.NameIdentifier))?.Value is { } id)
-            {
-                context.SetTargetingKey(id);
-            }
-            if ((user.FindFirst("email") ?? user.FindFirst(ClaimTypes.Email))?.Value is { } email)
-            {
-                context.Set("email", email);
-            }
+            context.SetTargetingKey(userId);
+        }
+        if (email is not null)
+        {
+            context.Set("email", email);
         }
         if (plan is not null)
         {
