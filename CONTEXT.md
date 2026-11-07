@@ -1130,6 +1130,9 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Universes': "DCI", "Assistant District Attorney", "Lady"), as are Jr. and numerals at the end. Two or more
   capitalised words must remain: a lone "Bartender" or "Eleven" can't be told from a name, and "Security Guard" is
   caught by a short list of role words. Self roles go by Universes' `IsSelfRole`.
+- **Written as names are, matched without case:** a name is kept as the credit writes it when it mixes cases ("McNulty",
+  "O'Brien"), and capitalised part by part when it doesn't ("O'BRIEN"); counts and lookups ignore case. Title-casing each
+  word had the surname lists showing "Mcnulty" and "O'brien".
 - **Gender from the actor:** TVmaze has no character gender, so the women's and men's lists use the actor's. Together,
   the top 30 were men's names but for Sarah, Mary and Kate, which is why the page splits them.
 - **Decades** by the show's premiere. A name's place in a decade is given only for decades with 300+ characters (the
@@ -1743,12 +1746,14 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `dotnet test`; `global.json`'s `test.runner` opts into the new one, and the documented commands work unchanged.
 - **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
   overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, the TVmaze budget
-  (the two-lane limiter on a fake clock, the change rule and the refresh schedule) and the makers ranking; Analytics' copy rules, streaks, the
+  (the two-lane limiter on a fake clock, the change rule and the refresh schedule), the makers ranking, title formulas,
+  characters' names and episode-length verdicts; Analytics' copy rules, streaks, the
   essential cut, show value, the forecasts, and the worker's gets-good, landing and season-verdict stages;
   Recommendations' matching (DNA as a 0.5-1 multiplier, kind and language, the nanogenre bonus, reasons) and signal
   weights; Notifications' quiet hours (time zones, a daylight-saving gap), when a digest is due, which preference an
-  alert follows, and the verdict, crossover and digest texts; Research's refresh rule and when the research assistant
-  leaves a workspace alone; Identity's payment rules (webhook signatures, prices by region, when a subscription lapses).
+  alert follows, and the verdict, crossover and digest texts; Research's refresh rule, the daily check's loose matches and
+  when the research assistant leaves a workspace alone; Identity's payment rules (webhook signatures, prices by region,
+  how far a payment pays, when a subscription lapses).
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
 - **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:

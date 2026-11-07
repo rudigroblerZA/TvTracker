@@ -56,7 +56,7 @@ public static class EpisodeLengthsApi
     private const int ListMinMinutes = 15;
     private static readonly TimeSpan CacheFor = TimeSpan.FromHours(6);
 
-    private sealed record SeasonRow(Guid ShowId, int SeasonNumber, int Episodes, int Timed, double Median, int Total);
+    internal sealed record SeasonRow(Guid ShowId, int SeasonNumber, int Episodes, int Timed, double Median, int Total);
 
     private sealed record ShowRow(Guid Id, string Title, string? PosterUrl, double Popularity, bool Scripted);
 
@@ -128,7 +128,7 @@ public static class EpisodeLengthsApi
     /// <summary>
     /// A show's lengths, or null when fewer than two seasons count.
     /// </summary>
-    private static EpisodeLengthsDto? Build(Guid showId, List<SeasonRow> seasons)
+    internal static EpisodeLengthsDto? Build(Guid showId, List<SeasonRow> seasons)
     {
         var dtos = seasons.Select(r => new SeasonLengthDto(r.SeasonNumber, r.Episodes, (int)Math.Round(r.Median), r.Total, r.Timed >= MinEpisodes))
             .ToList();
