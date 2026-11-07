@@ -22,8 +22,9 @@ public record SetPlanRequest(string Plan);
 /// <summary>
 /// Plans (<see cref="Plans"/>): what a user pays for. Identity owns each user's plan; a change goes out as
 /// <see cref="UserPlanChangedIntegrationEvent"/> through the outbox, and every plan rides the daily profile snapshot, so
-/// services enforcing a limit keep a copy that heals. There's no payment yet: admins (<c>Admin:Users</c>) set plans,
-/// and a payment provider's webhook will later call the same change. Non-admins get 404 from the admin endpoints.
+/// services enforcing a limit keep a copy that heals. People buy plans through a payment provider (<see cref="PaymentsApi"/>),
+/// and admins (<c>Admin:Users</c>) can still set one; both make the same change (<see cref="PlanState.SetPaidPlanAsync"/>).
+/// Non-admins get 404 from the admin endpoints.
 /// </summary>
 public static class PlansApi
 {
@@ -86,14 +87,8 @@ public static class PlansApi
             return TypedResults.NotFound();
         }
 
-        if (profile.Plan != request.Plan)
+        if (await PlanState.SetPaidPlanAsync(db, outbox, profile, request.Plan, time.GetUtcNow(), ct))
         {
-            var now = time.GetUtcNow();
-            profile.Plan = request.Plan;
-            profile.PlanChangedAtUtc = now.UtcDateTime;
-            profile.UpdatedAtUtc = now.UtcDateTime;
-            // Their own effective plan, and their family's members', who gain or lose the family plan with it.
-            await PlanState.RecomputeAsync(db, outbox, now, [profile.UserId, .. await PlanState.MembersOfAsync(db, profile.UserId, ct)], ct);
             await db.SaveChangesAsync(ct);
             await outbox.PublishAddedAsync(ct);
             loggers.CreateLogger(typeof(PlansApi)).LogInformation("Plan of {UserId} set to {Plan} by {Admin}",

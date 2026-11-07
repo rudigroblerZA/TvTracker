@@ -1353,11 +1353,45 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   people's work.
 - **Flag:** `plans`, evaluated per user in Tracking; off means no limits (fail open, like every flag), including the
   insights in plans (see Insights by plan).
-- **Admins set plans** until payments exist (BACKLOG F1); a payment webhook will make the same change.
+- **Admins can set plans** too; a payment and an admin's change are the same change (`PlanState.SetPaidPlanAsync`).
 - **Analytics keeps a copy too** (`user_plans`, from the same events), for Your services.
 - **Identity's migrations:** Identity moved off `EnsureCreated` for the plan columns. Its `InitialCreate` baseline was
   applied to a scratch database and diffed (`pg_dump -s`) against the live one: identical apart from EF's history table.
   Identity now reads flags, so the AppHost gives it flagd.
+
+## Payments
+
+- **The app keeps the books, the provider takes the money** (`Identity.API/Payments`): checkout sessions, subscriptions,
+  receipts and the plan change are Identity's own (`SubscriptionLedger`); a provider (`IPaymentProvider`) only makes a
+  checkout, cancels or resumes, and reads its signed webhooks into a few events (paid, cancel scheduled, resumed,
+  ended). Adding Stripe or Paddle is one class (BACKLOG F1); the first is a test provider (a decision: provider-neutral
+  first, so the flow could be built and tried without an account).
+- **Credited to who checked out:** the app makes a `CheckoutSession` at today's price for the caller's region, and a
+  first payment must name it, so the subscription is the session's user's; a webhook can't pick whose plan moves.
+  The return address is the server's (`Payments:ReturnUrl`), never a request's, so a checkout can't redirect elsewhere.
+- **Once per event:** each provider event id is stored (`processed_payment_events`) in the same save as its changes;
+  a resend, or two deliveries at once (the key's unique violation), applies one payment. Receipts are unique per
+  provider payment id too.
+- **Signed, fresh, anonymous:** the webhook endpoint needs no token, and isn't behind the flags (a payment taken must be
+  recorded); each provider checks its own signature. The test provider signs like Stripe (`t=…,v1=HMAC-SHA256`), refused
+  5 minutes either side of now, so a captured call can't be replayed later.
+- **Ending moves back only what it paid for:** when a subscription ends, the plan falls to Free only while it's still
+  that subscription's plan and no other active one pays; an admin's change in between stands. Families follow through
+  `PlanState`, as with an admin's change.
+- **A lost "ended" heals** (`SubscriptionLapse`, hourly): an active subscription whose period ended more than
+  `Payments:GraceDays` (3) ago is ended. The grace covers a renewal a day or two late, so nobody loses Plus meanwhile.
+- **Cancel and resume** call the provider, then record it, so the page shows it at once; the provider's webhook that
+  follows is a no-op.
+- **One at a time:** a second checkout with a subscription running is 409; switching plans is cancel, then buy. Proration
+  can come with a real provider.
+- **Prices are configuration** (`Payments:Prices`, per region, `*` for everywhere else; `PlanPrices.Default` is Plus
+  $2.99/$29.99 and Family $4.99/$49.99). A real provider's price list must match, since checkouts are made for the
+  amount here.
+- **The test provider** (`TestPaymentProvider` in Identity and the web app's `/dev/payments`, both development only, with
+  `Payments:Test:WebhookSecret` from the AppHost): its checkout pays by posting a signed webhook, and its subscription
+  page renews or ends one at once. It keeps no state of its own.
+- **Deletion and export:** deleting an account stops its subscriptions at the provider at once and deletes the payment
+  rows; the export carries the subscription and every receipt.
 
 ## Your services
 
@@ -1684,7 +1718,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Tests
 
 - **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`,
-  `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, `tests/Research.UnitTests`, xUnit v3): no database,
+  `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, `tests/Research.UnitTests`,
+  `tests/Identity.UnitTests`, xUnit v3): no database,
   network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
@@ -1697,7 +1732,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   Recommendations' matching (DNA as a 0.5-1 multiplier, kind and language, the nanogenre bonus, reasons) and signal
   weights; Notifications' quiet hours (time zones, a daylight-saving gap), when a digest is due, which preference an
   alert follows, and the verdict, crossover and digest texts; Research's refresh rule and when the research assistant
-  leaves a workspace alone.
+  leaves a workspace alone; Identity's payment rules (webhook signatures, prices by region, when a subscription lapses).
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
 - **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
@@ -1705,6 +1740,6 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Known gaps
 
-- There's no CI, and only Catalog, Analytics, Recommendations, Notifications and Research have tests.
+- There's no CI, and only Catalog, Analytics, Recommendations, Notifications, Research and Identity have tests.
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
 - The realm file still has the demo user (demo / demo); a shared environment should delete it.

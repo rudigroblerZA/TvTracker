@@ -861,6 +861,24 @@ public record ListLimits(string Plan, int? MaxLists, bool ShareLists, int Lists,
 /// </summary>
 /// <param name="Plan">The plan they get: their own, or the family plan they're in.</param>
 /// <param name="Purchased">The plan they pay for themselves.</param>
+/// <param name="Provider">The provider selling plans now; null while they can't be bought.</param>
+public record PlanPrices(string Currency, decimal PlusMonth, decimal PlusYear, decimal FamilyMonth, decimal FamilyYear, string? Provider)
+{
+    public decimal For(string plan, string interval) => (plan, interval) switch
+    {
+        ("plus", "year") => PlusYear,
+        ("plus", _) => PlusMonth,
+        ("family", "year") => FamilyYear,
+        _ => FamilyMonth
+    };
+}
+
+/// <param name="ManageUrl">The provider's page for it (the test provider's renews or ends it).</param>
+public record PlanSubscription(string Plan, string Interval, bool Active, bool CancelAtPeriodEnd, DateTime CurrentPeriodEndUtc, DateTime? EndedAtUtc,
+    string Provider, string? ManageUrl);
+
+public record CheckoutLink(string Url);
+
 public record UserPlan(string Plan, string Name, int? MaxLists, bool ShareLists, DateTime? ChangedAtUtc, string Purchased = "free",
     bool TrackServices = false);
 

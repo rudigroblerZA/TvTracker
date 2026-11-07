@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Identity.API.Data;
+using Identity.API.Payments;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -89,11 +90,12 @@ public static class ProfileApi
     /// </summary>
     private static async Task<NoContent> DeleteAccountAsync(
         ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak, TimeProvider time,
-        CancellationToken ct)
+        PaymentProviders payments, ILoggerFactory loggers, CancellationToken ct)
     {
         var userId = user.GetUserId();
 
         await keycloak.DeleteUserAsync(userId, ct);
+        await PaymentsApi.ForgetAsync(db, payments, userId, loggers.CreateLogger(typeof(ProfileApi)), ct);
 
         var profile = await db.Profiles.FindAsync([userId], ct);
         if (profile is not null)
@@ -130,7 +132,14 @@ public static class ProfileApi
         var export = new JsonObject
         {
             ["exportedAtUtc"] = DateTime.UtcNow,
-            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile))
+            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile)),
+            ["payments"] = new JsonObject
+            {
+                ["subscription"] = JsonSerializer.SerializeToNode(await PaymentsApi.LatestAsync(db, profile.UserId, ct) is { } s
+                    ? new { s.Plan, s.Interval, Active = s.Status == SubscriptionStatus.Active, s.CancelAtPeriodEnd, s.CurrentPeriodEndUtc, s.CreatedAtUtc, s.EndedAtUtc, s.Provider }
+                    : null),
+                ["receipts"] = JsonSerializer.SerializeToNode(await PaymentsApi.ReceiptsAsync(db, profile.UserId, ct))
+            }
         };
 
         foreach (var source in ExportSources)

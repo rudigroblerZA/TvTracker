@@ -2,6 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.Plans)]
 @inject IdentityClient Identity
 @inject FeatureFlagStore Flags
+@inject NavigationManager Navigation
 
 <PageTitle>Your plan · @Brand.AppName</PageTitle>
 
@@ -23,6 +24,32 @@
             <p>
                 You're on <strong>@plan.Name</strong>@(plan.ChangedAtUtc is { } changed ? $" since {changed:d MMM yyyy}" : "")@(plan.Plan == Plans.Family && plan.Purchased != Plans.Family ? ", through a family you're in" : "").
             </p>
+
+            <Feature Flag="@FeatureFlags.Payments">
+                @if (subscription is { Active: true } sub)
+                {
+                    <section class="panel">
+                        <p>
+                            <span>@($"{Plans.Name(sub.Plan)} by the {sub.Interval}, ")</span>
+                            <strong>@(sub.CancelAtPeriodEnd ? $"ends on {sub.CurrentPeriodEndUtc:d MMM yyyy}" : $"renews on {sub.CurrentPeriodEndUtc:d MMM yyyy}")</strong>
+                            <span>.</span>
+                        </p>
+                        @if (sub.CancelAtPeriodEnd)
+                        {
+                            <p class="muted small">You keep @Plans.Name(sub.Plan) until then, and go back to @Plans.Name(Plans.Free) after; nothing you made goes.</p>
+                            <button class="btn" @onclick="ResumeAsync" disabled="@busy">Keep @Plans.Name(sub.Plan)</button>
+                        }
+                        else
+                        {
+                            <button class="btn secondary" @onclick="CancelAsync" disabled="@busy">Cancel</button>
+                        }
+                        @if (sub.ManageUrl is { } manage)
+                        {
+                            <p class="muted small"><a href="@manage">The test provider's page</a> renews or ends it now.</p>
+                        }
+                    </section>
+                }
+            </Feature>
 
             @* Both columns come from the shared Plans limits, so this table says what the services enforce. *@
             <div class="plan-grid">
@@ -59,6 +86,20 @@
                         {
                             <p class="tag">Your plan</p>
                         }
+                        else if (key != Plans.Free && CanBuy && prices is not null)
+                        {
+                            <Feature Flag="@FeatureFlags.Payments">
+                                <div class="plan-buy">
+                                    @foreach (var interval in new[] { "month", "year" })
+                                    {
+                                        var price = prices.For(key, interval);
+                                        <button class="btn @(interval == "year" ? "secondary" : "")" @onclick="() => BuyAsync(key, interval)" disabled="@busy">
+                                            @($"{Money(price)} a {interval}")
+                                        </button>
+                                    }
+                                </div>
+                            </Feature>
+                        }
                     </section>
                 }
             </div>
@@ -66,9 +107,9 @@
             <Feature Flag="@FeatureFlags.FamilyPlan">
                 <p><a href="settings/family">Your family</a><span class="muted small">@(plan.Purchased == Plans.Family ? " · invite people to share your plan" : " · join a family, or see who's in yours")</span></p>
             </Feature>
-            @if (plan.Plan == Plans.Free)
+            @if (plan.Plan == Plans.Free && prices?.Provider is null)
             {
-                <p class="muted small">Upgrading in the app isn't available yet. Until it is, an admin can move you to @Plans.Name(Plans.Plus) or @Plans.Name(Plans.Family), or someone on @Plans.Name(Plans.Family) can invite you.</p>
+                <p class="muted small">Plans can't be bought here yet. Until they can, an admin can move you to @Plans.Name(Plans.Plus) or @Plans.Name(Plans.Family), or someone on @Plans.Name(Plans.Family) can invite you.</p>
             }
         }
     </Authorized>
@@ -80,7 +121,19 @@
 @code {
     private UserPlan? plan;
     private IReadOnlyList<PlanFeature>? features;
+    private PlanPrices? prices;
+    private PlanSubscription? subscription;
+    private bool busy;
     private string? error;
+
+    /// <summary>
+    /// A plan can be bought when a provider sells them and no subscription is running (switching is cancel, then buy).
+    /// </summary>
+    private bool CanBuy => prices?.Provider is not null && subscription is not { Active: true };
+
+    private string Money(decimal amount) => prices!.Currency == "USD"
+        ? amount.ToString("$0.00", System.Globalization.CultureInfo.InvariantCulture)
+        : $"{prices.Currency} {amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -90,12 +143,48 @@
         try
         {
             plan = await Identity.GetMyPlanAsync();
+            if (await Flags.IsEnabledAsync(FeatureFlags.Payments))
+            {
+                prices = await Identity.GetPlanPricesAsync();
+                subscription = await Identity.GetSubscriptionAsync();
+            }
             // Which insights each plan has comes from the flags (flagd.json and the flags page), not from code.
             features = await Flags.PlanFeaturesAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private Task BuyAsync(string key, string interval) => RunAsync(async () =>
+    {
+        if (await Identity.StartCheckoutAsync(key, interval) is { } link)
+        {
+            // The provider's checkout is another site; it sends the buyer back to this page.
+            Navigation.NavigateTo(link.Url, forceLoad: true);
+        }
+    });
+
+    private Task CancelAsync() => RunAsync(async () => subscription = await Identity.CancelSubscriptionAsync());
+
+    private Task ResumeAsync() => RunAsync(async () => subscription = await Identity.ResumeSubscriptionAsync());
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        error = null;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
         }
     }
 }

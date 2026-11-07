@@ -161,15 +161,15 @@ Nothing open.
 
 All the features from the review have shipped; new ideas go here.
 
-### F1. Paying for Plus and Family
+### F1. A real payment provider
 
-**P2 · M**
+**P2 · S**
 
-- **Why:** plans are plumbed (Identity owns each user's plan; Tracking enforces Free's 3 lists and no sharing), but
-  only admins can change a plan, on `/settings/plans`.
-- **What:** a payment provider's checkout from `/settings/plan`, and its webhook on Identity.API setting the plan
-  through the same change `PlansApi.SetPlanAsync` makes (`PlanState` recomputes the family's members too), downgrading
-  when a subscription lapses. Prices per region, and a receipt in the data export.
+- **Why:** buying Plus and Family works end to end against the test provider (CONTEXT.md, Payments), but nothing takes
+  real money yet.
+- **What:** one `IPaymentProvider` (Stripe or Paddle): its checkout for a `CheckoutSession`, cancel and resume calls, and
+  its signed webhooks read into `PaymentEvent`s, with the session's id in the checkout's metadata. Prices per region in
+  `Payments:Prices` to match the provider's, and its customer portal as `ManageUrl`.
 - **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
   period's end, and the webhook rejects unsigned calls.
 

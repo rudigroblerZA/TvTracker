@@ -18,4 +18,8 @@
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Identity.UnitTests" />
+  </ItemGroup>
+
 </Project>

@@ -79,11 +79,96 @@ public class FamilyMember
     public DateTime JoinedAtUtc { get; set; }
 }
 
+/// <summary>
+/// A checkout someone started: which plan and price, for whom. The provider's checkout refers back to it, so a payment
+/// is credited to the user who started it rather than to anyone a webhook names.
+/// </summary>
+public class CheckoutSession
+{
+    public Guid Id { get; set; }
+    public required string UserId { get; set; }
+    public required string Provider { get; set; }
+    public required string Plan { get; set; }
+    public required string Interval { get; set; }
+    public decimal Amount { get; set; }
+    public required string Currency { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
+}
+
+/// <summary>
+/// A paid plan at a provider. Active until the period it's paid for ends: renewed by a payment, ended by the provider
+/// or, when no word comes, by <see cref="Services.SubscriptionLapse"/> after a grace period.
+/// </summary>
+public class Subscription
+{
+    public Guid Id { get; set; }
+    public required string UserId { get; set; }
+    public required string Provider { get; set; }
+
+    /// <summary>
+    /// The provider's id for it; unique per provider.
+    /// </summary>
+    public required string ProviderSubscriptionId { get; set; }
+
+    public required string Plan { get; set; }
+    public required string Interval { get; set; }
+    public SubscriptionStatus Status { get; set; }
+    public DateTime CurrentPeriodEndUtc { get; set; }
+
+    /// <summary>
+    /// Cancelled, so it ends at <see cref="CurrentPeriodEndUtc"/> instead of renewing.
+    /// </summary>
+    public bool CancelAtPeriodEnd { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public DateTime? EndedAtUtc { get; set; }
+}
+
+public enum SubscriptionStatus
+{
+    Active,
+    Ended
+}
+
+/// <summary>
+/// A payment, the user's receipt (in their data export).
+/// </summary>
+public class PaymentReceipt
+{
+    public Guid Id { get; set; }
+    public required string UserId { get; set; }
+    public Guid SubscriptionId { get; set; }
+    public required string Provider { get; set; }
+    public required string ProviderPaymentId { get; set; }
+    public required string Plan { get; set; }
+    public required string Interval { get; set; }
+    public decimal Amount { get; set; }
+    public required string Currency { get; set; }
+    public DateTime PaidAtUtc { get; set; }
+    public DateTime PeriodEndUtc { get; set; }
+}
+
+/// <summary>
+/// A provider's webhook event already applied: providers resend, and a payment must count once.
+/// </summary>
+public class ProcessedPaymentEvent
+{
+    public required string Provider { get; set; }
+    public required string EventId { get; set; }
+    public DateTime ProcessedAtUtc { get; set; }
+}
+
 public class IdentityContext(DbContextOptions<IdentityContext> options) : DbContext(options), IIntegrationEventLogDbContext
 {
     public DbSet<UserProfile> Profiles => Set<UserProfile>();
     public DbSet<Family> Families => Set<Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
+    public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<PaymentReceipt> Receipts => Set<PaymentReceipt>();
+    public DbSet<ProcessedPaymentEvent> ProcessedPaymentEvents => Set<ProcessedPaymentEvent>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
 
@@ -122,6 +207,56 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(m => m.UserId).HasMaxLength(64);
             entity.Property(m => m.OwnerUserId).HasMaxLength(64);
             entity.HasIndex(m => m.OwnerUserId);
+        });
+
+        modelBuilder.Entity<CheckoutSession>(entity =>
+        {
+            entity.ToTable("checkout_sessions");
+            entity.Property(c => c.Id).ValueGeneratedNever();
+            entity.Property(c => c.UserId).HasMaxLength(64);
+            entity.Property(c => c.Provider).HasMaxLength(32);
+            entity.Property(c => c.Plan).HasMaxLength(16);
+            entity.Property(c => c.Interval).HasMaxLength(8);
+            entity.Property(c => c.Currency).HasMaxLength(3);
+            entity.Property(c => c.Amount).HasPrecision(10, 2);
+            entity.HasIndex(c => c.UserId);
+        });
+
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.ToTable("subscriptions");
+            entity.Property(s => s.Id).ValueGeneratedNever();
+            entity.Property(s => s.UserId).HasMaxLength(64);
+            entity.Property(s => s.Provider).HasMaxLength(32);
+            entity.Property(s => s.ProviderSubscriptionId).HasMaxLength(128);
+            entity.Property(s => s.Plan).HasMaxLength(16);
+            entity.Property(s => s.Interval).HasMaxLength(8);
+            entity.HasIndex(s => new { s.Provider, s.ProviderSubscriptionId }).IsUnique();
+            entity.HasIndex(s => s.UserId);
+            entity.HasIndex(s => s.CurrentPeriodEndUtc).HasFilter($"\"Status\" = {(int)SubscriptionStatus.Active}");
+        });
+
+        modelBuilder.Entity<PaymentReceipt>(entity =>
+        {
+            entity.ToTable("payment_receipts");
+            entity.Property(r => r.Id).ValueGeneratedNever();
+            entity.Property(r => r.UserId).HasMaxLength(64);
+            entity.Property(r => r.Provider).HasMaxLength(32);
+            entity.Property(r => r.ProviderPaymentId).HasMaxLength(128);
+            entity.Property(r => r.Plan).HasMaxLength(16);
+            entity.Property(r => r.Interval).HasMaxLength(8);
+            entity.Property(r => r.Currency).HasMaxLength(3);
+            entity.Property(r => r.Amount).HasPrecision(10, 2);
+            entity.HasIndex(r => new { r.Provider, r.ProviderPaymentId }).IsUnique();
+            entity.HasIndex(r => r.UserId);
+        });
+
+        modelBuilder.Entity<ProcessedPaymentEvent>(entity =>
+        {
+            entity.ToTable("processed_payment_events");
+            entity.HasKey(e => new { e.Provider, e.EventId });
+            entity.Property(e => e.Provider).HasMaxLength(32);
+            entity.Property(e => e.EventId).HasMaxLength(128);
         });
 
         modelBuilder.UseIntegrationEventLogs();

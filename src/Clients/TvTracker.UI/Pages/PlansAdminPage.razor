@@ -10,8 +10,9 @@
 <AuthorizeView>
     <Authorized>
         <p class="muted">
-            Set someone's plan until payments exist. A change reaches the services within seconds, and limits apply to new
-            lists and shares only: what they already have stays.
+            Set someone's plan by hand (people can also buy one on their plan page). A change reaches the services within
+            seconds, and limits apply to new lists and shares only: what they already have stays. A subscription ending
+            later moves back only the plan it paid for.
         </p>
         <form class="inline-form" @onsubmit="LoadAsync">
             <input type="search" @bind="term" placeholder="Name or email" aria-label="Find people" />
