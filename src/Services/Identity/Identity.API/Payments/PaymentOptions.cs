@@ -14,8 +14,8 @@ public sealed class PaymentOptions
     public string? Provider { get; set; }
 
     /// <summary>
-    /// Where the buyer lands after a checkout: the web app's plan page. Set by the server, never taken from a request,
-    /// so a checkout can't be used to send someone to another site.
+    /// Where the buyer lands after a checkout: the web app's plan page (a real provider needs it absolute). Set by the
+    /// server, never taken from a request, so a checkout can't be used to send someone to another site.
     /// </summary>
     public string? ReturnUrl { get; set; }
 
@@ -39,6 +39,9 @@ public sealed class PaymentOptions
 /// </summary>
 public sealed class TestProviderOptions
 {
+    /// <summary>
+    /// The web app's address for the test pages; unset, they're linked relative to wherever the app is open.
+    /// </summary>
     public string? CheckoutUrl { get; set; }
     public string? WebhookSecret { get; set; }
 }

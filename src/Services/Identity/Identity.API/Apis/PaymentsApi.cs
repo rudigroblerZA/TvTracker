@@ -116,7 +116,9 @@ public static class PaymentsApi
         ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, bool cancel, CancellationToken ct)
     {
         var subscription = await db.Subscriptions
-            .SingleOrDefaultAsync(s => s.UserId == user.GetUserId() && s.Status == SubscriptionStatus.Active, ct);
+            .Where(s => s.UserId == user.GetUserId() && s.Status == SubscriptionStatus.Active)
+            .OrderByDescending(s => s.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
         if (subscription is null || providers.Named(subscription.Provider) is not { } provider)
         {
             return TypedResults.NotFound();
@@ -131,7 +133,7 @@ public static class PaymentsApi
         return TypedResults.Ok(ToDto(subscription, providers));
     }
 
-    private static async Task<Results<Ok, BadRequest, NotFound, UnprocessableEntity>> WebhookAsync(
+    private static async Task<Results<Ok, BadRequest, NotFound, UnprocessableEntity, Conflict>> WebhookAsync(
         string provider, HttpRequest request, PaymentProviders providers, SubscriptionLedger ledger, TimeProvider time,
         ILoggerFactory loggers, CancellationToken ct)
     {
@@ -146,8 +148,14 @@ public static class PaymentsApi
             loggers.CreateLogger(typeof(PaymentsApi)).LogWarning("A {Provider} webhook was refused: bad or stale signature, or not an event the app acts on", provider);
             return TypedResults.BadRequest();
         }
-        // An unknown subscription is 422 so the provider retries; it may be a first payment's session not yet saved.
-        return await ledger.ApplyAsync(named.Name, e, ct) == LedgerResult.Unknown ? TypedResults.UnprocessableEntity() : TypedResults.Ok();
+        // An unknown subscription is 422 so the provider retries (a first payment's session may not be saved yet); a
+        // refused payment is 409, and logged to be refunded.
+        return await ledger.ApplyAsync(named.Name, e, ct) switch
+        {
+            LedgerResult.Unknown => TypedResults.UnprocessableEntity(),
+            LedgerResult.Refused => TypedResults.Conflict(),
+            _ => TypedResults.Ok()
+        };
     }
 
     /// <summary>
@@ -168,10 +176,11 @@ public static class PaymentsApi
             .ToListAsync(ct);
 
     /// <summary>
-    /// On account deletion: stops every active subscription at its provider at once (so nobody is charged for an account
-    /// that's gone) and deletes the payment records with the account. The provider keeps its own for its books.
+    /// The first step of an account deletion, before the login goes: stops every running subscription at its provider at
+    /// once, so nobody is charged for an account that's gone. A provider that fails (down, timing out) is logged to be
+    /// stopped by hand and doesn't stop the deletion.
     /// </summary>
-    internal static async Task ForgetAsync(IdentityContext db, PaymentProviders providers, string userId, ILogger logger, CancellationToken ct)
+    internal static async Task StopSubscriptionsAsync(IdentityContext db, PaymentProviders providers, string userId, ILogger logger, CancellationToken ct)
     {
         foreach (var subscription in await db.Subscriptions.Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
         {
@@ -179,14 +188,22 @@ public static class PaymentsApi
             {
                 await (providers.Named(subscription.Provider)?.CancelAsync(subscription, now: true, ct) ?? Task.CompletedTask);
             }
-            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            catch (Exception ex) when (!ct.IsCancellationRequested)
             {
                 logger.LogError(ex, "Subscription {Subscription} couldn't be stopped at {Provider}; stop it there by hand", subscription.ProviderSubscriptionId, subscription.Provider);
             }
         }
-        await db.Receipts.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
-        await db.Subscriptions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
-        await db.CheckoutSessions.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+    }
+
+    /// <summary>
+    /// Marks the user's payment records for deletion, in the same save as the profile (the provider keeps its own for its
+    /// books).
+    /// </summary>
+    internal static async Task RemoveRecordsAsync(IdentityContext db, string userId, CancellationToken ct)
+    {
+        db.Receipts.RemoveRange(await db.Receipts.Where(r => r.UserId == userId).ToListAsync(ct));
+        db.Subscriptions.RemoveRange(await db.Subscriptions.Where(s => s.UserId == userId).ToListAsync(ct));
+        db.CheckoutSessions.RemoveRange(await db.CheckoutSessions.Where(c => c.UserId == userId).ToListAsync(ct));
     }
 
     private static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>

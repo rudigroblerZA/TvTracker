@@ -19,7 +19,13 @@ public enum LedgerResult
     /// <summary>
     /// About a subscription or checkout the app doesn't know.
     /// </summary>
-    Unknown
+    Unknown,
+
+    /// <summary>
+    /// A payment the app won't apply: a checkout already used, or a second subscription for someone who has one running.
+    /// The provider took the money, so it's logged for a refund.
+    /// </summary>
+    Refused
 }
 
 /// <summary>
@@ -29,8 +35,13 @@ public enum LedgerResult
 /// resent event, or two deliveries at once, apply one payment.</item>
 /// <item><b>Credited to who checked out:</b> a first payment must name a checkout session the app made, and the
 /// subscription is the session's user's; a webhook can't choose whose plan it moves.</item>
-/// <item><b>Ending downgrades only what it paid for:</b> the plan falls back to Free only while it's still this
-/// subscription's plan and no other active subscription pays for one; an admin's later change stands.</item>
+/// <item><b>One running at a time, one per checkout:</b> a checkout session starts one subscription, and a payment that
+/// would start or revive one beside another that's running is refused (<see cref="LedgerResult.Refused"/>), so a double
+/// click on Pay, two checkouts paid at once or a late renewal of an ended one can't leave two running.</item>
+/// <item><b>The plan moves when a subscription starts or comes back,</b> not at each renewal, and an ending moves it back
+/// only while it's still that subscription's plan and nothing else pays: an admin's change in between stands.</item>
+/// <item><b>Receipts carry the price paid:</b> the provider's amount, else the subscription's own (kept from its checkout),
+/// so a renewal that doesn't state it still records the right amount and currency.</item>
 /// </list>
 /// </summary>
 public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, ILogger<SubscriptionLedger> logger)
@@ -47,17 +58,23 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         switch (e.Kind)
         {
             case PaymentEventKind.Paid:
-                CheckoutSession? session = null;
                 if (subscription is null)
                 {
-                    if (e.SessionId is not { } id || await db.CheckoutSessions.FindAsync([id], ct) is not { } found || found.Provider != provider)
+                    if (e.SessionId is not { } id || await db.CheckoutSessions.FindAsync([id], ct) is not { } session || session.Provider != provider)
                     {
                         return LedgerResult.Unknown;
                     }
-                    session = found;
+                    if (session.CompletedAtUtc is not null || await RunningAsync(session.UserId, except: null, ct))
+                    {
+                        return Refuse(e, session.UserId, session.CompletedAtUtc is not null ? "its checkout was already paid" : "another subscription is running");
+                    }
                     subscription = Start(provider, e, session, now);
                 }
-                await PaidAsync(subscription, e, session, now, ct);
+                else if (subscription.Status == SubscriptionStatus.Ended && await RunningAsync(subscription.UserId, subscription.Id, ct))
+                {
+                    return Refuse(e, subscription.UserId, "it ended and another subscription is running");
+                }
+                await PaidAsync(subscription, e, now, ct);
                 break;
             case PaymentEventKind.CancelScheduled or PaymentEventKind.Resumed when subscription is not null:
                 subscription.CancelAtPeriodEnd = e.Kind == PaymentEventKind.CancelScheduled;
@@ -104,9 +121,18 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
         }
     }
 
+    private Task<bool> RunningAsync(string userId, Guid? except, CancellationToken ct) =>
+        db.Subscriptions.AnyAsync(s => s.UserId == userId && s.Id != except && s.Status == SubscriptionStatus.Active, ct);
+
+    private LedgerResult Refuse(PaymentEvent e, string userId, string why)
+    {
+        logger.LogError("Payment event {Event} for {UserId} refused ({Why}); the provider took the payment, so refund it there", e.Id, userId, why);
+        return LedgerResult.Refused;
+    }
+
     private Subscription Start(string provider, PaymentEvent e, CheckoutSession session, DateTimeOffset now)
     {
-        session.CompletedAtUtc ??= now.UtcDateTime;
+        session.CompletedAtUtc = now.UtcDateTime;
         var subscription = new Subscription
         {
             Id = Guid.CreateVersion7(),
@@ -115,7 +141,10 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
             ProviderSubscriptionId = e.SubscriptionId,
             Plan = session.Plan,
             Interval = session.Interval,
-            Status = SubscriptionStatus.Active,
+            Amount = session.Amount,
+            Currency = session.Currency,
+            // Ended until its first payment is applied, which starts it (and moves the plan).
+            Status = SubscriptionStatus.Ended,
             CurrentPeriodEndUtc = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(now.UtcDateTime, session.Interval),
             CreatedAtUtc = now.UtcDateTime,
             UpdatedAtUtc = now.UtcDateTime
@@ -125,11 +154,11 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
     }
 
     /// <summary>
-    /// Extends the paid period, keeps a receipt (the amount the provider reports, else the checkout's price) and moves
-    /// the plan to the subscription's.
+    /// Extends the paid period and keeps a receipt; a subscription starting or coming back also moves the plan to its own.
     /// </summary>
-    private async Task PaidAsync(Subscription subscription, PaymentEvent e, CheckoutSession? session, DateTimeOffset now, CancellationToken ct)
+    private async Task PaidAsync(Subscription subscription, PaymentEvent e, DateTimeOffset now, CancellationToken ct)
     {
+        var starting = subscription.Status == SubscriptionStatus.Ended;
         var periodEnd = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(Max(subscription.CurrentPeriodEndUtc, now.UtcDateTime), subscription.Interval);
         subscription.CurrentPeriodEndUtc = Max(subscription.CurrentPeriodEndUtc, periodEnd);
         subscription.Status = SubscriptionStatus.Active;
@@ -148,14 +177,14 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
                 ProviderPaymentId = paymentId,
                 Plan = subscription.Plan,
                 Interval = subscription.Interval,
-                Amount = e.Amount ?? session?.Amount ?? 0,
-                Currency = e.Currency ?? session?.Currency ?? PlanPrices.Default.Currency,
+                Amount = e.Amount ?? subscription.Amount,
+                Currency = e.Currency ?? subscription.Currency,
                 PaidAtUtc = now.UtcDateTime,
                 PeriodEndUtc = subscription.CurrentPeriodEndUtc
             });
         }
 
-        if (await db.Profiles.FindAsync([subscription.UserId], ct) is { } profile)
+        if (starting && await db.Profiles.FindAsync([subscription.UserId], ct) is { } profile)
         {
             await PlanState.SetPaidPlanAsync(db, outbox, profile, subscription.Plan, now, ct);
         }
