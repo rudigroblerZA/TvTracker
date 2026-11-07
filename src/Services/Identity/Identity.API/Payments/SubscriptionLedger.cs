@@ -148,7 +148,8 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
             Amount = session.Amount,
             Currency = session.Currency,
             Status = SubscriptionStatus.Active,
-            CurrentPeriodEndUtc = e.PeriodEndUtc ?? PlanPrices.PeriodEnd(now.UtcDateTime, session.Interval),
+            // Nothing paid yet: the payment that starts it (PaidAsync) extends this by one period, or to the provider's date.
+            CurrentPeriodEndUtc = now.UtcDateTime,
             CreatedAtUtc = now.UtcDateTime,
             UpdatedAtUtc = now.UtcDateTime
         };
