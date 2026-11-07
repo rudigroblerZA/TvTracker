@@ -26,11 +26,10 @@ public sealed class IntegrationEventRetention(IServiceScopeFactory scopes, TimeP
 
     protected override TimeSpan FirstRunDelay => TimeSpan.FromMinutes(2);
 
-    protected override async Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(
-        IServiceProvider services, DateTime nowUtc, int batch, CancellationToken ct)
+    protected override async Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(IServiceProvider services, DateTime nowUtc, CancellationToken ct)
     {
         var (outbox, inbox) = await services.GetRequiredService<IIntegrationEventOutbox>()
-            .TrimAsync(nowUtc.AddDays(-OutboxDays), nowUtc.AddDays(-InboxDays), batch, ct);
+            .TrimAsync(nowUtc.AddDays(-OutboxDays), nowUtc.AddDays(-InboxDays), Batch, ct);
         return [("published outbox rows", outbox), ("inbox rows", inbox)];
     }
 }

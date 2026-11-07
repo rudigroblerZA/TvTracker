@@ -140,8 +140,7 @@ public static class FeatureFlags
     /// The same context for a user known by id rather than by a request's claims: a background job acting for them
     /// (Notifications deciding, per follower, whether a flagged alert goes out).
     /// </summary>
-    public static EvaluationContext ContextForUser(string userId, string? email = null, string? plan = null) =>
-        Context(userId, email, plan);
+    public static EvaluationContext ContextForUser(string userId, string? email) => Context(userId, email, plan: null);
 
     private static EvaluationContext Context(string? userId, string? email, string? plan)
     {

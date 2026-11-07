@@ -62,30 +62,14 @@ public sealed class CatalogNotificationHandlers(NotificationFanOut fanOut) :
 /// they get it only if it's redelivered.</item>
 /// </list>
 /// </summary>
-public sealed class AnalyticsNotificationHandlers(NotificationsContext db, NotificationFanOut fanOut)
+public sealed class AnalyticsNotificationHandlers(NotificationFanOut fanOut)
     : IIntegrationEventHandler<SeasonVerdictIntegrationEvent>
 {
-    public async Task HandleAsync(SeasonVerdictIntegrationEvent e, CancellationToken ct)
-    {
+    public Task HandleAsync(SeasonVerdictIntegrationEvent e, CancellationToken ct) =>
         // Events sent before VerdictId existed keep their own Id.
-        var verdict = e.VerdictId == Guid.Empty ? e : e with { Id = e.VerdictId };
-        if (await db.HasProcessedAsync(verdict, nameof(AnalyticsNotificationHandlers), ct))
-        {
-            return;
-        }
-
-        var result = await fanOut.NotifyFollowersAsync(verdict, new NotificationContent(
-            NotificationKind.SeasonVerdict, e.ShowId, null,
-            $"{e.ShowTitle}: how season {e.SeasonNumber} did",
-            SeasonVerdictText(e),
-            $"/shows/{e.ShowId}", FeatureFlags.SeasonVerdict), ct);
-
-        if (result.HeldBack == 0)
-        {
-            db.MarkProcessed(verdict, nameof(AnalyticsNotificationHandlers));
-            await db.SaveChangesAsync(ct);
-        }
-    }
+        fanOut.NotifyOnceAsync(e.VerdictId == Guid.Empty ? e : e with { Id = e.VerdictId }, nameof(AnalyticsNotificationHandlers),
+            [new NotificationContent(NotificationKind.SeasonVerdict, e.ShowId, null, $"{e.ShowTitle}: how season {e.SeasonNumber} did",
+                SeasonVerdictText(e), $"/shows/{e.ShowId}", FeatureFlags.SeasonVerdict)], ct);
 
     /// <summary>
     /// "Its best season yet, rated 8.6 against 8.1 for the others. The finale was a high point. 12 of 20 …"
@@ -132,31 +116,19 @@ public sealed class AnalyticsNotificationHandlers(NotificationsContext db, Notif
 /// so an hourly re-send after the flag turns on reaches them; those already told are skipped by the fan-out.</item>
 /// </list>
 /// </summary>
-public sealed class CrossoverNotificationHandler(NotificationsContext db, NotificationFanOut fanOut, TimeProvider time)
+public sealed class CrossoverNotificationHandler(NotificationFanOut fanOut, TimeProvider time)
     : IIntegrationEventHandler<CrossoverScheduledIntegrationEvent>
 {
-    public async Task HandleAsync(CrossoverScheduledIntegrationEvent e, CancellationToken ct)
+    public Task HandleAsync(CrossoverScheduledIntegrationEvent e, CancellationToken ct)
     {
-        var crossover = e with { Id = e.CrossoverId };
-        if (e.Parts.Count == 0
-            || await db.HasProcessedAsync(crossover, nameof(CrossoverNotificationHandler), ct))
+        if (e.Parts.Count == 0)
         {
-            return;
+            return Task.CompletedTask;
         }
-
         var body = CrossoverText(e, time.GetUtcNow());
-        var heldBack = 0;
-        foreach (var show in e.Parts.Select(p => p.ShowId).Distinct())
-        {
-            heldBack += (await fanOut.NotifyFollowersAsync(crossover, new NotificationContent(
-                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}", FeatureFlags.CrossoverAlerts), ct)).HeldBack;
-        }
-
-        if (heldBack == 0)
-        {
-            db.MarkProcessed(crossover, nameof(CrossoverNotificationHandler));
-            await db.SaveChangesAsync(ct);
-        }
+        return fanOut.NotifyOnceAsync(e with { Id = e.CrossoverId }, nameof(CrossoverNotificationHandler),
+            e.Parts.Select(p => p.ShowId).Distinct().Select(show => new NotificationContent(
+                NotificationKind.Crossover, show, null, $"Crossover ahead: {e.Name}", body, $"/universes/{e.UniverseId}", FeatureFlags.CrossoverAlerts)), ct);
     }
 
     /// <summary>
