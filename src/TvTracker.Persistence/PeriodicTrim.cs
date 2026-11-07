@@ -19,10 +19,9 @@ public abstract class PeriodicTrim(IServiceScopeFactory scopes, TimeProvider tim
     protected abstract TimeSpan FirstRunDelay { get; }
 
     /// <summary>
-    /// Deletes up to <paramref name="batch"/> rows of each kind; returns how many of each went, by name.
+    /// Deletes up to <see cref="Batch"/> rows of each kind; returns how many of each went, by name.
     /// </summary>
-    protected abstract Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(
-        IServiceProvider services, DateTime nowUtc, int batch, CancellationToken ct);
+    protected abstract Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(IServiceProvider services, DateTime nowUtc, CancellationToken ct);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -49,7 +48,7 @@ public abstract class PeriodicTrim(IServiceScopeFactory scopes, TimeProvider tim
         while (true)
         {
             await using var scope = scopes.CreateAsyncScope();
-            var deleted = await TrimBatchAsync(scope.ServiceProvider, now, Batch, ct);
+            var deleted = await TrimBatchAsync(scope.ServiceProvider, now, ct);
             foreach (var (rows, count) in deleted)
             {
                 totals[rows] = totals.GetValueOrDefault(rows) + count;

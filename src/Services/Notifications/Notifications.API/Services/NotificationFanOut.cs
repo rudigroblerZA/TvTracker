@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using TvTracker;
 using TvTracker.EventBus;
+using TvTracker.Persistence;
 
 namespace Notifications.API.Services;
 
@@ -9,9 +11,6 @@ namespace Notifications.API.Services;
 /// Notifications has it), so a flag targeted at some users holds it back from the others only.</param>
 public record NotificationContent(NotificationKind Kind, Guid ShowId, Guid? EpisodeId, string Title, string Body, string Link, string? Flag = null);
 
-/// <param name="HeldBack">Followers who wanted it but the flag was off for; a caller that would hear the event again
-/// (a crossover's hourly re-send) leaves it unprocessed while there are any, so they get it once the flag turns on.</param>
-public record FanOutResult(int Created, int HeldBack);
 
 /// <summary>
 /// Turns one catalog event into an inbox item per interested follower plus one queued delivery per channel.
@@ -22,14 +21,41 @@ public sealed class NotificationFanOut(NotificationsContext db, CachedFlags flag
     private const int BatchSize = 500;
     private const int ConcurrentFlagChecks = 16;
 
-    public async Task<FanOutResult> NotifyFollowersAsync(IntegrationEvent source, NotificationContent content, CancellationToken ct)
+    /// <summary>
+    /// The once-only wrapper every alert handler uses: skips an event already handled (the inbox, keyed by
+    /// <paramref name="identity"/>'s id), fans each content out to its show's followers, and marks it handled only when
+    /// the flag held nobody back, so an event heard again (a crossover's hourly re-send) reaches them once it's on.
+    /// Followers already told are skipped by the fan-out itself.
+    /// </summary>
+    public async Task NotifyOnceAsync(IntegrationEvent identity, string handler, IEnumerable<NotificationContent> contents, CancellationToken ct)
+    {
+        if (await db.HasProcessedAsync(identity, handler, ct))
+        {
+            return;
+        }
+        var heldBack = 0;
+        foreach (var content in contents)
+        {
+            heldBack += await NotifyFollowersAsync(identity, content, ct);
+        }
+        if (heldBack == 0)
+        {
+            db.MarkProcessed(identity, handler);
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    /// <summary>
+    /// Queues the alert for the show's followers; returns how many wanted it but its flag was off for.
+    /// </summary>
+    public async Task<int> NotifyFollowersAsync(IntegrationEvent source, NotificationContent content, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
 
         var followers = await db.Followers.Where(f => f.ShowId == content.ShowId).Select(f => f.UserId).ToListAsync(ct);
         if (followers.Count == 0)
         {
-            return new(0, 0);
+            return 0;
         }
 
         var muted = (await db.ShowPreferences
@@ -66,17 +92,15 @@ public sealed class NotificationFanOut(NotificationsContext db, CachedFlags flag
             {
                 var allowed = await AllowedAsync(flag, wanting, ct);
                 heldBack += wanting.Count - allowed.Count;
-                wanting = wanting.Where(p => allowed.Contains(p.UserId)).ToList();
+                wanting = allowed;
             }
 
             foreach (var pref in wanting)
             {
-                var userId = pref.UserId;
-
                 var item = new InboxItem
                 {
                     Id = Guid.CreateVersion7(),
-                    UserId = userId,
+                    UserId = pref.UserId,
                     Kind = content.Kind,
                     Title = content.Title,
                     Body = content.Body,
@@ -90,7 +114,7 @@ public sealed class NotificationFanOut(NotificationsContext db, CachedFlags flag
                 created++;
 
                 var sendAt = QuietHours.NextAllowedUtc(pref, now);
-                var userPlatforms = platforms[userId].ToList();
+                var userPlatforms = platforms[pref.UserId].ToList();
 
                 if (pref.PushEnabled && userPlatforms.Any(p => p is DevicePlatform.Android or DevicePlatform.iOS))
                 {
@@ -113,22 +137,22 @@ public sealed class NotificationFanOut(NotificationsContext db, CachedFlags flag
 
         logger.LogInformation("{Kind} for show {ShowId}: {Count} notifications queued, {HeldBack} held back by the flag",
             content.Kind, content.ShowId, created, heldBack);
-        return new(created, heldBack);
+        return heldBack;
     }
 
     /// <summary>
     /// Who the flag is on for, checked a few at a time: each follower is their own evaluation context, so a large
     /// show's fan-out would otherwise wait on thousands of flagd round trips one after another.
     /// </summary>
-    private async Task<HashSet<string>> AllowedAsync(string flag, List<NotificationPreferences> prefs, CancellationToken ct)
+    private async Task<List<NotificationPreferences>> AllowedAsync(string flag, List<NotificationPreferences> prefs, CancellationToken ct)
     {
-        var allowed = new System.Collections.Concurrent.ConcurrentBag<string>();
+        var allowed = new ConcurrentBag<NotificationPreferences>();
         await Parallel.ForEachAsync(prefs, new ParallelOptions { MaxDegreeOfParallelism = ConcurrentFlagChecks, CancellationToken = ct },
             async (pref, token) =>
             {
                 if (await flags.IsEnabledAsync(flag, FeatureFlags.ContextForUser(pref.UserId, pref.Email), token))
                 {
-                    allowed.Add(pref.UserId);
+                    allowed.Add(pref);
                 }
             });
         return [.. allowed];

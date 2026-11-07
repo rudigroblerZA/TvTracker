@@ -102,33 +102,38 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     /// <summary>
     /// The handler: no automatic redirects, and a connect step that only reaches public addresses (or the proxy).
     /// </summary>
-    internal static SocketsHttpHandler CreateHandler(IWebProxy? proxy) => new()
+    internal static SocketsHttpHandler CreateHandler(IWebProxy? proxy)
     {
-        AllowAutoRedirect = false,
-        AutomaticDecompression = DecompressionMethods.All,
-        UseProxy = proxy is not null,
-        Proxy = proxy,
-        ConnectCallback = async (context, ct) =>
+        var proxies = ProxyEndpoints(proxy);
+        return new SocketsHttpHandler
         {
-            var endpoint = context.DnsEndPoint;
-            var addresses = IPAddress.TryParse(endpoint.Host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(endpoint.Host, ct);
-            if (!IsProxy(proxy, endpoint) && (addresses.Length == 0 || !addresses.All(IsPublic)))
-            {
-                throw new NotPublicException();
-            }
-            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try
-            {
-                await socket.ConnectAsync(addresses, endpoint.Port, ct);
-                return new NetworkStream(socket, ownsSocket: true);
-            }
-            catch
-            {
-                socket.Dispose();
-                throw;
-            }
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.All,
+            UseProxy = proxy is not null,
+            Proxy = proxy,
+            ConnectCallback = (context, ct) => ConnectAsync(context.DnsEndPoint, IsProxy(proxies, context.DnsEndPoint), ct)
+        };
+    }
+
+    private static async ValueTask<Stream> ConnectAsync(DnsEndPoint endpoint, bool toProxy, CancellationToken ct)
+    {
+        var addresses = await ResolveAsync(endpoint.Host, ct);
+        if (!toProxy && !AllPublic(addresses))
+        {
+            throw new NotPublicException();
         }
-    };
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(addresses, endpoint.Port, ct);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
 
     /// <summary>
     /// Whether this connection is to the configured proxy (for http or https pages) rather than to a page's host.
@@ -137,10 +142,30 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     /// for a name under the reserved <c>.invalid</c> domain, which no bypass list names short of "everything" (and then
     /// nothing goes through the proxy to recognise).
     /// </summary>
-    internal static bool IsProxy(IWebProxy? proxy, DnsEndPoint endpoint) =>
-        proxy is not null && new[] { "http", "https" }.Any(scheme =>
-            new Uri($"{scheme}://proxy-probe.invalid/") is var probe && !proxy.IsBypassed(probe) && proxy.GetProxy(probe) is { } via
-            && string.Equals(via.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && via.Port == endpoint.Port);
+    internal static bool IsProxy(IWebProxy? proxy, DnsEndPoint endpoint) => IsProxy(ProxyEndpoints(proxy), endpoint);
+
+    private static bool IsProxy(IReadOnlyList<DnsEndPoint> proxies, DnsEndPoint endpoint) =>
+        proxies.Any(p => string.Equals(p.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && p.Port == endpoint.Port);
+
+    /// <summary>
+    /// The proxy's addresses for http and https pages, worked out once per handler (the proxy is fixed for its life).
+    /// </summary>
+    private static IReadOnlyList<DnsEndPoint> ProxyEndpoints(IWebProxy? proxy) => proxy is null ? [] :
+        new[] { "http", "https" }
+            .Select(scheme => new Uri($"{scheme}://proxy-probe.invalid/"))
+            .Where(probe => !proxy.IsBypassed(probe))
+            .Select(probe => proxy.GetProxy(probe))
+            .OfType<Uri>()
+            .Select(via => new DnsEndPoint(via.Host, via.Port))
+            .ToList();
+
+    /// <summary>
+    /// A host's addresses (a literal is its own), as both the early check and the connection read them.
+    /// </summary>
+    private static async Task<IPAddress[]> ResolveAsync(string host, CancellationToken ct) =>
+        IPAddress.TryParse(host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(host, ct);
+
+    private static bool AllPublic(IPAddress[] addresses) => addresses.Length > 0 && addresses.All(IsPublic);
 
     private sealed class NotPublicException() : IOException("The address isn't on the public web.");
 
@@ -155,16 +180,14 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
             return "That address isn't on the public web.";
         }
 
-        IPAddress[] addresses;
         try
         {
-            addresses = IPAddress.TryParse(uri.Host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(uri.Host, ct);
+            return AllPublic(await ResolveAsync(uri.Host, ct)) ? null : "That address isn't on the public web.";
         }
         catch (SocketException)
         {
             return $"{uri.Host} doesn't resolve.";
         }
-        return addresses.Length == 0 || addresses.Any(a => !IsPublic(a)) ? "That address isn't on the public web." : null;
     }
 
     internal static bool IsPublic(IPAddress address)

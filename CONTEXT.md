@@ -957,13 +957,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Target by user id:** the context has the user's id and, when Notifications has it, their email, which comes with
     registration and profile changes but not the daily snapshot; a user who registered before Notifications kept
     emails has none here. Rules for these alerts should go by `targetingKey`.
-  - **Held back, then sent:** while the flag held anyone back, the event isn't marked processed, so a crossover's hourly
-    re-send reaches them once it turns on (those already told are skipped); a verdict is sent once, so only a
-    redelivery would. A held-back digest isn't stamped, so it goes on their next digest day with the flag on.
+  - **Held back, then sent** (`NotificationFanOut.NotifyOnceAsync`, the once-only wrapper both alert handlers use):
+    while the flag held anyone back, the event isn't marked processed, so a crossover's hourly re-send reaches them
+    once it turns on; those already told are skipped, found by the inbox's unique index, which leads with the event
+    (migration `InboxLookupIndexes`). A verdict is sent once, so only a redelivery would. A held-back digest isn't stamped, so it goes on their next digest day with the flag on.
 - **Inbox retention** (`InboxRetention` on `PeriodicTrim`, the loop it shares with `IntegrationEventRetention`; daily,
   batches of 5,000): inbox items read 90+ days ago or created a year ago, and finished deliveries scheduled 30+ days
   ago. An item with a delivery still pending is kept, as is the delivery, since the worker still owes it. Each rule is
-  its own delete on its own index (migration `InboxRetentionIndexes`), so a batch doesn't scan the inbox. Before this,
+  its own delete on its own index (migrations `InboxRetentionIndexes` and `InboxLookupIndexes`, a partial index on
+  finished deliveries' schedule), so a batch doesn't scan the table. Before this,
   both were deleted only with the account. Nothing reads further back: the digest reads since the last one, and the
   fan-out's "already told" check covers redeliveries and crossovers re-sent for 14 days.
 

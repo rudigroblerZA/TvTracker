@@ -60,17 +60,15 @@ public sealed class InboxRetention(IServiceScopeFactory scopes, TimeProvider tim
         return d => d.Status != DeliveryStatus.Pending && d.ScheduledForUtc < before;
     }
 
-    protected override async Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(
-        IServiceProvider services, DateTime nowUtc, int batch, CancellationToken ct)
+    protected override async Task<IReadOnlyList<(string Rows, int Deleted)>> TrimBatchAsync(IServiceProvider services, DateTime nowUtc, CancellationToken ct)
     {
         var db = services.GetRequiredService<NotificationsContext>();
-        var owed = db.Deliveries.Where(d => d.Status == DeliveryStatus.Pending);
-        var read = await db.Inbox.Where(ReadLongAgo(nowUtc)).Where(i => !owed.Any(d => d.InboxItemId == i.Id))
-            .OrderBy(i => i.ReadAtUtc).Take(batch).ExecuteDeleteAsync(ct);
-        var old = await db.Inbox.Where(CreatedLongAgo(nowUtc)).Where(i => !owed.Any(d => d.InboxItemId == i.Id))
-            .OrderBy(i => i.CreatedAtUtc).Take(batch).ExecuteDeleteAsync(ct);
+        // An item whose delivery the worker still owes is kept, whichever rule it falls under.
+        var deletable = db.Inbox.Where(i => !db.Deliveries.Any(d => d.InboxItemId == i.Id && d.Status == DeliveryStatus.Pending));
+        var read = await deletable.Where(ReadLongAgo(nowUtc)).OrderBy(i => i.ReadAtUtc).Take(Batch).ExecuteDeleteAsync(ct);
+        var old = await deletable.Where(CreatedLongAgo(nowUtc)).OrderBy(i => i.CreatedAtUtc).Take(Batch).ExecuteDeleteAsync(ct);
         var deliveries = await db.Deliveries.Where(ExpiredDeliveries(nowUtc))
-            .OrderBy(d => d.ScheduledForUtc).Take(batch).ExecuteDeleteAsync(ct);
+            .OrderBy(d => d.ScheduledForUtc).Take(Batch).ExecuteDeleteAsync(ct);
         return [("inbox items read long ago", read), ("year-old inbox items", old), ("finished deliveries", deliveries)];
     }
 }

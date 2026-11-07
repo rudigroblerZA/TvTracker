@@ -225,7 +225,8 @@ public class NotificationsContext(DbContextOptions<NotificationsContext> options
         {
             entity.ToTable("inbox");
             entity.HasIndex(i => new { i.UserId, i.CreatedAtUtc });
-            entity.HasIndex(i => new { i.UserId, i.SourceEventId }).IsUnique();
+            // Source first: the fan-out's "already told" check looks up one event's recipients.
+            entity.HasIndex(i => new { i.SourceEventId, i.UserId }).IsUnique();
             // For the retention's two rules (InboxRetention).
             entity.HasIndex(i => i.CreatedAtUtc);
             entity.HasIndex(i => i.ReadAtUtc).HasFilter("\"ReadAtUtc\" IS NOT NULL");
@@ -239,6 +240,8 @@ public class NotificationsContext(DbContextOptions<NotificationsContext> options
         {
             entity.ToTable("deliveries");
             entity.HasIndex(d => new { d.Status, d.ScheduledForUtc });
+            // For the retention's delete of finished deliveries by age (InboxRetention).
+            entity.HasIndex(d => d.ScheduledForUtc).HasFilter($"\"Status\" <> {(int)DeliveryStatus.Pending}");
             entity.HasOne(d => d.InboxItem).WithMany().HasForeignKey(d => d.InboxItemId).OnDelete(DeleteBehavior.Cascade);
             entity.Property(d => d.UserId).HasMaxLength(64);
             entity.Property(d => d.LastError).HasMaxLength(1024);

@@ -59,6 +59,9 @@ namespace Notifications.API.Data.Migrations
 
                     b.HasIndex("InboxItemId");
 
+                    b.HasIndex("ScheduledForUtc")
+                        .HasFilter("\"Status\" <> 0");
+
                     b.HasIndex("Status", "ScheduledForUtc");
 
                     b.ToTable("deliveries", (string)null);
@@ -171,10 +174,10 @@ namespace Notifications.API.Data.Migrations
                     b.HasIndex("ReadAtUtc")
                         .HasFilter("\"ReadAtUtc\" IS NOT NULL");
 
-                    b.HasIndex("UserId", "CreatedAtUtc");
-
-                    b.HasIndex("UserId", "SourceEventId")
+                    b.HasIndex("SourceEventId", "UserId")
                         .IsUnique();
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("inbox", (string)null);
                 });
