@@ -36,14 +36,25 @@ public class WebPageSourceTests
     }
 
     [Fact]
-    public void Only_the_proxy_for_the_request_counts_as_the_proxy()
+    public void Only_the_configured_proxy_counts_as_the_proxy()
     {
-        var proxy = new WebProxy("http://10.0.0.5:3128");
-        var target = new Uri("https://example.com/");
+        // A loopback proxy, as in the sandbox: the bypass list covers localhost, which must not wave the proxy itself off.
+        var proxy = new WebProxy("http://127.0.0.1:37121", BypassOnLocal: true);
 
-        Assert.True(WebPageSource.IsProxy(proxy, target, new DnsEndPoint("10.0.0.5", 3128)));
-        Assert.False(WebPageSource.IsProxy(proxy, target, new DnsEndPoint("10.0.0.5", 8080)));
-        Assert.False(WebPageSource.IsProxy(proxy, target, new DnsEndPoint("example.com", 443)));
-        Assert.False(WebPageSource.IsProxy(null, target, new DnsEndPoint("10.0.0.5", 3128)));
+        Assert.True(WebPageSource.IsProxy(proxy, new DnsEndPoint("127.0.0.1", 37121)));
+        Assert.False(WebPageSource.IsProxy(proxy, new DnsEndPoint("127.0.0.1", 8080)));
+        Assert.False(WebPageSource.IsProxy(proxy, new DnsEndPoint("example.com", 443)));
+        Assert.False(WebPageSource.IsProxy(null, new DnsEndPoint("127.0.0.1", 37121)));
+    }
+
+    [Fact]
+    public async Task An_https_page_through_a_loopback_proxy_is_let_through()
+    {
+        // The tunnel to the proxy is attempted (nothing listens, so the OS refuses it), not stopped by the check.
+        using var http = new HttpClient(WebPageSource.CreateHandler(new WebProxy("http://127.0.0.1:1", BypassOnLocal: true)));
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => http.GetAsync("https://example.com/", TestContext.Current.CancellationToken));
+
+        Assert.IsType<SocketException>(ex.InnerException);
     }
 }

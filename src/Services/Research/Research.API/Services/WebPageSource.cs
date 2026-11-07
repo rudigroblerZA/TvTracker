@@ -112,7 +112,7 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
         {
             var endpoint = context.DnsEndPoint;
             var addresses = IPAddress.TryParse(endpoint.Host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(endpoint.Host, ct);
-            if (!IsProxy(proxy, context.InitialRequestMessage.RequestUri, endpoint) && (addresses.Length == 0 || !addresses.All(IsPublic)))
+            if (!IsProxy(proxy, endpoint) && (addresses.Length == 0 || !addresses.All(IsPublic)))
             {
                 throw new NotPublicException();
             }
@@ -131,11 +131,14 @@ public sealed class WebPageSource(ILogger<WebPageSource> logger)
     };
 
     /// <summary>
-    /// Whether this connection is to the proxy configured for the request, rather than to the page's host.
+    /// Whether this connection is to the configured proxy (for http or https pages) rather than to a page's host.
+    /// Not judged from the request: for an https page the handler opens a tunnel, and the request it connects for then
+    /// names the proxy itself, which the proxy's own bypass list (localhost) would wave off.
     /// </summary>
-    internal static bool IsProxy(IWebProxy? proxy, Uri? target, DnsEndPoint endpoint) =>
-        proxy is not null && target is not null && !proxy.IsBypassed(target) && proxy.GetProxy(target) is { } via
-        && string.Equals(via.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && via.Port == endpoint.Port;
+    internal static bool IsProxy(IWebProxy? proxy, DnsEndPoint endpoint) =>
+        proxy is not null && new[] { "http", "https" }.Any(scheme =>
+            new Uri($"{scheme}://example.com/") is var probe && !proxy.IsBypassed(probe) && proxy.GetProxy(probe) is { } via
+            && string.Equals(via.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase) && via.Port == endpoint.Port);
 
     private sealed class NotPublicException() : IOException("The address isn't on the public web.");
 
