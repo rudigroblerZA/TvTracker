@@ -86,6 +86,7 @@ public static class FeatureFlags
     public const string ListLinks = "list-links";
     public const string YourServices = "your-services";
     public const string FamilyPlan = "family-plan";
+    public const string Payments = "payments";
 
     /// <summary>
     /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage

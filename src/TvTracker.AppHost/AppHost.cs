@@ -486,4 +486,21 @@ if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configurati
     webApp.WithEnvironment("Affiliates__TestNetworkKey", testNetworkKey);
 }
 
+// Payments (running locally only): the test provider sells Plus and Family, its checkout being the web app's
+// /dev/payments page, which signs the webhooks it sends Identity with a secret the two share (TestPaymentProvider,
+// TestPaymentProvider page in the web app). A deployment names a real provider instead; none is built yet.
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    var paymentsSecret = Secret("payments-test-webhook-secret", "tvtracker-payments-dev-secret");
+    var webAddress = string.IsNullOrEmpty(webPublicUrl)
+        ? ReferenceExpression.Create($"{webApp.GetEndpoint("http")}")
+        : ReferenceExpression.Create($"{webPublicUrl.TrimEnd('/')}");
+    identityApi
+        .WithEnvironment("Payments__Provider", "test")
+        .WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webAddress}/settings/plan"))
+        .WithEnvironment("Payments__Test__CheckoutUrl", webAddress)
+        .WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
+    webApp.WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
+}
+
 builder.Build().Run();

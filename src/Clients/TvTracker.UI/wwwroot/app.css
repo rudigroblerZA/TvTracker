@@ -778,6 +778,7 @@ h1:focus, h2:focus { outline: none; }
 .plan-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); margin: 12px 0; }
 .plan-card.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .plan-card h2 { margin-top: 0; }
+.plan-buy { display: flex; flex-wrap: wrap; gap: 8px; }
 .plan-features { padding-left: 18px; margin: 0 0 10px; display: grid; gap: 4px; }
 .plan-users { list-style: none; padding: 0; display: grid; gap: 8px; }
 .plan-users li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

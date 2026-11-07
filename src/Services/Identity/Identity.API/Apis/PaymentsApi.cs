@@ -1,0 +1,195 @@
+using System.Security.Claims;
+using Identity.API.Data;
+using Identity.API.Payments;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TvTracker;
+using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
+
+namespace Identity.API.Apis;
+
+/// <param name="Provider">The provider selling now; null while plans can't be bought.</param>
+public record PlanPricesDto(string Currency, decimal PlusMonth, decimal PlusYear, decimal FamilyMonth, decimal FamilyYear, string? Provider);
+
+/// <param name="ManageUrl">The provider's page for this subscription, when it has one (the test provider's does).</param>
+public record SubscriptionDto(string Plan, string Interval, bool Active, bool CancelAtPeriodEnd, DateTime CurrentPeriodEndUtc, DateTime? EndedAtUtc,
+    string Provider, string? ManageUrl);
+
+public record CheckoutRequest(string Plan, string Interval);
+
+public record CheckoutDto(string Url);
+
+public record ReceiptDto(string Plan, string Interval, decimal Amount, string Currency, DateTime PaidAtUtc, DateTime PeriodEndUtc, string Provider);
+
+/// <summary>
+/// Buying Plus and Family through a payment provider (<see cref="IPaymentProvider"/>; the <c>payments</c> flag).
+/// <list type="bullet">
+/// <item><b>Checkout:</b> the app makes a session at today's price for the caller's region, and the provider's checkout
+/// names it; the return address is the server's own (<see cref="PaymentOptions.ReturnUrl"/>).</item>
+/// <item><b>Webhooks:</b> anonymous, but each provider checks its own signature, and an unsigned or stale call is 400
+/// with nothing applied. The plan moves through <see cref="SubscriptionLedger"/>, once per event.</item>
+/// <item><b>One at a time:</b> a second checkout while a subscription is active is refused (409); switching between Plus
+/// and Family is cancelling one and buying the other.</item>
+/// <item><b>Cancel and resume</b> ask the provider, then record it, so the page reflects it at once.</item>
+/// </list>
+/// </summary>
+public static class PaymentsApi
+{
+    public static void MapPaymentsApi(this IEndpointRouteBuilder app)
+    {
+        var api = app.MapGroup("/api/v1").RequireAuthorization().RequireFeature(FeatureFlags.Plans).RequireFeature(FeatureFlags.Payments);
+        api.MapGet("/plans/prices", GetPricesAsync);
+        api.MapGet("/me/subscription", GetSubscriptionAsync);
+        api.MapPost("/me/checkout", CheckoutAsync);
+        api.MapPost("/me/subscription/cancel", CancelAsync);
+        api.MapPost("/me/subscription/resume", ResumeAsync);
+
+        // Not behind the flags: a payment already taken must still be recorded while they're off.
+        app.MapPost("/api/v1/payments/webhooks/{provider}", WebhookAsync).AllowAnonymous();
+    }
+
+    private static async Task<Ok<PlanPricesDto>> GetPricesAsync(
+        ClaimsPrincipal user, IdentityContext db, IOptions<PaymentOptions> options, PaymentProviders providers, CancellationToken ct)
+    {
+        var region = await db.Profiles.Where(p => p.UserId == user.GetUserId()).Select(p => p.Region).SingleOrDefaultAsync(ct);
+        var prices = PlanPrices.For(region, options.Value.Prices);
+        return TypedResults.Ok(new PlanPricesDto(prices.Currency, prices.PlusMonth, prices.PlusYear, prices.FamilyMonth, prices.FamilyYear,
+            providers.Selling?.Name));
+    }
+
+    private static async Task<Results<Ok<SubscriptionDto>, NoContent>> GetSubscriptionAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, CancellationToken ct) =>
+        await LatestAsync(db, user.GetUserId(), ct) is { } subscription
+            ? TypedResults.Ok(ToDto(subscription, providers))
+            : TypedResults.NoContent();
+
+    private static async Task<Results<Ok<CheckoutDto>, ValidationProblem, Conflict<string>, ProblemHttpResult>> CheckoutAsync(
+        CheckoutRequest request, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, IOptions<PaymentOptions> options,
+        PaymentProviders providers, TimeProvider time, CancellationToken ct)
+    {
+        if (!PlanPrices.Sold(request.Plan) || !PlanPrices.Intervals.Contains(request.Interval))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["plan"] = [$"Choose {Plans.Plus} or {Plans.Family}, by the {PlanPrices.Month} or the {PlanPrices.Year}."]
+            });
+        }
+        if (providers.Selling is not { } provider || options.Value.ReturnUrl is not { Length: > 0 } returnUrl)
+        {
+            return TypedResults.Problem("Plans can't be bought here yet.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        var profile = await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, ct);
+        if (await db.Subscriptions.AnyAsync(s => s.UserId == profile.UserId && s.Status == SubscriptionStatus.Active, ct))
+        {
+            return TypedResults.Conflict("You already have a subscription; cancel it before buying another plan.");
+        }
+
+        var prices = PlanPrices.For(profile.Region, options.Value.Prices);
+        var session = new CheckoutSession
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = profile.UserId,
+            Provider = provider.Name,
+            Plan = request.Plan,
+            Interval = request.Interval,
+            Amount = prices.For(request.Plan, request.Interval),
+            Currency = prices.Currency,
+            CreatedAtUtc = time.GetUtcNow().UtcDateTime
+        };
+        db.CheckoutSessions.Add(session);
+        await db.SaveChangesAsync(ct);
+        var url = await provider.CreateCheckoutAsync(session, returnUrl, ct);
+        return TypedResults.Ok(new CheckoutDto(url.ToString()));
+    }
+
+    private static Task<Results<Ok<SubscriptionDto>, NotFound>> CancelAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, CancellationToken ct) =>
+        ChangeAsync(user, db, providers, time, cancel: true, ct);
+
+    private static Task<Results<Ok<SubscriptionDto>, NotFound>> ResumeAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, CancellationToken ct) =>
+        ChangeAsync(user, db, providers, time, cancel: false, ct);
+
+    private static async Task<Results<Ok<SubscriptionDto>, NotFound>> ChangeAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, bool cancel, CancellationToken ct)
+    {
+        var subscription = await db.Subscriptions
+            .SingleOrDefaultAsync(s => s.UserId == user.GetUserId() && s.Status == SubscriptionStatus.Active, ct);
+        if (subscription is null || providers.Named(subscription.Provider) is not { } provider)
+        {
+            return TypedResults.NotFound();
+        }
+        if (subscription.CancelAtPeriodEnd != cancel)
+        {
+            await (cancel ? provider.CancelAsync(subscription, now: false, ct) : provider.ResumeAsync(subscription, ct));
+            subscription.CancelAtPeriodEnd = cancel;
+            subscription.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+            await db.SaveChangesAsync(ct);
+        }
+        return TypedResults.Ok(ToDto(subscription, providers));
+    }
+
+    private static async Task<Results<Ok, BadRequest, NotFound, UnprocessableEntity>> WebhookAsync(
+        string provider, HttpRequest request, PaymentProviders providers, SubscriptionLedger ledger, TimeProvider time,
+        ILoggerFactory loggers, CancellationToken ct)
+    {
+        if (providers.Named(provider) is not { } named)
+        {
+            return TypedResults.NotFound();
+        }
+        using var reader = new StreamReader(request.Body);
+        var body = await reader.ReadToEndAsync(ct);
+        if (named.ReadWebhook(body, request.Headers, time.GetUtcNow()) is not { } e)
+        {
+            loggers.CreateLogger(typeof(PaymentsApi)).LogWarning("A {Provider} webhook was refused: bad or stale signature, or not an event the app acts on", provider);
+            return TypedResults.BadRequest();
+        }
+        // An unknown subscription is 422 so the provider retries; it may be a first payment's session not yet saved.
+        return await ledger.ApplyAsync(named.Name, e, ct) == LedgerResult.Unknown ? TypedResults.UnprocessableEntity() : TypedResults.Ok();
+    }
+
+    /// <summary>
+    /// The active subscription, else the most recent; for the plan page and the export.
+    /// </summary>
+    internal static Task<Subscription?> LatestAsync(IdentityContext db, string userId, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderBy(s => s.Status)
+            .ThenByDescending(s => s.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+    internal static async Task<List<ReceiptDto>> ReceiptsAsync(IdentityContext db, string userId, CancellationToken ct) =>
+        await db.Receipts.AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderBy(r => r.PaidAtUtc)
+            .Select(r => new ReceiptDto(r.Plan, r.Interval, r.Amount, r.Currency, r.PaidAtUtc, r.PeriodEndUtc, r.Provider))
+            .ToListAsync(ct);
+
+    /// <summary>
+    /// On account deletion: stops every active subscription at its provider at once (so nobody is charged for an account
+    /// that's gone) and deletes the payment records with the account. The provider keeps its own for its books.
+    /// </summary>
+    internal static async Task ForgetAsync(IdentityContext db, PaymentProviders providers, string userId, ILogger logger, CancellationToken ct)
+    {
+        foreach (var subscription in await db.Subscriptions.Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
+        {
+            try
+            {
+                await (providers.Named(subscription.Provider)?.CancelAsync(subscription, now: true, ct) ?? Task.CompletedTask);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            {
+                logger.LogError(ex, "Subscription {Subscription} couldn't be stopped at {Provider}; stop it there by hand", subscription.ProviderSubscriptionId, subscription.Provider);
+            }
+        }
+        await db.Receipts.Where(r => r.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.Subscriptions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.CheckoutSessions.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+    }
+
+    private static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>
+        new(s.Plan, s.Interval, s.Status == SubscriptionStatus.Active, s.CancelAtPeriodEnd, s.CurrentPeriodEndUtc, s.EndedAtUtc, s.Provider,
+            s.Status == SubscriptionStatus.Active ? providers.Named(s.Provider)?.ManageUrl(s) : null);
+}

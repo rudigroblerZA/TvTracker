@@ -81,6 +81,27 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<UserPlan?> GetMyPlanAsync(CancellationToken ct = default) =>
         GetAsync<UserPlan>(ApiClients.Identity, "api/v1/me/plan", ct);
 
+    public Task<PlanPrices?> GetPlanPricesAsync(CancellationToken ct = default) =>
+        GetAsync<PlanPrices>(ApiClients.Identity, "api/v1/plans/prices", ct);
+
+    /// <summary>
+    /// The caller's subscription (active, else the latest); null when they've never had one.
+    /// </summary>
+    public Task<PlanSubscription?> GetSubscriptionAsync(CancellationToken ct = default) =>
+        GetAsync<PlanSubscription>(ApiClients.Identity, "api/v1/me/subscription", ct);
+
+    /// <summary>
+    /// Starts a checkout for <paramref name="plan"/> by the month or year; the page sends the browser to its address.
+    /// </summary>
+    public Task<CheckoutLink?> StartCheckoutAsync(string plan, string interval, CancellationToken ct = default) =>
+        SendAsync<CheckoutLink>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/checkout", new { plan, interval }, ct);
+
+    public Task<PlanSubscription?> CancelSubscriptionAsync(CancellationToken ct = default) =>
+        SendAsync<PlanSubscription>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/subscription/cancel", null, ct);
+
+    public Task<PlanSubscription?> ResumeSubscriptionAsync(CancellationToken ct = default) =>
+        SendAsync<PlanSubscription>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/subscription/resume", null, ct);
+
     /// <summary>
     /// Users by name or email, for admins (Plus users with no term); null for anyone else.
     /// </summary>

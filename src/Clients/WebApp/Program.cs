@@ -195,6 +195,7 @@ app.MapGet("/go/{showId:guid}", async (Guid showId, string provider, int type, s
 });
 
 TestAffiliateNetwork.Map(app);
+TestPaymentProvider.Map(app);
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

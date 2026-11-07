@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of Identity's payment rules: webhook signatures, prices by region and when a subscription lapses. No
+       database or network. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Identity\Identity.API\Identity.API.csproj" />
+  </ItemGroup>
+
+</Project>

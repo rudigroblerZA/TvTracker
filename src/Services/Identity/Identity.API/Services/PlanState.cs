@@ -13,6 +13,25 @@ namespace Identity.API.Services;
 /// </summary>
 public static class PlanState
 {
+    /// <summary>
+    /// Sets the plan <paramref name="profile"/> pays for, and recomputes what they and their family's members get, with
+    /// the events in the outbox; the caller saves and publishes. The one way a plan changes: an admin's change and a
+    /// payment provider's both come here. False when it was already that plan.
+    /// </summary>
+    public static async Task<bool> SetPaidPlanAsync(IdentityContext db, IIntegrationEventOutbox outbox, UserProfile profile, string plan,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        if (profile.Plan == plan)
+        {
+            return false;
+        }
+        profile.Plan = plan;
+        profile.PlanChangedAtUtc = now.UtcDateTime;
+        profile.UpdatedAtUtc = now.UtcDateTime;
+        await RecomputeAsync(db, outbox, now, [profile.UserId, .. await MembersOfAsync(db, profile.UserId, ct)], ct);
+        return true;
+    }
+
     public static async Task RecomputeAsync(IdentityContext db, IIntegrationEventOutbox outbox, DateTimeOffset now,
         IReadOnlyCollection<string> userIds, CancellationToken ct)
     {

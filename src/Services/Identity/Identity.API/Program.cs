@@ -1,5 +1,6 @@
 using Identity.API.Apis;
 using Identity.API.Data;
+using Identity.API.Payments;
 using Identity.API.Services;
 using TvTracker.Persistence;
 
@@ -20,6 +21,16 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<ProfileSnapshotPublisher>();
 builder.Services.AddHostedService<RealmSecretsSeeder>();
 builder.Services.AddHostedService<AdminAccountSeeder>();
+
+// Payments: the provider named in Payments:Provider sells plans; the test provider only in development.
+builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
+}
+builder.Services.AddSingleton<PaymentProviders>();
+builder.Services.AddScoped<SubscriptionLedger>();
+builder.Services.AddHostedService<SubscriptionLapse>();
 
 // Used by the data export to collect each service's data for the user.
 foreach (var source in ProfileApi.ExportSources)
@@ -47,5 +58,6 @@ app.MapProfileApi();
 app.MapFlagsApi();
 app.MapPlansApi();
 app.MapFamilyApi();
+app.MapPaymentsApi();
 
 app.Run();
