@@ -15,6 +15,12 @@ public static class IdentitySettings
     public const string ApiAudience = "tvtracker-api";
 
     /// <summary>
+    /// The Keycloak client services sign in as to call another service's internal API (the sync worker's imports,
+    /// replay and overrides): <see cref="AuthenticationExtensions.InternalPolicy"/>.
+    /// </summary>
+    public const string InternalClient = "tvtracker-internal";
+
+    /// <summary>
     /// Keycloak as seen from the Android emulator; tokens issued there carry this issuer. Accepted in Development only:
     /// a development address has no place in production validation.
     /// </summary>
@@ -30,6 +36,13 @@ public static class IdentitySettings
 
 public static class AuthenticationExtensions
 {
+    /// <summary>
+    /// Internal APIs, which only other services may call: a valid token from a client in <c>Internal:Clients</c>
+    /// (<see cref="IdentitySettings.InternalClient"/> by default), whoever forwards it. A person's token is refused (403)
+    /// even when it's valid, and no token at all is 401.
+    /// </summary>
+    public const string InternalPolicy = "internal";
+
     /// <summary>
     /// Validates Keycloak access tokens (audience "tvtracker-api"). Claims keep their JWT names,
     /// so the user id is the "sub" claim. Also registers the rate limits every service applies to people
@@ -53,11 +66,25 @@ public static class AuthenticationExtensions
                 options.TokenValidationParameters.NameClaimType = "name";
             });
 
-        builder.Services.AddAuthorization();
+        var internalClients = builder.Configuration.GetSection("Internal:Clients").Get<string[]>() is { Length: > 0 } configured
+            ? configured
+            : [IdentitySettings.InternalClient];
+        builder.Services.AddAuthorization(options => options.AddPolicy(InternalPolicy, policy => policy
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context => IsInternalCaller(context.User, internalClients))));
         builder.Services.AddClientRateLimiting(builder.Configuration);
 
         return builder;
     }
+
+    /// <summary>
+    /// A service signed in as one of the internal clients: a client-credentials token (a service account, so never a
+    /// person's) whose client is listed.
+    /// </summary>
+    public static bool IsInternalCaller(ClaimsPrincipal user, IReadOnlyCollection<string> internalClients) =>
+        ClientRateLimiting.IsServiceAccount(user)
+        && (user.FindFirstValue("azp") ?? user.FindFirstValue("client_id")) is { } client
+        && internalClients.Contains(client, StringComparer.Ordinal);
 
     /// <summary>
     /// The Keycloak user id ("sub" claim). Throws if the user isn't signed in.

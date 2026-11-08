@@ -11,6 +11,19 @@ var urlOption = new Option<string>("--url")
     DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_SYNC_URL") ?? "http://localhost:5107",
     Recursive = true
 };
+var keycloakOption = new Option<string>("--keycloak")
+{
+    Description = "Keycloak's address, where the tool signs in as the internal client (or set TVTRACKER_KEYCLOAK_URL)",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_KEYCLOAK_URL") ?? "http://localhost:8080",
+    Recursive = true
+};
+var secretOption = new Option<string>("--client-secret")
+{
+    Description = "The internal client's secret, the AppHost's internal-client-secret (or set TVTRACKER_INTERNAL_SECRET; " +
+        "the development value by default)",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_INTERNAL_SECRET") ?? "tvtracker-internal-dev-secret",
+    Recursive = true
+};
 var detachOption = new Option<bool>("--detach")
 {
     Description = "Start the import and exit instead of following its progress",
@@ -65,7 +78,7 @@ cancel.SetAction(async (parse, ct) =>
 
 var root = new RootCommand("Bulk import shows from TVmaze into the TV Tracker catalog, through the sync worker")
 {
-    titles, ids, top, status, cancel, urlOption, detachOption
+    titles, ids, top, status, cancel, urlOption, keycloakOption, secretOption, detachOption
 };
 
 try
@@ -200,7 +213,9 @@ static List<string> ReadLines(string file)
 
 SyncWorkerClient Connect(ParseResult parse) =>
     Uri.TryCreate(parse.GetValue(urlOption), UriKind.Absolute, out var url) && url.Scheme is "http" or "https"
-        ? new SyncWorkerClient(url)
+        ? Uri.TryCreate(parse.GetValue(keycloakOption), UriKind.Absolute, out var keycloak) && keycloak.Scheme is "http" or "https"
+            ? new SyncWorkerClient(url, keycloak, parse.GetValue(secretOption)!)
+            : throw new CliException("--keycloak must be an http(s) address, like http://localhost:8080.")
         : throw new CliException($"--url must be an http(s) address, like http://localhost:5107.");
 
 static string[] ReadAll(TextReader reader) => reader.ReadToEnd().Split('\n');

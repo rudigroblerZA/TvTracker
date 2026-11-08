@@ -97,6 +97,8 @@ var identityAdminClientSecret = Secret("identity-admin-client-secret", "tvtracke
 var mcpClientSecret = Secret("mcp-client-secret", "tvtracker-mcp-dev-secret");
 var mcpGatewayKey = Secret("mcp-gateway-key", "tvtracker-gateway-dev-key");
 var appAdminPassword = Secret("app-admin-password", "admin");
+// The internal client other services sign in as to call the sync worker's imports, replay and overrides (BACKLOG S2).
+var internalClientSecret = Secret("internal-client-secret", "tvtracker-internal-dev-secret");
 
 // ---------------------------------------------------------------------------
 // Services
@@ -113,6 +115,8 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-web", webClientSecret)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-identity-admin", identityAdminClientSecret)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-mcp", mcpClientSecret)
+    .WithEnvironment("Keycloak__ClientSecrets__tvtracker-internal", internalClientSecret)
+    .WithEnvironment("Keycloak__ServiceClients__tvtracker-internal", "Internal service calls")
     .WithEnvironment("Flags__Directory", flagsDirectory)
     .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
@@ -171,6 +175,7 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
     .WithReference(analyticsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WaitFor(analyticsApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
 // Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
@@ -285,7 +290,14 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WaitFor(notificationsApi)
     .WaitFor(analyticsWorker)
     .WaitFor(socialApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
+
+// The sync worker's callers sign in as the internal client; the worker accepts nothing else on its internal APIs.
+foreach (var caller in new[] { catalogApi, ratingsApi, researchApi, analyticsWorker, socialApi })
+{
+    caller.WithEnvironment("Internal__ClientSecret", internalClientSecret);
+}
 
 // The embedding model for semantic search: the "Embeddings" section of the AppHost's configuration (Model, and any
 // Models:{id} settings, such as a Docker Model Runner endpoint). Passed to both, since Catalog.API embeds search terms

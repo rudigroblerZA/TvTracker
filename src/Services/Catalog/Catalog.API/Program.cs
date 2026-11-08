@@ -1,3 +1,4 @@
+using TvTracker;
 using Catalog.API.Apis;
 using Catalog.API.Services;
 using Catalog.Data;
@@ -31,8 +32,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Search asks the sync worker to import provider matches first; the worker owns provider calls and writes.
 // No retries: when the worker is down, search should answer from the catalog straight away.
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
 builder.Services.AddHttpClient<CatalogImportClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
-    .RemoveAllResilienceHandlers();
+    .RemoveAllResilienceHandlers()
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 // For the ops dashboard (Development only): the other services' stats, skipped quickly when a service is down.
 builder.Services.AddHttpClient("analytics", http =>
     {
@@ -51,7 +54,8 @@ builder.Services.AddHttpClient("catalog-sync", http =>
         http.BaseAddress = new Uri("https+http://catalog-sync/");
         http.Timeout = TimeSpan.FromSeconds(3);
     })
-    .RemoveAllResilienceHandlers();
+    .RemoveAllResilienceHandlers()
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 #pragma warning restore EXTEXP0001
 builder.Services.AddSearchRateLimiting(builder.Configuration);
 

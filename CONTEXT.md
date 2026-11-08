@@ -944,7 +944,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   fan-out adds no email deliveries; push and web push carry on.
 - **What it reads:** Notifications' own copies (followers, mutes, the user's inbox since the last digest) and
   Catalog.API's public schedule for the coming week. Up Next and friends' finishes aren't in it: they live in Tracking
-  and Social, which need the user's token (service-to-service auth is BACKLOG S2).
+  and Social, which answer a person's data only to that person's token; the internal client (Service-to-service
+  auth) is for the sync worker's APIs, not for reading someone's viewing.
 - **When:** every 15 minutes the worker sends to users whose day it is, from their hour, in their time zone, and whose
   last digest is six or more days old; six, not seven, so a run a few minutes late doesn't skip a week. An empty week
   sends nothing but counts as sent.
@@ -1337,7 +1338,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Seats under a lock:** a join runs in a transaction holding the family's row (`FOR UPDATE`), so two people taking
     the last seat at once can't both get in. Checked with three joins at once for one seat: one 200, two 409.
 - **The owner of the data enforces the limit,** from its own copy (`user_plans` in Tracking): no call to Identity on
-  every write, and no service-to-service auth needed (BACKLOG S2). The copy keeps the newest by Identity's change time,
+  every write, and no call between services at all. The copy keeps the newest by Identity's change time,
   since events can arrive out of order; no row means free.
   - **Tested:** demo's copy deleted, then restored by the snapshot two minutes after start, with Identity's time.
 - **Not a token claim:** a Keycloak role would need a token refresh before a change applied, and would put billing in
@@ -1569,10 +1570,33 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   username "demo" is someone else. Development keeps it: it's how the app is tried.
 - **The Android emulator's issuer** (`http://10.0.2.2:8080/…`) is accepted only in Development.
 
+## Service-to-service auth
+
+- **The sync worker's internal APIs** (imports, search imports, history resolving, replay, overrides, its TVmaze stats
+  and bulk jobs) answer only the internal client: a Keycloak client-credentials token from `tvtracker-internal`
+  (`AuthenticationExtensions.InternalPolicy`, the client list in `Internal:Clients`). No token is 401; a valid token
+  from anyone else, a person or another service account such as the MCP server's, is 403. Before, they accepted any
+  caller; only the network kept them private, so one compromised container could rewrite catalog data through
+  overrides (BACKLOG S2).
+- **One shared client, not one per caller:** Catalog.API, Ratings, Research, Analytics.Worker and Social all call as
+  `tvtracker-internal` (`Internal:ClientSecret`, the AppHost's `internal-client-secret`). One secret to give and rotate;
+  a client per caller would only matter if the worker treated callers differently, and it doesn't.
+- **`ServiceToken` in ServiceDefaults** (moved from Mcp.Server, which still uses it for `tvtracker-mcp`): a service's
+  own token, cached until 80% of its lifetime, put on a client's requests by `ServiceTokenHandler`
+  (`AddServiceToken(section, clientId)`).
+- **The client in older realms:** Keycloak imports the realm file only once, so Identity.API creates the service clients
+  in `Keycloak:ServiceClients` when the realm lacks them, with their secret, as it already sets the others' secrets. Only
+  Identity (and, in development, the MCP server) holds the master realm's admin; the callers get just the client's
+  secret. Checked on the development realm made before the client existed: Identity created it on start.
+- **Tested:** no token 401; demo's token and the MCP server's 403; the internal client through. Catalog.API's search
+  imports (8 shows from two searches) and Ratings' accept and revert of a correction went through as before, and
+  `tvtracker-import status` signs in with the development secret (a wrong one is refused with a message).
+  Analytics.Worker's and Social's replay requests and Research's overrides use the same handler and weren't triggered.
+
 ## Secrets
 
 - **Aspire secret parameters** (`Secret` in `AppHost.cs`): the Keycloak clients' secrets (`web-client-secret`,
-  `identity-admin-client-secret`, `mcp-client-secret`), the MCP gateway's key (`mcp-gateway-key`), the app admin's
+  `identity-admin-client-secret`, `mcp-client-secret`, `internal-client-secret`), the MCP gateway's key (`mcp-gateway-key`), the app admin's
   password (`app-admin-password`) and Keycloak's console admin (`keycloak-admin-password`). Values come from
   `Parameters:<name>` (user secrets, environment variables, azd environment secrets).
   - **Development defaults in run mode only:** running locally, an unset parameter takes the old development value

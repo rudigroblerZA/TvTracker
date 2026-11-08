@@ -604,7 +604,10 @@ dotnet run -- cancel               # stop after the current show
 
 Shows already in the catalog are skipped, so running a job again picks up where a cancelled or interrupted one stopped.
 One job runs at a time, at most 5000 shows each. Ctrl+C stops following, not the import (`--detach` doesn't follow
-at all). The tool talks to `http://localhost:5107` (`--url` or `TVTRACKER_SYNC_URL` to change it). Exit codes: 0 done,
+at all). The tool talks to `http://localhost:5107` (`--url` or `TVTRACKER_SYNC_URL` to change it), and signs in at
+Keycloak (`--keycloak` or `TVTRACKER_KEYCLOAK_URL`, `http://localhost:8080` by default) as the internal client, since
+the sync worker's APIs answer nothing else: in development its default secret works, elsewhere pass the AppHost's
+`internal-client-secret` (`--client-secret` or `TVTRACKER_INTERNAL_SECRET`). Exit codes: 0 done,
 2 done with some shows failing, 1 cancelled, failed or unreachable. Job state lives in the worker's memory, so a
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
@@ -1573,7 +1576,7 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 ## Before production
 
 - Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
-  `identity-admin-client-secret`, `mcp-client-secret`, `mcp-gateway-key`, `app-admin-password` and
+  `identity-admin-client-secret`, `mcp-client-secret`, `internal-client-secret`, `mcp-gateway-key`, `app-admin-password` and
   `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
   password into Keycloak's realm on start.
 - Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the

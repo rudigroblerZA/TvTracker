@@ -1,3 +1,4 @@
+using TvTracker;
 using Research.API.Apis;
 using Research.API.Data;
 using Research.API.IntegrationEvents;
@@ -31,7 +32,9 @@ builder.Services.AddSingleton<WebPageSource>();
 
 // Shows come from Catalog.API like any client's; saved catalog fields go to the sync worker's overrides.
 builder.Services.AddHttpClient<CatalogReader>(http => http.BaseAddress = new Uri("https+http://catalog-api/"));
-builder.Services.AddHttpClient<CatalogOverrides>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"));
+builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
+builder.Services.AddHttpClient<CatalogOverrides>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 
 builder.Services.AddSingleton<WikimediaSource>();
 builder.Services.AddSingleton<TmdbSource>();

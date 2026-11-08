@@ -13,14 +13,13 @@ that shows it), what done looks like, its priority and its size.
 Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
 November 2026, then inbox retention (R4), research in the data export (S5), pinned page fetches (S6), a season-verdict
 preference (D2) and per-follower flags (T3), then CI with tests (Q1), the development issuer in Development only (S3) and
-rate limits on every write (S4); CONTEXT.md has the decisions.
+rate limits on every write (S4), then service-to-service auth for the sync worker (S2); CONTEXT.md has the decisions.
 
 Production runs on Azure Container Apps and takes payments through Stripe (CONTEXT.md, Production decisions), so the
 order to launch is:
 
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
-| S2 | [Service-to-service auth](#s2-service-to-service-auth-for-internal-apis) | P1 | M |
 | O1 | [A deployment](#o1-a-deployment) | P1 | L |
 | F1 | [A real payment provider](#f1-a-real-payment-provider) | P1 | S |
 | O2 | [Alerts and dashboards](#o2-alerts-and-dashboards) | P2 | M |
@@ -71,19 +70,7 @@ Nothing open.
 
 ## Security
 
-### S2. Service-to-service auth for internal APIs
-
-**P1 · M**
-
-- **Why:**
-  - The sync worker's import, replay and override APIs (`ImportApi.cs:19`, `OverridesApi.cs:17`) accept any caller.
-    Catalog.API, Ratings, Research, Analytics.Worker and Social call them with no token.
-  - They aren't routed by the BFF and have no external endpoint, so today only something inside the environment can
-    reach them. One compromised container could still rewrite catalog data through overrides.
-- **What:** client-credentials tokens for service callers, as `tvtracker-mcp` already does for Analytics, with a role
-  claim the sync worker requires. Or, if hosting gives network isolation (Container Apps internal ingress), document
-  that as the control.
-- **Done when:** an unauthenticated call to `/api/v1/overrides` gets 401, and the five callers still work.
+Nothing open.
 
 ## Performance
 
