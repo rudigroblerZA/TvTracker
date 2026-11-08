@@ -53,6 +53,9 @@ claude mcp add --transport http tvtracker http://localhost:5112/mcp
 # Demo data while the AppHost runs: users with a dated, realistic history (cleanup --prefix seed- removes them)
 dotnet run --project src/Tools/TvTracker.LoadGen -- seed --prefix seed- --users 40
 
+# Ten fixed test personas (persona-tess … persona-sam, README: Test personas), each shaped for different features
+dotnet run --project src/Tools/TvTracker.LoadGen -- personas
+
 # Load while the AppHost runs (setup once; cleanup deletes the users and their data)
 dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes

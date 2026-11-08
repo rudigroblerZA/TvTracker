@@ -668,6 +668,43 @@ dotnet run -- cleanup --prefix seed-                     # remove them and every
   earlier ones (any user with the prefix). The same `--seed` and catalog give each user the same name, taste and shows;
   watch dates count back from the day it runs.
 
+#### Test personas
+
+`personas` creates ten fixed people to test the app as, each shaped to show a different part of it. Sign in at the web
+app as `persona-<name>` with the password (`load-test` unless `--password` says otherwise):
+
+```bash
+cd src/Tools/TvTracker.LoadGen
+dotnet run -- personas                                   # safe to run again
+dotnet run -- cleanup --prefix persona-                  # remove them and everything they did
+```
+
+| Persona | Who | Look at |
+| --- | --- | --- |
+| `persona-tess` | Tess Harper, London: two and a half years of dated history, 20 shows, half finished (the TV Time refugee) | Year in TV, Your TV clock, Your TV life, taste twins, Your taste, For you |
+| `persona-marco` | Marco Bellini, New York: running crime shows only, each episode within a day of airing | Streaks (kept up), Spoiler watch, the waiting room, Up Next, the calendar, season verdicts |
+| `persona-priya` | Priya Nair, Kolkata: whole seasons of science fiction in a few late nights | Your TV clock (night, binges), Fits your time off, While you wait, Will you finish it? |
+| `persona-walt` | Walt Brennan, Chicago: period drama, nothing watched for seven months, shows stopped part way, a planned backlog | Previously on…, Is it worth going back?, Backlog triage, Will you finish it? (stalled) |
+| `persona-nia` | Nia Dlamini, Johannesburg: an account and nothing else | Every empty state, the first follow, Bring your history |
+| `persona-kenji` | Kenji Watanabe, Sydney: anime, on **Plus**, a day ahead of UTC | Plus features (Essential cut on long anime, Tonight's plan, the reunion radar, Mixtape), dates near midnight |
+| `persona-rosa` | Rosa Alvarez, Los Angeles: comedy, owns a **Family** plan | The plan page's family section (invite link, members), Tonight for two with Leo |
+| `persona-leo` | Leo Alvarez, Los Angeles: Rosa's family member | Plus through a family without paying, the member's plan page, Tonight for two with Rosa |
+| `persona-mira` | Mira Novak, Berlin: crime and legal drama, a **moderator** (Moderation:Users in the AppHost's development settings), many comments | The moderation page, Research and episode notes; her follow request to Sam stays pending |
+| `persona-sam` | Sam Okafor, Toronto: legal and medical drama, a **private profile** | Follow requests (Marco's approved, Mira's waiting), what others see of a private profile |
+
+- **Their history** works as `seed`'s does (dated watches through the history import, ratings that agree, a few
+  comments), but each persona's taste, time zone, number of shows and pace are fixed: evenings, keeping up as episodes
+  air, bingeing, or stopping months ago. Their full name and their own time zone mark a persona whose history is seeded (a new account
+  starts with its Keycloak name in UTC), so a rerun skips it.
+- **Who they are** is set again on every run, as the app's admin (`--app-admin-password`, `admin` in development) and as
+  themselves: Kenji's Plus and Rosa's Family plan, Leo joining Rosa's family, Sam's private profile, the follows between
+  them, and Sam approving Marco. The plans need the `plans` flag on to make a difference.
+- **They follow each other** (Tess is the most followed), so the social feed and "people you follow" on show pages have
+  something in them. Nia follows no one and no one follows her.
+- **Give it a few minutes** after a first run: the personas send about 4,000 dated watches, and the other services work
+  through those events in order, so Social shows a persona's name, and Analytics their insights, once they catch up
+  (Analytics' insights also wait for its hourly run).
+
 ### MCP server (internal queries)
 
 `mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the

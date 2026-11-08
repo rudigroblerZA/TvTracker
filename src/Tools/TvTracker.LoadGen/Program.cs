@@ -33,7 +33,7 @@ setup.SetAction(async (parse, ct) =>
 {
     using var http = new HttpClient();
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
-    var (clientCreated, created) = await EnsureUsersAsync(parse, keycloak, ct);
+    var (clientCreated, created) = await EnsureUsersAsync(parse, keycloak, LoadUsers(parse), ct);
     Console.WriteLine(clientCreated ? $"Created client {Keycloak.ClientId}." : $"Client {Keycloak.ClientId} exists.");
     var count = parse.GetValue(usersOption);
     Console.WriteLine($"{created} users created, {count - created} already there ({Username(parse, 1)} … {Username(parse, count)}).");
@@ -133,10 +133,27 @@ seed.SetAction(async (parse, ct) =>
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
     var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
-    await EnsureUsersAsync(parse, keycloak, ct);
+    await EnsureUsersAsync(parse, keycloak, LoadUsers(parse), ct);
     var options = new SeedOptions(parse.GetValue(bffOption)!, parse.GetValue(usersOption), parse.GetValue(passwordOption)!, parse.GetValue(prefixOption)!,
         Math.Clamp(parse.GetValue(monthsOption), 1, 120), parse.GetValue(seedOption));
     return await new Seeder(http, keycloak, options, i => Username(parse, i), ct => AdminTokenAsync(parse, keycloak, ct)).RunAsync(ct);
+});
+
+var appAdminOption = new Option<string>("--app-admin-password") { Description = "The app's admin (admin, in Admin:Users), who sets the personas' plans", DefaultValueFactory = _ => "admin" };
+
+var personas = new Command("personas", "Create the ten test personas (persona-tess … persona-sam, README: Test personas) with the history, plan, family, privacy and follows each stands for; safe to run again")
+{
+    adminUserOption, adminPasswordOption, appAdminOption, seedOption
+};
+personas.SetAction(async (parse, ct) =>
+{
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
+    await EnsureUsersAsync(parse, keycloak, TestPersona.All.Select(p => (p.Username, p.FirstName, p.LastName)), ct);
+    var options = new SeedOptions(parse.GetValue(bffOption)!, TestPersona.All.Count, parse.GetValue(passwordOption)!, TestPersona.Prefix,
+        TestPersona.MaxMonths, parse.GetValue(seedOption));
+    var seeder = new Seeder(http, keycloak, options, i => TestPersona.All[i - 1].Username, ct => AdminTokenAsync(parse, keycloak, ct));
+    return await seeder.SeedPersonasAsync(TestPersona.All, ("admin", parse.GetValue(appAdminOption)!), ct);
 });
 
 var cleanup = new Command("cleanup", "Delete the load-test users and everything they did, through the app's own account deletion")
@@ -172,7 +189,7 @@ cleanup.SetAction(async (parse, ct) =>
 
 var root = new RootCommand("Generate load against a running TV Tracker AppHost with load-test users")
 {
-    setup, run, seed, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
+    setup, run, seed, personas, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
 };
 
 try
@@ -196,15 +213,20 @@ string Username(ParseResult parse, int i) => $"{parse.GetValue(prefixOption)}{i:
 Task<string> AdminTokenAsync(ParseResult parse, Keycloak keycloak, CancellationToken ct) =>
     keycloak.AdminTokenAsync(parse.GetValue(adminUserOption)!, parse.GetValue(adminPasswordOption)!, ct);
 
-// The load-test client and users 1..--users (safe to repeat): whether the client was made, and how many users were.
-async Task<(bool ClientCreated, int UsersCreated)> EnsureUsersAsync(ParseResult parse, Keycloak keycloak, CancellationToken ct)
+// The load-test users 1..--users: username, first and last name.
+IEnumerable<(string Username, string FirstName, string LastName)> LoadUsers(ParseResult parse) =>
+    Enumerable.Range(1, parse.GetValue(usersOption)).Select(i => (Username(parse, i), "Load", $"Tester {i:000}"));
+
+// The load-test client and the given users (safe to repeat): whether the client was made, and how many users were.
+async Task<(bool ClientCreated, int UsersCreated)> EnsureUsersAsync(ParseResult parse, Keycloak keycloak,
+    IEnumerable<(string Username, string FirstName, string LastName)> users, CancellationToken ct)
 {
     var admin = await AdminTokenAsync(parse, keycloak, ct);
     var clientCreated = await keycloak.EnsureClientAsync(admin, ct);
     var created = 0;
-    for (var i = 1; i <= parse.GetValue(usersOption); i++)
+    foreach (var (username, firstName, lastName) in users)
     {
-        if (await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct))
+        if (await keycloak.EnsureUserAsync(admin, username, firstName, lastName, parse.GetValue(passwordOption)!, ct))
         {
             created++;
         }
