@@ -74,7 +74,7 @@ public static class SocialApi
         api.MapDelete("/me/follow-requests/{userId}", DeclineAsync);
         api.MapGet("/me/blocks", GetBlocksAsync);
         api.MapGet("/feed", GetFeedAsync);
-        api.MapGet("/people", SearchAsync);
+        api.MapGet("/people", SearchAsync).RequireRateLimiting(ClientRateLimiting.PeopleSearch);
         api.MapGet("/people/{userId}", GetPersonAsync);
         api.MapPost("/people/{userId}/follow", FollowAsync);
         api.MapDelete("/people/{userId}/follow", UnfollowAsync);

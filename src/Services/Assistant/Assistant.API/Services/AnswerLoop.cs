@@ -176,7 +176,7 @@ public sealed partial class AnswerLoop(IConfiguration config, Toolbox toolbox, B
     /// invoking 'discover_list'", which tells a model nothing; this names the argument and repeats the tool's description
     /// (where the allowed values are).
     /// </summary>
-    private static List<string> Missing(JsonElement schema, JsonObject? args) =>
+    internal static List<string> Missing(JsonElement schema, JsonObject? args) =>
         schema.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array
             ? required.EnumerateArray().Select(r => r.GetString() ?? "")
                 .Where(key => args?[key] is not JsonValue value || (value.TryGetValue<string>(out var text) && text.Trim().Length == 0))
@@ -187,7 +187,7 @@ public sealed partial class AnswerLoop(IConfiguration config, Toolbox toolbox, B
     /// A value outside its property's allowed values (the schema's enum), with the allowed ones. qwen3 0.6B asked
     /// discover_list for the list "drama" when it meant hidden gems within drama.
     /// </summary>
-    private static string? NotAllowed(JsonElement schema, JsonObject? args)
+    internal static string? NotAllowed(JsonElement schema, JsonObject? args)
     {
         if (args is null || !schema.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object)
         {
@@ -209,7 +209,7 @@ public sealed partial class AnswerLoop(IConfiguration config, Toolbox toolbox, B
     /// An id among the arguments that no tool has returned. Asked about a person, qwen3 0.6B called person_insights with
     /// a made-up id ("12345678-9012-…") instead of finding the person first; told so, it can look them up.
     /// </summary>
-    private static string? UnknownId(JsonObject? args, HashSet<Guid> known) =>
+    internal static string? UnknownId(JsonObject? args, HashSet<Guid> known) =>
         args?.Select(p => p.Value is JsonValue v && v.TryGetValue<string>(out var text) ? text : null)
             .FirstOrDefault(text => Guid.TryParse(text, out var id) && !known.Contains(id));
 

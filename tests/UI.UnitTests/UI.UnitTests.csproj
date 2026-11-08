@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of the shared UI's pure parts: the history import parser (on the files in samples/history-import) and
+       Tonight's planner. No browser, network or services. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Clients\TvTracker.UI\TvTracker.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\history-import\*" LinkBase="samples" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

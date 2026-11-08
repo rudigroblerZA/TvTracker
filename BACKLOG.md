@@ -12,11 +12,19 @@ that shows it), what done looks like, its priority and its size.
 
 Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
 November 2026, then inbox retention (R4), research in the data export (S5), pinned page fetches (S6), a season-verdict
-preference (D2) and per-follower flags (T3); CONTEXT.md has the decisions.
+preference (D2) and per-follower flags (T3), then CI with tests (Q1), the development issuer in Development only (S3) and
+rate limits on every write (S4); CONTEXT.md has the decisions.
+
+Production runs on Azure Container Apps and takes payments through Stripe (CONTEXT.md, Production decisions), so the
+order to launch is:
 
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
-| Q1 | [Tests and CI](#q1-tests-and-ci) | P1 | M |
+| S2 | [Service-to-service auth](#s2-service-to-service-auth-for-internal-apis) | P1 | M |
+| O1 | [A deployment](#o1-a-deployment) | P1 | L |
+| F1 | [A real payment provider](#f1-a-real-payment-provider) | P1 | S |
+| O2 | [Alerts and dashboards](#o2-alerts-and-dashboards) | P2 | M |
+| Q3 | [Compile the MAUI app in CI](#q3-compile-the-maui-app-in-ci) | P2 | M |
 
 ## What the review found sound
 
@@ -34,26 +42,6 @@ So the rest of the list reads in proportion:
   the web app refreshes tokens.
 
 ## Quality
-
-### Q1. Tests and CI
-
-**P1 · M**
-
-- **Why:** only Catalog and Analytics have unit tests (CONTEXT.md, Tests), and nothing runs them on a pull request. The
-  last two reviews (season verdict, Ask) found real defects that a unit test would have caught.
-- **What:**
-  - A GitHub Actions workflow that builds `src/TvTracker.AppHost` and `src/Tools/Catalog.ImportCli` and runs `dotnet test`
-    on pull requests. The MAUI app needs its workload, so it's Q3.
-    The tests run on Microsoft.Testing.Platform only (CONTEXT.md, Tests), so the workflow uses its arguments
-    (`--report-trx`, `--coverage`), not VSTest's `--logger trx` or `--collect:"XPlat Code Coverage"`.
-  - Tests for the rest of the pure logic that's easiest to get wrong:
-    - **Analytics:** `DnaInsight` anchors, the renewal cohorts, the catch-up planner's week split.
-    - **Planners:** `TonightPlanner` (knapsack, mix cap, overrun), in TvTracker.UI.
-    - **Ask's guards:** `AnswerLoop`'s `Missing`, `NotAllowed` and `UnknownId`, and `Toolbox.Compact`.
-    - **Ratings:** `Moderation` (blocked terms, links held, hourly limits).
-    - **UI:** `HistoryImportParser` on the TV Time, Trakt and generic fixtures.
-- **Done when:** the workflow runs on every PR and blocks merging when red, and each area above has tests for its
-  documented rules (the ones CONTEXT.md lists with examples).
 
 ### Q2. An evaluation set for Ask
 
@@ -85,7 +73,7 @@ Nothing open.
 
 ### S2. Service-to-service auth for internal APIs
 
-**P2 · M**
+**P1 · M**
 
 - **Why:**
   - The sync worker's import, replay and override APIs (`ImportApi.cs:19`, `OverridesApi.cs:17`) accept any caller.
@@ -96,32 +84,6 @@ Nothing open.
   claim the sync worker requires. Or, if hosting gives network isolation (Container Apps internal ingress), document
   that as the control.
 - **Done when:** an unauthenticated call to `/api/v1/overrides` gets 401, and the five callers still work.
-
-### S3. Accept the Android emulator's issuer only in Development
-
-**P3 · S**
-
-- **Why:** `AuthenticationExtensions.cs:47` always accepts `http://10.0.2.2:8080/realms/tvtracker` as an issuer. Tokens
-  still need Keycloak's signing keys, so the risk is small, but a development address has no place in production
-  validation.
-- **What:** add it to `ValidIssuers` only when the environment is Development.
-- **Done when:** production configuration lists one issuer.
-
-### S4. Rate limits beyond search
-
-**P2 · S**
-
-- **Why:**
-  - Only Catalog's search and mood scoring are rate-limited (`SearchRateLimiting`).
-  - Everything else relies on sign-in: follows, watches, lists, ratings, social follow and people search, and the
-    data export, which fans out to five services.
-  - Ratings has its own hourly post limits and Ask its own queue.
-- **What:**
-  - Move `SearchRateLimiting`'s partitioning (user, else forwarded IP, else shared) into ServiceDefaults as a general
-    per-user policy.
-  - Apply it to every mutating endpoint, with tighter ones on people search and the export.
-- **Done when:** a load-test user hammering writes gets 429s with `Retry-After`, and normal use (`tvtracker-load run`)
-  sees none.
 
 ## Performance
 
@@ -163,11 +125,11 @@ All the features from the review have shipped; new ideas go here.
 
 ### F1. A real payment provider
 
-**P2 · S**
+**P1 · S**
 
 - **Why:** buying Plus and Family works end to end against the test provider (CONTEXT.md, Payments), but nothing takes
   real money yet.
-- **What:** one `IPaymentProvider` (Stripe or Paddle): its checkout for a `CheckoutSession`, cancel and resume calls, and
+- **What:** one `IPaymentProvider` for Stripe (decided; CONTEXT.md, Production decisions): its checkout for a `CheckoutSession`, cancel and resume calls, and
   its signed webhooks read into `PaymentEvent`s, with the session's id in the checkout's metadata. Prices per region in
   `Payments:Prices` to match the provider's, and its customer portal as `ManageUrl`.
 - **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
@@ -211,9 +173,9 @@ All the features from the review have shipped; new ideas go here.
 
 ### O1. A deployment
 
-**P2 · L**
+**P1 · L**
 
-- **What:**
+- **What** (Azure Container Apps, decided):
   - Publish the AppHost to Azure Container Apps (`aspire publish` / `azd`), with managed Postgres and PgBouncer (the
     connection budget in CONTEXT.md assumes a pooler once replicas multiply).
   - RabbitMQ as a container or a managed broker, Redis, Keycloak, and Model Runner where GPU or CPU capacity allows.

@@ -1,0 +1,58 @@
+# Builds the services, the web app and the tools, and runs every unit-test project, on each pull request and on main.
+# The MAUI app needs its workload and is left out (BACKLOG Q3). The tests run on Microsoft.Testing.Platform
+# (global.json), so `dotnet test <project>` runs each one as the docs show.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # The AppHost references every service and the web app.
+      - name: Build services and web app
+        run: dotnet build src/TvTracker.AppHost -c Release
+
+      - name: Build tools
+        run: |
+          dotnet build src/Tools/Catalog.ImportCli -c Release
+          dotnet build src/Tools/TvTracker.LoadGen -c Release
+
+      - name: Unit tests
+        run: |
+          status=0
+          for project in tests/*/*.csproj; do
+            echo "::group::$project"
+            dotnet test "$(dirname "$project")" -c Release || status=1
+            echo "::endgroup::"
+          done
+          exit $status

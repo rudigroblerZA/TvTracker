@@ -115,6 +115,7 @@
   ],
   "users": [
     {
+      "id": "0d3e0000-de40-4000-8000-000000000001",
       "username": "demo",
       "email": "demo@example.com",
       "firstName": "Demo",

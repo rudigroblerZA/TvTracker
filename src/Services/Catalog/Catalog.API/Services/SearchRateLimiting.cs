@@ -1,6 +1,4 @@
-﻿using System.Globalization;
-using System.Net;
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 
 namespace Catalog.API.Services;
 
@@ -34,9 +32,8 @@ public sealed class SearchRateLimitOptions
 }
 
 /// <summary>
-/// Rate limiting for the search endpoint. Callers are told apart, in order, by the signed-in user (a validated
-/// Keycloak token), the client IP the mobile gateway or web app adds as X-Forwarded-For, or the calling service's address.
-/// Over the limit, search returns 429 with Retry-After.
+/// Rate limiting for the search endpoint (and Catalog's other costly reads), with callers told apart as every limit is
+/// (<see cref="ClientRateLimiting.PartitionKey"/>): over the limit, 429 with Retry-After. Services share a larger bucket.
 /// </summary>
 public static class SearchRateLimiting
 {
@@ -46,59 +43,14 @@ public static class SearchRateLimiting
     {
         var options = configuration.GetSection("SearchRateLimit").Get<SearchRateLimitOptions>() ?? new SearchRateLimitOptions();
         services.AddSingleton(new SearchImportLimiter(options.ImportsPerMinute));
-
-        services.AddRateLimiter(limiter =>
+        services.AddRateLimiter(limiter => limiter.AddPolicy(Policy, context =>
         {
-            limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            limiter.OnRejected = (context, _) =>
-            {
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                {
-                    context.HttpContext.Response.Headers.RetryAfter =
-                        ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
-                }
-                return ValueTask.CompletedTask;
-            };
-
-            limiter.AddPolicy(Policy, context =>
-            {
-                var (key, shared) = PartitionKey(context);
-                var burst = shared ? options.SharedBurst : options.PerClientBurst;
-                var perMinute = shared ? options.SharedPerMinute : options.PerClientPerMinute;
-
-                return RateLimitPartition.GetTokenBucketLimiter(key, _ => new TokenBucketRateLimiterOptions
-                {
-                    TokenLimit = burst,
-                    // Refill every 10 seconds, so a client that hits the limit waits seconds rather than a minute.
-                    TokensPerPeriod = Math.Max(1, perMinute / 6),
-                    ReplenishmentPeriod = TimeSpan.FromSeconds(10),
-                    QueueLimit = 0,
-                    AutoReplenishment = true
-                });
-            });
-        });
-
+            var (key, shared) = ClientRateLimiting.PartitionKey(context);
+            return shared
+                ? ClientRateLimiting.Bucket(key, options.SharedBurst, options.SharedPerMinute)
+                : ClientRateLimiting.Bucket(key, options.PerClientBurst, options.PerClientPerMinute);
+        }));
         return services;
-    }
-
-    private static (string Key, bool Shared) PartitionKey(HttpContext context)
-    {
-        if (context.User.FindFirst("sub")?.Value is { } userId)
-        {
-            return ($"user:{userId}", false);
-        }
-
-        // The mobile gateway (YARP) and the web app (each browser's address) set X-Forwarded-For. Use the last entry:
-        // it's the one they added, while earlier entries come from the client and could be anything.
-        // Only internal callers can reach this service, so the header can't be set by someone else.
-        var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-        var lastHop = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-        if (lastHop is not null && IPAddress.TryParse(lastHop, out var clientIp))
-        {
-            return ($"ip:{clientIp}", false);
-        }
-
-        return ($"service:{context.Connection.RemoteIpAddress}", true);
     }
 }
 

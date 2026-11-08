@@ -33,13 +33,16 @@ dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --o
 scripts/backup.sh
 scripts/restore.sh backups/<timestamp>
 
-# Unit tests (Catalog, Analytics, Recommendations, Notifications, Research and Identity; no database, network or AppHost needed)
+# Unit tests (no database, network or AppHost needed); CI runs every project in tests/ on each pull request
 dotnet test tests/Catalog.UnitTests
 dotnet test tests/Analytics.UnitTests
 dotnet test tests/Recommendations.UnitTests
 dotnet test tests/Notifications.UnitTests
 dotnet test tests/Research.UnitTests
 dotnet test tests/Identity.UnitTests
+dotnet test tests/Ratings.UnitTests
+dotnet test tests/Assistant.UnitTests
+dotnet test tests/UI.UnitTests
 
 # Bulk import while the AppHost runs
 dotnet run --project src/Tools/Catalog.ImportCli -- ids 82 431
@@ -55,8 +58,10 @@ dotnet run --project src/Tools/TvTracker.LoadGen -- setup --users 20
 dotnet run --project src/Tools/TvTracker.LoadGen -- run --users 20 --duration 2m --writes
 ```
 
-Unit tests cover Catalog's, Analytics', Recommendations', Notifications', Research's and Identity's pure rules (`tests/`); there's no CI, and
-the other services have none yet.
+Unit tests cover the pure rules of Catalog, Analytics, Recommendations, Notifications, Research, Identity, Ratings
+(moderation), Assistant (Ask's guards) and the shared UI (history import, Tonight's planner), in `tests/`; Tracking and
+Social have none yet. CI (`.github/workflows/ci.yml`) builds and runs them all on every pull request; a new test project
+in `tests/` is picked up without a change to it.
 Run the tests, then verify changes by building, running the AppHost and checking endpoints, the database or the UI.
 A rule documented in CONTEXT.md with examples gets a test with those examples. For performance, `tvtracker-load run` before and after (`--csv` to compare). `http://localhost:5102/ops` shows catalog, sync and analytics state at a glance.
 Set `Catalog:Provider=mock` in `Catalog.SyncWorker` when TVmaze is down or not needed.

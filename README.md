@@ -547,19 +547,27 @@ Useful local addresses:
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
 | DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
-### Unit tests
+### Unit tests and CI
 
-Catalog, Analytics, Recommendations and Notifications have unit tests of their rules (title matching, crossovers,
-Wikiquote parsing, overrides, streaks, the essential cut, forecasts, the worker's gets-good, landing and season-verdict
-stages, how recommendations are matched, quiet hours and the weekly digest). They need no database, network or running
-AppHost:
+Unit tests cover the services' rules (title matching, crossovers, Wikiquote parsing, overrides, streaks, the essential
+cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation, Ask's guards) and
+the shared UI's history import and Tonight's planner. They need no database, network or running AppHost:
 
 ```bash
 dotnet test tests/Catalog.UnitTests
 dotnet test tests/Analytics.UnitTests
 dotnet test tests/Recommendations.UnitTests
 dotnet test tests/Notifications.UnitTests
+dotnet test tests/Research.UnitTests
+dotnet test tests/Identity.UnitTests
+dotnet test tests/Ratings.UnitTests
+dotnet test tests/Assistant.UnitTests
+dotnet test tests/UI.UnitTests
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) builds the services, the web app and the tools and runs every project in
+`tests/` on each pull request and on `main`. To make a red run block merging, require the "build-and-test" check in the
+repository's branch protection (Settings, Branches).
 
 ### Backing up development data
 
@@ -1568,7 +1576,8 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
   `identity-admin-client-secret`, `mcp-client-secret`, `mcp-gateway-key`, `app-admin-password` and
   `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
   password into Keycloak's realm on start.
-- Delete the realm's demo user, and turn on HTTPS for Keycloak.
+- Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the
+  services accept the Android emulator's token issuer only in Development.
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
 
 ## Package versions

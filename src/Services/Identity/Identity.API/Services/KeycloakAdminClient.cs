@@ -28,6 +28,17 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Whether Keycloak has a user with this id.
+    /// </summary>
+    public async Task<bool> UserExistsAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await GetAdminTokenAsync(cancellationToken);
+        var (status, _) = await SendAsync<JsonObject>(HttpMethod.Get, $"{Users}/{Uri.EscapeDataString(userId)}", token, null, cancellationToken,
+            HttpStatusCode.NotFound);
+        return status != HttpStatusCode.NotFound;
+    }
+
+    /// <summary>
     /// Makes sure a user exists with this password: creates them when missing (true), else resets their password, so
     /// the configured value is the one that holds (false).
     /// </summary>
