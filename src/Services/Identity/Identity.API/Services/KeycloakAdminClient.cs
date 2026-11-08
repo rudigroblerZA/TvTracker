@@ -28,17 +28,14 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
-    /// Deletes the user with this username, if there is one; true when one was deleted.
+    /// Whether Keycloak has a user with this id.
     /// </summary>
-    public async Task<bool> DeleteUserByNameAsync(string username, CancellationToken cancellationToken)
+    public async Task<bool> UserExistsAsync(string userId, CancellationToken cancellationToken)
     {
         var token = await GetAdminTokenAsync(cancellationToken);
-        if (await FindUserIdAsync(token, username, cancellationToken) is not { } id)
-        {
-            return false;
-        }
-        await SendAsync<JsonNode>(HttpMethod.Delete, $"{Users}/{Uri.EscapeDataString(id)}", token, null, cancellationToken, HttpStatusCode.NotFound);
-        return true;
+        var (status, _) = await SendAsync<JsonObject>(HttpMethod.Get, $"{Users}/{Uri.EscapeDataString(userId)}", token, null, cancellationToken,
+            HttpStatusCode.NotFound);
+        return status != HttpStatusCode.NotFound;
     }
 
     /// <summary>

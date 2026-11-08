@@ -93,10 +93,18 @@ public static class ProfileApi
         ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak, TimeProvider time,
         PaymentProviders payments, ILoggerFactory loggers, CancellationToken ct)
     {
-        var userId = user.GetUserId();
+        await DeleteAccountByIdAsync(user.GetUserId(), db, outbox, keycloak, time, payments, loggers.CreateLogger(typeof(ProfileApi)), ct);
+        return TypedResults.NoContent();
+    }
 
+    /// <summary>
+    /// The account deletion itself, for the endpoint and for <see cref="Services.DemoAccountRemover"/>.
+    /// </summary>
+    internal static async Task DeleteAccountByIdAsync(string userId, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak,
+        TimeProvider time, PaymentProviders payments, ILogger logger, CancellationToken ct)
+    {
         // Subscriptions first, so a failure before the login goes leaves the account whole to try again.
-        await PaymentsApi.StopSubscriptionsAsync(db, payments, userId, loggers.CreateLogger(typeof(ProfileApi)), ct);
+        await PaymentsApi.StopSubscriptionsAsync(db, payments, userId, logger, ct);
         await keycloak.DeleteUserAsync(userId, ct);
         await PaymentsApi.RemoveRecordsAsync(db, userId, ct);
 
@@ -116,8 +124,6 @@ public static class ProfileApi
 
         await db.SaveChangesAsync(ct);
         await outbox.PublishAddedAsync(ct);
-
-        return TypedResults.NoContent();
     }
 
     /// <summary>

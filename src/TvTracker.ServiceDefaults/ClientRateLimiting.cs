@@ -48,10 +48,16 @@ public static class ClientRateLimiting
     public const string Export = "export";
 
     /// <summary>
-    /// Who a request counts against, and whether that's a shared bucket for other services rather than a person.
+    /// Who a request counts against, and whether that's a shared bucket for other services rather than a person. A
+    /// Keycloak service account's token (client credentials: Mcp.Server's <c>tvtracker-mcp</c>, Ask's tools) has a
+    /// <c>sub</c> too, but speaks for many people at once, so it counts as a service.
     /// </summary>
     public static (string Key, bool Shared) PartitionKey(HttpContext context)
     {
+        if (IsServiceAccount(context.User))
+        {
+            return ($"service:{context.User.FindFirst("azp")?.Value ?? context.User.FindFirst("client_id")?.Value}", true);
+        }
         if (context.User.FindFirst("sub")?.Value is { } userId)
         {
             return ($"user:{userId}", false);
@@ -83,8 +89,23 @@ public static class ClientRateLimiting
             AutoReplenishment = true
         });
 
-    internal static bool IsWrite(HttpRequest request) =>
-        !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method));
+    /// <summary>
+    /// Keycloak names a client's service account <c>service-account-&lt;client&gt;</c> and puts the client in
+    /// <c>client_id</c> on client-credentials tokens; a person's token has neither.
+    /// </summary>
+    public static bool IsServiceAccount(System.Security.Claims.ClaimsPrincipal user) =>
+        user.FindFirst("preferred_username")?.Value?.StartsWith("service-account-", StringComparison.Ordinal) == true
+        || user.FindFirst("client_id") is not null;
+
+    /// <summary>
+    /// What the write budget counts: a change (not a GET, HEAD or OPTIONS) to an endpoint without a policy of its own.
+    /// Search, mood scoring, mixtapes and the history import's mapping are reads sent as POSTs, and their own policy
+    /// (Catalog's search) already limits them; counting them as changes too would let a user's searches use up their
+    /// budget for marking episodes watched.
+    /// </summary>
+    internal static bool CountsAsWrite(HttpContext context) =>
+        !(HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method) || HttpMethods.IsOptions(context.Request.Method))
+        && context.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>() is null;
 
     public static IServiceCollection AddClientRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
@@ -105,7 +126,7 @@ public static class ClientRateLimiting
             limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
                 var (key, shared) = PartitionKey(context);
-                return !IsWrite(context.Request) || shared
+                return !CountsAsWrite(context) || shared
                     ? RateLimitPartition.GetNoLimiter("unlimited")
                     : Bucket($"writes:{key}", options.WritesBurst, options.WritesPerMinute);
             });

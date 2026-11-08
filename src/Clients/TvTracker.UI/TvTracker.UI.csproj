@@ -26,4 +26,8 @@
     <PackageReference Include="OpenFeature" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="UI.UnitTests" />
+  </ItemGroup>
+
 </Project>

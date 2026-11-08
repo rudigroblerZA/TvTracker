@@ -1539,13 +1539,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **One partition rule** (`ClientRateLimiting.PartitionKey` in ServiceDefaults): the signed-in user, else the client
   address the mobile gateway or web app forwarded (the last `X-Forwarded-For` entry; earlier ones come from the client),
   else the calling service. Search had this first; it moved to ServiceDefaults when every service gained limits.
+  - **Service accounts are services:** a Keycloak client-credentials token has a `sub` too (Mcp.Server's
+    `tvtracker-mcp`: `preferred_username` `service-account-tvtracker-mcp`, `client_id`), but speaks for every Ask user at
+    once, so it shares the services' bucket rather than one person's.
 - **Every change a person makes** (POST, PUT, PATCH, DELETE) counts against a global limiter: 120 in a burst, 300 a
-  minute after, refilled every 10 seconds (`RateLimits` configuration). Service-to-service calls (no token, nothing
-  forwarded) aren't limited: they're the app's own work, such as an accepted correction reaching the sync worker.
+  minute after, refilled every 10 seconds (`RateLimits` configuration). Service-to-service calls aren't limited:
+  they're the app's own work, such as an accepted correction reaching the sync worker. An endpoint with a policy of its
+  own isn't counted either: search, mood scoring, mixtapes and the history import's mapping are reads sent as POSTs,
+  and a user's searches shouldn't use up their budget for marking episodes watched.
 - **Tighter policies:** people search (20, then 30 a minute, as show search) and the data export, which reads every
   service (3 an hour).
-- **The app waits, not fails:** `ApiClientBase` waits out a 429's Retry-After (up to 30 seconds, three times), since a
-  history import's status step sends one change per show.
+- **Changes wait, reads fail fast:** `ApiClientBase` waits out a 429's Retry-After on a change (up to 30 seconds, three
+  times; a past date is no wait), since a history import's status step sends one change per show. A read fails at once:
+  a search box waiting half a minute is worse than an error. The web app's HTTP resilience doesn't retry 429s, so this is
+  the only layer that does. The phone's offline queue keeps a change answered 429, and everything after it, for its
+  next try; any other 4xx still drops it as no longer applying.
 - **One call turns it on:** `UseDefaultAuthentication()` adds authentication, authorization and the limiter, in that
   order; the limiter needs the user, and with only `UseAuthentication` called ASP.NET adds authorization before it.
 - **Tested:** 300 settings changes at once got 183 through and 117 answered 429 with `Retry-After: 10`, reads untouched;
@@ -1555,8 +1563,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 ## Production hygiene
 
 - **The demo account goes** (`DemoAccountRemover` in Identity.API): Keycloak imports the realm file, demo / demo
-  included, on its first start, so outside Development Identity deletes the `demo` user on every start. Development
-  keeps it: it's how the app is tried.
+  included, on its first start, so outside Development Identity deletes the demo user on every start, through the
+  ordinary account deletion (`ProfileApi.DeleteAccountByIdAsync`), so anything made with it goes from every service too.
+  It goes by the fixed id the realm file gives it, never by name: registration is open, and a person who later takes the
+  username "demo" is someone else. Development keeps it: it's how the app is tried.
 - **The Android emulator's issuer** (`http://10.0.2.2:8080/…`) is accepted only in Development.
 
 ## Secrets

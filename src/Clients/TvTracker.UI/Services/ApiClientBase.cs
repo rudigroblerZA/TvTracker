@@ -102,18 +102,21 @@ public abstract class ApiClientBase(
         using var request = await CreateRequestAsync(new HttpMethod(pending.Method), pending.Url, pending.Body, ct);
         using var response = await httpClientFactory.CreateClient(pending.Client).SendAsync(request, ct);
 
-        // 4xx other than auth means the change no longer applies (e.g. the list was deleted); drop it.
+        // 4xx other than auth and rate limits means the change no longer applies (e.g. the list was deleted); drop it. A
+        // 429 (a long queue replayed at once) keeps it, and the rest after it, for the next try.
         if (response.StatusCode is HttpStatusCode.Unauthorized)
         {
             throw new SignInRequiredException();
         }
-        return (int)response.StatusCode < 500;
+        return response.StatusCode != HttpStatusCode.TooManyRequests && (int)response.StatusCode < 500;
     }
 
     /// <summary>
-    /// Sends a request, and when the service answers 429 (a rate limit, ClientRateLimiting), waits the Retry-After it
-    /// gives and tries again, up to <see cref="RateLimitRetries"/> times, so a long run of changes (a history import's
-    /// statuses) slows down instead of failing. A wait longer than <see cref="MaxRateLimitWait"/> is left to the caller.
+    /// Sends a request. A change (anything but a GET) answered 429 (a rate limit, ClientRateLimiting) waits the
+    /// Retry-After it gives and is tried again, up to <see cref="RateLimitRetries"/> times, so a long run of changes (a
+    /// history import's statuses) slows down instead of failing. A read fails at once instead: a page or a search box
+    /// waiting half a minute is worse than an error, and its answer would arrive after newer ones. A wait longer than
+    /// <see cref="MaxRateLimitWait"/> is left to the caller.
     /// </summary>
     private async Task<HttpResponseMessage> SendWaitingAsync(string client, HttpMethod method, string url, string? json, CancellationToken ct)
     {
@@ -121,8 +124,8 @@ public abstract class ApiClientBase(
         {
             using var request = await CreateRequestAsync(method, url, json, ct);
             var response = await httpClientFactory.CreateClient(client).SendAsync(request, ct);
-            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt == RateLimitRetries
-                || RetryAfter(response) is not { } wait || wait > MaxRateLimitWait)
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || method == HttpMethod.Get || attempt == RateLimitRetries
+                || RetryAfter(response, DateTimeOffset.UtcNow) is not { } wait || wait > MaxRateLimitWait)
             {
                 return response;
             }
@@ -134,8 +137,14 @@ public abstract class ApiClientBase(
     internal const int RateLimitRetries = 3;
     internal static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(30);
 
-    private static TimeSpan? RetryAfter(HttpResponseMessage response) =>
-        response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date is { } at ? at - DateTimeOffset.UtcNow : null);
+    /// <summary>
+    /// How long a 429 asks to wait: its seconds, or until its date, never less than nothing (a date already past, or a
+    /// clock a little ahead of the server's, means now).
+    /// </summary>
+    internal static TimeSpan? RetryAfter(HttpResponseMessage response, DateTimeOffset now) =>
+        (response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date is { } at ? at - now : null)) is { } wait
+            ? wait < TimeSpan.Zero ? TimeSpan.Zero : wait
+            : null;
 
     private async Task<HttpRequestMessage> CreateRequestAsync(HttpMethod method, string url, string? json, CancellationToken ct)
     {
