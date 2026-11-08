@@ -29,22 +29,25 @@ public sealed record SeedOptions(string BffUrl, int Users, string Password, stri
 /// a half-done one with its own seed (imports, follows and ratings are idempotent; a comment may be posted again).</item>
 /// </list>
 /// </summary>
+/// <summary>
+/// How a user watches. <see cref="Evenings"/>: an evening every few days, sometimes two to four in a row.
+/// <see cref="KeepsUp"/>: each new episode within a day or so of airing (catching up on older ones in the evenings), and
+/// every show started is caught up. <see cref="Binges"/>: three to seven episodes a night, late.
+/// </summary>
+internal enum Pace { Evenings, KeepsUp, Binges }
+
+/// <summary>
+/// The shares of shows planned, finished and being watched; the rest are stopped part way.
+/// </summary>
+internal sealed record Mix(double Planned, double Finished, double Watching)
+{
+    public static readonly Mix Usual = new(0.2, 0.3, 0.35);
+}
+
 public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptions options, Func<int, string> username,
     Func<CancellationToken, Task<string>> adminToken)
 {
     private sealed record Persona(string Name, string[] Genres);
-
-    /// <summary>
-    /// How a user watches. <see cref="Pace.Evenings"/>: an evening every few days, sometimes two to four in a row.
-    /// <see cref="Pace.KeepsUp"/>: each new episode within a day or so of airing (catching up on older ones in the evenings).
-    /// <see cref="Pace.Binges"/>: three to seven episodes a night, late.
-    /// </summary>
-    private enum Pace { Evenings, KeepsUp, Binges }
-
-    /// <summary>
-    /// The shares of shows planned, finished and being watched; the rest are stopped part way.
-    /// </summary>
-    private sealed record Mix(double Planned, double Finished, double Watching);
 
     /// <param name="Airing">Only shows with an episode aired in the last three weeks.</param>
     /// <param name="QuietDays">Nothing watched in the last this many days (a lapsed viewer).</param>
@@ -52,7 +55,6 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
     private sealed record Profile(string Name, string Taste, TimeZoneInfo Zone, string[] Genres, int MinShows, int MaxShows,
         int Months, Pace Pace, Mix Mix, bool Airing = false, int QuietDays = 0, double CommentChance = 0.15, int MaxComments = 4);
 
-    private static readonly Mix Usual = new(0.2, 0.3, 0.35);
 
     private static readonly Persona[] Personas =
     [
@@ -81,10 +83,6 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
 
     private readonly Dictionary<Guid, Task<Episodes>> episodes = [];
 
-    /// <summary>
-    /// How many months of history a show's episodes are loaded for (two a day); the personas' longest history raises it.
-    /// </summary>
-    private int historyMonths = options.Months;
 
     /// <summary>
     /// A show's regular episodes in order; <c>Complete</c> is false when loading stopped early (more than a history
@@ -92,7 +90,8 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
     /// </summary>
     private sealed record Episodes(List<Episode> List, bool Complete);
 
-    private sealed record Show(Guid Id, string[] Genres);
+    /// <param name="Running">Airing or renewed (the catalog's status), so new episodes may come.</param>
+    private sealed record Show(Guid Id, string[] Genres, bool Running);
 
     private sealed record Episode(Guid Id, DateTimeOffset AirsAtUtc);
 
@@ -112,10 +111,6 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
     {
         var users = Enumerable.Range(1, options.Users).Select(i => new Session(keycloak, username(i), options.Password, options.BffUrl)).ToList();
         var catalog = await CatalogAsync(users[0], Personas.SelectMany(p => p.Genres), ct);
-        if (catalog.Count < 20)
-        {
-            throw new CliException($"Only {catalog.Count} shows came back from the catalog through {options.BffUrl}; import more first.");
-        }
         Console.WriteLine($"{catalog.Count} shows to choose from; seeding {options.Users} users with seed {options.Seed}.");
 
         var seeded = new List<(int Index, Session User)>();
@@ -183,28 +178,37 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
     private async Task<(Outcome Outcome, string? Summary)> SeedUserAsync(Session user, int index, List<Show> catalog, CancellationToken ct)
     {
         var first = FirstNames[(index - 1) % FirstNames.Length];
-        var seed = options.Seed;
-        using (var profileJson = await GetJsonAsync(user, "/identity/api/v1/profile", ct))
+        // "Ava K." is done; "Ava K. (seeding, seed 3)" is half done with seed 3.
+        if (await SeedToUseAsync(user, $"{Regex.Escape(first)} [A-Z]\\.", null, ct) is not { } seed)
         {
-            var current = profileJson?.RootElement.GetProperty("displayName").GetString() ?? "";
-            // "Ava K." is done; "Ava K. (seeding, seed 3)" is half done with seed 3.
-            var state = Regex.Match(current, $"^{Regex.Escape(first)} [A-Z]\\.(?: \\(seeding, seed (-?\\d+)\\))?$");
-            if (state.Success && !state.Groups[1].Success)
-            {
-                return (Outcome.Skipped, null);
-            }
-            if (state.Success)
-            {
-                seed = int.Parse(state.Groups[1].Value, CultureInfo.InvariantCulture);
-            }
+            return (Outcome.Skipped, null);
         }
 
         var rng = new Random(seed * 7919 + index);
         var persona = Personas[rng.Next(Personas.Length)];
         var zone = TimeZoneInfo.FindSystemTimeZoneById(Zones[rng.Next(Zones.Length)]);
         var name = $"{first} {(char)('A' + rng.Next(26))}.";
-        var profile = new Profile(name, persona.Name, zone, persona.Genres, 8, 20, options.Months, Pace.Evenings, Usual);
+        var profile = new Profile(name, persona.Name, zone, persona.Genres, 8, 20, options.Months, Pace.Evenings, Mix.Usual);
         return await SeedProfileAsync(user, profile, seed, rng, catalog, ct);
+    }
+
+    /// <summary>
+    /// The seed to seed a user with, or null when they're done. The profile's name keeps the state: while seeding it carries
+    /// the seed (<paramref name="namePattern"/> then " (seeding, seed 3)"), so a rerun finishes the same picks; the plain
+    /// name, set only once every write went through, marks them done. With <paramref name="zone"/>, done also needs that
+    /// time zone, which the first write sets: a new account's name comes from Keycloak's and could already be the plain one.
+    /// </summary>
+    private async Task<int?> SeedToUseAsync(Session user, string namePattern, string? zone, CancellationToken ct)
+    {
+        using var profile = await GetJsonAsync(user, "/identity/api/v1/profile", ct);
+        var current = profile?.RootElement.GetProperty("displayName").GetString() ?? "";
+        var state = Regex.Match(current, $"^{namePattern}(?: \\(seeding, seed (-?\\d+)\\))?$");
+        if (state.Success && state.Groups[1].Success)
+        {
+            return int.Parse(state.Groups[1].Value, CultureInfo.InvariantCulture);
+        }
+        var done = state.Success && (zone is null || profile?.RootElement.GetProperty("timeZone").GetString() == zone);
+        return done ? null : options.Seed;
     }
 
     /// <summary>
@@ -244,16 +248,13 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
         List<Show> picks;
         if (profile.Airing)
         {
-            // Shows on air: an episode in the last three weeks. Their episodes load anyway, so checking costs nothing extra.
-            picks = [];
-            foreach (var candidate in ranked.Take(wanted * 5))
-            {
-                if (picks.Count < wanted && (await EpisodesAsync(user, candidate.Id, ct)).List
-                        .Any(e => e.AirsAtUtc < now.AddHours(-1) && e.AirsAtUtc > now.AddDays(-21)))
-                {
-                    picks.Add(candidate);
-                }
-            }
+            // Running shows with an episode in the last three weeks; the candidates' episodes load together (a long show's
+            // list stops before its latest seasons, so it drops out, which is as well for someone keeping up).
+            var candidates = ranked.Where(s => s.Running).Take(wanted * 3).ToList();
+            var loaded = await Task.WhenAll(candidates.Select(c => EpisodesAsync(user, c.Id, ct)));
+            picks = candidates.Zip(loaded)
+                .Where(x => x.Second.List.Any(e => e.AirsAtUtc < now.AddHours(-1) && e.AirsAtUtc > now.AddDays(-21)))
+                .Select(x => x.First).Take(wanted).ToList();
         }
         else
         {
@@ -399,15 +400,18 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
             using var json = await GetJsonAsync(user, $"/catalog/api/v1/genres/{Uri.EscapeDataString(genre)}/shows?pageSize=40", ct);
             return json is not null && json.RootElement.TryGetProperty("items", out var items)
                 ? items.EnumerateArray().Select(item => new Show(item.GetProperty("id").GetGuid(),
-                    item.GetProperty("genres").EnumerateArray().Select(g => g.GetString() ?? "").ToArray())).ToList()
+                    item.GetProperty("genres").EnumerateArray().Select(g => g.GetString() ?? "").ToArray(),
+                    item.GetProperty("status").GetInt32() is 1 or 2)).ToList()
                 : [];
         }));
-        return pages.SelectMany(p => p).DistinctBy(s => s.Id).OrderBy(s => s.Id).ToList();
+        var catalog = pages.SelectMany(p => p).DistinctBy(s => s.Id).OrderBy(s => s.Id).ToList();
+        return catalog.Count >= 20 ? catalog
+            : throw new CliException($"Only {catalog.Count} shows came back from the catalog through {options.BffUrl}; import more first.");
     }
 
     /// <summary>
     /// A show's dated regular episodes in order, loaded once for every user: season by season until there are more than a
-    /// history of <see cref="historyMonths"/> could hold (two a day), so a 30-season show costs a few requests, not
+    /// history of <see cref="SeedOptions.Months"/> could hold (two a day), so a 30-season show costs a few requests, not
     /// thirty, and is then never finished.
     /// </summary>
     private Task<Episodes> EpisodesAsync(Session user, Guid showId, CancellationToken ct)
@@ -428,7 +432,7 @@ public sealed partial class Seeder(HttpClient http, Keycloak keycloak, SeedOptio
             {
                 return new([], false);
             }
-            var cap = historyMonths * 30 * 2;
+            var cap = options.Months * 30 * 2;
             var list = new List<Episode>();
             var seasons = show.RootElement.GetProperty("seasons").EnumerateArray().Select(s => s.GetProperty("number").GetInt32()).Where(n => n > 0).Order().ToList();
             foreach (var season in seasons)

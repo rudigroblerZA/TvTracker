@@ -10,55 +10,62 @@ namespace TvTracker.LoadGen;
 /// </summary>
 /// <param name="Key">The username's suffix.</param>
 /// <param name="Shows">How many shows, at least and at most.</param>
-/// <param name="Plan">A plan an admin sets: Plus, or Family for the family's owner.</param>
+/// <param name="Months">How far back the history goes.</param>
+/// <param name="Airing">Only running shows with an episode in the last three weeks.</param>
+/// <param name="QuietDays">Nothing watched in the last this many days.</param>
+/// <param name="Plan">A plan the app's admin sets: Plus, or Family for the family's owner.</param>
 /// <param name="FamilyOf">Joins this persona's family (who must own one).</param>
 /// <param name="Private">A private profile: follows are requests, approved only for <paramref name="Approves"/>.</param>
 /// <param name="Follows">The personas they follow.</param>
-/// <param name="Tests">What to look at as them.</param>
-public sealed record TestPersona(string Key, string Name, string Zone, string Taste, string[] Genres, (int Min, int Max) Shows,
-    int Months, string Pace, string Tests, string? Plan = null, string? FamilyOf = null, bool Private = false,
-    string[]? Approves = null, string[]? Follows = null, bool Moderator = false)
+internal sealed record TestPersona(string Key, string Name, string Zone, string Taste, string[] Genres, (int Min, int Max) Shows,
+    int Months, Pace Pace = Pace.Evenings, Mix? Mix = null, bool Airing = false, int QuietDays = 0, double CommentChance = 0.15,
+    int MaxComments = 4, string? Plan = null, string? FamilyOf = null, bool Private = false, string[]? Approves = null,
+    string[]? Follows = null)
 {
     public const string Prefix = "persona-";
 
     public string Username => Prefix + Key;
 
+    public string FirstName => Name.Split(' ')[0];
+
+    public string LastName => Name.Split(' ')[^1];
+
+    /// <summary>
+    /// The longest history, which a show's episodes are loaded for.
+    /// </summary>
+    public static int MaxMonths => All.Max(p => p.Months);
+
+    // What each is for is in the README's table; a persona's comment says the shape that makes it so.
     public static readonly IReadOnlyList<TestPersona> All =
     [
-        new("tess", "Tess Harper", "Europe/London", "drama and romance", ["Drama", "Romance", "Comedy", "Mystery"], (18, 22), 30, "evenings",
-            "The TV Time refugee: two and a half years of dated history across 20 shows, half finished. Year in TV, Your TV clock, " +
-            "Your TV life, taste twins, Your taste, For you.",
-            Follows: ["marco", "priya", "mira"]),
-        new("marco", "Marco Bellini", "America/New_York", "crime on air now", ["Crime", "Thriller", "Drama", "Action"], (5, 7), 6, "keeps-up",
-            "Keeps up: running shows only, each new episode within a day of airing. Streaks (kept up), Spoiler watch, the waiting " +
-            "room, Up Next, the calendar, season verdicts.",
-            Follows: ["tess", "sam"]),
-        new("priya", "Priya Nair", "Asia/Kolkata", "science fiction and fantasy", ["Science-Fiction", "Fantasy", "Supernatural", "Horror"], (8, 12), 6, "binges",
-            "The binge watcher: whole seasons in a few late nights, mostly finished. Your TV clock (night owl, binges), Fits your " +
-            "time off, While you wait, Will you finish it?",
-            Follows: ["tess", "kenji"]),
-        new("walt", "Walt Brennan", "America/Chicago", "period drama", ["Drama", "History", "War", "Western"], (10, 14), 24, "lapsed",
-            "The lapsed viewer: nothing watched for seven months, shows stopped part way and a planned backlog. Previously on…, " +
-            "Is it worth going back?, Backlog triage, Will you finish it? (stalled).",
-            Follows: ["tess"]),
-        new("nia", "Nia Dlamini", "Africa/Johannesburg", "nothing yet", [], (0, 0), 1, "none",
-            "The newcomer: an account and nothing else. Every empty state, the first follow, Bring your history."),
-        new("kenji", "Kenji Watanabe", "Australia/Sydney", "anime", ["Anime", "Fantasy", "Adventure", "Comedy"], (8, 12), 12, "evenings",
-            "Plus subscriber, a day ahead of UTC: every Plus feature unlocked (Essential cut on long anime, Tonight's plan, the " +
-            "reunion radar, Mixtape), and dates near midnight.",
+        // The TV Time refugee: years of dated history, half of it finished.
+        new("tess", "Tess Harper", "Europe/London", "drama and romance", ["Drama", "Romance", "Comedy", "Mystery"], (18, 22), 30,
+            Mix: new(0.1, 0.5, 0.25), Follows: ["marco", "priya", "mira"]),
+        // Keeps up: running shows only, each new episode within a day of airing.
+        new("marco", "Marco Bellini", "America/New_York", "crime on air now", ["Crime", "Thriller", "Drama", "Action"], (5, 7), 6,
+            Pace.KeepsUp, new(0, 0, 1), Airing: true, Follows: ["tess", "sam"]),
+        // The binge watcher: whole seasons in a few late nights, mostly finished.
+        new("priya", "Priya Nair", "Asia/Kolkata", "science fiction and fantasy", ["Science-Fiction", "Fantasy", "Supernatural", "Horror"], (8, 12), 6,
+            Pace.Binges, new(0.1, 0.7, 0.15), Follows: ["tess", "kenji"]),
+        // The lapsed viewer: nothing for seven months, shows stopped part way, a planned backlog.
+        new("walt", "Walt Brennan", "America/Chicago", "period drama", ["Drama", "History", "War", "Western"], (10, 14), 24,
+            Mix: new(0.3, 0.1, 0.35), QuietDays: 210, Follows: ["tess"]),
+        // The newcomer: an account and nothing else.
+        new("nia", "Nia Dlamini", "Africa/Johannesburg", "nothing yet", [], (0, 0), 1),
+        // Plus, a day ahead of UTC.
+        new("kenji", "Kenji Watanabe", "Australia/Sydney", "anime", ["Anime", "Fantasy", "Adventure", "Comedy"], (8, 12), 12,
             Plan: "plus", Follows: ["priya"]),
-        new("rosa", "Rosa Alvarez", "America/Los_Angeles", "comedy and family", ["Comedy", "Family", "Romance", "Food"], (10, 14), 12, "evenings",
-            "Family plan owner: the plan page's family section (invite link, members), Plus features, Tonight for two with Leo.",
+        // Owns a Family plan.
+        new("rosa", "Rosa Alvarez", "America/Los_Angeles", "comedy and family", ["Comedy", "Family", "Romance", "Food"], (10, 14), 12,
             Plan: "family", Follows: ["leo", "tess"]),
-        new("leo", "Leo Alvarez", "America/Los_Angeles", "comedy and science fiction", ["Comedy", "Science-Fiction", "Adventure", "Family"], (8, 12), 12, "evenings",
-            "Family member: Plus through Rosa's family without paying, the member's view of the plan page, Tonight for two with Rosa.",
+        // Plus through Rosa's family.
+        new("leo", "Leo Alvarez", "America/Los_Angeles", "comedy and science fiction", ["Comedy", "Science-Fiction", "Adventure", "Family"], (8, 12), 12,
             FamilyOf: "rosa", Follows: ["rosa", "kenji"]),
-        new("mira", "Mira Novak", "Europe/Berlin", "crime and legal", ["Crime", "Mystery", "Legal", "Drama"], (10, 14), 12, "evenings",
-            "Moderator (Moderation:Users in development): the moderation page, Research and episode notes, and plenty of comments " +
-            "to moderate. Her follow request to Sam stays pending.",
-            Moderator: true, Follows: ["sam", "tess"]),
-        new("sam", "Sam Okafor", "America/Toronto", "legal and medical drama", ["Drama", "Legal", "Medical", "Thriller"], (8, 12), 12, "evenings",
-            "Private profile: follow requests (Marco's approved, Mira's waiting), what others see of a private profile, Visibility.",
+        // A moderator (Moderation:Users in the AppHost's development settings), with plenty of comments to moderate.
+        new("mira", "Mira Novak", "Europe/Berlin", "crime and legal", ["Crime", "Mystery", "Legal", "Drama"], (10, 14), 12,
+            CommentChance: 0.5, MaxComments: 10, Follows: ["sam", "tess"]),
+        // A private profile: Marco's request approved, Mira's left waiting.
+        new("sam", "Sam Okafor", "America/Toronto", "legal and medical drama", ["Drama", "Legal", "Medical", "Thriller"], (8, 12), 12,
             Private: true, Approves: ["marco"], Follows: ["marco"])
     ];
 }
@@ -70,16 +77,11 @@ public sealed partial class Seeder
     /// run, what makes them who they are: plans (as the app's admin), the family, privacy and follows, all idempotent.
     /// </summary>
     /// <param name="appAdmin">The app's own admin (in Admin:Users, not Keycloak's console admin), who sets plans.</param>
-    public async Task<int> SeedPersonasAsync(IReadOnlyList<TestPersona> personas, (string Username, string Password) appAdmin,
+    internal async Task<int> SeedPersonasAsync(IReadOnlyList<TestPersona> personas, (string Username, string Password) appAdmin,
         CancellationToken ct)
     {
         var users = personas.ToDictionary(p => p.Key, p => new Session(keycloak, p.Username, options.Password, options.BffUrl));
-        historyMonths = Math.Max(options.Months, personas.Max(p => p.Months));
         var catalog = await CatalogAsync(users[personas[0].Key], personas.SelectMany(p => p.Genres), ct);
-        if (catalog.Count < 20)
-        {
-            throw new CliException($"Only {catalog.Count} shows came back from the catalog through {options.BffUrl}; import more first.");
-        }
 
         var unfinished = 0;
         foreach (var (persona, i) in personas.Select((p, i) => (p, i)))
@@ -103,8 +105,7 @@ public sealed partial class Seeder
         var admin = new Session(keycloak, appAdmin.Username, appAdmin.Password, options.BffUrl);
         foreach (var persona in personas.Where(p => p.Plan is not null))
         {
-            var code = await SendAsync(admin, HttpMethod.Put, $"/identity/api/v1/admin/plans/users/{IdOf(persona.Key)}", new { plan = persona.Plan }, ct);
-            failures += Ok(code) ? 0 : 1;
+            await WriteAsync(admin, HttpMethod.Put, $"/identity/api/v1/admin/plans/users/{IdOf(persona.Key)}", new { plan = persona.Plan });
         }
         foreach (var member in personas.Where(p => p.FamilyOf is not null))
         {
@@ -149,31 +150,13 @@ public sealed partial class Seeder
     private async Task<(Outcome Outcome, string? Summary)> SeedPersonaAsync(Session user, TestPersona persona, int index, List<Show> catalog,
         CancellationToken ct)
     {
-        var seed = options.Seed;
-        using (var profileJson = await GetJsonAsync(user, "/identity/api/v1/profile", ct))
+        if (await SeedToUseAsync(user, Regex.Escape(persona.Name), persona.Zone, ct) is not { } seed)
         {
-            var current = profileJson?.RootElement.GetProperty("displayName").GetString() ?? "";
-            var state = Regex.Match(current, $"^{Regex.Escape(persona.Name)}(?: \\(seeding, seed (-?\\d+)\\))?$");
-            if (state.Success && !state.Groups[1].Success)
-            {
-                return (Outcome.Skipped, null);
-            }
-            if (state.Success)
-            {
-                seed = int.Parse(state.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-            }
+            return (Outcome.Skipped, null);
         }
-
-        var (pace, mix, airing, quiet) = persona.Pace switch
-        {
-            "keeps-up" => (Pace.KeepsUp, new Mix(0, 0, 1), true, 0),
-            "binges" => (Pace.Binges, new Mix(0.1, 0.7, 0.15), false, 0),
-            "lapsed" => (Pace.Evenings, new Mix(0.3, 0.1, 0.35), false, 210),
-            _ => (Pace.Evenings, persona.Key == "tess" ? new Mix(0.1, 0.5, 0.25) : Usual, false, 0)
-        };
         var profile = new Profile(persona.Name, persona.Taste, TimeZoneInfo.FindSystemTimeZoneById(persona.Zone), persona.Genres,
-            persona.Shows.Min, persona.Shows.Max, persona.Months, pace, mix, airing, quiet,
-            CommentChance: persona.Moderator ? 0.5 : 0.15, MaxComments: persona.Moderator ? 10 : 4);
+            persona.Shows.Min, persona.Shows.Max, persona.Months, persona.Pace, persona.Mix ?? Mix.Usual, persona.Airing,
+            persona.QuietDays, persona.CommentChance, persona.MaxComments);
         return await SeedProfileAsync(user, profile, seed, new Random(seed * 7919 + 1000 + index), catalog, ct);
     }
 }

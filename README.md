@@ -694,7 +694,8 @@ dotnet run -- cleanup --prefix persona-                  # remove them and every
 
 - **Their history** works as `seed`'s does (dated watches through the history import, ratings that agree, a few
   comments), but each persona's taste, time zone, number of shows and pace are fixed: evenings, keeping up as episodes
-  air, bingeing, or stopping months ago. The full name marks a persona whose history is seeded, so a rerun skips it.
+  air, bingeing, or stopping months ago. Their full name and their own time zone mark a persona whose history is seeded (a new account
+  starts with its Keycloak name in UTC), so a rerun skips it.
 - **Who they are** is set again on every run, as the app's admin (`--app-admin-password`, `admin` in development) and as
   themselves: Kenji's Plus and Rosa's Family plan, Leo joining Rosa's family, Sam's private profile, the follows between
   them, and Sam approving Marco. The plans need the `plans` flag on to make a difference.
