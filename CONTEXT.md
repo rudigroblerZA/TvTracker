@@ -1563,7 +1563,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Alerts
 
-- **Checks in the services, a signal a backend reads** (`AlertMonitor`, `IAlertCheck` in ServiceDefaults; BACKLOG O2):
+- **Checks in the services, a signal a backend reads** (`AlertMonitor`, `IAlertCheck` in `TvTracker.Alerts`, which
+  ServiceDefaults references; BACKLOG O2):
   each service registers the checks it can answer (`AddAlert<T>()`), and the monitor runs them every minute, from two
   minutes after start so a start's own catching up doesn't fire anything. A firing alert is the gauge
   `tvtracker.alerts.firing` (1/0, tagged `alert`, meter `TvTracker.Alerts`), one error log on the change to firing and
@@ -1575,14 +1576,17 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   finding the condition, and a flapping database would otherwise fire and resolve every alert in turn.
 - **The five:**
   - **`outbox-backlog`** (`OutboxBacklogAlert`, registered by `AddIntegrationEventOutbox`, so every service with an outbox
-    has it; the persistence library now references ServiceDefaults for this): the oldest unpublished row is 5+ minutes
-    old. The publisher retries every 15 seconds, so that's far past a hiccup.
+    has it; the alert types are a project of their own, with only the framework, so the persistence library can take them
+    without ServiceDefaults' packages): the oldest unpublished row is 5+ minutes old. The publisher retries every 15
+    seconds, so that's far past a hiccup. It asks for the two unpublished states rather than "not published", which an
+    index can't seek, since published rows are nearly all of the table.
   - **`dead-letters`** (Catalog.API, which already counts the queue for `/ops`): any letter at all, since nothing heals
     one but a fix and a replay. One shared queue, so one service watches it and it fires once.
-  - **`insights-run`** (Analytics.Worker, `InsightsRunStatus` kept by the refresher): the latest run failed, or none
-    finished within two intervals plus the start's delay; a hung run logs nothing, so the second half is what catches it.
-  - **`tvmaze-errors`** (sync worker, from `TvMazeUsage`): 10%+ of the last 15 minutes' calls were 5xx, unanswered or 429,
-    with 20 calls at least. A 404 is an answer, not an error. Fifteen minutes rather than `/ops`' hour, so it resolves soon
+  - **`insights-run`** (Analytics.Worker, `InsightsRunStatus` kept by the refresher, which also tells it its schedule):
+    the latest run failed, or none finished within two intervals plus the start's delay; a hung run logs nothing, so the
+    second half is what catches it.
+  - **`tvmaze-errors`** (sync worker, from `TvMazeUsage`, whose failed and 429 rules `/ops` reads too): 10%+ of the last 15
+    minutes' calls were 5xx, unanswered or 429, with 20 calls at least. A 404 is an answer, not an error. Fifteen minutes rather than `/ops`' hour, so it resolves soon
     after TVmaze does; every loop catches per show, so without it an outage only shows as stale shows.
   - **`ask-queue`** (Assistant.API): the oldest unanswered question was asked 10+ minutes ago, or 10+ are unanswered (one
     per person, so ten people).

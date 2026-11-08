@@ -20,9 +20,9 @@ public class AlertTests
     [Fact]
     public void An_outbox_fires_once_its_oldest_unpublished_event_is_five_minutes_old()
     {
-        Assert.False(OutboxBacklogAlert<NoContext>.Evaluate(0, null, Now).Firing);
-        Assert.False(OutboxBacklogAlert<NoContext>.Evaluate(40, Now.AddMinutes(-4), Now).Firing);
-        var stuck = OutboxBacklogAlert<NoContext>.Evaluate(3, Now.AddMinutes(-12), Now);
+        Assert.False(OutboxBacklog.Evaluate(0, null, Now).Firing);
+        Assert.False(OutboxBacklog.Evaluate(40, Now.AddMinutes(-4), Now).Firing);
+        var stuck = OutboxBacklog.Evaluate(3, Now.AddMinutes(-12), Now);
         Assert.True(stuck.Firing);
         Assert.Equal("3 events unpublished, the oldest 12 min old", stuck.Detail);
     }
@@ -65,8 +65,8 @@ public class AlertTests
     private static AlertMonitor Monitor(IAlertCheck check)
     {
         var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
-        return new AlertMonitor([check], services.GetRequiredService<IServiceScopeFactory>(), services.GetRequiredService<IMeterFactory>(),
-            new ConfigurationBuilder().Build(), TimeProvider.System, NullLogger<AlertMonitor>.Instance);
+        return new AlertMonitor([check], services.GetRequiredService<IMeterFactory>(), new ConfigurationBuilder().Build(),
+            TimeProvider.System, NullLogger<AlertMonitor>.Instance);
     }
 
     /// <summary>
@@ -77,13 +77,7 @@ public class AlertTests
         public AlertState? Next { get; set; }
         public string Name => "scripted";
 
-        public Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct) =>
+        public Task<AlertState> CheckAsync(CancellationToken ct) =>
             Next is { } state ? Task.FromResult(state) : throw new InvalidOperationException("can't look");
-    }
-
-    private sealed class NoContext : Microsoft.EntityFrameworkCore.DbContext, IIntegrationEventLogDbContext
-    {
-        public Microsoft.EntityFrameworkCore.DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
-        public Microsoft.EntityFrameworkCore.DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
     }
 }

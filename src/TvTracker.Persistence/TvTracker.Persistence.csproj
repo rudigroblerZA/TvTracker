@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TvTracker.EventBus\TvTracker.EventBus.csproj" />
-    <ProjectReference Include="..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\TvTracker.Alerts\TvTracker.Alerts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

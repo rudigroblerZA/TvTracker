@@ -20,15 +20,14 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
     /// </summary>
     private static readonly TimeSpan FullSyncInterval = TimeSpan.FromDays(1);
 
-    public static TimeSpan Interval(IConfiguration configuration) => configuration.GetValue("Analytics:RefreshInterval", TimeSpan.FromHours(1));
-
-    public static TimeSpan FirstRunDelay(IConfiguration configuration) => configuration.GetValue("Analytics:StartupDelay", StartupDelay);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(FirstRunDelay(configuration), stoppingToken);
+        var interval = configuration.GetValue("Analytics:RefreshInterval", TimeSpan.FromHours(1));
+        var firstRunDelay = configuration.GetValue("Analytics:StartupDelay", StartupDelay);
+        status.Schedule(firstRunDelay, interval);
+        await Task.Delay(firstRunDelay, stoppingToken);
 
-        using var timer = new PeriodicTimer(Interval(configuration));
+        using var timer = new PeriodicTimer(interval);
         var lastFullSync = DateTimeOffset.MinValue;
         do
         {
