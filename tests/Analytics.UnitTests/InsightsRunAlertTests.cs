@@ -11,19 +11,35 @@ public class InsightsRunAlertTests
     private static readonly DateTimeOffset Start = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
     private static readonly TimeSpan Overdue = TimeSpan.FromMinutes(121);
 
+    private static bool Fires(DateTimeOffset? lastSuccess, DateTimeOffset? failedAt, int minutesAfterStart) =>
+        InsightsRunAlert.Evaluate(new InsightsRunStatus.Snapshot(Start, lastSuccess, failedAt, failedAt is null ? null : "timeout",
+            Overdue, Start.AddMinutes(minutesAfterStart))).Firing;
+
     [Fact]
-    public void A_failed_run_fires_until_a_later_one_succeeds()
-    {
-        Assert.True(InsightsRunAlert.Evaluate(Start, null, Start.AddMinutes(2), "timeout", Overdue, Start.AddMinutes(3)).Firing);
-        Assert.True(InsightsRunAlert.Evaluate(Start, Start.AddMinutes(2), Start.AddMinutes(62), "timeout", Overdue, Start.AddMinutes(63)).Firing);
-        Assert.False(InsightsRunAlert.Evaluate(Start, Start.AddMinutes(122), Start.AddMinutes(62), "timeout", Overdue, Start.AddMinutes(123)).Firing);
-    }
+    public void A_failed_run_fires() => Assert.True(Fires(Start.AddMinutes(2), Start.AddMinutes(62), 63));
 
     [Fact]
     public void A_run_that_never_finishes_fires_after_two_intervals_and_the_delay()
     {
-        Assert.False(InsightsRunAlert.Evaluate(Start, null, null, null, Overdue, Start.AddMinutes(120)).Firing);
-        Assert.True(InsightsRunAlert.Evaluate(Start, null, null, null, Overdue, Start.AddMinutes(122)).Firing);
-        Assert.True(InsightsRunAlert.Evaluate(Start, Start.AddMinutes(2), null, null, Overdue, Start.AddMinutes(124)).Firing);
+        Assert.False(Fires(null, null, 120));
+        Assert.True(Fires(null, null, 122));
+        Assert.False(Fires(Start.AddMinutes(2), null, 122));
+        Assert.True(Fires(Start.AddMinutes(2), null, 124));
+    }
+
+    [Fact]
+    public void A_success_clears_the_failure()
+    {
+        var time = new FixedTime(Start);
+        var status = new InsightsRunStatus(time);
+        status.Failed(new TimeoutException("timeout"));
+        Assert.True(InsightsRunAlert.Evaluate(status.Now()).Firing);
+        status.Succeeded();
+        Assert.False(InsightsRunAlert.Evaluate(status.Now()).Firing);
+    }
+
+    private sealed class FixedTime(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

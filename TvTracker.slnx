@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/Aspire/">
     <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />
+    <Project Path="src/TvTracker.Alerts/TvTracker.Alerts.csproj" />
     <Project Path="src/TvTracker.ServiceDefaults/TvTracker.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/BuildingBlocks/">

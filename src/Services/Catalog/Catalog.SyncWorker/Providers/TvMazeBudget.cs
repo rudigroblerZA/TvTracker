@@ -215,17 +215,34 @@ public sealed class TvMazeUsage
     }
 
     /// <summary>
-    /// Calls in the last <paramref name="window"/> (at most an hour), and how many of them failed: a server error, no
-    /// answer, or 429. A 404 is TVmaze's answer about a show or person, not an error.
+    /// TVmaze refused the call for the rate (429).
+    /// </summary>
+    private static bool TooMany(Call c) => c.Status == 429;
+
+    /// <summary>
+    /// A server error, or no answer at all. A 404 is TVmaze's answer about a show or person, not a failure.
+    /// </summary>
+    private static bool Failed(Call c) => c.Status is 0 or >= 500;
+
+    /// <summary>
+    /// Calls in the last <paramref name="window"/> (at most an hour), and how many of them failed or were refused (429).
     /// </summary>
     public (int Calls, int Errors) Errors(TimeSpan window)
     {
+        var (calls, errors) = (0, 0);
         lock (gate)
         {
             var since = time.GetUtcNow() - window;
-            var calls = recent.Where(c => c.At >= since).ToList();
-            return (calls.Count, calls.Count(c => c.Status is 0 or 429 or >= 500));
+            foreach (var c in recent)
+            {
+                if (c.At >= since)
+                {
+                    calls++;
+                    errors += Failed(c) || TooMany(c) ? 1 : 0;
+                }
+            }
         }
+        return (calls, errors);
     }
 
     /// <summary>
@@ -239,11 +256,11 @@ public sealed class TvMazeUsage
             var now = time.GetUtcNow();
             calls = recent.Where(c => c.At >= now - Kept).ToList();
         }
-        return new TvMazeUsageReport(calls.Count, calls.Count(c => c.Status == 429), TvMazeRateLimiter.PermitLimit, TvMazeRateLimiter.BackgroundLimit,
+        return new TvMazeUsageReport(calls.Count, calls.Count(TooMany), TvMazeRateLimiter.PermitLimit, TvMazeRateLimiter.BackgroundLimit,
             waiting.Interactive, waiting.Background,
             calls.GroupBy(c => (c.Caller, c.Lane))
                 .Select(g => new TvMazeCallerUsage(g.Key.Caller, g.Key.Lane == TvMazeLane.Interactive ? "interactive" : "background", g.Count(),
-                    g.Count(c => c.Status == 429), g.Count(c => c.Status is 0 or >= 500), Math.Round(g.Average(c => c.WaitedMs)),
+                    g.Count(TooMany), g.Count(Failed), Math.Round(g.Average(c => c.WaitedMs)),
                     Math.Round(g.Max(c => c.WaitedMs))))
                 .OrderByDescending(c => c.Calls).ThenBy(c => c.Caller, StringComparer.Ordinal)
                 .ToList());

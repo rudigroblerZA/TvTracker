@@ -13,7 +13,7 @@ public sealed class DeadLettersAlert(RabbitMQEventBus bus) : IAlertCheck
 {
     public string Name => "dead-letters";
 
-    public async Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct)
+    public async Task<AlertState> CheckAsync(CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));

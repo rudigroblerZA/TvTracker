@@ -15,7 +15,7 @@ public sealed class AskQueueAlert(AskQueue queue, TimeProvider time) : IAlertChe
 
     public string Name => "ask-queue";
 
-    public Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct)
+    public Task<AlertState> CheckAsync(CancellationToken ct)
     {
         var (unanswered, oldest) = queue.Backlog();
         return Task.FromResult(Evaluate(unanswered, oldest, time.GetUtcNow().UtcDateTime));

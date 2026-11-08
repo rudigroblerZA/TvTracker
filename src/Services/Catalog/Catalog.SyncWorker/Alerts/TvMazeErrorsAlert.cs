@@ -17,7 +17,7 @@ public sealed class TvMazeErrorsAlert(TvMazeUsage usage) : IAlertCheck
 
     public string Name => "tvmaze-errors";
 
-    public Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct)
+    public Task<AlertState> CheckAsync(CancellationToken ct)
     {
         var (calls, errors) = usage.Errors(Window);
         return Task.FromResult(Evaluate(calls, errors));
@@ -25,7 +25,7 @@ public sealed class TvMazeErrorsAlert(TvMazeUsage usage) : IAlertCheck
 
     internal static AlertState Evaluate(int calls, int errors)
     {
-        var detail = $"{errors} of {calls} TVmaze call{(calls == 1 ? "" : "s")} in the last 15 minutes failed";
+        var detail = $"{errors} of {calls} TVmaze call{(calls == 1 ? "" : "s")} in the last {Window.TotalMinutes:0} minutes failed";
         return new AlertState(calls >= MinCalls && errors >= calls * MaxErrorShare, detail);
     }
 }

@@ -1,32 +1,38 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using TvTracker;
 
 namespace TvTracker.Persistence;
 
 /// <summary>
-/// Fires when an event saved to this service's outbox has gone unpublished for <see cref="After"/>: RabbitMQ is down or
-/// refusing it, or an event can't be sent at all. <see cref="OutboxPublisher"/> retries every 15 seconds, so a few
-/// minutes is already far past a hiccup, and every service downstream is missing that change meanwhile. Every service
-/// with an outbox gets it (<c>AddIntegrationEventOutbox</c>).
+/// Fires when an event saved to this service's outbox has gone unpublished for <see cref="OutboxBacklog.After"/>:
+/// RabbitMQ is down or refusing it, or an event can't be sent at all. <see cref="OutboxPublisher"/> retries every 15
+/// seconds, so a few minutes is already far past a hiccup, and every service downstream is missing that change meanwhile.
+/// Every service with an outbox gets it (<c>AddIntegrationEventOutbox</c>).
 /// </summary>
-public sealed class OutboxBacklogAlert<TContext>(TimeProvider time) : IAlertCheck
+public sealed class OutboxBacklogAlert<TContext>(IServiceScopeFactory scopes, TimeProvider time) : IAlertCheck
     where TContext : DbContext, IIntegrationEventLogDbContext
 {
-    public static readonly TimeSpan After = TimeSpan.FromMinutes(5);
-
     public string Name => "outbox-backlog";
 
-    public async Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct)
+    public async Task<AlertState> CheckAsync(CancellationToken ct)
     {
-        var db = services.GetRequiredService<TContext>();
-        var pending = await db.IntegrationEventLogs.AsNoTracking()
-            .Where(e => e.State != EventState.Published)
-            .GroupBy(_ => 1)
-            .Select(g => new { Count = g.Count(), Oldest = g.Min(e => e.CreatedAtUtc) })
-            .SingleOrDefaultAsync(ct);
-        return Evaluate(pending?.Count ?? 0, pending?.Oldest, time.GetUtcNow().UtcDateTime);
+        await using var scope = scopes.CreateAsyncScope();
+        // Unpublished as the two states, not "not published": Postgres can't seek an index on <>, and published rows
+        // (kept 7 days) are nearly all of the table.
+        var unpublished = scope.ServiceProvider.GetRequiredService<TContext>().IntegrationEventLogs.AsNoTracking()
+            .Where(e => e.State == EventState.NotPublished || e.State == EventState.PublishFailed);
+        var count = await unpublished.CountAsync(ct);
+        var oldest = count == 0 ? null : await unpublished.MinAsync(e => (DateTime?)e.CreatedAtUtc, ct);
+        return OutboxBacklog.Evaluate(count, oldest, time.GetUtcNow().UtcDateTime);
     }
+}
+
+/// <summary>
+/// The outbox alert's rule, apart from any one context.
+/// </summary>
+public static class OutboxBacklog
+{
+    public static readonly TimeSpan After = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Firing once the oldest unpublished event is <see cref="After"/> old; younger ones are the publisher's normal work.

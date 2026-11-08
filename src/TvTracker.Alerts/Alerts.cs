@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -24,8 +23,7 @@ public interface IAlertCheck
     /// </summary>
     string Name { get; }
 
-    /// <param name="services">A scope's services, fresh for each run.</param>
-    Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct);
+    Task<AlertState> CheckAsync(CancellationToken ct);
 }
 
 /// <summary>
@@ -49,18 +47,16 @@ public sealed class AlertMonitor : BackgroundService
     public const string MeterName = "TvTracker.Alerts";
 
     private readonly IReadOnlyList<IAlertCheck> checks;
-    private readonly IServiceScopeFactory scopes;
     private readonly TimeProvider time;
     private readonly ILogger<AlertMonitor> logger;
     private readonly TimeSpan interval;
     private readonly TimeSpan firstCheck;
     private readonly ConcurrentDictionary<string, AlertState> states = new();
 
-    public AlertMonitor(IEnumerable<IAlertCheck> checks, IServiceScopeFactory scopes, IMeterFactory meters, IConfiguration config,
-        TimeProvider time, ILogger<AlertMonitor> logger)
+    public AlertMonitor(IEnumerable<IAlertCheck> checks, IMeterFactory meters, IConfiguration config, TimeProvider time,
+        ILogger<AlertMonitor> logger)
     {
         this.checks = checks.ToList();
-        this.scopes = scopes;
         this.time = time;
         this.logger = logger;
         interval = config.GetValue("Alerts:Interval", TimeSpan.FromMinutes(1));
@@ -95,8 +91,7 @@ public sealed class AlertMonitor : BackgroundService
             AlertState now;
             try
             {
-                await using var scope = scopes.CreateAsyncScope();
-                now = await check.CheckAsync(scope.ServiceProvider, ct);
+                now = await check.CheckAsync(ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

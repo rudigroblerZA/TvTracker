@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Catalog.UnitTests" />
+    <ProjectReference Include="..\TvTracker.Alerts\TvTracker.Alerts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,22 +3,34 @@ using TvTracker;
 namespace Analytics.Worker;
 
 /// <summary>
-/// What the last insights run did, kept by <see cref="InsightsRefresher"/> for <see cref="InsightsRunAlert"/>.
+/// What the insights runs have done so far, and how long a run may take, kept by <see cref="InsightsRefresher"/> for
+/// <see cref="InsightsRunAlert"/>.
 /// </summary>
 public sealed class InsightsRunStatus(TimeProvider time)
 {
-    public DateTimeOffset StartedAt { get; } = time.GetUtcNow();
-    public DateTimeOffset? LastSuccess { get; private set; }
-    public DateTimeOffset? LastFailure { get; private set; }
-    public string? LastError { get; private set; }
+    private readonly DateTimeOffset startedAt = time.GetUtcNow();
+    private TimeSpan overdueAfter = TimeSpan.FromHours(2);
+    private DateTimeOffset? lastSuccess;
+    private (DateTimeOffset At, string Error)? failure;
 
-    public void Succeeded() => LastSuccess = time.GetUtcNow();
+    /// <summary>
+    /// Called by the refresher as it starts: a run is overdue after two of its intervals plus the delay before the first.
+    /// </summary>
+    public void Schedule(TimeSpan firstRunDelay, TimeSpan interval) => overdueAfter = firstRunDelay + interval * 2;
 
-    public void Failed(Exception ex)
+    public void Succeeded()
     {
-        LastFailure = time.GetUtcNow();
-        LastError = ex.Message;
+        lastSuccess = time.GetUtcNow();
+        failure = null;
     }
+
+    public void Failed(Exception ex) => failure = (time.GetUtcNow(), ex.Message);
+
+    public Snapshot Now() => new(startedAt, lastSuccess, failure?.At, failure?.Error, overdueAfter, time.GetUtcNow());
+
+    /// <param name="FailedAt">When the latest run failed; null once a later one succeeds.</param>
+    public sealed record Snapshot(DateTimeOffset StartedAt, DateTimeOffset? LastSuccess, DateTimeOffset? FailedAt, string? Error,
+        TimeSpan OverdueAfter, DateTimeOffset At);
 }
 
 /// <summary>
@@ -27,28 +39,25 @@ public sealed class InsightsRunStatus(TimeProvider time)
 /// show page's insights, the discovery lists, the tags and DNA sent to the catalog and Recommendations, and the season
 /// verdicts stop moving while it fires. It resolves with the next run that finishes.
 /// </summary>
-public sealed class InsightsRunAlert(InsightsRunStatus status, IConfiguration configuration, TimeProvider time) : IAlertCheck
+public sealed class InsightsRunAlert(InsightsRunStatus status) : IAlertCheck
 {
     public string Name => "insights-run";
 
-    public Task<AlertState> CheckAsync(IServiceProvider services, CancellationToken ct) =>
-        Task.FromResult(Evaluate(status.StartedAt, status.LastSuccess, status.LastFailure, status.LastError,
-            InsightsRefresher.Interval(configuration) * 2 + InsightsRefresher.FirstRunDelay(configuration), time.GetUtcNow()));
+    public Task<AlertState> CheckAsync(CancellationToken ct) => Task.FromResult(Evaluate(status.Now()));
 
-    internal static AlertState Evaluate(DateTimeOffset startedAt, DateTimeOffset? lastSuccess, DateTimeOffset? lastFailure,
-        string? error, TimeSpan overdueAfter, DateTimeOffset now)
+    internal static AlertState Evaluate(InsightsRunStatus.Snapshot s)
     {
-        if (lastFailure is { } failed && (lastSuccess is not { } ok || failed > ok))
+        if (s.FailedAt is { } failed)
         {
-            return new AlertState(true, $"The last run failed at {failed:u}: {error}");
+            return new AlertState(true, $"The last run failed at {failed:u}: {s.Error}");
         }
-        var since = lastSuccess ?? startedAt;
-        if (now - since > overdueAfter)
+        var since = s.LastSuccess ?? s.StartedAt;
+        if (s.At - since > s.OverdueAfter)
         {
-            return new AlertState(true, lastSuccess is null
-                ? $"No run has finished since the worker started at {startedAt:u}"
+            return new AlertState(true, s.LastSuccess is null
+                ? $"No run has finished since the worker started at {s.StartedAt:u}"
                 : $"No run has finished since {since:u}");
         }
-        return new AlertState(false, lastSuccess is { } last ? $"The last run finished at {last:u}" : "The first run hasn't finished yet");
+        return new AlertState(false, s.LastSuccess is { } last ? $"The last run finished at {last:u}" : "The first run hasn't finished yet");
     }
 }
