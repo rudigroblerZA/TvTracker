@@ -13,7 +13,7 @@ that shows it), what done looks like, its priority and its size.
 Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
 November 2026, then inbox retention (R4), research in the data export (S5), pinned page fetches (S6), a season-verdict
 preference (D2) and per-follower flags (T3), then CI with tests (Q1), the development issuer in Development only (S3) and
-rate limits on every write (S4), then service-to-service auth for the sync worker (S2); CONTEXT.md has the decisions.
+rate limits on every write (S4), then service-to-service auth for the sync worker (S2), then alerts (O2); CONTEXT.md has the decisions.
 
 Production runs on Azure Container Apps and takes payments through Stripe (CONTEXT.md, Production decisions), so the
 order to launch is:
@@ -22,7 +22,6 @@ order to launch is:
 | --- | --- | --- | --- |
 | O1 | [A deployment](#o1-a-deployment) | P1 | L |
 | F1 | [A real payment provider](#f1-a-real-payment-provider) | P1 | S |
-| O2 | [Alerts and dashboards](#o2-alerts-and-dashboards) | P2 | M |
 | Q3 | [Compile the MAUI app in CI](#q3-compile-the-maui-app-in-ci) | P2 | M |
 
 ## What the review found sound
@@ -167,21 +166,9 @@ All the features from the review have shipped; new ideas go here.
     connection budget in CONTEXT.md assumes a pooler once replicas multiply).
   - RabbitMQ as a container or a managed broker, Redis, Keycloak, and Model Runner where GPU or CPU capacity allows.
   - Start from the hosting estimate already made.
+  - Send the services' OpenTelemetry to Azure Monitor, with a dashboard per service, and alert rules on the
+    `tvtracker.alerts.firing` gauge (CONTEXT.md, Alerts); in development the Aspire dashboard is both.
 - **Done when:** one command deploys a staging environment from `main`.
-
-### O2. Alerts and dashboards
-
-**P3 · M**
-
-- **What:** alerts on what's already logged or countable:
-  - outbox rows pending for over 5 minutes;
-  - dead-letter depth (`tvtracker_dead_letters`, on `/ops` already);
-  - "Computing insights failed";
-  - the sync worker's TVmaze error rate;
-  - Ask's queue length.
-  
-  A dashboard per service from the existing OpenTelemetry data.
-- **Done when:** each alert fires in a test of its failure.
 
 ## From the analytics review (October 2026)
 

@@ -17,6 +17,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IIntegrationEventOutbox, IntegrationEventOutbox<TContext>>();
         services.AddHostedService<OutboxPublisher>();
         services.AddHostedService<IntegrationEventRetention>();
+        services.AddAlert<OutboxBacklogAlert<TContext>>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }

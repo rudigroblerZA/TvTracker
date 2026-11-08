@@ -85,6 +85,15 @@ public sealed class AskQueue(AnswerLoop loop, TimeProvider time, ILogger<AskQueu
     /// </summary>
     public int Ahead(Ask ask) => asks.Values.Count(a => a.StartedAtUtc is null && a.AskedAtUtc < ask.AskedAtUtc);
 
+    /// <summary>
+    /// Questions not answered yet (queued or being answered), and when the oldest was asked; for the queue alert.
+    /// </summary>
+    public (int Unanswered, DateTime? OldestAskedAtUtc) Backlog()
+    {
+        var open = asks.Values.Where(a => a.FinishedAtUtc is null).Select(a => a.AskedAtUtc).ToList();
+        return (open.Count, open.Count == 0 ? null : open.Min());
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (var ask in queue.Reader.ReadAllAsync(stoppingToken))

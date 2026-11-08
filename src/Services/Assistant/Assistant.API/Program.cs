@@ -1,3 +1,4 @@
+using Assistant.API.Alerts;
 using Assistant.API.Apis;
 using Assistant.API.Services;
 
@@ -12,6 +13,7 @@ builder.Services.AddSingleton<Toolbox>();
 builder.Services.AddSingleton<AnswerLoop>();
 builder.Services.AddSingleton<AskQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AskQueue>());
+builder.Services.AddAlert<AskQueueAlert>();
 
 builder.Services.AddProblemDetails();
 
