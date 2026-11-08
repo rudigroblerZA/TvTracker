@@ -924,7 +924,7 @@ provider: Stripe in a deployment (and locally once its test key is given), else,
     - Locally, in the AppHost's user secrets: `Parameters:stripe-secret-key` (`sk_test_…`) and
       `Parameters:stripe-webhook-secret` from `stripe listen --forward-to http://localhost:5101/api/v1/payments/webhooks/stripe`
       (Stripe's CLI), and optionally `Parameters:stripe-portal-url`. With the key set, Stripe sells instead of the test
-      provider; the checkout comes back to the web app's https address. Card `4242 4242 4242 4242` pays in test mode.
+      provider; the checkout comes back to the web app's own address (https when it has one). Card `4242 4242 4242 4242` pays in test mode.
     - Prices: the checkout is made for `Payments:Prices`' amount, so nothing needs creating in Stripe's product list.
   - **Admins** can still set anyone's plan on `/settings/plans`; a subscription ending moves back only the plan it paid
     for.

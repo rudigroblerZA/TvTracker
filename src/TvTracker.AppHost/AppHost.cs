@@ -519,8 +519,10 @@ if (builder.ExecutionContext.IsPublishMode || stripeLocally)
     }
     else
     {
-        // Stripe needs an absolute address to send the buyer back to: the web app's own, here.
-        identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint("https")}/settings/plan"));
+        // Stripe needs an absolute address to send the buyer back to: the web app's own, here, https when its launch
+        // profile has it (an endpoint that doesn't exist never resolves, and Identity would wait on it for ever).
+        var webScheme = webApp.Resource.Annotations.OfType<EndpointAnnotation>().Any(e => e.Name == "https") ? "https" : "http";
+        identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"));
         if (builder.Configuration["Parameters:stripe-portal-url"] is { Length: > 0 })
         {
             identityApi.WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"));
