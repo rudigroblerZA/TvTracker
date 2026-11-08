@@ -1589,7 +1589,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Dashboards:** the Aspire dashboard already shows each service's traces, metrics and logs from OpenTelemetry;
   production's per-service dashboards come with the deployment's monitoring backend (O1).
 - **Tested** (`AlertTests`, `InsightsRunAlertTests`, `AskQueueAlertTests`) for the rules and the monitor's transitions,
-  and live: see the PR for RabbitMQ stopped (outbox) and a message put on the dead-letter queue.
+  and live: a message put on `tvtracker_dead_letters` fired `dead-letters` on Catalog.API's next check (Degraded, one
+  error log), and purging it resolved it; with RabbitMQ stopped, unfollowing and following a show fired Tracking's
+  `outbox-backlog` 5 min 46 s later ("2 events unpublished"), resolved a minute after RabbitMQ was back. Tracking read
+  Unhealthy meanwhile, since its RabbitMQ check outranks Degraded.
 
 ## Production hygiene
 
