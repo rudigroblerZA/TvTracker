@@ -91,7 +91,8 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
     /// <summary>
     /// Creates a user with a password unless one with that username exists. True when it created one.
     /// </summary>
-    public async Task<bool> EnsureUserAsync(string adminToken, string username, string displayNumber, string password, CancellationToken ct)
+    public async Task<bool> EnsureUserAsync(string adminToken, string username, string firstName, string lastName, string password,
+        CancellationToken ct)
     {
         var existing = await AdminGetAsync<List<object>>(adminToken, $"users?username={Uri.EscapeDataString(username)}&exact=true", ct);
         if (existing.Count > 0)
@@ -103,8 +104,8 @@ public sealed class Keycloak(HttpClient http, string baseUrl)
         {
             username,
             email = $"{username}@example.com",
-            firstName = "Load",
-            lastName = $"Tester {displayNumber}",
+            firstName,
+            lastName,
             enabled = true,
             emailVerified = true,
             credentials = new[] { new { type = "password", value = password, temporary = false } }

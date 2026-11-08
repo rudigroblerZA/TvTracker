@@ -139,6 +139,30 @@ seed.SetAction(async (parse, ct) =>
     return await new Seeder(http, keycloak, options, i => Username(parse, i), ct => AdminTokenAsync(parse, keycloak, ct)).RunAsync(ct);
 });
 
+var appAdminOption = new Option<string>("--app-admin-password") { Description = "The app's admin (admin, in Admin:Users), who sets the personas' plans", DefaultValueFactory = _ => "admin" };
+
+var personas = new Command("personas", "Create the ten test personas (persona-tess … persona-sam, README: Test personas) with the history, plan, family, privacy and follows each stands for; safe to run again")
+{
+    adminUserOption, adminPasswordOption, appAdminOption, monthsOption, seedOption
+};
+personas.SetAction(async (parse, ct) =>
+{
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+    var keycloak = new Keycloak(http, parse.GetValue(keycloakOption)!);
+    var admin = await AdminTokenAsync(parse, keycloak, ct);
+    await keycloak.EnsureClientAsync(admin, ct);
+    foreach (var persona in TestPersona.All)
+    {
+        // Not the persona's own name: a new account's display name comes from Keycloak's, and the full name marks a
+        // persona whose history is seeded.
+        await keycloak.EnsureUserAsync(admin, persona.Username, persona.Name.Split(' ')[0], "Persona", parse.GetValue(passwordOption)!, ct);
+    }
+    var options = new SeedOptions(parse.GetValue(bffOption)!, TestPersona.All.Count, parse.GetValue(passwordOption)!, TestPersona.Prefix,
+        Math.Clamp(parse.GetValue(monthsOption), 1, 120), parse.GetValue(seedOption));
+    var seeder = new Seeder(http, keycloak, options, i => TestPersona.All[i - 1].Username, ct => AdminTokenAsync(parse, keycloak, ct));
+    return await seeder.SeedPersonasAsync(TestPersona.All, ("admin", parse.GetValue(appAdminOption)!), ct);
+});
+
 var cleanup = new Command("cleanup", "Delete the load-test users and everything they did, through the app's own account deletion")
 {
     adminUserOption, adminPasswordOption
@@ -172,7 +196,7 @@ cleanup.SetAction(async (parse, ct) =>
 
 var root = new RootCommand("Generate load against a running TV Tracker AppHost with load-test users")
 {
-    setup, run, seed, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
+    setup, run, seed, personas, cleanup, bffOption, keycloakOption, usersOption, prefixOption, passwordOption
 };
 
 try
@@ -204,7 +228,7 @@ async Task<(bool ClientCreated, int UsersCreated)> EnsureUsersAsync(ParseResult 
     var created = 0;
     for (var i = 1; i <= parse.GetValue(usersOption); i++)
     {
-        if (await keycloak.EnsureUserAsync(admin, Username(parse, i), i.ToString("000", CultureInfo.InvariantCulture), parse.GetValue(passwordOption)!, ct))
+        if (await keycloak.EnsureUserAsync(admin, Username(parse, i), "Load", $"Tester {i:000}", parse.GetValue(passwordOption)!, ct))
         {
             created++;
         }
