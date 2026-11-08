@@ -2,6 +2,7 @@ using Identity.API.Apis;
 using Identity.API.Data;
 using Identity.API.Payments;
 using Identity.API.Services;
+using Microsoft.Extensions.Options;
 using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,13 +27,17 @@ if (!builder.Environment.IsDevelopment())
     builder.Services.AddHostedService<DemoAccountRemover>();
 }
 
-// Payments: the provider named in Payments:Provider sells plans; the test provider only in development.
+// Payments: the provider named in Payments:Provider sells plans; Stripe is always registered (its webhooks need its
+// signing secret, so it does nothing unconfigured), the test provider only in development.
 builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
 }
-builder.Services.AddSingleton<PaymentProviders>();
+builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
+    client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<PaymentOptions>>().Value.Stripe.ApiBase));
+builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
+builder.Services.AddScoped<PaymentProviders>();
 builder.Services.AddScoped<SubscriptionLedger>();
 builder.Services.AddHostedService<SubscriptionLapse>();
 

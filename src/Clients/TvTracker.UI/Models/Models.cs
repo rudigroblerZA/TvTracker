@@ -868,7 +868,8 @@ public record PlanPrices(string Currency, decimal PlusMonth, decimal PlusYear, d
     };
 }
 
-/// <param name="ManageUrl">The provider's page for it (the test provider's renews or ends it).</param>
+/// <param name="ManageUrl">The provider's page for it: the test provider's renews or ends it, Stripe's customer portal
+/// manages the card and invoices.</param>
 public record PlanSubscription(string Plan, string Interval, bool Active, bool CancelAtPeriodEnd, DateTime CurrentPeriodEndUtc, DateTime? EndedAtUtc,
     string Provider, string? ManageUrl);
 

@@ -45,7 +45,14 @@
                         }
                         @if (sub.ManageUrl is { } manage)
                         {
-                            <p class="muted small"><a href="@manage">The test provider's page</a> renews or ends it now.</p>
+                            @if (sub.Provider == "test")
+                            {
+                                <p class="muted small"><a href="@manage">The test provider's page</a> renews or ends it now.</p>
+                            }
+                            else
+                            {
+                                <p class="muted small"><a href="@manage" target="_blank" rel="noopener">Manage billing</a>: your card and invoices.</p>
+                            }
                         }
                     </section>
                 }

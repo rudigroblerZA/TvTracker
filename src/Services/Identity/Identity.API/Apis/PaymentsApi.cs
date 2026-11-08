@@ -67,7 +67,7 @@ public static class PaymentsApi
 
     private static async Task<Results<Ok<CheckoutDto>, ValidationProblem, Conflict<string>, ProblemHttpResult>> CheckoutAsync(
         CheckoutRequest request, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, IOptions<PaymentOptions> options,
-        PaymentProviders providers, TimeProvider time, CancellationToken ct)
+        PaymentProviders providers, TimeProvider time, ILogger<CheckoutSession> logger, CancellationToken ct)
     {
         if (!PlanPrices.Sold(request.Plan) || !PlanPrices.Intervals.Contains(request.Interval))
         {
@@ -100,8 +100,17 @@ public static class PaymentsApi
         };
         db.CheckoutSessions.Add(session);
         await db.SaveChangesAsync(ct);
-        var url = await provider.CreateCheckoutAsync(session, returnUrl, ct);
-        return TypedResults.Ok(new CheckoutDto(url.ToString()));
+        try
+        {
+            var url = await provider.CreateCheckoutAsync(session, returnUrl, ct);
+            return TypedResults.Ok(new CheckoutDto(url.ToString()));
+        }
+        catch (HttpRequestException ex)
+        {
+            // The session stays unused; nothing was charged.
+            logger.LogError(ex, "{Provider} couldn't make a checkout for session {Session}", provider.Name, session.Id);
+            return TypedResults.Problem("The payment provider didn't answer; try again in a moment.", statusCode: StatusCodes.Status502BadGateway);
+        }
     }
 
     private static Task<Results<Ok<SubscriptionDto>, NotFound>> CancelAsync(
@@ -147,6 +156,10 @@ public static class PaymentsApi
         {
             loggers.CreateLogger(typeof(PaymentsApi)).LogWarning("A {Provider} webhook was refused: bad or stale signature, or not an event the app acts on", provider);
             return TypedResults.BadRequest();
+        }
+        if (e.Kind == PaymentEventKind.Ignored)
+        {
+            return TypedResults.Ok();
         }
         // An unknown subscription is 422 so the provider retries (a first payment's session may not be saved yet); a
         // refused payment is 409, and logged to be refunded.

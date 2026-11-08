@@ -878,7 +878,7 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 ### Plans
 
 Free, Plus and Family, behind the `plans` flag. Plus and Family are bought on `/settings/plan` through a payment
-provider; in development that's a test provider, and a real one is still to come (BACKLOG F1).
+provider: Stripe in a deployment (and locally once its test key is given), else, in development, a test provider.
 
 - **Insights by plan:** Plus and Family add 18 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
@@ -914,12 +914,25 @@ provider; in development that's a test provider, and a real one is still to come
   - **Trying it locally:** the AppHost turns on the test provider. "Buy" goes to the web app's `/dev/payments` page,
     which charges nothing; "Pay" sends Identity a signed webhook as a real provider would. Its subscription page
     (linked from your plan) renews it or ends it at once, to try a renewal or a period's end.
+  - **Stripe:** "Buy" goes to Stripe's hosted checkout and comes back to `/settings/plan`; "Manage billing" on your plan
+    opens Stripe's customer portal (card, invoices). To set it up:
+    - In Stripe (test mode first): a webhook endpoint at `https://<identity>/api/v1/payments/webhooks/stripe` for
+      `invoice.paid`, `customer.subscription.updated` and `customer.subscription.deleted`, and the customer portal turned
+      on, with its login link.
+    - A deployment's parameters: `stripe-secret-key` and `stripe-webhook-secret` (secrets), `stripe-portal-url`, and
+      `payments-return-url` (the web app's public `/settings/plan`).
+    - Locally, in the AppHost's user secrets: `Parameters:stripe-secret-key` (`sk_test_…`) and
+      `Parameters:stripe-webhook-secret` from `stripe listen --forward-to http://localhost:5101/api/v1/payments/webhooks/stripe`
+      (Stripe's CLI), and optionally `Parameters:stripe-portal-url`. With the key set, Stripe sells instead of the test
+      provider; the checkout comes back to the web app's https address. Card `4242 4242 4242 4242` pays in test mode.
+    - Prices: the checkout is made for `Payments:Prices`' amount, so nothing needs creating in Stripe's product list.
   - **Admins** can still set anyone's plan on `/settings/plans`; a subscription ending moves back only the plan it paid
     for.
   - **API** (Identity): `GET /api/v1/plans/prices`, `GET /api/v1/me/subscription` (204 without one),
     `POST /api/v1/me/checkout` (`{"plan": "plus" | "family", "interval": "month" | "year"}`, the checkout's address
     back; 409 with a subscription running, 503 with no provider), `POST /api/v1/me/subscription/cancel` and
-    `/resume`, and the providers' `POST /api/v1/payments/webhooks/{provider}` (signed; 400 otherwise).
+    `/resume`, and the providers' `POST /api/v1/payments/webhooks/{provider}` (`test` or `stripe`; signed, 400
+    otherwise; 200 for a signed event the app doesn't act on, so Stripe doesn't retry it).
 - **Where it shows:** `/settings/plan` compares the plans and shows yours. If a plan has a list limit again, the lists
   page says "2 of 3 lists on Free" and turns Create off at it. Lists and sharing still go through the plan's
   `MaxLists` and `ShareLists`, so a plan can get a limit back without new plumbing.

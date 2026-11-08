@@ -13,7 +13,7 @@ that shows it), what done looks like, its priority and its size.
 Retries with a dead-letter queue (R2), secrets out of the AppHost (S1) and cached flag answers (P2) shipped in
 November 2026, then inbox retention (R4), research in the data export (S5), pinned page fetches (S6), a season-verdict
 preference (D2) and per-follower flags (T3), then CI with tests (Q1), the development issuer in Development only (S3) and
-rate limits on every write (S4), then service-to-service auth for the sync worker (S2), then alerts (O2); CONTEXT.md has the decisions.
+rate limits on every write (S4), then service-to-service auth for the sync worker (S2), then alerts (O2), then Stripe (F1); CONTEXT.md has the decisions.
 
 Production runs on Azure Container Apps and takes payments through Stripe (CONTEXT.md, Production decisions), so the
 order to launch is:
@@ -21,7 +21,6 @@ order to launch is:
 | # | Item | Priority | Size |
 | --- | --- | --- | --- |
 | O1 | [A deployment](#o1-a-deployment) | P1 | L |
-| F1 | [A real payment provider](#f1-a-real-payment-provider) | P1 | S |
 | Q3 | [Compile the MAUI app in CI](#q3-compile-the-maui-app-in-ci) | P2 | M |
 
 ## What the review found sound
@@ -108,18 +107,6 @@ Nothing open.
 ## Features
 
 All the features from the review have shipped; new ideas go here.
-
-### F1. A real payment provider
-
-**P1 · S**
-
-- **Why:** buying Plus and Family works end to end against the test provider (CONTEXT.md, Payments), but nothing takes
-  real money yet.
-- **What:** one `IPaymentProvider` for Stripe (decided; CONTEXT.md, Production decisions): its checkout for a `CheckoutSession`, cancel and resume calls, and
-  its signed webhooks read into `PaymentEvent`s, with the session's id in the checkout's metadata. Prices per region in
-  `Payments:Prices` to match the provider's, and its customer portal as `ManageUrl`.
-- **Done when:** a test-mode purchase moves a user to Plus within seconds, a cancelled one moves them back at the
-  period's end, and the webhook rejects unsigned calls.
 
 ### F2. Affiliate programs
 

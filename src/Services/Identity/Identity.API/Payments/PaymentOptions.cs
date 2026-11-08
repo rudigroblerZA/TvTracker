@@ -14,7 +14,8 @@ public sealed class PaymentOptions
     public string? Provider { get; set; }
 
     /// <summary>
-    /// Where the buyer lands after a checkout: the web app's plan page (a real provider needs it absolute). Set by the
+    /// Where the buyer lands after a checkout: the web app's plan page (absolute for Stripe; the test provider's is
+    /// relative). Set by the
     /// server, never taken from a request, so a checkout can't be used to send someone to another site.
     /// </summary>
     public string? ReturnUrl { get; set; }
@@ -31,6 +32,8 @@ public sealed class PaymentOptions
     public List<RegionPrices> Prices { get; set; } = [];
 
     public TestProviderOptions Test { get; set; } = new();
+
+    public StripeOptions Stripe { get; set; } = new();
 }
 
 /// <summary>

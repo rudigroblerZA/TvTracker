@@ -498,10 +498,41 @@ if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configurati
     webApp.WithEnvironment("Affiliates__TestNetworkKey", testNetworkKey);
 }
 
-// Payments (running locally only): the test provider sells Plus and Family, its checkout being the web app's
-// /dev/payments page, which signs the webhooks it sends Identity with a secret the two share (TestPaymentProvider,
-// TestPaymentProvider page in the web app). A deployment names a real provider instead; none is built yet.
-if (!builder.ExecutionContext.IsPublishMode)
+// Payments. A deployment sells through Stripe (CONTEXT.md, Payments and Production decisions): its secret key and webhook
+// signing secret are secret parameters, the customer portal's login link and the plan page's public address plain ones,
+// all required. Running locally, Stripe sells in test mode once its key is given (user secrets:
+// Parameters:stripe-secret-key and stripe-webhook-secret, from `stripe listen`; README, Payments); otherwise the test
+// provider does, its checkout being the web app's /dev/payments page, which signs the webhooks it sends Identity with a
+// secret the two share.
+var stripeLocally = !builder.ExecutionContext.IsPublishMode && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"]);
+if (builder.ExecutionContext.IsPublishMode || stripeLocally)
+{
+    identityApi
+        .WithEnvironment("Payments__Provider", "stripe")
+        .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
+        .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true));
+    if (builder.ExecutionContext.IsPublishMode)
+    {
+        identityApi
+            .WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"))
+            .WithEnvironment("Payments__ReturnUrl", builder.AddParameter("payments-return-url"));
+    }
+    else
+    {
+        // Stripe needs an absolute address to send the buyer back to: the web app's own, here.
+        identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint("https")}/settings/plan"));
+        if (builder.Configuration["Parameters:stripe-portal-url"] is { Length: > 0 })
+        {
+            identityApi.WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"));
+        }
+        // A stand-in for Stripe's API (Stripe's stripe-mock, or a recorder) when testing without an account.
+        if (builder.Configuration["Stripe:ApiBase"] is { Length: > 0 } apiBase)
+        {
+            identityApi.WithEnvironment("Payments__Stripe__ApiBase", apiBase);
+        }
+    }
+}
+else
 {
     // The test pages are linked relative to the page the buyer is on, so the browser keeps the origin (http or https)
     // it signed in on and its sign-in cookie.

@@ -22,7 +22,13 @@ public enum PaymentEventKind
     /// <summary>
     /// Over: the period ended without a renewal, or it was stopped at once.
     /// </summary>
-    Ended
+    Ended,
+
+    /// <summary>
+    /// A genuine event the app doesn't act on (Stripe sends many): acknowledged, so the provider doesn't retry it, and
+    /// not recorded.
+    /// </summary>
+    Ignored
 }
 
 /// <summary>
@@ -55,7 +61,8 @@ public interface IPaymentProvider
     Task ResumeAsync(Subscription subscription, CancellationToken ct);
 
     /// <summary>
-    /// The event in a webhook, or null when its signature doesn't check out (or it's one the app doesn't act on).
+    /// The event in a webhook (<see cref="PaymentEventKind.Ignored"/> for a signed one the app doesn't act on), or null
+    /// when its signature doesn't check out or it can't be read.
     /// </summary>
     PaymentEvent? ReadWebhook(string body, IHeaderDictionary headers, DateTimeOffset now);
 
