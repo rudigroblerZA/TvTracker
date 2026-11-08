@@ -15,7 +15,8 @@ public static class IdentitySettings
     public const string ApiAudience = "tvtracker-api";
 
     /// <summary>
-    /// Keycloak as seen from the Android emulator; tokens issued there carry this issuer.
+    /// Keycloak as seen from the Android emulator; tokens issued there carry this issuer. Accepted in Development only:
+    /// a development address has no place in production validation.
     /// </summary>
     public const string AndroidEmulatorAuthority = "http://10.0.2.2:8080/realms/" + Realm;
 
@@ -31,7 +32,8 @@ public static class AuthenticationExtensions
 {
     /// <summary>
     /// Validates Keycloak access tokens (audience "tvtracker-api"). Claims keep their JWT names,
-    /// so the user id is the "sub" claim.
+    /// so the user id is the "sub" claim. Also registers the rate limits every service applies to people
+    /// (<see cref="ClientRateLimiting"/>); <see cref="ClientRateLimiting.UseDefaultAuthentication"/> turns both on.
     /// </summary>
     public static TBuilder AddDefaultAuthentication<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -45,11 +47,14 @@ public static class AuthenticationExtensions
                 options.Audience = IdentitySettings.ApiAudience;
                 options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
                 options.MapInboundClaims = false;
-                options.TokenValidationParameters.ValidIssuers = [authority, IdentitySettings.AndroidEmulatorAuthority];
+                options.TokenValidationParameters.ValidIssuers = builder.Environment.IsDevelopment()
+                    ? [authority, IdentitySettings.AndroidEmulatorAuthority]
+                    : [authority];
                 options.TokenValidationParameters.NameClaimType = "name";
             });
 
         builder.Services.AddAuthorization();
+        builder.Services.AddClientRateLimiting(builder.Configuration);
 
         return builder;
     }

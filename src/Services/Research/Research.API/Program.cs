@@ -49,8 +49,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpsApi();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseDefaultAuthentication();
 
 app.MapGet("/api/v1/status", () => new { Service = "research-api", Status = "ok" });
 app.MapResearchApi();

@@ -19,8 +19,7 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseDefaultAuthentication();
 
 app.MapGet("/api/v1/status", () => new { Service = "assistant-api", Status = "ok" });
 app.MapAskApi();

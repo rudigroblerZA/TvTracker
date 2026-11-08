@@ -1,0 +1,46 @@
+using System.Net;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
+
+namespace Catalog.UnitTests;
+
+/// <summary>
+/// Who a request counts against, as CONTEXT.md states it: the signed-in user, else the client address the gateway or web
+/// app added (the last X-Forwarded-For entry, since earlier ones come from the client), else a shared bucket for services.
+/// </summary>
+public class ClientRateLimitingTests
+{
+    private static DefaultHttpContext Request(string? userId = null, string? forwarded = null)
+    {
+        var context = new DefaultHttpContext();
+        if (userId is not null)
+        {
+            context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", userId)], "test"));
+        }
+        if (forwarded is not null)
+        {
+            context.Request.Headers["X-Forwarded-For"] = forwarded;
+        }
+        context.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.7");
+        return context;
+    }
+
+    [Fact]
+    public void A_signed_in_user_is_counted_as_themselves_wherever_they_call_from() =>
+        Assert.Equal(("user:abc", false), ClientRateLimiting.PartitionKey(Request("abc", "203.0.113.9")));
+
+    [Fact]
+    public void Signed_out_the_last_forwarded_address_counts_not_one_the_client_wrote()
+    {
+        // A client can send its own X-Forwarded-For; the gateway appends the address it saw.
+        Assert.Equal(("ip:203.0.113.9", false), ClientRateLimiting.PartitionKey(Request(forwarded: "1.2.3.4, 203.0.113.9")));
+    }
+
+    [Fact]
+    public void Calls_with_neither_are_another_service_and_share_one_bucket()
+    {
+        Assert.Equal(("service:10.0.0.7", true), ClientRateLimiting.PartitionKey(Request()));
+        Assert.Equal(("service:10.0.0.7", true), ClientRateLimiting.PartitionKey(Request(forwarded: "not-an-address")));
+    }
+}

@@ -41,7 +41,8 @@ public static class ProfileApi
         api.MapGet("/profile", GetProfileAsync);
         api.MapPut("/profile", UpdateProfileAsync);
         api.MapDelete("/account", DeleteAccountAsync);
-        api.MapGet("/account/export", ExportAsync);
+        // Each export reads every service, so a person gets a few an hour.
+        api.MapGet("/account/export", ExportAsync).RequireRateLimiting(ClientRateLimiting.Export);
 
         return api;
     }

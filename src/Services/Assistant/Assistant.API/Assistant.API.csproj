@@ -11,4 +11,8 @@
     <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Assistant.UnitTests" />
+  </ItemGroup>
+
 </Project>

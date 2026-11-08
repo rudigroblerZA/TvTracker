@@ -321,7 +321,7 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
     show or clear it.
 - **Tag filter:** `tags=a,b` means every tag listed. It's stored in `shows.Tags` (text[], GIN index) and needs sign-in
   (401 otherwise); the rest of search is public.
-- **Rate limits:** per user, else per client IP (the last `X-Forwarded-For` entry), else one shared bucket for services.
+- **Rate limits:** search's own policy, partitioned as every limit is (see Rate limits).
 
 ## Show detail cache
 
@@ -1515,6 +1515,50 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Checked in flagd** over OFREP with the rule as written: plan free → off (TARGETING_MATCH), plus or family → on, no plan
   → on (DEFAULT).
 
+## Production decisions
+
+- **Azure Container Apps** (a decision, 8 November 2026): deployed with azd and Aspire's publisher, managed Postgres with
+  PgBouncer (the connection budget, Persistence), Redis, and RabbitMQ and Keycloak as containers. The backlog's
+  deployment (O1) and the business plan's running costs assume it; Docker Compose on one VM and Kubernetes were the
+  alternatives.
+- **Stripe** for payments (the same day): the test provider already signs webhooks the way Stripe does, so the provider
+  is one class (BACKLOG F1). Paddle, a merchant of record that collects VAT and sales tax for a higher fee, was the
+  alternative.
+- **CI and hardening first:** every later change ships through CI.
+
+## CI
+
+- **GitHub Actions** (`.github/workflows/ci.yml`), on pull requests and `main`: builds the AppHost (every service and
+  the web app) and both tools in Release, then runs `dotnet test` on every project in `tests/`, so a new test project
+  needs no change to the workflow. The MAUI app needs its workload and is left out (BACKLOG Q3).
+- **Blocking a merge** is the repository's branch protection, requiring the `build-and-test` check; the workflow can't
+  set that itself.
+
+## Rate limits
+
+- **One partition rule** (`ClientRateLimiting.PartitionKey` in ServiceDefaults): the signed-in user, else the client
+  address the mobile gateway or web app forwarded (the last `X-Forwarded-For` entry; earlier ones come from the client),
+  else the calling service. Search had this first; it moved to ServiceDefaults when every service gained limits.
+- **Every change a person makes** (POST, PUT, PATCH, DELETE) counts against a global limiter: 120 in a burst, 300 a
+  minute after, refilled every 10 seconds (`RateLimits` configuration). Service-to-service calls (no token, nothing
+  forwarded) aren't limited: they're the app's own work, such as an accepted correction reaching the sync worker.
+- **Tighter policies:** people search (20, then 30 a minute, as show search) and the data export, which reads every
+  service (3 an hour).
+- **The app waits, not fails:** `ApiClientBase` waits out a 429's Retry-After (up to 30 seconds, three times), since a
+  history import's status step sends one change per show.
+- **One call turns it on:** `UseDefaultAuthentication()` adds authentication, authorization and the limiter, in that
+  order; the limiter needs the user, and with only `UseAuthentication` called ASP.NET adds authorization before it.
+- **Tested:** 300 settings changes at once got 183 through and 117 answered 429 with `Retry-After: 10`, reads untouched;
+  a fourth export in the hour 429; 25 people searches, 4 refused; `tvtracker-load run --users 20 --writes` for a
+  minute, 4,000 requests and no 429.
+
+## Production hygiene
+
+- **The demo account goes** (`DemoAccountRemover` in Identity.API): Keycloak imports the realm file, demo / demo
+  included, on its first start, so outside Development Identity deletes the `demo` user on every start. Development
+  keeps it: it's how the app is tried.
+- **The Android emulator's issuer** (`http://10.0.2.2:8080/…`) is accepted only in Development.
+
 ## Secrets
 
 - **Aspire secret parameters** (`Secret` in `AppHost.cs`): the Keycloak clients' secrets (`web-client-secret`,
@@ -1738,13 +1782,13 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 - **Unit tests for the pure rules** (`tests/Catalog.UnitTests`, `tests/Analytics.UnitTests`,
   `tests/Recommendations.UnitTests`, `tests/Notifications.UnitTests`, `tests/Research.UnitTests`,
-  `tests/Identity.UnitTests`, xUnit v3): no database,
+  `tests/Identity.UnitTests`, `tests/Ratings.UnitTests`, `tests/Assistant.UnitTests`, `tests/UI.UnitTests`, xUnit v3): no database,
   network or AppHost, so they run in a second. The service projects grant `InternalsVisibleTo` to their test project,
   and a rule buried in an endpoint is pulled out into an internal static method to be tested (Streaks' `KeptUp`,
   `CatalogSynchronizer.StatusOf` with the clock passed in) rather than tested through HTTP.
 - **Runner:** xunit.v3 4 runs on Microsoft.Testing.Platform only, which on the .NET 10 SDK refuses the old VSTest
   `dotnet test`; `global.json`'s `test.runner` opts into the new one, and the documented commands work unchanged.
-- **What they cover:** Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
+- **What they cover:** the rate limits' partition rule (in Catalog's project, beside the cached flags); Catalog's title keys, character and franchise matching, crossover labels, Wikiquote parsing,
   overrides, where-to-watch links, HTML stripping, the presumed-ended status, affiliate links, the TVmaze budget
   (the two-lane limiter on a fake clock, the change rule and the refresh schedule), the makers ranking, title formulas,
   characters' names and episode-length verdicts; Analytics' copy rules, streaks, the
@@ -1753,7 +1797,10 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   weights; Notifications' quiet hours (time zones, a daylight-saving gap), when a digest is due, which preference an
   alert follows, and the verdict, crossover and digest texts; Research's refresh rule, the daily check's loose matches and
   when the research assistant leaves a workspace alone; Identity's payment rules (webhook signatures, prices by region,
-  how far a payment pays, when a subscription lapses).
+  how far a payment pays, when a subscription lapses); Ratings' moderation (blocked terms as whole words, held links,
+  who moderates); Ask's guards (missing and out-of-enum arguments, made-up ids, whole-word links, compacted results); and
+  the shared UI's history import (each sample file's counts as `samples/history-import/README.md` gives them, zone-less
+  times, the earliest watch, account files left unread) and Tonight's planner (overrun, one show, the mix cap).
 - **Worker stages on built shows:** `Build.Context` makes a `ShowInsightContext` from in-memory episodes and an
   `InsightSources` with nothing about our users, so a stage runs exactly as in the pipeline.
 - **Examples from this file:** a test uses the cases written here where it can (MobLand's and Scrubs' streaks, "NCIS:
@@ -1761,6 +1808,5 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Known gaps
 
-- There's no CI, and only Catalog, Analytics, Recommendations, Notifications, Research and Identity have tests.
+- Tracking and Social have no unit tests, and CI doesn't build the MAUI app (BACKLOG Q3).
 - The MAUI app has been compiled only for Android, on Linux; iOS, Mac Catalyst and Windows builds are unchecked.
-- The realm file still has the demo user (demo / demo); a shared environment should delete it.

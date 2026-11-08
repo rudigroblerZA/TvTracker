@@ -44,8 +44,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseDefaultAuthentication();
 
 app.MapGet("/api/v1/status", () => new { Service = "ratings-api", Status = "ok" });
 app.MapRatingsApi();

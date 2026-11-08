@@ -28,6 +28,20 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Deletes the user with this username, if there is one; true when one was deleted.
+    /// </summary>
+    public async Task<bool> DeleteUserByNameAsync(string username, CancellationToken cancellationToken)
+    {
+        var token = await GetAdminTokenAsync(cancellationToken);
+        if (await FindUserIdAsync(token, username, cancellationToken) is not { } id)
+        {
+            return false;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Delete, $"{Users}/{Uri.EscapeDataString(id)}", token, null, cancellationToken, HttpStatusCode.NotFound);
+        return true;
+    }
+
+    /// <summary>
     /// Makes sure a user exists with this password: creates them when missing (true), else resets their password, so
     /// the configured value is the one that holds (false).
     /// </summary>

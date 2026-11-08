@@ -21,6 +21,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<ProfileSnapshotPublisher>();
 builder.Services.AddHostedService<RealmSecretsSeeder>();
 builder.Services.AddHostedService<AdminAccountSeeder>();
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.AddHostedService<DemoAccountRemover>();
+}
 
 // Payments: the provider named in Payments:Provider sells plans; the test provider only in development.
 builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
@@ -50,8 +54,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseDefaultAuthentication();
 
 app.MapGet("/api/v1/status", () => new { Service = "identity-api", Status = "ok" });
 app.MapProfileApi();

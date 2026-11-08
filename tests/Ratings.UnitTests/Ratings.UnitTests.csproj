@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of Ratings' moderation rules: blocked terms, held links and who moderates. No database or network. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Ratings\Ratings.API\Ratings.API.csproj" />
+  </ItemGroup>
+
+</Project>

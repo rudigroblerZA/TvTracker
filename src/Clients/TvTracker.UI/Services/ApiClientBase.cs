@@ -28,8 +28,7 @@ public abstract class ApiClientBase(
         var cacheKey = $"{client}:{url}";
         try
         {
-            using var request = await CreateRequestAsync(HttpMethod.Get, url, null, ct);
-            using var response = await httpClientFactory.CreateClient(client).SendAsync(request, ct);
+            using var response = await SendWaitingAsync(client, HttpMethod.Get, url, null, ct);
 
             if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NoContent)
             {
@@ -68,8 +67,7 @@ public abstract class ApiClientBase(
         var json = body is null ? null : JsonSerializer.Serialize(body, body.GetType(), JsonOptions);
         try
         {
-            using var request = await CreateRequestAsync(method, url, json, ct);
-            using var response = await httpClientFactory.CreateClient(client).SendAsync(request, ct);
+            using var response = await SendWaitingAsync(client, method, url, json, ct);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -111,6 +109,33 @@ public abstract class ApiClientBase(
         }
         return (int)response.StatusCode < 500;
     }
+
+    /// <summary>
+    /// Sends a request, and when the service answers 429 (a rate limit, ClientRateLimiting), waits the Retry-After it
+    /// gives and tries again, up to <see cref="RateLimitRetries"/> times, so a long run of changes (a history import's
+    /// statuses) slows down instead of failing. A wait longer than <see cref="MaxRateLimitWait"/> is left to the caller.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendWaitingAsync(string client, HttpMethod method, string url, string? json, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            using var request = await CreateRequestAsync(method, url, json, ct);
+            var response = await httpClientFactory.CreateClient(client).SendAsync(request, ct);
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt == RateLimitRetries
+                || RetryAfter(response) is not { } wait || wait > MaxRateLimitWait)
+            {
+                return response;
+            }
+            response.Dispose();
+            await Task.Delay(wait, ct);
+        }
+    }
+
+    internal const int RateLimitRetries = 3;
+    internal static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(30);
+
+    private static TimeSpan? RetryAfter(HttpResponseMessage response) =>
+        response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date is { } at ? at - DateTimeOffset.UtcNow : null);
 
     private async Task<HttpRequestMessage> CreateRequestAsync(HttpMethod method, string url, string? json, CancellationToken ct)
     {
