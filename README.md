@@ -744,6 +744,23 @@ Catalog.API gathers the other services' sections server-side (`/api/v1/ops/stats
 `/api/v1/imports/bulk/current` on the sync worker); a service that's down just leaves its section empty. Since it
 isn't signed in, it and the stats endpoints are only mapped in Development.
 
+### Alerts
+
+Each service checks a few conditions a minute (the first two minutes after start) and says when one starts or stops:
+
+| Alert | Where | Fires when |
+| --- | --- | --- |
+| `outbox-backlog` | every service with an outbox | an event saved to the outbox is still unpublished after 5 minutes |
+| `dead-letters` | Catalog.API | `tvtracker_dead_letters` holds anything (see the ops page to replay) |
+| `insights-run` | Analytics.Worker | the last insights run failed, or none finished in two intervals |
+| `tvmaze-errors` | Catalog.SyncWorker | 10%+ of 20 or more TVmaze calls in 15 minutes failed (5xx, no answer, 429) |
+| `ask-queue` | Assistant.API | the oldest unanswered question is 10 minutes old, or 10 are waiting |
+
+A firing alert shows three ways: the service turns **Degraded** on the Aspire dashboard (its `/health` names the alert;
+still 200, so nothing restarts it), one error log `Alert {Alert} firing: …` (and an information log when it's resolved),
+and the `tvtracker.alerts.firing` gauge (1 or 0, tagged `alert`) on the `TvTracker.Alerts` meter, for a monitoring
+backend's alert rules. `Alerts:Interval` and `Alerts:FirstCheck` change the timing.
+
 ### Feature flags
 
 Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, While you wait, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,

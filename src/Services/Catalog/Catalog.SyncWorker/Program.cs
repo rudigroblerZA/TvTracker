@@ -1,3 +1,4 @@
+using Catalog.SyncWorker.Alerts;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.SyncWorker;
@@ -37,6 +38,7 @@ else
     builder.Services.Configure<TvMazeOptions>(builder.Configuration.GetSection("TvMaze"));
     builder.Services.AddSingleton<TvMazeRateLimiter>();
     builder.Services.AddSingleton<TvMazeUsage>();
+    builder.Services.AddAlert<TvMazeErrorsAlert>();
     builder.Services.AddSingleton<TvMazeEmbedOutage>();
     builder.Services.AddTransient<TvMazeRateLimitHandler>();
     builder.Services.AddHttpClient<ICatalogProvider, TvMazeCatalogProvider>((sp, http) =>

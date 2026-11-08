@@ -6,7 +6,8 @@ namespace Analytics.Worker;
 /// Recomputes all insights shortly after startup, then every <c>Analytics:RefreshInterval</c> (default one hour), and
 /// scores the season calls whose seasons are over.
 /// </summary>
-public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, TimeProvider time, ILogger<InsightsRefresher> logger)
+public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfiguration configuration, TimeProvider time, InsightsRunStatus status,
+    ILogger<InsightsRefresher> logger)
     : BackgroundService
 {
     /// <summary>
@@ -19,12 +20,15 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
     /// </summary>
     private static readonly TimeSpan FullSyncInterval = TimeSpan.FromDays(1);
 
+    public static TimeSpan Interval(IConfiguration configuration) => configuration.GetValue("Analytics:RefreshInterval", TimeSpan.FromHours(1));
+
+    public static TimeSpan FirstRunDelay(IConfiguration configuration) => configuration.GetValue("Analytics:StartupDelay", StartupDelay);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = configuration.GetValue("Analytics:RefreshInterval", TimeSpan.FromHours(1));
-        await Task.Delay(configuration.GetValue("Analytics:StartupDelay", StartupDelay), stoppingToken);
+        await Task.Delay(FirstRunDelay(configuration), stoppingToken);
 
-        using var timer = new PeriodicTimer(interval);
+        using var timer = new PeriodicTimer(Interval(configuration));
         var lastFullSync = DateTimeOffset.MinValue;
         do
         {
@@ -37,9 +41,11 @@ public sealed class InsightsRefresher(IServiceScopeFactory scopeFactory, IConfig
                 {
                     lastFullSync = time.GetUtcNow();
                 }
+                status.Succeeded();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                status.Failed(ex);
                 logger.LogError(ex, "Computing insights failed; will retry at the next interval");
             }
 

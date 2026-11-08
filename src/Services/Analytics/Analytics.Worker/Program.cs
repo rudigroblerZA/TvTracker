@@ -42,6 +42,8 @@ builder.Services.AddIntegrationEventOutbox<AnalyticsContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInsights();
 builder.Services.AddScoped<SeasonCallScorer>();
+builder.Services.AddSingleton<InsightsRunStatus>();
+builder.Services.AddAlert<InsightsRunAlert>();
 builder.Services.AddHostedService<InsightsRefresher>();
 
 // Backfill on first start; the sync worker's internal replay endpoint.

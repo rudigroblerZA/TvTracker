@@ -215,6 +215,20 @@ public sealed class TvMazeUsage
     }
 
     /// <summary>
+    /// Calls in the last <paramref name="window"/> (at most an hour), and how many of them failed: a server error, no
+    /// answer, or 429. A 404 is TVmaze's answer about a show or person, not an error.
+    /// </summary>
+    public (int Calls, int Errors) Errors(TimeSpan window)
+    {
+        lock (gate)
+        {
+            var since = time.GetUtcNow() - window;
+            var calls = recent.Where(c => c.At >= since).ToList();
+            return (calls.Count, calls.Count(c => c.Status is 0 or 429 or >= 500));
+        }
+    }
+
+    /// <summary>
     /// The last hour, per caller, busiest first.
     /// </summary>
     public TvMazeUsageReport Report((int Interactive, int Background) waiting)

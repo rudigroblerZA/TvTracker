@@ -1,4 +1,5 @@
 using TvTracker;
+using Catalog.API.Alerts;
 using Catalog.API.Apis;
 using Catalog.API.Services;
 using Catalog.Data;
@@ -77,6 +78,7 @@ if (AffiliateLinks.TestNetwork(builder.Configuration) is { } testNetwork)
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
 builder.AddRabbitMQEventBus("eventbus");
 builder.Services.AddHostedService<CrossoverAlerts>();
+builder.Services.AddAlert<DeadLettersAlert>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
