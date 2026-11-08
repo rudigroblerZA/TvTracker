@@ -1,3 +1,4 @@
+using TvTracker;
 using Analytics.Data;
 using Analytics.Worker;
 using Analytics.Worker.Insights;
@@ -44,7 +45,9 @@ builder.Services.AddScoped<SeasonCallScorer>();
 builder.Services.AddHostedService<InsightsRefresher>();
 
 // Backfill on first start; the sync worker's internal replay endpoint.
-builder.Services.AddHttpClient<CatalogReplayRequester>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"));
+builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
+builder.Services.AddHttpClient<CatalogReplayRequester>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CatalogReplayRequester>());
 
 var app = builder.Build();

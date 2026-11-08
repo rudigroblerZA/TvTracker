@@ -14,7 +14,7 @@ public static class OverridesApi
 {
     public static void MapOverridesApi(this IEndpointRouteBuilder app)
     {
-        var api = app.MapGroup("/api/v1/overrides");
+        var api = app.MapGroup("/api/v1/overrides").RequireAuthorization(AuthenticationExtensions.InternalPolicy);
         api.MapPost("", AddAsync);
         api.MapDelete("/{id:guid}", RemoveAsync);
     }

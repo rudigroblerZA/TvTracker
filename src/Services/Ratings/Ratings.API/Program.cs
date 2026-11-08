@@ -1,3 +1,4 @@
+using TvTracker;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Ratings.API.Apis;
@@ -30,7 +31,9 @@ builder.Services.AddHostedService<RatingsSnapshotPublisher>();
 builder.Services.AddSingleton<Moderation>();
 
 // Accepted corrections are applied by the catalog sync worker.
-builder.Services.AddHttpClient<CatalogSyncClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"));
+builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
+builder.Services.AddHttpClient<CatalogSyncClient>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

@@ -20,7 +20,7 @@ public static class ImportApi
 
     public static RouteGroupBuilder MapImportApi(this IEndpointRouteBuilder app)
     {
-        var api = app.MapGroup("/api/v1/imports");
+        var api = app.MapGroup("/api/v1/imports").RequireAuthorization(AuthenticationExtensions.InternalPolicy);
 
         api.MapPost("/search", ImportSearchResultsAsync);
 

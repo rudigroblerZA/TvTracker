@@ -1,29 +1,37 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-namespace Mcp.Server.Services;
+namespace TvTracker;
 
 /// <summary>
-/// The MCP server's own access token, for Analytics.API (every endpoint there needs sign-in). It signs in as the
-/// confidential client <c>Mcp:ClientId</c> with the client-credentials grant; the token carries the services' audience
-/// and no user, so only endpoints that don't need a user answer it.
+/// A service's own access token, for calls made as the service rather than for a user: Mcp.Server reading Analytics
+/// (<c>tvtracker-mcp</c>), and the callers of the sync worker's internal APIs (<c>tvtracker-internal</c>, which the sync
+/// worker requires; <see cref="Microsoft.Extensions.Hosting.AuthenticationExtensions.InternalPolicy"/>). It signs in with
+/// the client-credentials grant as <c>{section}:ClientId</c> / <c>{section}:ClientSecret</c>; the token carries the
+/// services' audience and no person, and is kept until 80% of its lifetime.
 /// <para>
-/// Keycloak imports the realm only on its first start, so in development a realm made before this client existed gets
-/// it here, through the master realm's admin API (<c>Keycloak:AdminUsername</c> / <c>Keycloak:AdminPassword</c>, set by
-/// the AppHost), as <see cref="ClientDefinition"/>.
+/// Keycloak imports the realm only on its first start. A realm made before a client existed gets it from Identity.API on
+/// start (<c>Keycloak:ServiceClients</c>), or, in development, here, when the service has the master realm's admin
+/// (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>; only Mcp.Server is given it).
 /// </para>
 /// </summary>
-public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration config, IHostEnvironment environment, ILogger<ServiceToken> logger)
+public sealed class ServiceToken(HttpClient http, IConfiguration config, IHostEnvironment environment, ILogger<ServiceToken> logger,
+    string section, string defaultClientId)
 {
-    private readonly HttpClient http = httpFactory.CreateClient(nameof(ServiceToken));
     private readonly SemaphoreSlim gate = new(1, 1);
     private string? token;
     private DateTimeOffset refreshAt;
 
     private string BaseUrl => (config["Identity:Url"] ?? throw new InvalidOperationException("Missing configuration value 'Identity:Url'.")).TrimEnd('/');
-    private string ClientId => config["Mcp:ClientId"] ?? "tvtracker-mcp";
-    private string ClientSecret => config["Mcp:ClientSecret"] ?? throw new InvalidOperationException("Missing configuration value 'Mcp:ClientSecret'.");
+    public string ClientId => config[$"{section}:ClientId"] ?? defaultClientId;
+    private string ClientSecret => config[$"{section}:ClientSecret"]
+        ?? throw new InvalidOperationException($"Missing configuration value '{section}:ClientSecret'.");
 
     public async Task<string> GetAsync(CancellationToken ct)
     {
@@ -47,7 +55,7 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
             }
             if (response is null)
             {
-                throw new InvalidOperationException($"Keycloak refused the client '{ClientId}'. Check Mcp:ClientSecret, or create the client.");
+                throw new InvalidOperationException($"Keycloak refused the client '{ClientId}'. Check {section}:ClientSecret, or create the client.");
             }
 
             token = response.AccessToken;
@@ -81,7 +89,7 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
     }
 
     /// <summary>
-    /// Creates the client unless it exists. True when it created it.
+    /// Creates the client unless it exists, when this service has the master realm's admin. True when it created it.
     /// </summary>
     private async Task<bool> EnsureClientAsync(CancellationToken ct)
     {
@@ -105,21 +113,48 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
             return false;
         }
 
-        using var create = new HttpRequestMessage(HttpMethod.Post, clients) { Content = JsonContent.Create(ClientDefinition(ClientId, ClientSecret)) };
+        using var create = new HttpRequestMessage(HttpMethod.Post, clients)
+        {
+            Content = JsonContent.Create(ServiceClients.Definition(ClientId, ClientId, ClientSecret))
+        };
         create.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
         using var created = await http.SendAsync(create, ct);
+        if (created.StatusCode == HttpStatusCode.Conflict)
+        {
+            return true;
+        }
         created.EnsureSuccessStatusCode();
-        logger.LogInformation("Created the Keycloak client {ClientId} for the MCP server", ClientId);
+        logger.LogInformation("Created the Keycloak client {ClientId}", ClientId);
         return true;
     }
 
-    /// <summary>
-    /// Confidential, client credentials only, with the same audience mapper as the app's clients.
-    /// </summary>
-    private static object ClientDefinition(string clientId, string secret) => new
+    private sealed record TokenResponse(
+        [property: JsonPropertyName("access_token")] string AccessToken,
+        [property: JsonPropertyName("expires_in")] int ExpiresIn);
+}
+
+/// <summary>
+/// Puts a <see cref="ServiceToken"/> on each request of the HttpClient it's added to.
+/// </summary>
+public sealed class ServiceTokenHandler(ServiceToken token) : DelegatingHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await token.GetAsync(cancellationToken));
+        return await base.SendAsync(request, cancellationToken);
+    }
+}
+
+/// <summary>
+/// Service clients in Keycloak: confidential, client credentials only, with the same audience mapper as the app's clients,
+/// so the services accept their tokens.
+/// </summary>
+public static class ServiceClients
+{
+    public static object Definition(string clientId, string name, string secret) => new
     {
         clientId,
-        name = "MCP server (internal queries)",
+        name,
         enabled = true,
         protocol = "openid-connect",
         publicClient = false,
@@ -144,19 +179,17 @@ public sealed class ServiceToken(IHttpClientFactory httpFactory, IConfiguration 
         }
     };
 
-    private sealed record TokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken,
-        [property: JsonPropertyName("expires_in")] int ExpiresIn);
-}
-
-/// <summary>
-/// Adds the service token to Analytics.API calls.
-/// </summary>
-public sealed class ServiceTokenHandler(ServiceToken token) : DelegatingHandler
-{
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Registers the service's token (one per process) and its handler; add the handler to each client that calls as the
+    /// service: <c>.AddHttpMessageHandler&lt;ServiceTokenHandler&gt;()</c>.
+    /// </summary>
+    public static IServiceCollection AddServiceToken(this IServiceCollection services, string section, string defaultClientId)
     {
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await token.GetAsync(cancellationToken));
-        return await base.SendAsync(request, cancellationToken);
+        services.AddHttpClient(nameof(ServiceToken));
+        services.AddSingleton(sp => new ServiceToken(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(ServiceToken)),
+            sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<ILogger<ServiceToken>>(),
+            section, defaultClientId));
+        services.AddTransient<ServiceTokenHandler>();
+        return services;
     }
 }

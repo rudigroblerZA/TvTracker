@@ -11,6 +11,8 @@ using TvTracker.IntegrationEvents;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// The import, replay and override APIs answer only other services' internal client (BACKLOG S2).
+builder.AddDefaultAuthentication();
 
 // The schema is created by Catalog.API; the AppHost starts this worker once that service is healthy.
 builder.AddCatalogDbContext();
@@ -69,8 +71,10 @@ builder.Services.AddHostedService<NanogenreService>();
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+app.UseDefaultAuthentication();
 
-// Internal only: Catalog.API calls this before searching. Not exposed outside the Aspire network.
+// Internal only: other services call these with the internal client's token (AuthenticationExtensions.InternalPolicy);
+// they aren't routed by the BFF either.
 app.MapImportApi();
 app.MapOverridesApi();
 

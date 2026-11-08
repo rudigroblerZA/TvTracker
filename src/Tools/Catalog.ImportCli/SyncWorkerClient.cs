@@ -33,11 +33,14 @@ public record BulkImportProblem(string Item, string Reason);
 public sealed class CliException(string message) : Exception(message);
 
 /// <summary>
-/// Calls the sync worker's internal bulk import endpoints (/api/v1/imports/bulk).
+/// Calls the sync worker's internal bulk import endpoints (/api/v1/imports/bulk), signed in as the internal client
+/// (tvtracker-internal, client credentials), which is all those endpoints accept.
 /// </summary>
-public sealed class SyncWorkerClient(Uri baseUrl) : IDisposable
+public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSecret) : IDisposable
 {
+    private const string ClientId = "tvtracker-internal";
     private readonly HttpClient _http = new() { BaseAddress = baseUrl, Timeout = TimeSpan.FromSeconds(30) };
+    private DateTimeOffset _tokenRefreshAt;
 
     /// <summary>
     /// Starts a job. Returns the running job instead, with Started false, when one is already running.
@@ -89,13 +92,51 @@ public sealed class SyncWorkerClient(Uri baseUrl) : IDisposable
 
     private async Task<HttpResponseMessage> SendAsync(Func<Task<HttpResponseMessage>> send)
     {
+        await SignInAsync();
         try
         {
-            return await send();
+            var response = await send();
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                throw new CliException($"The sync worker refused the internal client's token ({(int)response.StatusCode}). Check --client-secret.");
+            }
+            return response;
         }
         catch (HttpRequestException ex)
         {
             throw new CliException($"Couldn't reach the sync worker at {_http.BaseAddress} ({ex.Message}). Is the AppHost running?");
+        }
+    }
+
+    /// <summary>
+    /// A client-credentials token from Keycloak, kept until 80% of its lifetime (a followed import polls for a while).
+    /// </summary>
+    private async Task SignInAsync()
+    {
+        if (_http.DefaultRequestHeaders.Authorization is not null && DateTimeOffset.UtcNow < _tokenRefreshAt)
+        {
+            return;
+        }
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.PostAsync(new Uri(keycloak, "realms/tvtracker/protocol/openid-connect/token"), new FormUrlEncodedContent(
+                new Dictionary<string, string> { ["grant_type"] = "client_credentials", ["client_id"] = ClientId, ["client_secret"] = clientSecret }));
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new CliException($"Couldn't reach Keycloak at {keycloak} ({ex.Message}). Is the AppHost running?");
+        }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new CliException($"Keycloak refused the internal client ({(int)response.StatusCode}). Check --client-secret.");
+            }
+            var token = await response.Content.ReadFromJsonAsync<System.Text.Json.Nodes.JsonObject>();
+            _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",
+                token?["access_token"]?.GetValue<string>() ?? throw new CliException("Keycloak answered without a token."));
+            _tokenRefreshAt = DateTimeOffset.UtcNow.AddSeconds((token["expires_in"]?.GetValue<int>() ?? 60) * 0.8);
         }
     }
 

@@ -1,14 +1,13 @@
 using Mcp.Server.Services;
 using Mcp.Server.Tools;
 using ModelContextProtocol.Protocol;
+using TvTracker;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-builder.Services.AddHttpClient(nameof(ServiceToken));
-builder.Services.AddSingleton<ServiceToken>();
-builder.Services.AddTransient<ServiceTokenHandler>();
+builder.Services.AddServiceToken("Mcp", "tvtracker-mcp");
 builder.Services.AddHttpClient(Backends.Catalog, client => client.BaseAddress = new Uri("https+http://catalog-api/"));
 builder.Services.AddHttpClient(Backends.Analytics, client => client.BaseAddress = new Uri("https+http://analytics-api/"))
     .AddHttpMessageHandler<ServiceTokenHandler>();

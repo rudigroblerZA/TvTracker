@@ -1,3 +1,4 @@
+using TvTracker;
 using Social.API.Apis;
 using Social.API.Data;
 using Social.API.IntegrationEvents;
@@ -49,7 +50,9 @@ builder.Services.AddIntegrationEventOutbox<SocialContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Backfill on first start; the sync worker's internal replay endpoint.
-builder.Services.AddHttpClient<CatalogReplayRequester>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"));
+builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
+builder.Services.AddHttpClient<CatalogReplayRequester>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
+    .AddHttpMessageHandler<ServiceTokenHandler>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CatalogReplayRequester>());
 
 builder.Services.AddProblemDetails();

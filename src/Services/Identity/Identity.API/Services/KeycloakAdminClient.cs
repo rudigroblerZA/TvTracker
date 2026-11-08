@@ -106,6 +106,22 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Creates a service client (<see cref="TvTracker.ServiceClients.Definition"/>) unless the realm has it. True when it
+    /// created it.
+    /// </summary>
+    public async Task<bool> EnsureServiceClientAsync(string token, string clientId, string name, string secret, CancellationToken cancellationToken)
+    {
+        if (await FindClientAsync(token, clientId, cancellationToken) is not null)
+        {
+            return false;
+        }
+        var (status, _) = await SendAsync<JsonNode>(HttpMethod.Post, Clients, token,
+            System.Text.Json.JsonSerializer.SerializeToNode(TvTracker.ServiceClients.Definition(clientId, name, secret)), cancellationToken,
+            HttpStatusCode.Conflict);
+        return status != HttpStatusCode.Conflict;
+    }
+
+    /// <summary>
     /// Adds <paramref name="pattern"/> to a client's allowed redirect and post-logout redirect addresses unless it's
     /// there. Null when the realm has no such client, else whether it changed.
     /// </summary>
