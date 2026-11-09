@@ -266,6 +266,12 @@ public static partial class HistoryImportParser
             ReadEntry(fileName, file);
         }
 
+        // A rated series has been watched, so IMDb's watchlist (in the same archive, in either order) doesn't plan it.
+        foreach (var key in ratings.Keys.Where(k => follows.TryGetValue(k, out var f) && f.Status == "plan"))
+        {
+            follows.Remove(key);
+        }
+
         var all = watches.Values.Select(v => v.Watch).OrderBy(w => w.WatchedAtUtc ?? DateTimeOffset.MaxValue).ToList();
         var used = all.Select(w => w.ShowKey).Concat(follows.Keys).Concat(ratings.Keys).ToHashSet();
         var dated = all.Where(w => w.WatchedAtUtc is not null).ToList();

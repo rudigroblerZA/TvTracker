@@ -21,7 +21,8 @@ public record ResolveShowRequest(string Key, string? TvdbId, string? Title, int?
 public record ResolveShowsRequest(IReadOnlyList<ResolveShowRequest> Shows);
 
 /// <param name="ExternalId">The provider's id, now in the catalog; null when the show couldn't be found.</param>
-/// <param name="Outcome">"found" (already in the catalog), "imported", "not-found" or "failed" (the provider erred; try again later).</param>
+/// <param name="Outcome">"found" (already in the catalog), "imported", "not-found", "failed" (the provider erred; try again
+/// later) or "later" (the call's time ran out before this show; send it again).</param>
 public record ResolvedShow(string Key, string? ExternalId, string Outcome);
 
 public record ResolveShowsResult(IReadOnlyList<ResolvedShow> Shows);

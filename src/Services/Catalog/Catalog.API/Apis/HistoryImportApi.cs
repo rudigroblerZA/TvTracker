@@ -17,7 +17,8 @@ public record HistoryEpisodeNumber(int Season, int Number);
 
 public record HistoryResolveRequest(IReadOnlyList<HistoryShowRequest> Shows);
 
-/// <param name="Outcome">"found", "imported", "not-found" or "failed" (try that show again later).</param>
+/// <param name="Outcome">"found", "imported", "not-found", "failed" (try that show again later) or "later" (not reached in
+/// this call's time; send it again).</param>
 /// <param name="Episodes">The ids of the requested episodes the catalog has; a number it lacks is left out.</param>
 public record HistoryShowDto(string Key, Guid? ShowId, string? Title, string? PosterUrl, string Outcome, IReadOnlyList<HistoryEpisodeDto> Episodes);
 

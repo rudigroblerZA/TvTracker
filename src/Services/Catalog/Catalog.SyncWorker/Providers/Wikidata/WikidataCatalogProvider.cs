@@ -99,10 +99,17 @@ public sealed class WikidataCatalogProvider(WikidataSparql wikidata, TimeProvide
     public Task<string?> LookUpShowByImdbAsync(string imdbId, CancellationToken cancellationToken = default) =>
         LookUpAsync("P345", imdbId, cancellationToken);
 
+    /// <summary>
+    /// The best-known show item with that id: an id can sit on several items (a series and its franchise), and only a
+    /// show can be imported.
+    /// </summary>
     private async Task<string?> LookUpAsync(string property, string value, CancellationToken ct)
     {
         var rows = await wikidata.QueryAsync($$"""
-            SELECT ?item WHERE { ?item wdt:{{property}} {{WikidataSparql.Literal(value)}} . } LIMIT 1
+            SELECT ?item ?sl WHERE {
+              ?item wdt:{{property}} {{WikidataSparql.Literal(value)}} ; wikibase:sitelinks ?sl .
+              FILTER EXISTS { VALUES ?type { {{Types}} } ?item wdt:P31 ?type }
+            } ORDER BY DESC(?sl) LIMIT 1
             """, ct);
         return rows.Select(r => Id(r["item"])).FirstOrDefault();
     }
@@ -132,7 +139,8 @@ public sealed class WikidataCatalogProvider(WikidataSparql wikidata, TimeProvide
                 OPTIONAL { ?seasonItem p:P179 ?ss . ?ss ps:P179 wd:{{externalId}} ; pq:P1545 ?sRaw . BIND(xsd:integer(?sRaw) AS ?s) }
               }
               OPTIONAL { ?ep wdt:P577 ?date }
-              OPTIONAL { ?ep wdt:P2047 ?dur }
+              # The duration normalised to seconds: the statement's own amount may be in minutes, hours or seconds.
+              OPTIONAL { ?ep p:P2047/psn:P2047/wikibase:quantityAmount ?seconds . BIND(?seconds / 60 AS ?dur) }
               OPTIONAL { ?ep rdfs:label ?title FILTER(LANG(?title) = "en") }
             } GROUP BY ?ep ?title
             """, cancellationToken))
@@ -326,7 +334,8 @@ public sealed class WikidataCatalogProvider(WikidataSparql wikidata, TimeProvide
                   ?item wdt:P31 ?showType ; wdt:P31 ?type ; wikibase:sitelinks ?sl ; rdfs:label ?label FILTER(LANG(?label) = "en")
                   OPTIONAL { ?item schema:description ?description FILTER(LANG(?description) = "en") }
                   OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> }
-                  OPTIONAL { ?item wdt:P580 ?start }
+                  # The start time, else the publication date: many series items have only the latter.
+                  OPTIONAL { ?item wdt:P580|wdt:P577 ?start }
                   OPTIONAL { ?item wdt:P582 ?end }
                   OPTIONAL { ?item wdt:P3383|wdt:P18|wdt:P154 ?image }
                   OPTIONAL { ?item wdt:P449 ?net . ?net rdfs:label ?networkName FILTER(LANG(?networkName) = "en") }

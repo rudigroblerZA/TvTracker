@@ -209,17 +209,27 @@ public sealed class CatalogSynchronizer(
     /// shows "Running" for years (Girls, last aired 2017; Peaky Blinders, 2022), often with an undated, empty next
     /// season, which therefore doesn't count as coming. A scheduled episode, a TBA one, or a dated season brings the
     /// show back to airing on its next refresh.
+    /// <para>
+    /// A TBA episode is an undated one after the last dated episode: Wikidata leaves many past episodes undated (66 of
+    /// Friends' 236 have a date), and those aren't still to come. A show with no dated episode at all goes by its
+    /// premiere.
+    /// </para>
     /// </summary>
     internal static ShowStatus StatusOf(ProviderShow p, DateTimeOffset now)
     {
+        var lastDated = p.Episodes.Where(e => e.AirsAtUtc is not null)
+            .MaxBy(e => (e.SeasonNumber, e.EpisodeNumber));
+        bool Tba(ProviderEpisode e) => e.AirsAtUtc is null
+            && (lastDated is null || (e.SeasonNumber, e.EpisodeNumber).CompareTo((lastDated.SeasonNumber, lastDated.EpisodeNumber)) > 0);
         if (p.Status != ShowStatus.Airing
-            || p.Episodes.Any(e => e.AirsAtUtc is null || e.AirsAtUtc > now)
+            || p.Episodes.Any(e => Tba(e) || e.AirsAtUtc > now)
             || p.Seasons.Any(s => s.PremieresAtUtc > now))
         {
             return p.Status;
         }
 
-        var last = p.Episodes.Max(e => e.AirsAtUtc);
+        var last = p.Episodes.Max(e => e.AirsAtUtc)
+            ?? (p.FirstAirDate is { } premiere ? new DateTimeOffset(premiere.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null);
         return last < now.AddYears(-PresumedEndedAfterYears) ? ShowStatus.Ended : p.Status;
     }
 

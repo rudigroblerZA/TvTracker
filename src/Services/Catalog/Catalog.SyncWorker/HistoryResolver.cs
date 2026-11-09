@@ -14,16 +14,29 @@ namespace Catalog.SyncWorker;
 /// or "The Office" is a coin toss. Lookups are cached for <see cref="CacheFor"/>
 /// (misses too, for a day), so a second import of the same export costs no provider calls for lookups.
 /// </summary>
-public sealed class HistoryResolver(ICatalogProvider provider, CatalogSynchronizer synchronizer, HybridCache cache, ILogger<HistoryResolver> logger)
+public sealed class HistoryResolver(ICatalogProvider provider, CatalogSynchronizer synchronizer, HybridCache cache, TimeProvider time,
+    ILogger<HistoryResolver> logger)
 {
+    /// <summary>
+    /// How long one call may spend before handing the shows it hasn't reached back as "later", well inside the page's
+    /// request timeout: a show the catalog lacks is two TVmaze calls, but four or five Wikidata queries a second apart.
+    /// </summary>
+    internal static readonly TimeSpan Budget = TimeSpan.FromSeconds(15);
+
     private static readonly TimeSpan CacheFor = TimeSpan.FromDays(30);
     private static readonly TimeSpan MissCacheFor = TimeSpan.FromDays(1);
 
     public async Task<ResolveShowsResult> ResolveAsync(ResolveShowsRequest request, CancellationToken ct)
     {
         var results = new List<ResolvedShow>();
+        var started = time.GetUtcNow();
         foreach (var show in request.Shows)
         {
+            if (time.GetUtcNow() - started > Budget)
+            {
+                results.Add(new ResolvedShow(show.Key, null, "later"));
+                continue;
+            }
             try
             {
                 var externalId = await FindAsync(show, ct);

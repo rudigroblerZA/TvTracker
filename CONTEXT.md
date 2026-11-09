@@ -102,7 +102,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **What a show is:** an item that is a television series, miniseries, animated, anime or web series. Episodes are
     the episode items part of it (P179), placed by their season (P4908, the episode's ordinal) and the season's own
     ordinal in the series; an episode without both is left out. Air dates are P577's earliest (one per country), as
-    the start of that day in UTC: Wikidata gives no time.
+    the start of that day in UTC: Wikidata gives no time. Runtimes are P2047's normalised amount (seconds) over 60,
+    since a statement's own unit can be minutes, hours or seconds. A show starts at its P580, else its P577 (many
+    series items have only that), else its first dated episode.
+  - **Undated isn't to come:** Wikidata leaves many past episodes undated (66 of Friends' 236 are dated), so
+    `StatusOf` counts an undated episode as TBA only after the last dated one, and a show with no dated episode goes
+    by its premiere; otherwise such a show could never be presumed ended.
+  - **Lookups by IMDb or TheTVDB id** take the best-known show item with it (an id can also sit on a franchise item).
+  - **Memorable lines and the TV atlas** find shows by their TVmaze id, so they're off, saying so in the
+    log, while the catalog comes from Wikidata.
   - **TVmaze's vocabulary** (`WikidataMapping`): genre items' labels map to TVmaze's genres by words ("comedy-drama" is
     Comedy and Drama), the kind is animation for an animated type and else the first kind word in a genre, where a
     joined word doesn't count (The Office's "pseudo-documentary" stays scripted); popularity is 1.5 per wiki with a
@@ -110,9 +118,12 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Cast order:** Wikidata keeps no billing, and lists guest stars with the regulars: actors with a stated character
     come first, then by how many wikis have a page about them. Character items are the same in every show, unlike
     TVmaze's per-show character ids.
-  - **Gently:** one request at a time, a second apart, a 429's Retry-After waited out once (`WikidataSparql`), and a
-    502/503/504 (the query service gives them under load) tried once more after 5 s; past that it's an
-    `HttpRequestException`, which every sync loop already skips and retries later. A show is three queries and a
+  - **Gently:** one request at a time, a second apart (`WikidataSparql`), with TVmaze's two lanes: a waiting
+    interactive query (search and history imports, by `TvMazeCaller`'s lane) goes before background ones. A 429's
+    Retry-After holds everyone off until it passes: a person's query fails at once (search answers from the catalog),
+    background work waits it out once without holding the slot. A 502/503/504 (the query service gives them under
+    load) is tried once more after 5 s; past that it's an `HttpRequestException`, which every sync loop already skips
+    and retries later. A show is three queries and a
     Wikipedia summary. The index query for popular shows takes about 20 s, so the featured list is read once a day.
   - **The same answer twice:** Wikidata returns rows, `GROUP_CONCAT`s and `SAMPLE`s in no fixed order, and the
     synchronizer sees any difference as a change, so genres, characters, people and samples are sorted or taken as the
@@ -1543,14 +1554,18 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **Resolving in the sync worker** (`HistoryResolver`, `POST /api/v1/imports/resolve`): IMDb ids go through TVmaze's
   `lookup/shows?imdb=` (Wikidata's P345), TheTVDB ids through `lookup/shows?thetvdb=` (P4835); titles are searched and taken only on a title match as Same name reads titles
   (`NamesakeTitles.Key`; year within one when given), because the first result for "Ghosts" is a coin toss. Found shows are imported when missing. Lookups are cached 30 days
-  (misses a day). Ten shows a call: each missing show is two provider calls on the shared limiter.
+  (misses a day). Ten shows a call: each missing show is two provider calls on the shared limiter, but four or five
+  Wikidata queries a second apart, so a call stops starting shows after 15 s (`HistoryResolver.Budget`) and hands the
+  rest back as "later", which the page puts in its next batch.
 - **Catalog.API maps** (`HistoryImportApi`, signed in, search's rate limit) the worker's ids to catalog show and
   episode ids by season and episode number; the catalog never sees the watches.
 - **Tracking marks** (`ImportWatchesAsync`, `POST /api/v1/watched/import`, 500 a call) each watch at its own time, the
   earliest per episode, follows a new show from its first watch, and sends one `EpisodeWatched` per moment so Analytics
   and Social keep the times. Already-watched episodes are left alone, so a repeat import is a no-op; nothing is unmarked.
 - **The page orchestrates** (`/settings/import`), as Holiday episodes and Who said it? do: resolve in batches of ten with
-  progress, then mark in chunks, then statuses (planned, stopped). Stopping keeps what's done; a rerun skips it.
+  progress, then mark in chunks, then statuses (planned, stopped), then IMDb's ratings four at a time (one refused is
+  counted and the rest go on). Stopping keeps what's done; a rerun skips it. A series rated and on the watchlist is
+  rated, not planned.
 
 ## Insights by plan
 

@@ -24,9 +24,13 @@ namespace Catalog.SyncWorker.Settings;
 /// and a failed round is simply tried again in the next. A plain client with one try, as Research's sources.
 /// </para>
 /// </summary>
-public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<SettingsService> logger) : BackgroundService
+public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, IConfiguration configuration, ILogger<SettingsService> logger)
+    : BackgroundService
 {
-    private const string Provider = "tvmaze";
+    /// <summary>
+    /// Shows are found on Wikidata by their TVmaze id (P8600), so only TVmaze's shows are looked up (BACKLOG D2).
+    /// </summary>
+    private const string Provider = CatalogSources.TvMaze;
     private const int Batch = 25;
     private const int Attempts = 3;
     private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(4);
@@ -59,6 +63,11 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (CatalogSources.Configured(configuration) != Provider)
+        {
+            logger.LogInformation("The TV atlas: off, since the catalog isn't from TVmaze and shows are found by their TVmaze id");
+            return;
+        }
         await Task.Delay(FirstDelay, time, stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {

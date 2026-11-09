@@ -35,6 +35,17 @@ public class StatusOfTests
     }
 
     [Fact]
+    public void An_undated_past_episode_is_not_to_be_announced()
+    {
+        // Wikidata leaves many of a show's past episodes undated (Friends: 66 of 236 dated).
+        Assert.Equal(ShowStatus.Ended, CatalogSynchronizer.StatusOf(
+            Show(Episode("e1", 1, 1, "Pilot", null), Episode("e2", 1, 2, "Second", Now.AddYears(-20)), Episode("e3", 1, 3, "Third", Now.AddYears(-20))), Now));
+        // Undated after the last dated one is still to come.
+        Assert.Equal(ShowStatus.Airing, CatalogSynchronizer.StatusOf(
+            Show(Episode("e1", 1, 1, "Pilot", Now.AddYears(-20)), Episode("e2", 1, 2, "TBA", null)), Now));
+    }
+
+    [Fact]
     public void A_dated_season_keeps_it_airing() =>
         Assert.Equal(ShowStatus.Airing, CatalogSynchronizer.StatusOf(
             Show(ShowStatus.Airing, [new ProviderSeason(2, "Season 2", null, Now.AddMonths(3))], Episode("e1", 1, 8, "Finale", Now.AddYears(-6))), Now));
