@@ -974,6 +974,21 @@ read-only, without signing in or having an account.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
 - **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
+### Landing page, privacy and terms
+
+- **Landing page:** signed out, Home (`/`) opens with what the app does, "Get started free" (Keycloak's sign-in page,
+  where Register creates the account), the four things that set it apart, and what Free, Plus and Family include, with
+  Trending below. Signed in, Home is unchanged.
+- **Privacy** (`/privacy`) and **Terms** (`/terms`), linked from every page's footer and readable signed out. They
+  describe what the app actually does: what's stored and why, what stays on the device, what others see (activity,
+  posts, shared lists), who else gets data (Stripe, streaming links, TVmaze's pictures), cookies, how long things are
+  kept, export and deletion in Settings, moderation, the paid plans' renewal, cancellation and refunds. Keep them in step
+  when a feature stores something new, and change `PrivacyPage.LastUpdated` with the text.
+- **Who runs it:** `Branding:Operator` (the legal name; default the app's name) and `Branding:ContactEmail` (shown for
+  privacy questions when set) in the AppHost's configuration; the AppHost passes them to the web app.
+- **A starting text, not legal advice:** have both pages reviewed for the country the operator is established in, and
+  the places it sells to, before launch.
+
 ### White label and theme
 
 - **App name:** `Branding:AppName` in the AppHost's `appsettings.json` (default "TV Tracker"), or the
@@ -1648,6 +1663,8 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
   password into Keycloak's realm on start.
 - Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the
   services accept the Android emulator's token issuer only in Development.
+- Set `Branding:Operator` and `Branding:ContactEmail`, and have the privacy policy and terms reviewed (Landing page,
+  privacy and terms).
 - Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
 
 ## Package versions

@@ -1,0 +1,156 @@
+@page "/privacy"
+
+@* What the app stores and why, as the code does it (CONTEXT.md has the decisions behind each). Keep this page in step
+   when a feature starts storing something new or sending data somewhere new. *@
+
+<PageTitle>Privacy · @Brand.AppName</PageTitle>
+
+<article class="legal">
+    <h1>Privacy policy</h1>
+    <p class="muted">Last updated @LastUpdated</p>
+
+    <p>
+        This policy explains what @Brand.AppName keeps about you, why, who else sees any of it, and how you can get a copy
+        or have it deleted.
+        @if (Brand.Operator != Brand.AppName)
+        {
+            <span> @Brand.AppName is run by @Brand.Operator ("we").</span>
+        }
+        @if (Brand.ContactEmail is { } email)
+        {
+            <span> Questions go to <a href="mailto:@email">@email</a>.</span>
+        }
+    </p>
+
+    <h2>The short version</h2>
+    <ul>
+        <li>We keep what you tell the app (your shows, the episodes you've watched, your ratings and posts) so it can work
+            for you. We don't sell it, and there are no advertising trackers.</li>
+        <li>Figures about our users that others can see, such as how many people finished a season, need at least five
+            people behind them, so they can't point to you.</li>
+        <li>You can download everything we hold about you, and delete your account, in Settings at any time.</li>
+    </ul>
+
+    <h2>What we keep</h2>
+    <ul>
+        <li><strong>Your account:</strong> your username, email address and password (held by our sign-in service, with the
+            password stored only as a hash), and your profile: display name, picture address, time zone, region and
+            language.</li>
+        <li><strong>Your viewing:</strong> the shows you follow and their status, the episodes you mark as watched and
+            when, your lists, your ratings of shows and episodes, your episode duels and your predictions.</li>
+        <li><strong>What you write for others:</strong> comments, tips and community insights, suggested corrections,
+            flags on other people's posts, and the helpful votes you give.</li>
+        <li><strong>People:</strong> who you follow, who follows you, follow requests, the people you've blocked, and your
+            privacy settings.</li>
+        <li><strong>Notifications:</strong> your notification preferences, your inbox, and the devices you've allowed to
+            receive push notifications.</li>
+        <li><strong>Plans and payments:</strong> your plan, your family plan's members, your subscription (plan, price,
+            period, whether it renews) and a receipt for each payment. Your card details go to the payment provider and
+            never reach us.</li>
+        <li><strong>History you import:</strong> the file is read on your device; only the shows, episodes and dates it
+            contains are sent to us, and account files in an export archive are never opened.</li>
+        <li><strong>Streaming services</strong> you tell us you pay for, to show what they cost you per hour watched.</li>
+    </ul>
+
+    <h2>What stays on your device</h2>
+    <p>
+        Some settings never leave the device you set them on: the theme, the spoiler shield, your birth year (for Your TV
+        life), your birthday (for Birthdays) and your Guess the show record. The web app keeps them in your browser's
+        storage, the phone app in its own preferences.
+    </p>
+
+    <h2>Why we use it</h2>
+    <ul>
+        <li>To run the service you signed up for: tracking, calendars, recommendations, insights and the social
+            features. This is the basis for nearly everything we keep.</li>
+        <li>To take payments and keep the records the law requires.</li>
+        <li>To keep the service safe: rate limits, moderation of posts, and logs we use to find faults.</li>
+        <li>To send the notifications and the weekly digest you've turned on. You can turn each one off in Settings.</li>
+    </ul>
+    <p>
+        Our insights are computed from the episodes and ratings of shows, and from your own viewing for the ones about
+        you. Where an insight is about other users, we show it only with five or more people or ratings behind it.
+        Questions you ask in Ask the app are answered by a model we run ourselves, kept in memory for two hours and never
+        stored.
+    </p>
+
+    <h2>What others can see</h2>
+    <ul>
+        <li>People who follow you see your activity (episodes watched, shows followed, finished and rated) unless you
+            turn off "share my activity". A private profile shows only your name to anyone you haven't approved.</li>
+        <li>Your comments and other posts are public to signed-in users, under your display name. Episode titles are never
+            shown in the activity feed, only episode numbers.</li>
+        <li>A list you share is visible on your profile; a list link can be opened by anyone who has it, until you turn
+            the link off.</li>
+        <li>Family plan members see the owner's name and each other's names, nothing more.</li>
+    </ul>
+
+    <h2>Who else receives data</h2>
+    <ul>
+        <li><strong>Your payment provider</strong> (Stripe) handles checkout and billing, including your card and billing
+            details, under its own privacy policy. We tell it which plan you're buying; it tells us when a payment
+            succeeds.</li>
+        <li><strong>Streaming services</strong> you open from a show page: the link goes through us so we can count clicks
+            per service, without recording who clicked. Some links carry an affiliate code, so the service may pay us a
+            commission on a sign-up.</li>
+        <li><strong>Show pictures</strong> are loaded by your browser or phone from TVmaze, which therefore sees your
+            device's network address, as any website you visit does.</li>
+        <li>Our show data comes from TVmaze, Wikidata and Wikiquote. We fetch it ourselves, and send them nothing about
+            you; when you import a history, the titles of shows we don't yet have are looked up there, without your
+            name.</li>
+        <li>We use hosting and infrastructure providers to run the service, who process data only on our behalf.</li>
+        <li>We may disclose data where the law requires it.</li>
+    </ul>
+
+    <h2>Cookies</h2>
+    <p>
+        The web app uses one cookie to keep you signed in, and the sign-in service sets its own while you sign in. There
+        are no advertising or analytics cookies.
+    </p>
+
+    <h2>How long we keep it</h2>
+    <ul>
+        <li>Your account and what you've added stay until you delete them or your account.</li>
+        <li>Notifications are removed 90 days after you've read them, and after a year at the latest.</li>
+        <li>Payment receipts are kept while your account exists; the payment provider keeps its own records for as long
+            as the law requires.</li>
+        <li>Counts of clicks on streaming links carry no information about who clicked.</li>
+    </ul>
+
+    <h2>Your rights</h2>
+    <ul>
+        <li><strong>A copy of your data:</strong> Settings → Export my data gives you everything every part of the app
+            holds about you, as a file.</li>
+        <li><strong>Deleting your account:</strong> Settings → Delete account removes your account and everything you've
+            added, from every part of the app, and stops any subscription at once. Posts you wrote go with it.</li>
+        <li><strong>Correcting it:</strong> you can change your profile, ratings, lists and posts at any time.</li>
+        <li>Depending on where you live (for example under the GDPR or POPIA), you may also have the right to object to or
+            restrict how we use your data, and to complain to your data protection authority.
+            @if (Brand.ContactEmail is { } address)
+            {
+                <span> Write to <a href="mailto:@address">@address</a> for anything Settings doesn't cover.</span>
+            }
+        </li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>
+        @Brand.AppName isn't meant for children under 13, or under the age at which you can agree to this yourself where
+        you live (16 in parts of Europe). We don't knowingly keep their data, and delete it when we learn of it.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+        When we change this policy we'll update the date above, and tell you in the app before a change that affects
+        what we do with data you've already given us.
+    </p>
+
+    <p class="muted"><a href="terms">Terms of use</a></p>
+</article>
+
+@code {
+    /// <summary>
+    /// When the policy last changed; update it with any change to the text.
+    /// </summary>
+    internal const string LastUpdated = "9 November 2026";
+}

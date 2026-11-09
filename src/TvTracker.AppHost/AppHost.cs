@@ -465,6 +465,9 @@ if (!string.IsNullOrEmpty(webPublicUrl))
 
 var webApp = builder.AddProject<Projects.WebApp>("webapp")
     .WithEnvironment("Branding__AppName", appName)
+    // Who runs the app and how to reach them, for the privacy policy and terms (README, Privacy and terms).
+    .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
+    .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "")
     .WithExternalHttpEndpoints()
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)

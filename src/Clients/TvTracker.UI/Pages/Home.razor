@@ -3,10 +3,60 @@
 @inject TrackingClient Tracking
 @inject RecommendationsClient Recommendations
 @inject UserSession Session
+@inject IAuthActions Auth
 
 <PageTitle>@Brand.AppName</PageTitle>
 
-<h1>@Brand.AppName</h1>
+<AuthorizeView>
+    <Authorized>
+        <h1>@Brand.AppName</h1>
+    </Authorized>
+    <NotAuthorized>
+        @* The landing page: what the app is, for someone who isn't signed in. Each claim is a feature that exists. *@
+        <section class="landing-hero">
+            <h1>Know what to watch next, and whether it's worth it</h1>
+            <p class="landing-lead">
+                @Brand.AppName tracks every show you follow, tells you when the next episode airs, and reads the ratings of
+                every episode so you know where a show gets good, how it ends and how long it'll take.
+            </p>
+            <div class="landing-actions">
+                <button class="btn" @onclick="SignUpAsync">Get started free</button>
+                <a class="btn btn-quiet" href="search">Browse shows</a>
+            </div>
+            <p class="muted small">New here? Choose <em>Register</em> on the sign-in page. Tracking is free, with no limit on shows or lists.</p>
+        </section>
+
+        <section class="landing-features" aria-label="What you get">
+            <div class="landing-feature">
+                <h2>Never lose your place</h2>
+                <p>Up Next lines up the next episode of everything you're watching, the calendar shows what airs this week,
+                    and streaks count the days you kept up.</p>
+            </div>
+            <div class="landing-feature">
+                <h2>Insights before you start</h2>
+                <p>When a slow show gets good, whether it sticks the landing, a worth-it score, and each season's verdict,
+                    all without spoilers.</p>
+            </div>
+            <div class="landing-feature">
+                <h2>Bring your history</h2>
+                <p>Import your TV Time or Trakt history with the date of every episode, so your stats and year in TV start
+                    full.</p>
+            </div>
+            <div class="landing-feature">
+                <h2>Watch with friends</h2>
+                <p>Follow people, see what they're watching, share lists by link, and plan an evening for two. Your profile
+                    can be private.</p>
+            </div>
+        </section>
+
+        <section class="landing-plans">
+            <h2>Free, with Plus when you want more</h2>
+            <p>Following, tracking, ratings, lists, calendars and the insights about shows are free. <strong>Plus</strong>
+                adds the tools that read your own viewing: tonight's plan, the essential cut of a long show, catching up
+                before a premiere, your year in TV and more. <strong>Family</strong> shares Plus with up to five people.</p>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
 
 <AuthorizeView>
     <Authorized>
@@ -90,6 +140,8 @@
 </section>
 
 @code {
+    private Task SignUpAsync() => Auth.SignInAsync();
+
     private List<ShowSummary>? trending;
     private List<UpNextItem>? upNext;
     private List<RecommendedShow>? forYou;

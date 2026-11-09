@@ -1,0 +1,87 @@
+@page "/terms"
+
+@* The terms, as the app works (moderation, plans, payments). A starting text: have it reviewed for the place the
+   operator is established before launch (README, Privacy and terms). *@
+
+<PageTitle>Terms · @Brand.AppName</PageTitle>
+
+<article class="legal">
+    <h1>Terms of use</h1>
+    <p class="muted">Last updated @PrivacyPage.LastUpdated</p>
+
+    <p>
+        These terms are the agreement between you and @Brand.Operator ("we") for using @Brand.AppName. By creating an
+        account or using the app, you accept them. Our <a href="privacy">privacy policy</a> explains what we do with
+        your data.
+    </p>
+
+    <h2>Your account</h2>
+    <ul>
+        <li>You need to be at least 13, or the age at which you can agree to this yourself where you live.</li>
+        <li>Keep your sign-in details to yourself; you're responsible for what's done with your account.</li>
+        <li>You can delete your account at any time in Settings. We may suspend or close an account that breaks these
+            terms, and will tell you why unless the law or someone's safety prevents it.</li>
+    </ul>
+
+    <h2>What you post</h2>
+    <ul>
+        <li>Your comments, tips, insights and corrections stay yours. You let us show them in the app, to other users,
+            for as long as they're up; that permission ends when you delete them or your account.</li>
+        <li>Don't post anything unlawful, hateful, harassing, sexually explicit, or that infringes someone else's rights,
+            and don't spam. Mark spoilers as spoilers.</li>
+        <li>Posts are moderated. A post can be held for review (one with a link, for example), refused for blocked words,
+            or hidden after other users flag it. When one of yours is hidden, you can still see it and why.</li>
+        <li>Don't try to get around rate limits, read other people's data, or disrupt the service, including by automated
+            means.</li>
+    </ul>
+
+    <h2>The show information and insights</h2>
+    <ul>
+        <li>Show and episode data comes from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>, and
+            quotes and some facts from Wikiquote and Wikidata, under the
+            <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a> licence.
+            Pictures belong to their owners.</li>
+        <li>Insights, forecasts, recommendations and Ask's answers are worked out from that data and can be wrong. They're
+            for interest and planning, not promises: a forecast season may never come, and a "where to watch" link may
+            have changed.</li>
+        <li>Links to streaming services take you to their sites, under their own terms. Some carry an affiliate code, so
+            the service may pay us for a sign-up; that never changes what we show you.</li>
+    </ul>
+
+    <h2>Plans and payments</h2>
+    <ul>
+        <li>Following, tracking, ratings, lists and the insights about shows are free. Plus and Family add the features
+            listed on the plan page, which can change over time; we'll tell you before a paid feature you have is taken
+            out of your plan.</li>
+        <li>A paid plan is a subscription, by the month or the year, at the price shown when you buy it, taken by our
+            payment provider. It renews until you cancel.</li>
+        <li>When you cancel, you keep the plan until the end of the period you've paid for, and nothing more is charged.
+            We don't refund part-periods, except where the law gives you that right (for example a right to withdraw
+            from a purchase within a set time).</li>
+        <li>We may change prices; a new price applies from your next renewal after we've told you, and you can cancel
+            before then.</li>
+        <li>A Family plan's owner pays for up to five members, who get Plus while the owner's plan runs. When it ends,
+            members go back to their own plans. What anyone made on a paid plan stays when the plan ends.</li>
+    </ul>
+
+    <h2>The service</h2>
+    <ul>
+        <li>We work to keep @Brand.AppName running and your data safe, but provide it as it is, without guarantees that it
+            will always be available or free of errors. We may change, add or remove features.</li>
+        <li>As far as the law allows, we aren't liable for indirect losses, or for more than you paid us in the twelve
+            months before a claim. Nothing in these terms limits rights you have under consumer law that can't be
+            waived.</li>
+    </ul>
+
+    <h2>Changes and contact</h2>
+    <p>
+        We may update these terms; the date above says when. We'll tell you in the app before a change that affects you
+        takes effect, and if you don't agree you can stop using the app and delete your account.
+        These terms are governed by the law of the place where @Brand.Operator is established, without taking away the
+        protection of the law where you live.
+        @if (Brand.ContactEmail is { } email)
+        {
+            <span> Questions go to <a href="mailto:@email">@email</a>.</span>
+        }
+    </p>
+</article>
