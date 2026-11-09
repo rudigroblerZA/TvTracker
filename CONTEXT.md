@@ -1368,8 +1368,8 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 - **The app keeps the books, the provider takes the money** (`Identity.API/Payments`): checkout sessions, subscriptions,
   receipts and the plan change are Identity's own (`SubscriptionLedger`); a provider (`IPaymentProvider`) only makes a
   checkout, cancels or resumes, and reads its signed webhooks into a few events (paid, cancel scheduled, resumed,
-  ended). Adding Stripe or Paddle is one class (BACKLOG F1); the first is a test provider (a decision: provider-neutral
-  first, so the flow could be built and tried without an account).
+  ended). The first was a test provider (a decision: provider-neutral first, so the flow could be built and tried
+  without an account); Stripe came after as one class.
 - **Credited to who checked out:** the app makes a `CheckoutSession` at today's price for the caller's region, and a
   first payment must name it, so the subscription is the session's user's; a webhook can't pick whose plan moves.
   The return address is the server's (`Payments:ReturnUrl`), never a request's, so a checkout can't redirect elsewhere.
@@ -1407,6 +1407,40 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   `/settings/plan`), so the browser keeps the origin it signed in on, http or https, and its cookie. The signature
   (`PaymentSignature`, one file linked into the web app, so the sender and the checker can't drift) takes any number
   of `v1` values (a rotating secret), and anything malformed is a 400.
+- **Stripe** (`StripePaymentProvider`, BACKLOG F1), over its REST API with a plain HttpClient: four calls and three
+  webhook events weren't worth an SDK and its release train.
+  - **The app's prices:** the Checkout Session is made with inline `price_data` for the `CheckoutSession`'s amount and
+    interval, so `Payments:Prices` stays the one price list and nothing has to be kept in step in Stripe's catalogue.
+    Amounts go in Stripe's minor units (zero-decimal currencies such as JPY in whole units).
+  - **Credited by metadata:** the session's id goes in the subscription's metadata, which every invoice of it carries
+    back, so `invoice.paid`'s first payment names the checkout as the test provider's does. The session id is also the
+    request's idempotency key, so a retried request makes one checkout.
+  - **Events:** `invoice.paid` is a payment, `customer.subscription.updated` a cancel scheduled or taken back only when
+    `cancel_at_period_end` or `cancel_at` (which the customer portal sets on newer API versions) is what changed,
+    `customer.subscription.deleted` the end. Any other signed event is answered 200 (`PaymentEventKind.Ignored`), since
+    Stripe retries anything else for days.
+  - **Both payload shapes:** from API version 2025-03-31 an invoice's subscription and metadata moved under
+    `parent.subscription_details`; the webhook endpoint's version decides which comes, so both are read.
+  - **The same signature:** Stripe signs `Stripe-Signature: t=…,v1=…` exactly as `PaymentSignature` checks the test
+    provider's (HMAC-SHA256 of `{t}.{body}`, five minutes either side), so the check is one piece of code.
+  - **Managing billing** is the customer portal's login link (`Payments:Stripe:PortalUrl`): the app keeps no Stripe
+    customer id to open a portal session with, and the login link needs none.
+  - **Selling:** a deployment always names Stripe (its parameters are required); locally Stripe sells once the AppHost
+    has both `Parameters:stripe-secret-key` and `stripe-webhook-secret`, else the test provider does. A failed call to
+    make a checkout, cancel or resume answers 502 and changes nothing.
+  - **One try, no retries** (the client's resilience handler is removed, 20 s timeout): a repeated cancel, or a delete
+    Stripe already carried out, comes back as an error, and a checkout shouldn't keep the buyer waiting 30 s.
+  - **Resuming clears both** `cancel_at_period_end` and `cancel_at`, so a cancellation scheduled in the portal is taken
+    back too.
+  - **Events about a subscription the app doesn't have** (a deleted account's, whose deletion stopped it at Stripe) are
+    acknowledged (`LedgerResult.NotHere`), not 422: only a first payment can be early, and Stripe would retry the rest
+    for days.
+  - **The paid period** is the latest line end on the invoice: a plan change's invoice carries proration lines for time
+    already passed. Three-decimal currencies (KWD, BHD, …) go in thousandths, rounded to a ten as Stripe requires.
+  - **Tested** with no Stripe account: unit tests on both invoice shapes, the cancel rule, ignored events, signatures
+    and minor units; and live, Identity selling through Stripe against a recorder standing in for its API (the checkout
+    request, and later resume and delete, replayed to Stripe's `stripe-mock`, which checks them against the API's
+    specification), with Stripe-shaped webhooks signed as Stripe signs them.
 - **The lapse rule is `SubscriptionLapse.Lapsed`:** the job loads the active subscriptions past their period end (a range
   on the period index) and lets it decide, so the rule is written once.
 - **Deletion and export:** deleting an account first stops its subscriptions at the provider (before the login goes, so

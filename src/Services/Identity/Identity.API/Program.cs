@@ -2,6 +2,7 @@ using Identity.API.Apis;
 using Identity.API.Data;
 using Identity.API.Payments;
 using Identity.API.Services;
+using Microsoft.Extensions.Options;
 using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,13 +27,25 @@ if (!builder.Environment.IsDevelopment())
     builder.Services.AddHostedService<DemoAccountRemover>();
 }
 
-// Payments: the provider named in Payments:Provider sells plans; the test provider only in development.
+// Payments: the provider named in Payments:Provider sells plans; Stripe is always registered (its webhooks need its
+// signing secret, so it does nothing unconfigured), the test provider only in development.
 builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
 }
-builder.Services.AddSingleton<PaymentProviders>();
+// No automatic retries for Stripe: a repeated cancel, or a delete Stripe already carried out, comes back as an error, and
+// a checkout shouldn't keep the buyer waiting 30 s; one try within 20 s, and the caller answers 502.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
+    {
+        client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<PaymentOptions>>().Value.Stripe.ApiBase);
+        client.Timeout = TimeSpan.FromSeconds(20);
+    })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
+builder.Services.AddScoped<PaymentProviders>();
 builder.Services.AddScoped<SubscriptionLedger>();
 builder.Services.AddHostedService<SubscriptionLapse>();
 
