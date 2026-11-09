@@ -7,9 +7,9 @@ using System.Text.RegularExpressions;
 namespace TvTracker.UI.Services;
 
 /// <summary>
-/// A show in an export, keyed by its TheTVDB id when the export has one, else its normalised title.
+/// A show in an export, keyed by its IMDb or TheTVDB id when the export has one, else its normalised title.
 /// </summary>
-public sealed record ParsedShow(string Key, string? TvdbId, string Title, int? Year);
+public sealed record ParsedShow(string Key, string? TvdbId, string Title, int? Year, string? ImdbId = null);
 
 /// <param name="WatchedAtUtc">The watch's time; null when the export gives none (such a watch is marked at import time).</param>
 public sealed record ParsedWatch(string ShowKey, int Season, int Episode, DateTimeOffset? WatchedAtUtc);
@@ -17,24 +17,30 @@ public sealed record ParsedWatch(string ShowKey, int Season, int Episode, DateTi
 /// <param name="Status">"watching", "plan" or "stopped".</param>
 public sealed record ParsedFollow(string ShowKey, string Status);
 
+/// <param name="Stars">1 to 5, from IMDb's 1 to 10 (half, rounded up: a 7 is 4 stars).</param>
+public sealed record ParsedRating(string ShowKey, int Stars);
+
 /// <param name="Files">The files that were read, with what each gave.</param>
 /// <param name="Skipped">Rows that couldn't be read (no show, no episode number, …).</param>
 /// <param name="Earliest">The earliest dated watch, and <paramref name="Latest"/> the latest; <paramref name="Undated"/> counts the rest.</param>
+/// <param name="Ratings">Shows rated in the export (IMDb's); none for the other formats.</param>
 public sealed record ParsedHistory(string Source, Dictionary<string, ParsedShow> Shows, List<ParsedWatch> Watches, List<ParsedFollow> Follows,
-    List<string> Files, int Skipped, DateTimeOffset? Earliest, DateTimeOffset? Latest, int Undated);
+    List<string> Files, int Skipped, DateTimeOffset? Earliest, DateTimeOffset? Latest, int Undated, List<ParsedRating> Ratings);
 
 /// <summary>
 /// Reads a viewing-history export into shows, watches and follows, for Bring your history. It takes the official TV Time
 /// GDPR archive (<c>tracking-prod-records-v2.csv</c>, <c>followed_tv_show.csv</c>, the older <c>seen_episode.csv</c>), the
 /// TV Time Out and TV Time Liberator CSVs (<c>series_tvdb_id</c>/<c>tvdb_id</c>, <c>season</c>, <c>episode</c>,
 /// <c>watched_at</c>), Trakt's JSON (history items, or the watched list with <c>last_watched_at</c>), and any CSV with a show
-/// title or TheTVDB id, a season, an episode and, ideally, a date. Columns are matched by name, loosely, since the exports
+/// title or TheTVDB id, a season, an episode and, ideally, a date; and IMDb's ratings and watchlist CSVs (<c>Const</c>,
+/// <c>Title Type</c>, <c>Your Rating</c>), whose series become ratings and plans to watch. Columns are matched by name, loosely, since the exports
 /// have changed names over the years (<c>s_no</c>, <c>season_number</c>, <c>episode_season_number</c>, <c>season</c>).
 /// <list type="bullet">
 /// <item><b>Times without a zone</b> ("2024-11-02 11:53:58", TV Time's) are read in the viewer's time zone, so a Tuesday
 /// evening stays a Tuesday evening; times with a zone are kept as given.</item>
 /// <item><b>One watch per episode:</b> the earliest time wins; rewatch rows count only when there's no first watch.</item>
-/// <item><b>Movies are left out:</b> the catalog has none.</item>
+/// <item><b>Movies are left out:</b> the catalog has none. So are IMDb's episode rows: they name the episode's own IMDb id,
+/// not its show's or its number.</item>
 /// </list>
 /// Nothing is sent anywhere by this class: the page decides what to do with the result.
 /// </summary>
@@ -54,6 +60,7 @@ public static partial class HistoryImportParser
         // kind the earliest time wins.
         var watches = new Dictionary<(string, int, int), (ParsedWatch Watch, bool Rewatch)>();
         var follows = new Dictionary<string, ParsedFollow>();
+        var ratings = new Dictionary<string, ParsedRating>();
         var files = new List<string>();
         var skipped = 0;
         var source = "a CSV file";
@@ -64,7 +71,7 @@ public static partial class HistoryImportParser
             var (w, f, n, kind) = lower.EndsWith(".json") ? ReadJson(content) : lower.EndsWith(".csv") ? ReadCsv(content) : (0, 0, 0, null);
             if (w > 0 || f > 0)
             {
-                files.Add($"{Path.GetFileName(name)}: {w} watches, {f} follows");
+                files.Add(kind == "IMDb" ? $"{Path.GetFileName(name)}: {f} series" : $"{Path.GetFileName(name)}: {w} watches, {f} follows");
                 source = kind ?? source;
             }
             skipped += n;
@@ -140,6 +147,7 @@ public static partial class HistoryImportParser
             var kind = header.Contains("s_no") || header.Contains("tv_show_name") || header.Contains("series_name") ? "TV Time"
                 : header.Contains("series_tvdb_id") || header.Contains("is_watched") ? "TV Time Out"
                 : null;
+            if (header.Contains("const") && header.Contains("title type")) return ReadImdb(rows, header);
             if (idCol < 0 && titleCol < 0) return (0, 0, 0, null);
 
             int w = 0, f = 0, n = 0;
@@ -168,6 +176,43 @@ public static partial class HistoryImportParser
                 if (AddWatch(key, Int(Cell(seasonCol)), Int(Cell(episodeCol)), at, first: !isRewatch)) w++; else n++;
             }
             return (w, f, n, kind);
+        }
+
+        // IMDb's ratings.csv and watchlist.csv: one row per title. A series with a rating of yours is rated; a series on the
+        // watchlist is planned. Counted as follows for the files list, as ratings are what the page reports.
+        (int, int, int, string?) ReadImdb(IEnumerator<List<string>> rows, List<string> header)
+        {
+            int Col(string name) => header.IndexOf(name);
+            int constCol = Col("const"), typeCol = Col("title type"), titleCol = Col("title"), yearCol = Col("year"), ratingCol = Col("your rating");
+            var watchlist = header.Contains("position");
+            int f = 0, n = 0;
+            while (rows.MoveNext())
+            {
+                var row = rows.Current;
+                string? Cell(int i) => i >= 0 && i < row.Count ? row[i].Trim() : null;
+                var type = (Cell(typeCol) ?? "").Replace(" ", "").ToLowerInvariant();
+                if (type is not ("tvseries" or "tvminiseries") || Cell(constCol) is not { } imdbId || !ImdbId().IsMatch(imdbId))
+                {
+                    n++;
+                    continue;
+                }
+                var key = $"imdb:{imdbId}";
+                if (!shows.ContainsKey(key))
+                {
+                    shows[key] = new ParsedShow(key, null, Cell(titleCol) ?? "", YearOf(Cell(yearCol)), imdbId);
+                }
+                if (Int(Cell(ratingCol)) is >= 1 and <= 10 and var rating)
+                {
+                    ratings[key] = new ParsedRating(key, (rating + 1) / 2);
+                    f++;
+                }
+                else if (watchlist)
+                {
+                    follows[key] = new ParsedFollow(key, "plan");
+                    f++;
+                }
+            }
+            return (0, f, n, "IMDb");
         }
 
         string? AddShow(string? tvdbId, string? title, int? year)
@@ -222,10 +267,10 @@ public static partial class HistoryImportParser
         }
 
         var all = watches.Values.Select(v => v.Watch).OrderBy(w => w.WatchedAtUtc ?? DateTimeOffset.MaxValue).ToList();
-        var used = all.Select(w => w.ShowKey).Concat(follows.Keys).ToHashSet();
+        var used = all.Select(w => w.ShowKey).Concat(follows.Keys).Concat(ratings.Keys).ToHashSet();
         var dated = all.Where(w => w.WatchedAtUtc is not null).ToList();
         return new ParsedHistory(source, shows.Where(s => used.Contains(s.Key)).ToDictionary(s => s.Key, s => s.Value), all, follows.Values.ToList(),
-            files, skipped, dated.FirstOrDefault()?.WatchedAtUtc, dated.LastOrDefault()?.WatchedAtUtc, all.Count - dated.Count);
+            files, skipped, dated.FirstOrDefault()?.WatchedAtUtc, dated.LastOrDefault()?.WatchedAtUtc, all.Count - dated.Count, ratings.Values.ToList());
     }
 
     /// <summary>
@@ -344,6 +389,9 @@ public static partial class HistoryImportParser
 
     [GeneratedRegex(@"\s*\(((?:19|20)\d{2})\)\s*$")]
     private static partial Regex TrailingYear();
+
+    [GeneratedRegex(@"^tt\d{5,10}$")]
+    private static partial Regex ImdbId();
 
     [GeneratedRegex(@"[^\p{L}\p{Nd}]+")]
     private static partial Regex NotWord();

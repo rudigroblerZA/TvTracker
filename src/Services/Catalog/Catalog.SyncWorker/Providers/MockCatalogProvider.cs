@@ -11,7 +11,7 @@ namespace Catalog.SyncWorker.Providers;
 /// </summary>
 public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogProvider
 {
-    public string Name => "mock";
+    public string Name => CatalogSources.Mock;
 
     public Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<string>>(BuildCatalog().Select(s => s.ExternalId).ToList());
@@ -36,6 +36,9 @@ public sealed class MockCatalogProvider(TimeProvider timeProvider) : ICatalogPro
     }
 
     public Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<string?>(null);
+
+    public Task<string?> LookUpShowByImdbAsync(string imdbId, CancellationToken cancellationToken = default) =>
         Task.FromResult<string?>(null);
 
     public Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default) =>

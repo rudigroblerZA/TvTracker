@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Catalog.SyncWorker.Providers;
 
 /// <summary>
-/// Source of show data. Implementations: TvMazeCatalogProvider (default) and MockCatalogProvider.
+/// Source of show data. Implementations: TvMazeCatalogProvider (default), WikidataCatalogProvider and MockCatalogProvider.
 /// A real provider should also respect the provider's rate limits.
 /// </summary>
 public interface ICatalogProvider
@@ -42,6 +42,12 @@ public interface ICatalogProvider
     /// identifies shows by.
     /// </summary>
     Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The provider's id of the show with an IMDb id ("tt0903747"), or null when it has none: what IMDb's ratings and
+    /// watchlist exports identify titles by.
+    /// </summary>
+    Task<string?> LookUpShowByImdbAsync(string imdbId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The provider's shows changed within <paramref name="within"/>, by id, with when each last changed; a change to an

@@ -2,6 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.HistoryImport)]
 @inject CatalogClient Catalog
 @inject TrackingClient Tracking
+@inject RatingsClient Ratings
 @inject UserSession Session
 
 <PageTitle>Bring your history · @Brand.AppName</PageTitle>
@@ -13,7 +14,7 @@
     <Authorized>
         <p class="muted">
             Import what you've watched from a TV Time archive (the GDPR zip, or the TV Time Out and Liberator files), a
-            Trakt export, or any CSV with a show, a season, an episode and a date. Every watch keeps its original date, so
+            Trakt export, IMDb's ratings or watchlist CSV, or any CSV with a show, a season, an episode and a date. Every watch keeps its original date, so
             Year in TV, Your TV clock and Streaks read your past as it happened. The file is read here and only the
             episodes and dates are sent; nothing you already have is changed.
         </p>
@@ -34,7 +35,7 @@
             <section class="panel">
                 <h2>What's in it</h2>
                 <ul>
-                    <li>@($"{parsed.Watches.Count} episodes watched across {parsed.Shows.Count} shows, from {parsed.Source}")</li>
+                    <li>@(parsed.Watches.Count > 0 ? $"{parsed.Watches.Count} episodes watched across {parsed.Shows.Count} shows, from {parsed.Source}" : $"{parsed.Shows.Count} shows, from {parsed.Source}")</li>
                     @if (parsed.Earliest is { } first && parsed.Latest is { } last)
                     {
                         <li>@($"Dated from {first:d MMM yyyy} to {last:d MMM yyyy}")@(parsed.Undated > 0 ? $"; {parsed.Undated} without a date (they'll be marked as of today)" : "")</li>
@@ -43,7 +44,14 @@
                     {
                         <li>No dates in the file: every watch will be marked as of today.</li>
                     }
-                    <li>@($"{parsed.Follows.Count} shows followed or saved for later")</li>
+                    @if (parsed.Follows.Count > 0 || parsed.Ratings.Count == 0)
+                    {
+                        <li>@($"{parsed.Follows.Count} shows followed or saved for later")</li>
+                    }
+                    @if (parsed.Ratings.Count > 0)
+                    {
+                        <li>@($"{parsed.Ratings.Count} shows rated (IMDb's 1 to 10 as 1 to 5 stars: a 7 or 8 is 4 stars)")</li>
+                    }
                     @if (parsed.Skipped > 0)
                     {
                         <li class="muted">@($"{parsed.Skipped} rows skipped (movies, or no show or episode number)")</li>
@@ -58,7 +66,7 @@
                         }
                     </ul>
                 </details>
-                @if (parsed.Watches.Count == 0 && parsed.Follows.Count == 0)
+                @if (parsed.Watches.Count == 0 && parsed.Follows.Count == 0 && parsed.Ratings.Count == 0)
                 {
                     <p>Nothing to import was found. The file needs a show and an episode number per row.</p>
                     <button class="btn btn-quiet" type="button" @onclick="Reset">Choose another file</button>
@@ -83,11 +91,18 @@
             <section class="panel">
                 <h2>@(cancelled ? "Stopped" : "Done")</h2>
                 <ul>
-                    <li>@($"{summary.Added} episodes marked watched, with their dates")@(summary.AlreadyHad > 0 ? $" ({summary.AlreadyHad} were already marked)" : "")</li>
+                    @if (summary.Added > 0 || summary.AlreadyHad > 0 || summary.Rated + summary.AlreadyRated == 0)
+                    {
+                        <li>@($"{summary.Added} episodes marked watched, with their dates")@(summary.AlreadyHad > 0 ? $" ({summary.AlreadyHad} were already marked)" : "")</li>
+                    }
                     <li>@($"{summary.Matched} shows matched")@(summary.Imported > 0 ? $", {summary.Imported} of them added to the catalog for you" : "")</li>
                     @if (summary.Follows > 0)
                     {
                         <li>@($"{summary.Follows} shows set to plan to watch or stopped, as they were")</li>
+                    }
+                    @if (summary.Rated > 0)
+                    {
+                        <li>@($"{summary.Rated} shows rated")@(summary.AlreadyRated > 0 ? $" ({summary.AlreadyRated} you'd rated already kept your rating)" : "")</li>
                     }
                     @if (summary.MissingEpisodes > 0)
                     {
@@ -138,7 +153,8 @@
     private CancellationTokenSource? cancel;
     private ImportSummary? summary;
 
-    private sealed record ImportSummary(int Added, int AlreadyHad, int Matched, int Imported, int Follows, int MissingEpisodes, int Failed, List<string> Unmatched);
+    private sealed record ImportSummary(int Added, int AlreadyHad, int Matched, int Imported, int Follows, int MissingEpisodes, int Failed,
+        List<string> Unmatched, int Rated, int AlreadyRated);
 
     private int Percent => total == 0 ? 0 : Math.Min(100, 100 * done / total);
 
@@ -194,9 +210,9 @@
         var ct = cancel.Token;
         var watchesByShow = parsed.Watches.GroupBy(w => w.ShowKey).ToDictionary(g => g.Key, g => g.ToList());
         var shows = parsed.Shows.Values.OrderBy(s => s.Title, StringComparer.CurrentCulture).ToList();
-        total = shows.Count + parsed.Watches.Count;
+        total = shows.Count + parsed.Watches.Count + parsed.Ratings.Count;
         done = 0;
-        int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0;
+        int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0, rated = 0, alreadyRated = 0;
         var unmatched = new List<string>();
         // Each matched show's catalog id and its episode ids by (season, number).
         var found = new Dictionary<string, (Guid ShowId, Dictionary<(int, int), Guid> Episodes)>();
@@ -209,7 +225,8 @@
                 progress = $"Finding shows: {done} of {shows.Count}…";
                 StateHasChanged();
                 var request = batch.Select(s => new HistoryShowRequest(s.Key, s.TvdbId, s.Title, s.Year,
-                    (watchesByShow.GetValueOrDefault(s.Key) ?? []).Select(w => new HistoryEpisodeNumber(w.Season, w.Episode)).Distinct().ToList())).ToList();
+                    (watchesByShow.GetValueOrDefault(s.Key) ?? []).Select(w => new HistoryEpisodeNumber(w.Season, w.Episode)).Distinct().ToList(),
+                    s.ImdbId)).ToList();
                 var result = await Catalog.ResolveHistoryAsync(request, ct);
                 foreach (var show in batch)
                 {
@@ -221,7 +238,7 @@
                         found[show.Key] = (id, r.Episodes.ToDictionary(e => (e.Season, e.Number), e => e.EpisodeId));
                     }
                     else if (r?.Outcome == "failed") failed++;
-                    else unmatched.Add(show.Title.Length > 0 ? show.Title : $"TVDB {show.TvdbId}");
+                    else unmatched.Add(show.Title.Length > 0 ? show.Title : show.ImdbId is { } imdb ? $"IMDb {imdb}" : $"TVDB {show.TvdbId}");
                 }
                 done += batch.Length;
             }
@@ -279,6 +296,26 @@
                 }
                 follows++;
             }
+
+            // 4. Ratings (IMDb's), leaving a show the user has rated here alone.
+            foreach (var rating in parsed.Ratings)
+            {
+                ct.ThrowIfCancellationRequested();
+                done++;
+                if (!found.TryGetValue(rating.ShowKey, out var show))
+                {
+                    continue;
+                }
+                progress = $"Rating shows: {rated + alreadyRated + 1} of {parsed.Ratings.Count}…";
+                StateHasChanged();
+                if (await Ratings.GetMyShowRatingAsync(show.ShowId, ct) is not null)
+                {
+                    alreadyRated++;
+                    continue;
+                }
+                await Ratings.RateShowAsync(show.ShowId, rating.Stars, ct);
+                rated++;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -295,6 +332,6 @@
             cancel.Dispose();
             cancel = null;
         }
-        summary = new ImportSummary(added, alreadyHad, matched, imported, follows, missing, failed, unmatched);
+        summary = new ImportSummary(added, alreadyHad, matched, imported, follows, missing, failed, unmatched, rated, alreadyRated);
     }
 }

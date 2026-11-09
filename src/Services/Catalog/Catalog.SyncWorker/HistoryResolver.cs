@@ -7,7 +7,8 @@ namespace Catalog.SyncWorker;
 
 /// <summary>
 /// Finds the provider's show for each entry of someone's history export and makes sure the catalog has it, for Bring
-/// your history. A TheTVDB id is looked up directly (<see cref="ICatalogProvider.LookUpShowByTvdbAsync"/>); otherwise the
+/// your history. An IMDb or TheTVDB id is looked up directly (<see cref="ICatalogProvider.LookUpShowByImdbAsync"/>,
+/// <see cref="ICatalogProvider.LookUpShowByTvdbAsync"/>); otherwise the
 /// title is searched and taken only when a result's title matches it as Same name compares titles
 /// (<see cref="NamesakeTitles.Key"/>; and its year, when given, within a year), since the first search result for "Ghosts"
 /// or "The Office" is a coin toss. Lookups are cached for <see cref="CacheFor"/>
@@ -45,6 +46,14 @@ public sealed class HistoryResolver(ICatalogProvider provider, CatalogSynchroniz
 
     private async Task<string?> FindAsync(ResolveShowRequest show, CancellationToken ct)
     {
+        if (show.ImdbId is { Length: > 0 } imdb)
+        {
+            var found = await CachedAsync(CacheKeys.HistoryImdb(provider.Name, imdb), () => provider.LookUpShowByImdbAsync(imdb, ct), ct);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
         if (show.TvdbId is { Length: > 0 } tvdb)
         {
             var found = await CachedAsync(CacheKeys.HistoryTvdb(provider.Name, tvdb), () => provider.LookUpShowByTvdbAsync(tvdb, ct), ct);

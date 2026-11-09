@@ -15,7 +15,8 @@ public static class HistoryImports
 /// <param name="Key">The caller's handle for the show, given back unchanged.</param>
 /// <param name="TvdbId">TheTVDB's id, when the export has one (TV Time's do).</param>
 /// <param name="Year">The year the show started, when known, to tell namesakes apart.</param>
-public record ResolveShowRequest(string Key, string? TvdbId, string? Title, int? Year);
+/// <param name="ImdbId">IMDb's id ("tt0903747"), when the export has one (IMDb's own do).</param>
+public record ResolveShowRequest(string Key, string? TvdbId, string? Title, int? Year, string? ImdbId = null);
 
 public record ResolveShowsRequest(IReadOnlyList<ResolveShowRequest> Shows);
 

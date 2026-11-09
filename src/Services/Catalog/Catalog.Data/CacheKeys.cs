@@ -21,6 +21,8 @@ public static class CacheKeys
     /// </summary>
     public static string HistoryTvdb(string provider, string tvdbId) => $"catalog:history:tvdb:{provider}:{tvdbId}";
 
+    public static string HistoryImdb(string provider, string imdbId) => $"catalog:history:imdb:{provider}:{imdbId}";
+
     /// <summary>
     /// A history import's lookup of a provider show by normalised title and year.
     /// </summary>

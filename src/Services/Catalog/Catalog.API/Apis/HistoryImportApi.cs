@@ -9,8 +9,9 @@ namespace Catalog.API.Apis;
 
 /// <param name="Key">The client's handle for the show (its TheTVDB id or title), given back unchanged.</param>
 /// <param name="Episodes">The season and episode numbers the client has watches for, to get their ids.</param>
-public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes)
-    : ResolveShowRequest(Key, TvdbId, Title, Year);
+public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes,
+    string? ImdbId = null)
+    : ResolveShowRequest(Key, TvdbId, Title, Year, ImdbId);
 
 public record HistoryEpisodeNumber(int Season, int Number);
 
@@ -25,9 +26,9 @@ public record HistoryEpisodeDto(int Season, int Number, Guid EpisodeId);
 public record HistoryResolveResult(IReadOnlyList<HistoryShowDto> Shows);
 
 /// <summary>
-/// Bring your history: turns the shows and episode numbers of a TV Time, TV Time Out or Trakt export into catalog ids, so
-/// the page can mark them watched in Tracking with their original dates. The sync worker finds each show by TheTVDB id or
-/// title and imports it when the catalog lacks it (<see cref="CatalogImportClient.ResolveAsync"/>); this maps the result to
+/// Bring your history: turns the shows and episode numbers of a TV Time, TV Time Out, Trakt or IMDb export into catalog
+/// ids, so the page can mark them watched in Tracking with their original dates. The sync worker finds each show by IMDb
+/// or TheTVDB id or title and imports it when the catalog lacks it (<see cref="CatalogImportClient.ResolveAsync"/>); this maps the result to
 /// catalog show and episode ids by season and episode number.
 /// <list type="bullet">
 /// <item><b>Small batches:</b> at most <see cref="HistoryImports.MaxShows"/> shows a call, since a show the catalog
@@ -38,8 +39,6 @@ public record HistoryResolveResult(IReadOnlyList<HistoryShowDto> Shows);
 /// </summary>
 public static class HistoryImportApi
 {
-    private const string Provider = "tvmaze";
-
     public static void MapHistoryImportApi(this RouteGroupBuilder api) =>
         api.MapPost("/history/resolve", ResolveAsync)
             .RequireAuthorization()
@@ -47,7 +46,7 @@ public static class HistoryImportApi
             .RequireFeature(FeatureFlags.HistoryImport);
 
     private static async Task<Results<Ok<HistoryResolveResult>, BadRequest<string>>> ResolveAsync(HistoryResolveRequest request, ClaimsPrincipal user,
-        CatalogContext db, CatalogImportClient importer, CancellationToken ct)
+        CatalogContext db, CatalogImportClient importer, IConfiguration configuration, CancellationToken ct)
     {
         if (request.Shows is not { Count: > 0 and <= HistoryImports.MaxShows })
         {
@@ -56,8 +55,9 @@ public static class HistoryImportApi
 
         var resolved = await importer.ResolveAsync(request.Shows, ct);
         var externalIds = resolved.Where(r => r.ExternalId is not null).Select(r => r.ExternalId!).Distinct().ToList();
+        var source = CatalogSources.Configured(configuration);
         var shows = await db.Shows.AsNoTracking()
-            .Where(s => s.Source == Provider && externalIds.Contains(s.ExternalId))
+            .Where(s => s.Source == source && externalIds.Contains(s.ExternalId))
             .Select(s => new { s.ExternalId, s.Id, s.Title, s.PosterUrl })
             .ToDictionaryAsync(s => s.ExternalId, ct);
         // Episodes only for shows with watches to place; a follow-only show (plan to watch, stopped) asks for none.
