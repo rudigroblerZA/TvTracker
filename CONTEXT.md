@@ -1426,12 +1426,21 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   - **Managing billing** is the customer portal's login link (`Payments:Stripe:PortalUrl`): the app keeps no Stripe
     customer id to open a portal session with, and the login link needs none.
   - **Selling:** a deployment always names Stripe (its parameters are required); locally Stripe sells once the AppHost
-    has `Parameters:stripe-secret-key`, else the test provider does. A failed call to make a checkout answers 502 and
-    leaves the session unused.
+    has both `Parameters:stripe-secret-key` and `stripe-webhook-secret`, else the test provider does. A failed call to
+    make a checkout, cancel or resume answers 502 and changes nothing.
+  - **One try, no retries** (the client's resilience handler is removed, 20 s timeout): a repeated cancel, or a delete
+    Stripe already carried out, comes back as an error, and a checkout shouldn't keep the buyer waiting 30 s.
+  - **Resuming clears both** `cancel_at_period_end` and `cancel_at`, so a cancellation scheduled in the portal is taken
+    back too.
+  - **Events about a subscription the app doesn't have** (a deleted account's, whose deletion stopped it at Stripe) are
+    acknowledged (`LedgerResult.NotHere`), not 422: only a first payment can be early, and Stripe would retry the rest
+    for days.
+  - **The paid period** is the latest line end on the invoice: a plan change's invoice carries proration lines for time
+    already passed. Three-decimal currencies (KWD, BHD, …) go in thousandths, rounded to a ten as Stripe requires.
   - **Tested** with no Stripe account: unit tests on both invoice shapes, the cancel rule, ignored events, signatures
     and minor units; and live, Identity selling through Stripe against a recorder standing in for its API (the checkout
-    request then replayed to Stripe's `stripe-mock`, which checks it against the API's specification), with Stripe-shaped
-    webhooks signed as Stripe signs them.
+    request, and later resume and delete, replayed to Stripe's `stripe-mock`, which checks them against the API's
+    specification), with Stripe-shaped webhooks signed as Stripe signs them.
 - **The lapse rule is `SubscriptionLapse.Lapsed`:** the job loads the active subscriptions past their period end (a range
   on the period index) and lets it decide, so the rule is written once.
 - **Deletion and export:** deleting an account first stops its subscriptions at the provider (before the login goes, so

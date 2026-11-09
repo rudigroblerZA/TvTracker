@@ -17,9 +17,16 @@ public enum LedgerResult
     Duplicate,
 
     /// <summary>
-    /// About a subscription or checkout the app doesn't know.
+    /// A payment for a subscription or checkout the app doesn't know (yet: the provider retries).
     /// </summary>
     Unknown,
+
+    /// <summary>
+    /// A cancel, resume or end for a subscription the app doesn't have: its account was deleted (which stops the
+    /// subscription at the provider, whose confirmation then arrives here), or it was never sold here. Nothing to do, and
+    /// nothing a retry would change.
+    /// </summary>
+    NotHere,
 
     /// <summary>
     /// A payment the app won't apply: a checkout already used, or a second subscription for someone who has one running.
@@ -87,6 +94,8 @@ public sealed class SubscriptionLedger(IdentityContext db, IIntegrationEventOutb
             case PaymentEventKind.Ended when subscription is not null:
                 await EndAsync(subscription, now, ct);
                 break;
+            case PaymentEventKind.CancelScheduled or PaymentEventKind.Resumed or PaymentEventKind.Ended:
+                return LedgerResult.NotHere;
             default:
                 return LedgerResult.Unknown;
         }

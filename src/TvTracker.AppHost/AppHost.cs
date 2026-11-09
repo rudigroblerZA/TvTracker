@@ -504,7 +504,10 @@ if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configurati
 // Parameters:stripe-secret-key and stripe-webhook-secret, from `stripe listen`; README, Payments); otherwise the test
 // provider does, its checkout being the web app's /dev/payments page, which signs the webhooks it sends Identity with a
 // secret the two share.
-var stripeLocally = !builder.ExecutionContext.IsPublishMode && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"]);
+// Both values, locally: a webhook secret left unset would be a parameter with no value, which Identity waits on for ever.
+var stripeLocally = !builder.ExecutionContext.IsPublishMode
+    && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"])
+    && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-webhook-secret"]);
 if (builder.ExecutionContext.IsPublishMode || stripeLocally)
 {
     identityApi

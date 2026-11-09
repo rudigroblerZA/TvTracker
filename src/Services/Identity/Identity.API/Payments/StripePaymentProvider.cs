@@ -37,7 +37,8 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
     public const string SessionKey = "checkout_session";
 
     /// <summary>
-    /// Currencies Stripe counts in whole units, not hundredths (its "zero-decimal" list).
+    /// Currencies Stripe counts in whole units, not hundredths (its "zero-decimal" list). HUF, TWD and ISK have rules of
+    /// their own at Stripe (whole units in some places, hundredths in others); price them in whole amounts.
     /// </summary>
     private static readonly HashSet<string> ZeroDecimal =
         ["bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"];
@@ -82,8 +83,10 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
 
     public async Task ResumeAsync(Subscription subscription, CancellationToken ct)
     {
+        // Both ways a cancellation is scheduled are cleared: the app's own (cancel_at_period_end) and the customer portal's
+        // on newer API versions (cancel_at, unset by sending it empty).
         using var _ = await SendAsync(HttpMethod.Post, $"v1/subscriptions/{Uri.EscapeDataString(subscription.ProviderSubscriptionId)}",
-            new() { ["cancel_at_period_end"] = "false" }, null, ct);
+            new() { ["cancel_at_period_end"] = "false", ["cancel_at"] = "" }, null, ct);
     }
 
     public string? ManageUrl(Subscription subscription) => Stripe.PortalUrl is { Length: > 0 } url ? url : null;
@@ -114,7 +117,8 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
                 _ => Ignored(id)
             };
         }
-        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException
+            or ArgumentOutOfRangeException or OverflowException)
         {
             return null;
         }
@@ -143,11 +147,14 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
         decimal? amount = invoice.TryGetProperty("amount_paid", out var paid) && currency is not null
             ? FromMinorUnits(paid.GetInt64(), currency)
             : null;
-        DateTime? periodEnd = invoice.TryGetProperty("lines", out var lines)
-            && lines.GetProperty("data").EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.Object } line
-            && line.TryGetProperty("period", out var period)
-            ? DateTimeOffset.FromUnixTimeSeconds(period.GetProperty("end").GetInt64()).UtcDateTime
-            : null;
+        // The latest end among the lines: a plan change's invoice also has proration lines for time already passed.
+        var ends = invoice.TryGetProperty("lines", out var lines)
+            ? lines.GetProperty("data").EnumerateArray()
+                .Where(l => l.TryGetProperty("period", out var p) && p.TryGetProperty("end", out _))
+                .Select(l => l.GetProperty("period").GetProperty("end").GetInt64())
+                .ToList()
+            : [];
+        DateTime? periodEnd = ends.Count > 0 ? DateTimeOffset.FromUnixTimeSeconds(ends.Max()).UtcDateTime : null;
         return new PaymentEvent(id, PaymentEventKind.Paid, subscription, session, Text(invoice, "id"), amount, currency?.ToUpperInvariant(), periodEnd);
     }
 
@@ -172,11 +179,21 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
             ? value.GetString()
             : null;
 
-    internal static long MinorUnits(decimal amount, string currency) =>
-        (long)Math.Round(ZeroDecimal.Contains(currency.ToLowerInvariant()) ? amount : amount * 100m, MidpointRounding.AwayFromZero);
+    /// <summary>
+    /// Currencies Stripe counts in thousandths, whose amounts must end in 0 (its "three-decimal" list).
+    /// </summary>
+    private static readonly HashSet<string> ThreeDecimal = ["bhd", "jod", "kwd", "omr", "tnd"];
 
-    internal static decimal FromMinorUnits(long amount, string currency) =>
-        ZeroDecimal.Contains(currency.ToLowerInvariant()) ? amount : amount / 100m;
+    private static decimal Scale(string currency) =>
+        ZeroDecimal.Contains(currency.ToLowerInvariant()) ? 1m : ThreeDecimal.Contains(currency.ToLowerInvariant()) ? 1000m : 100m;
+
+    internal static long MinorUnits(decimal amount, string currency)
+    {
+        var units = (long)Math.Round(amount * Scale(currency), MidpointRounding.AwayFromZero);
+        return ThreeDecimal.Contains(currency.ToLowerInvariant()) ? (long)Math.Round(units / 10m, MidpointRounding.AwayFromZero) * 10 : units;
+    }
+
+    internal static decimal FromMinorUnits(long amount, string currency) => amount / Scale(currency);
 
     private static string AddQuery(Uri uri, string query) =>
         new UriBuilder(uri) { Query = string.IsNullOrEmpty(uri.Query) ? query : $"{uri.Query.TrimStart('?')}&{query}" }.Uri.ToString();

@@ -34,8 +34,16 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
 }
+// No automatic retries for Stripe: a repeated cancel, or a delete Stripe already carried out, comes back as an error, and
+// a checkout shouldn't keep the buyer waiting 30 s; one try within 20 s, and the caller answers 502.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
 builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
-    client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<PaymentOptions>>().Value.Stripe.ApiBase));
+    {
+        client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<PaymentOptions>>().Value.Stripe.ApiBase);
+        client.Timeout = TimeSpan.FromSeconds(20);
+    })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
 builder.Services.AddScoped<PaymentProviders>();
 builder.Services.AddScoped<SubscriptionLedger>();

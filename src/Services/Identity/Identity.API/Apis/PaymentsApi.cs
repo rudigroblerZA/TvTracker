@@ -105,7 +105,7 @@ public static class PaymentsApi
             var url = await provider.CreateCheckoutAsync(session, returnUrl, ct);
             return TypedResults.Ok(new CheckoutDto(url.ToString()));
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ProviderFailed(ex, ct))
         {
             // The session stays unused; nothing was charged.
             logger.LogError(ex, "{Provider} couldn't make a checkout for session {Session}", provider.Name, session.Id);
@@ -113,16 +113,22 @@ public static class PaymentsApi
         }
     }
 
-    private static Task<Results<Ok<SubscriptionDto>, NotFound>> CancelAsync(
-        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, CancellationToken ct) =>
-        ChangeAsync(user, db, providers, time, cancel: true, ct);
+    /// <summary>
+    /// A provider call that failed, for any reason short of the request itself being given up: an error answer, no
+    /// answer in time, a reply that couldn't be read, or the provider not being configured.
+    /// </summary>
+    private static bool ProviderFailed(Exception ex, CancellationToken ct) => ex is not OperationCanceledException || !ct.IsCancellationRequested;
 
-    private static Task<Results<Ok<SubscriptionDto>, NotFound>> ResumeAsync(
-        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, CancellationToken ct) =>
-        ChangeAsync(user, db, providers, time, cancel: false, ct);
+    private static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> CancelAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, ILogger<Subscription> logger, CancellationToken ct) =>
+        ChangeAsync(user, db, providers, time, logger, cancel: true, ct);
 
-    private static async Task<Results<Ok<SubscriptionDto>, NotFound>> ChangeAsync(
-        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, bool cancel, CancellationToken ct)
+    private static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> ResumeAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, ILogger<Subscription> logger, CancellationToken ct) =>
+        ChangeAsync(user, db, providers, time, logger, cancel: false, ct);
+
+    private static async Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> ChangeAsync(
+        ClaimsPrincipal user, IdentityContext db, PaymentProviders providers, TimeProvider time, ILogger logger, bool cancel, CancellationToken ct)
     {
         var subscription = await db.Subscriptions
             .Where(s => s.UserId == user.GetUserId() && s.Status == SubscriptionStatus.Active)
@@ -134,7 +140,17 @@ public static class PaymentsApi
         }
         if (subscription.CancelAtPeriodEnd != cancel)
         {
-            await (cancel ? provider.CancelAsync(subscription, now: false, ct) : provider.ResumeAsync(subscription, ct));
+            try
+            {
+                await (cancel ? provider.CancelAsync(subscription, now: false, ct) : provider.ResumeAsync(subscription, ct));
+            }
+            catch (Exception ex) when (ProviderFailed(ex, ct))
+            {
+                logger.LogError(ex, "{Provider} couldn't {Change} subscription {Subscription}", provider.Name, cancel ? "cancel" : "resume",
+                    subscription.ProviderSubscriptionId);
+                return TypedResults.Problem("The payment provider didn't answer; nothing changed. Try again in a moment.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
             subscription.CancelAtPeriodEnd = cancel;
             subscription.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
             await db.SaveChangesAsync(ct);
@@ -163,6 +179,7 @@ public static class PaymentsApi
         }
         // An unknown subscription is 422 so the provider retries (a first payment's session may not be saved yet); a
         // refused payment is 409, and logged to be refunded.
+        // A change to a subscription the app doesn't have (its account deleted) is acknowledged: a retry changes nothing.
         return await ledger.ApplyAsync(named.Name, e, ct) switch
         {
             LedgerResult.Unknown => TypedResults.UnprocessableEntity(),

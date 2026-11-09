@@ -95,13 +95,29 @@ public class StripeTests
         Assert.Null(StripePaymentProvider.Read("""{"id":"evt_1"}"""));
     }
 
+    [Fact]
+    public void The_paid_period_is_the_latest_line_end_and_a_malformed_number_is_unreadable()
+    {
+        // A plan change's invoice: a proration credit for time already passed, then the new period.
+        var change = Event("invoice.paid", """
+            {"id":"in_4","amount_paid":200,"currency":"usd","subscription":"sub_4",
+             "lines":{"data":[{"period":{"start":1760000000,"end":1762603200}},{"period":{"start":1762603200,"end":1765195200}}]}}
+            """);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1765195200).UtcDateTime, StripePaymentProvider.Read(change)!.PeriodEndUtc);
+
+        var odd = Event("invoice.paid", """{"id":"in_5","amount_paid":2.5,"currency":"usd","subscription":"sub_5"}""");
+        Assert.Null(StripePaymentProvider.Read(odd));
+    }
+
     [Theory]
     [InlineData(2.99, "USD", 299)]
     [InlineData(49.99, "eur", 4999)]
     [InlineData(500, "JPY", 500)]
+    [InlineData(0.9, "KWD", 900)]
     public void Amounts_go_to_Stripe_in_its_minor_units(decimal amount, string currency, long minor)
     {
         Assert.Equal(minor, StripePaymentProvider.MinorUnits(amount, currency));
+        Assert.Equal(0, StripePaymentProvider.MinorUnits(amount, currency) % (currency == "KWD" ? 10 : 1));
         Assert.Equal(amount, StripePaymentProvider.FromMinorUnits(minor, currency));
     }
 }
