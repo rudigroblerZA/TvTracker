@@ -483,9 +483,10 @@ one-line description). Shows, seasons, episodes with air dates and runtimes, cas
 executive producers, careers and acting credits all come from it, and search is Wikidata's own. It has no ratings, no
 where-to-watch, no similar shows and no change feed (refreshes go by the timer), episodes have a day rather than a time,
 and coverage is good for well-known shows and thin for the rest: Breaking Bad's 62 episodes are all there and dated,
-Friends' 236 are there but only 66 dated. Memorable lines, the TV atlas, Same name and Research find shows by their TVmaze id,
-so they stay empty for Wikidata's shows. Requests are one at a time, a second apart, since Wikimedia limits addresses
-hard; a show takes three or four requests.
+Friends' 236 are there but only 66 dated. Memorable lines, the TV atlas and Research find shows by their TVmaze id, so
+they stay empty for Wikidata's shows (the first two say so in the log and don't run). Requests are one at a time, a
+second apart, with searches and history imports ahead of background work, since Wikimedia limits addresses hard; a show
+takes three or four requests, so a history import adds missing shows more slowly than with TVmaze.
 
 TVmaze data is licensed CC BY-SA; the app footer carries the required credit (Wikidata's needs none). TVmaze has no keywords, "similar shows" or
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide

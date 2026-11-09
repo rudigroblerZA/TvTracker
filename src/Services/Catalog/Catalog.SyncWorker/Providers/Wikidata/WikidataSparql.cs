@@ -6,9 +6,10 @@ namespace Catalog.SyncWorker.Providers.Wikidata;
 
 /// <summary>
 /// Wikidata's query service and Wikipedia's page summaries for the catalog provider, gently: one request at a time and
-/// at least a second apart, since Wikimedia limits a shared address hard (CONTEXT.md, Research), and a 429's
-/// Retry-After waited out once (up to a minute) before giving up with an <see cref="HttpRequestException"/> for the 429,
-/// which every sync loop already treats as "skip this show, try again later", as it does TVmaze's. A 502, 503 or
+/// at least a second apart, interactive callers first, since Wikimedia limits a shared address hard (CONTEXT.md,
+/// Research). A 429's Retry-After holds every caller off until it passes: background work waits it out once (up to a
+/// minute), and anything else gets an <see cref="HttpRequestException"/> for the 429, which every sync loop already
+/// treats as "skip this show, try again later", as it does TVmaze's. A 502, 503 or
 /// 504, which the query service gives now and then under load, is tried once more 5 s later; nothing else is retried,
 /// as with the other Wikimedia clients: the standard resilience handler would retry a 429 until its timeout.
 /// </summary>
@@ -20,8 +21,11 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
     private static readonly TimeSpan MaxWait = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan GatewayRetryAfter = TimeSpan.FromSeconds(5);
 
-    private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly (Queue<TaskCompletionSource> Interactive, Queue<TaskCompletionSource> Background) waiters = (new(), new());
+    private readonly Lock sync = new();
+    private bool busy;
     private DateTimeOffset lastAt = DateTimeOffset.MinValue;
+    private DateTimeOffset busyUntil = DateTimeOffset.MinValue;
 
     /// <summary>
     /// The result's rows: each a map of variable name to its value as text (an item's full URI, a literal's text).
@@ -46,7 +50,13 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
     public async Task<string?> WikipediaSummaryAsync(string articleUrl, CancellationToken ct)
     {
         // The address is already percent-encoded ("https://en.wikipedia.org/wiki/Breaking_Bad").
-        var title = articleUrl[(articleUrl.LastIndexOf('/') + 1)..];
+        // Everything after "/wiki/": a title can hold a slash of its own ("20/20 (American TV program)").
+        var at = articleUrl.IndexOf("/wiki/", StringComparison.Ordinal);
+        if (at < 0)
+        {
+            return null;
+        }
+        var title = Uri.EscapeDataString(Uri.UnescapeDataString(articleUrl[(at + "/wiki/".Length)..]));
         using var json = await SendAsync(() => new HttpRequestMessage(HttpMethod.Get,
             $"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"), ct);
         return json?.RootElement.TryGetProperty("extract", out var extract) == true ? extract.GetString() : null;
@@ -57,10 +67,24 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
     /// </summary>
     private async Task<JsonDocument?> SendAsync(Func<HttpRequestMessage> build, CancellationToken ct)
     {
-        await gate.WaitAsync(ct);
-        try
+        var interactive = TvMazeCaller.Current.Lane == TvMazeLane.Interactive;
+        for (var attempt = 0; ; attempt++)
         {
-            for (var attempt = 0; ; attempt++)
+            // Wikimedia asked everyone to wait: a person's request fails at once (search answers from the catalog, a
+            // history import says "try again later"); background work waits it out, without holding the slot.
+            if (busyUntil - time.GetUtcNow() is { Ticks: > 0 } cooling)
+            {
+                if (interactive || cooling > MaxWait)
+                {
+                    throw Busy(cooling);
+                }
+                await Task.Delay(cooling, time, ct);
+            }
+
+            HttpStatusCode status;
+            TimeSpan? retryAfter;
+            await AcquireAsync(interactive, ct);
+            try
             {
                 var wait = lastAt + Spacing - time.GetUtcNow();
                 if (wait > TimeSpan.Zero)
@@ -70,33 +94,87 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
                 lastAt = time.GetUtcNow();
                 using var request = build();
                 using var response = await httpFactory.CreateClient(HttpClientName).SendAsync(request, ct);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    var after = response.Headers.RetryAfter?.Delta;
-                    if (attempt > 0 || after is null || after > MaxWait)
-                    {
-                        throw new HttpRequestException($"Wikimedia answered 429 Too Many Requests (retry after {after?.TotalSeconds ?? 0:0} s).",
-                            null, HttpStatusCode.TooManyRequests);
-                    }
-                    await Task.Delay(after.Value, time, ct);
-                    continue;
-                }
-                if (attempt == 0 && response.StatusCode is HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
-                {
-                    await Task.Delay(GatewayRetryAfter, time, ct);
-                    continue;
-                }
-                if (response.StatusCode == HttpStatusCode.NotFound)
+                status = response.StatusCode;
+                retryAfter = response.Headers.RetryAfter?.Delta;
+                if (status == HttpStatusCode.NotFound)
                 {
                     return null;
                 }
-                response.EnsureSuccessStatusCode();
-                return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                }
             }
+            finally
+            {
+                Release();
+            }
+
+            if (status == HttpStatusCode.TooManyRequests)
+            {
+                var after = retryAfter ?? MaxWait;
+                busyUntil = time.GetUtcNow() + after;
+                if (attempt > 0 || interactive || after > MaxWait)
+                {
+                    throw Busy(after);
+                }
+                continue;
+            }
+            if (attempt == 0 && status is HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
+            {
+                await Task.Delay(GatewayRetryAfter, time, ct);
+                continue;
+            }
+            throw new HttpRequestException($"Wikimedia answered {(int)status}.", null, status);
         }
-        finally
+    }
+
+    private static HttpRequestException Busy(TimeSpan after) =>
+        new($"Wikimedia answered 429 Too Many Requests (retry after {after.TotalSeconds:0} s).", null, HttpStatusCode.TooManyRequests);
+
+    /// <summary>
+    /// One request at a time, a waiting interactive caller (search and history imports, by <see cref="TvMazeCaller"/>'s
+    /// lane) always before a background one, as TVmaze's limiter does: a cast-credits round shouldn't put a search
+    /// behind dozens of queries.
+    /// </summary>
+    private Task AcquireAsync(bool interactive, CancellationToken ct)
+    {
+        lock (sync)
         {
-            gate.Release();
+            // Free means no live waiter: Release hands the slot straight to one, and frees it only with both queues empty.
+            if (!busy)
+            {
+                busy = true;
+                return Task.CompletedTask;
+            }
+            var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            (interactive ? waiters.Interactive : waiters.Background).Enqueue(waiter);
+            if (ct.CanBeCanceled)
+            {
+                // A cancelled waiter stays queued; Release skips it, since it can't be completed again. The registration
+                // goes once the wait ends, so a loop's long-lived token doesn't collect one per query.
+                var registration = ct.Register(() => waiter.TrySetCanceled(ct));
+                waiter.Task.ContinueWith(_ => registration.Dispose(), TaskScheduler.Default);
+            }
+            return waiter.Task;
+        }
+    }
+
+    private void Release()
+    {
+        lock (sync)
+        {
+            foreach (var queue in new[] { waiters.Interactive, waiters.Background })
+            {
+                while (queue.TryDequeue(out var next))
+                {
+                    if (next.TrySetResult())
+                    {
+                        return;
+                    }
+                }
+            }
+            busy = false;
         }
     }
 

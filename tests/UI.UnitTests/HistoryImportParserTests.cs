@@ -54,6 +54,30 @@ public class HistoryImportParserTests
     }
 
     [Fact]
+    public void A_rated_series_on_the_watchlist_is_rated_not_planned()
+    {
+        // Both IMDb files in one archive, the watchlist read second: Severance is rated, so it's been watched.
+        using var zip = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(zip, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, text) in new[]
+            {
+                ("ratings.csv", "Const,Your Rating,Date Rated,Title,Title Type,Year\ntt11280740,9,2024-06-14,Severance,TV Series,2022\n"),
+                ("watchlist.csv", "Position,Const,Created,Title,Title Type,Year,Your Rating\n1,tt11280740,2024-07-01,Severance,TV Series,2022,\n2,tt14688458,2024-07-01,Silo,TV Series,2023,\n")
+            })
+            {
+                using var writer = new StreamWriter(archive.CreateEntry(name).Open());
+                writer.Write(text);
+            }
+        }
+        zip.Position = 0;
+        var history = HistoryImportParser.Parse(zip, "imdb.zip", NewYork);
+
+        Assert.Equal(5, Assert.Single(history.Ratings).Stars);
+        Assert.Equal("imdb:tt14688458", Assert.Single(history.Follows).ShowKey);
+    }
+
+    [Fact]
     public void The_tv_time_archive_never_opens_its_account_files()
     {
         var files = Sample("tv-time-gdpr-export.zip").Files;

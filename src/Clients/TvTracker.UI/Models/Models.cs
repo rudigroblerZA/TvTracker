@@ -1277,7 +1277,7 @@ public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int?
 
 public record HistoryEpisodeNumber(int Season, int Number);
 
-/// <param name="Outcome">"found", "imported", "not-found" or "failed".</param>
+/// <param name="Outcome">"found", "imported", "not-found", "failed" or "later" (not reached; send again).</param>
 public record HistoryShow(string Key, Guid? ShowId, string? Title, string? PosterUrl, string Outcome, IReadOnlyList<HistoryEpisode> Episodes);
 
 public record HistoryEpisode(int Season, int Number, Guid EpisodeId);

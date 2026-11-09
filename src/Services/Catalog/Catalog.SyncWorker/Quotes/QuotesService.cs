@@ -17,9 +17,13 @@ namespace Catalog.SyncWorker.Quotes;
 /// catalog's episodes when read, so a line still finds its episode after a refresh re-creates it.</item>
 /// </list>
 /// </summary>
-public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<QuotesService> logger) : BackgroundService
+public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvider time, IConfiguration configuration, ILogger<QuotesService> logger)
+    : BackgroundService
 {
-    private const string Provider = "tvmaze";
+    /// <summary>
+    /// Shows are found on Wikidata by their TVmaze id (P8600), so only TVmaze's shows are looked up (BACKLOG D2).
+    /// </summary>
+    private const string Provider = CatalogSources.TvMaze;
     private const int LookupBatch = 100;
     private const int Attempts = 3;
     private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(3);
@@ -35,6 +39,11 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (CatalogSources.Configured(configuration) != Provider)
+        {
+            logger.LogInformation("Memorable lines: off, since the catalog isn't from TVmaze and shows are found by their TVmaze id");
+            return;
+        }
         await Task.Delay(FirstDelay, time, stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {

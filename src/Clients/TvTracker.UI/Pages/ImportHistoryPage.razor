@@ -104,6 +104,10 @@
                     {
                         <li>@($"{summary.Rated} shows rated")@(summary.AlreadyRated > 0 ? $" ({summary.AlreadyRated} you'd rated already kept your rating)" : "")</li>
                     }
+                    @if (summary.RatingsFailed > 0)
+                    {
+                        <li class="muted">@($"{summary.RatingsFailed} ratings couldn't be saved right now; import the file again later to try them again.")</li>
+                    }
                     @if (summary.MissingEpisodes > 0)
                     {
                         <li class="muted">@($"{summary.MissingEpisodes} watches had no matching episode (specials, or numbering the catalog counts differently)")</li>
@@ -154,7 +158,7 @@
     private ImportSummary? summary;
 
     private sealed record ImportSummary(int Added, int AlreadyHad, int Matched, int Imported, int Follows, int MissingEpisodes, int Failed,
-        List<string> Unmatched, int Rated, int AlreadyRated);
+        List<string> Unmatched, int Rated, int AlreadyRated, int RatingsFailed);
 
     private int Percent => total == 0 ? 0 : Math.Min(100, 100 * done / total);
 
@@ -212,16 +216,19 @@
         var shows = parsed.Shows.Values.OrderBy(s => s.Title, StringComparer.CurrentCulture).ToList();
         total = shows.Count + parsed.Watches.Count + parsed.Ratings.Count;
         done = 0;
-        int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0, rated = 0, alreadyRated = 0;
+        int added = 0, alreadyHad = 0, matched = 0, imported = 0, follows = 0, missing = 0, failed = 0, rated = 0, alreadyRated = 0, ratingsFailed = 0;
         var unmatched = new List<string>();
         // Each matched show's catalog id and its episode ids by (season, number).
         var found = new Dictionary<string, (Guid ShowId, Dictionary<(int, int), Guid> Episodes)>();
         try
         {
-            // 1. Shows, in small batches, since each one the catalog lacks is fetched from the provider.
-            foreach (var batch in shows.Chunk(ShowsPerCall))
+            // 1. Shows, in small batches, since each one the catalog lacks is fetched from the provider. A show the call's
+            // time ran out before ("later") goes into the next batch; every call reaches at least one show.
+            var pending = new Queue<ParsedShow>(shows);
+            while (pending.Count > 0)
             {
                 ct.ThrowIfCancellationRequested();
+                var batch = Enumerable.Range(0, Math.Min(ShowsPerCall, pending.Count)).Select(_ => pending.Dequeue()).ToArray();
                 progress = $"Finding shows: {done} of {shows.Count}…";
                 StateHasChanged();
                 var request = batch.Select(s => new HistoryShowRequest(s.Key, s.TvdbId, s.Title, s.Year,
@@ -231,6 +238,11 @@
                 foreach (var show in batch)
                 {
                     var r = result?.Shows.FirstOrDefault(x => x.Key == show.Key);
+                    if (r?.Outcome == "later")
+                    {
+                        pending.Enqueue(show);
+                        continue;
+                    }
                     if (r?.ShowId is { } id)
                     {
                         matched++;
@@ -239,8 +251,8 @@
                     }
                     else if (r?.Outcome == "failed") failed++;
                     else unmatched.Add(show.Title.Length > 0 ? show.Title : show.ImdbId is { } imdb ? $"IMDb {imdb}" : $"TVDB {show.TvdbId}");
+                    done++;
                 }
-                done += batch.Length;
             }
 
             // 2. Watches, with their own times; the ones without a date as of now.
@@ -297,25 +309,33 @@
                 follows++;
             }
 
-            // 4. Ratings (IMDb's), leaving a show the user has rated here alone.
-            foreach (var rating in parsed.Ratings)
-            {
-                ct.ThrowIfCancellationRequested();
-                done++;
-                if (!found.TryGetValue(rating.ShowKey, out var show))
+            // 4. Ratings (IMDb's), four at a time, leaving a show the user has rated here alone. One the service refuses
+            // is counted and skipped rather than stopping the rest.
+            done += parsed.Ratings.Count(r => !found.ContainsKey(r.ShowKey));
+            await Parallel.ForEachAsync(parsed.Ratings.Where(r => found.ContainsKey(r.ShowKey)),
+                new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct }, async (rating, token) =>
                 {
-                    continue;
-                }
-                progress = $"Rating shows: {rated + alreadyRated + 1} of {parsed.Ratings.Count}…";
-                StateHasChanged();
-                if (await Ratings.GetMyShowRatingAsync(show.ShowId, ct) is not null)
-                {
-                    alreadyRated++;
-                    continue;
-                }
-                await Ratings.RateShowAsync(show.ShowId, rating.Stars, ct);
-                rated++;
-            }
+                    var showId = found[rating.ShowKey].ShowId;
+                    try
+                    {
+                        if (await Ratings.GetMyShowRatingAsync(showId, token) is not null)
+                        {
+                            Interlocked.Increment(ref alreadyRated);
+                        }
+                        else
+                        {
+                            await Ratings.RateShowAsync(showId, rating.Stars, token);
+                            Interlocked.Increment(ref rated);
+                        }
+                    }
+                    catch (HttpRequestException)
+                    {
+                        Interlocked.Increment(ref ratingsFailed);
+                    }
+                    Interlocked.Increment(ref done);
+                    progress = $"Rating shows: {rated + alreadyRated + ratingsFailed} of {parsed.Ratings.Count}…";
+                    await InvokeAsync(StateHasChanged);
+                });
         }
         catch (OperationCanceledException)
         {
@@ -332,6 +352,6 @@
             cancel.Dispose();
             cancel = null;
         }
-        summary = new ImportSummary(added, alreadyHad, matched, imported, follows, missing, failed, unmatched, rated, alreadyRated);
+        summary = new ImportSummary(added, alreadyHad, matched, imported, follows, missing, failed, unmatched, rated, alreadyRated, ratingsFailed);
     }
 }

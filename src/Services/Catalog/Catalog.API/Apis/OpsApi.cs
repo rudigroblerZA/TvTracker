@@ -269,7 +269,8 @@ public static class OpsApi
             await db.Quotes.Where(q => q.EpisodeNumber != null)
                 .Select(q => new { q.ShowId, q.SeasonNumber, q.EpisodeNumber }).Distinct().CountAsync(ct),
             await db.QuoteSources.MaxAsync(q => q.FetchedAtUtc, ct),
-            await db.Shows.CountAsync(s => s.Source == "tvmaze", ct),
+            // The lookups find shows by their TVmaze id, so they cover only TVmaze's shows.
+            await db.Shows.CountAsync(s => s.Source == CatalogSources.TvMaze, ct),
             await db.SettingLookups.CountAsync(l => l.CheckedAtUtc >= monthAgo, ct),
             await db.Settings.Where(s => s.Kind == ShowSettingKinds.Set).Select(s => s.ShowId).Distinct().CountAsync(ct),
             await db.Settings.Where(s => s.Kind == ShowSettingKinds.Filmed).Select(s => s.ShowId).Distinct().CountAsync(ct),
