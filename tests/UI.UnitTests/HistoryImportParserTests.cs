@@ -25,6 +25,8 @@ public class HistoryImportParserTests
     [InlineData("tv-time-out-series.csv", 4, 0, 4)]
     [InlineData("trakt-export.json", 3, 22, 1)]
     [InlineData("generic-by-title.csv", 3, 19, 0)]
+    [InlineData("imdb-ratings.csv", 5, 0, 0)]
+    [InlineData("imdb-watchlist.csv", 3, 0, 2)]
     public void Each_sample_reads_as_its_readme_says(string file, int shows, int watches, int follows)
     {
         var history = Sample(file);
@@ -33,6 +35,22 @@ public class HistoryImportParserTests
         Assert.Equal(follows, history.Follows.Count);
         // A file of statuses only names shows through its follows.
         Assert.Equal(shows, file == "tv-time-out-series.csv" ? history.Follows.Count : history.Shows.Count);
+    }
+
+    [Fact]
+    public void IMDb_series_ratings_become_stars_and_episodes_and_movies_are_skipped()
+    {
+        var ratings = Sample("imdb-ratings.csv");
+
+        // 10 and 9 are 5 stars, 8 and 7 four, 5 three; Ozymandias (an episode) and The Godfather are skipped.
+        Assert.Equal([("tt0903747", 5), ("tt0108778", 4), ("tt0306414", 5), ("tt7366338", 4), ("tt11280740", 3)],
+            ratings.Ratings.Select(r => (ratings.Shows[r.ShowKey].ImdbId, r.Stars)));
+        Assert.Equal(2, ratings.Skipped);
+
+        // On the watchlist, a series you've rated is a rating; the rest are planned.
+        var watchlist = Sample("imdb-watchlist.csv");
+        Assert.Equal(["Silo", "Shōgun"], watchlist.Follows.Select(f => watchlist.Shows[f.ShowKey].Title));
+        Assert.Equal(5, Assert.Single(watchlist.Ratings).Stars);
     }
 
     [Fact]

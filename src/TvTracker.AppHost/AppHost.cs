@@ -293,6 +293,14 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
+// Where the catalog comes from: TVmaze unless the AppHost's Catalog:Provider says "wikidata" (CC0) or "mock". Catalog.API
+// is told too, since it matches the provider's ids (history imports, character trails) by the shows' source.
+if (builder.Configuration["Catalog:Provider"] is { Length: > 0 } catalogProvider)
+{
+    catalogApi.WithEnvironment("Catalog__Provider", catalogProvider);
+    catalogSync.WithEnvironment("Catalog__Provider", catalogProvider);
+}
+
 // The sync worker's callers sign in as the internal client; the worker accepts nothing else on its internal APIs.
 foreach (var caller in new[] { catalogApi, ratingsApi, researchApi, analyticsWorker, socialApi })
 {

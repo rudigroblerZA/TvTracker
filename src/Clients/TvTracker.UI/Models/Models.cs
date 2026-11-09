@@ -1272,7 +1272,8 @@ public record StreakDue(Guid ShowId, string Title, string? PosterUrl, int Season
 /// <summary>
 /// Bring your history: a show from an export to resolve, with the episode numbers watched.
 /// </summary>
-public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes);
+public record HistoryShowRequest(string Key, string? TvdbId, string? Title, int? Year, IReadOnlyList<HistoryEpisodeNumber> Episodes,
+    string? ImdbId = null);
 
 public record HistoryEpisodeNumber(int Season, int Number);
 

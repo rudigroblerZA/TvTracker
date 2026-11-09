@@ -362,10 +362,13 @@ episode titles, since a milestone episode is often an event. It works signed out
 **Bring your history** (`/settings/import`, from Settings; `history-import` flag; free, signed in): import what you
 watched elsewhere, dates included. It reads the official TV Time archive (the GDPR zip: `tracking-prod-records-v2.csv`,
 `followed_tv_show.csv`, the older `seen_episode.csv`), the TV Time Out and Liberator files, a Trakt export (history or
-watched JSON), or any CSV with a show, a season, an episode and a date. The file is read in the app and only the episodes
+watched JSON), IMDb's ratings or watchlist CSV, or any CSV with a show, a season, an episode and a date. The file is read in the app and only the episodes
 and dates are sent, so Year in TV, Your TV clock and Streaks read your past as it happened; other importers keep the
 episodes and lose the dates.
-- **Shows are found** by TheTVDB id (what TV Time uses) or by title and year, and added to the catalog when it lacks
+- **IMDb:** IMDb's exports list titles, not episodes, so a rated series is rated here (1 to 10 halved and rounded up: a 7
+  or 8 is 4 stars) and a series on the watchlist is planned. Episodes and movies in the file are skipped (an episode row
+  names its own IMDb id, not its show's or its number). A show you've already rated here keeps your rating.
+- **Shows are found** by IMDb id, TheTVDB id (what TV Time uses) or by title and year, and added to the catalog when it lacks
   them, a few a minute, with progress shown; a title that can't be matched is listed with a search link, and importing
   the file again picks it up. Specials and numbering the catalog counts differently are reported, not guessed.
 - **Dates:** TV Time's times have no zone and are read in your profile's time zone; a bare date lands mid-day; a watch
@@ -374,8 +377,8 @@ episodes and lose the dates.
   export says you'd planned or stopped get that status; shows with watches are followed from their first watch.
 - **API:** `POST /api/v1/history/resolve` (Catalog.API, signed in, up to 10 shows a call) and
   `POST /api/v1/watched/import` (Tracking.API, up to 500 watches with their times).
-- **Sample files to try it with** are in `samples/history-import/`: a TV Time archive, TV Time Out files, a Trakt export
-  and a CSV by title, all made up, with real TheTVDB ids.
+- **Sample files to try it with** are in `samples/history-import/`: a TV Time archive, TV Time Out files, a Trakt export,
+  IMDb's ratings and watchlist, and a CSV by title, all made up, with real TheTVDB and IMDb ids.
 
 **Streaks** (`/streaks`, from Insights and Up Next; `streaks` flag; free, signed in): days and weeks in a row with
 something watched, and the shows you keep up with as they air: each new episode watched within 7 days of airing,
@@ -471,9 +474,20 @@ answers from the catalog. Limits are under `SearchRateLimit` in Catalog.API's co
 
 To work offline, set `Catalog:Provider` to `mock` to use `MockCatalogProvider`: 12 invented shows whose air dates are relative
 to the current week, so there are always episodes that aired recently and episodes coming up. Shows are stored per provider,
-so switching leaves the other provider's shows in the database without refreshing them.
+so switching leaves the other provider's shows in the database without refreshing them. Set it in the AppHost's
+configuration (`Catalog__Provider`), which passes it to the sync worker and Catalog.API alike.
 
-TVmaze data is licensed CC BY-SA; the app footer carries the required credit. TVmaze has no keywords, "similar shows" or
+**Wikidata as the catalog** (`Catalog:Provider=wikidata`): the catalog from [Wikidata](https://www.wikidata.org), whose data
+is CC0 (no licence terms at all), with each show's overview from its English Wikipedia article (CC BY-SA, else Wikidata's
+one-line description). Shows, seasons, episodes with air dates and runtimes, cast with their characters, creators and
+executive producers, careers and acting credits all come from it, and search is Wikidata's own. It has no ratings, no
+where-to-watch, no similar shows and no change feed (refreshes go by the timer), episodes have a day rather than a time,
+and coverage is good for well-known shows and thin for the rest: Breaking Bad's 62 episodes are all there and dated,
+Friends' 236 are there but only 66 dated. Memorable lines, the TV atlas, Same name and Research find shows by their TVmaze id,
+so they stay empty for Wikidata's shows. Requests are one at a time, a second apart, since Wikimedia limits addresses
+hard; a show takes three or four requests.
+
+TVmaze data is licensed CC BY-SA; the app footer carries the required credit (Wikidata's needs none). TVmaze has no keywords, "similar shows" or
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 

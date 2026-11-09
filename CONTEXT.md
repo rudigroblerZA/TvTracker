@@ -91,8 +91,34 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
 
 ## Catalog sync (TVmaze)
 
-- **Provider abstraction:** `ICatalogProvider` has two implementations, `TvMazeCatalogProvider` and
-  `MockCatalogProvider` (`Catalog:Provider=mock` for offline). Shows are stored per provider (`Source` + `ExternalId`).
+- **Provider abstraction:** `ICatalogProvider` has three implementations, `TvMazeCatalogProvider`,
+  `WikidataCatalogProvider` and `MockCatalogProvider` (`Catalog:Provider`, `CatalogSources`, set by the AppHost on the
+  sync worker and Catalog.API together). Shows are stored per provider (`Source` + `ExternalId`). Providers' ids never
+  collide (numbers, Q-numbers, "mock-…"), so Catalog.API matches credits to shows by id alone.
+- **Wikidata** (`Providers/Wikidata`, a decision: a source with no licence terms, CC0, beside TVmaze's CC BY-SA; OMDb is
+  non-commercial and TMDB and TheTVDB need paid or written licences, so they were ruled out):
+  - **One source at a time:** the worker reads one provider, and about ten loops filter shows by its name, so running
+    Wikidata beside TVmaze, each show refreshed from its own, is a larger change (BACKLOG D2).
+  - **What a show is:** an item that is a television series, miniseries, animated, anime or web series. Episodes are
+    the episode items part of it (P179), placed by their season (P4908, the episode's ordinal) and the season's own
+    ordinal in the series; an episode without both is left out. Air dates are P577's earliest (one per country), as
+    the start of that day in UTC: Wikidata gives no time.
+  - **TVmaze's vocabulary** (`WikidataMapping`): genre items' labels map to TVmaze's genres by words ("comedy-drama" is
+    Comedy and Drama), the kind is animation for an animated type and else the first kind word in a genre, where a
+    joined word doesn't count (The Office's "pseudo-documentary" stays scripted); popularity is 1.5 per wiki with a
+    page about the show, capped at 100; language is the language's last word ("American English" is english).
+  - **Cast order:** Wikidata keeps no billing, and lists guest stars with the regulars: actors with a stated character
+    come first, then by how many wikis have a page about them. Character items are the same in every show, unlike
+    TVmaze's per-show character ids.
+  - **Gently:** one request at a time, a second apart, a 429's Retry-After waited out once (`WikidataSparql`), and a
+    502/503/504 (the query service gives them under load) tried once more after 5 s; past that it's an
+    `HttpRequestException`, which every sync loop already skips and retries later. A show is three queries and a
+    Wikipedia summary. The index query for popular shows takes about 20 s, so the featured list is read once a day.
+  - **The same answer twice:** Wikidata returns rows, `GROUP_CONCAT`s and `SAMPLE`s in no fixed order, and the
+    synchronizer sees any difference as a change, so genres, characters, people and samples are sorted or taken as the
+    least value. Before that, refreshing an unchanged Breaking Bad raised `ShowUpdated`.
+  - **Checked** against the live service: Breaking Bad (62 of 62 episodes, dated and timed), Severance, Friends (236
+    episodes, 66 dated), The Office's namesakes in search, Vince Gilligan's career and Bryan Cranston's roles.
 - **Rate limit:** TVmaze allows 20 calls per 10 s. One limiter is shared by everything: hourly import, refreshes, search
   imports, bulk import, the creatives backfill and career refreshes. New background work must spend calls sparingly.
   `CreativesService`, for example, does 30 shows and 30 people a minute. New work names itself with
@@ -1507,10 +1533,15 @@ integration events (RabbitMQ) or as an HTTP call through Aspire service discover
   with `is_followed`/`is_for_later`/`is_archived`, `tracking-stats`; `s_id` is TheTVDB's), `followed_tv_show.csv`, the older
   `seen_episode.csv`; TV Time Out and Liberator CSVs (`series_tvdb_id` or `tvdb_id`, `season`, `episode`, `is_watched`,
   `watched_at`, `status`); Trakt JSON (history items with `watched_at`, or the watched list with `last_watched_at`;
-  `ids.tvdb`); any CSV with a title or TVDB id, season, episode and date. The TV Time layout comes from importers' code
+  `ids.tvdb`); IMDb's ratings and watchlist CSVs (`Const`, `Title Type`, `Your Rating`); any CSV with a title or TVDB
+  id, season, episode and date.
+- **IMDb gives titles, not episodes:** its exports have one row per title, and an episode's row names its own id, not its
+  show's or its number, so placing it would need IMDb's data, which isn't licensed for this. A series' rating becomes
+  stars (half, rounded up, so 7 and 8 are both 4) and a watchlisted series is planned; a show already rated here keeps
+  its rating. The TV Time layout comes from importers' code
   and research notes, not a real archive: none was to hand after the shutdown, so the first real file may add a column.
-- **Resolving in the sync worker** (`HistoryResolver`, `POST /api/v1/imports/resolve`): TheTVDB ids go through TVmaze's
-  `lookup/shows?thetvdb=`; titles are searched and taken only on a title match as Same name reads titles
+- **Resolving in the sync worker** (`HistoryResolver`, `POST /api/v1/imports/resolve`): IMDb ids go through TVmaze's
+  `lookup/shows?imdb=` (Wikidata's P345), TheTVDB ids through `lookup/shows?thetvdb=` (P4835); titles are searched and taken only on a title match as Same name reads titles
   (`NamesakeTitles.Key`; year within one when given), because the first result for "Ghosts" is a coin toss. Found shows are imported when missing. Lookups are cached 30 days
   (misses a day). Ten shows a call: each missing show is two provider calls on the shared limiter.
 - **Catalog.API maps** (`HistoryImportApi`, signed in, search's rate limit) the worker's ids to catalog show and

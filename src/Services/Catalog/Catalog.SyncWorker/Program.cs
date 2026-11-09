@@ -4,6 +4,7 @@ using Catalog.Embeddings;
 using Catalog.SyncWorker;
 using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
+using Catalog.SyncWorker.Providers.Wikidata;
 using Catalog.SyncWorker.Quotes;
 using Catalog.SyncWorker.Settings;
 using Microsoft.Extensions.Options;
@@ -28,10 +29,26 @@ builder.Services.AddIntegrationEventOutbox<CatalogContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Catalog:Provider picks the data source: "tvmaze" (default) or "mock" for invented offline data.
-if (string.Equals(builder.Configuration["Catalog:Provider"], "mock", StringComparison.OrdinalIgnoreCase))
+// Catalog:Provider picks the data source: "tvmaze" (default), "wikidata" (CC0) or "mock" for invented offline data.
+var catalogProvider = CatalogSources.Configured(builder.Configuration);
+if (catalogProvider == CatalogSources.Mock)
 {
     builder.Services.AddSingleton<ICatalogProvider, MockCatalogProvider>();
+}
+else if (catalogProvider == CatalogSources.Wikidata)
+{
+    // One try per request, within the query service's own 60 s limit: Wikimedia's 429s are waited out by the client.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+    builder.Services.AddHttpClient(WikidataSparql.HttpClientName, http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(70);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker-catalog/1.0 (+https://github.com/rudigroblerZA/TvTracker)");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = System.Net.DecompressionMethods.All })
+        .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+    builder.Services.AddSingleton<WikidataSparql>();
+    builder.Services.AddSingleton<ICatalogProvider, WikidataCatalogProvider>();
 }
 else
 {

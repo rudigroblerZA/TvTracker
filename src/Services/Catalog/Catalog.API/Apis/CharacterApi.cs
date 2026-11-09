@@ -112,7 +112,9 @@ public static class CharacterApi
 
         var externalIds = credits.Where(c => c.ShowId is null).Select(c => c.ShowExternalId).Distinct().ToList();
         var imported = await db.Shows.AsNoTracking()
-            .Where(s => s.Source == "tvmaze" && externalIds.Contains(s.ExternalId))
+            // Providers' ids never collide (TVmaze's are numbers, Wikidata's Q-numbers, the mock's "mock-…"), so whichever
+            // provider the catalog is filled from, its credits match its shows.
+            .Where(s => externalIds.Contains(s.ExternalId))
             .ToDictionaryAsync(s => s.ExternalId, s => s.Id, ct);
         var inCatalog = cast.Select(c => (c.PersonId, c.ShowId)).ToHashSet();
 

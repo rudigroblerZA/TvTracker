@@ -53,7 +53,7 @@ public sealed partial class TvMazeCatalogProvider(
 {
     private readonly TvMazeOptions _options = options.Value;
 
-    public string Name => "tvmaze";
+    public string Name => CatalogSources.TvMaze;
 
     public async Task<IReadOnlyList<string>> GetFeaturedShowIdsAsync(CancellationToken cancellationToken = default)
     {
@@ -152,10 +152,16 @@ public sealed partial class TvMazeCatalogProvider(
     internal static string? UpdatesSince(TimeSpan within) =>
         within <= TimeSpan.FromDays(1) ? "day" : within <= TimeSpan.FromDays(7) ? "week" : within <= TimeSpan.FromDays(30) ? "month" : null;
 
-    public async Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default)
+    public Task<string?> LookUpShowByTvdbAsync(string tvdbId, CancellationToken cancellationToken = default) =>
+        LookUpAsync("thetvdb", tvdbId, cancellationToken);
+
+    public Task<string?> LookUpShowByImdbAsync(string imdbId, CancellationToken cancellationToken = default) =>
+        LookUpAsync("imdb", imdbId, cancellationToken);
+
+    private async Task<string?> LookUpAsync(string key, string id, CancellationToken cancellationToken)
     {
         // TVmaze answers with a redirect to the show (followed by the client) or 404 when it has no show with that id.
-        using var response = await http.GetAsync($"lookup/shows?thetvdb={Uri.EscapeDataString(tvdbId)}", cancellationToken);
+        using var response = await http.GetAsync($"lookup/shows?{key}={Uri.EscapeDataString(id)}", cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;

@@ -84,6 +84,22 @@ Nothing open.
 
 ## Catalog data
 
+### D2. Wikidata beside TVmaze
+
+**P3 · L**
+
+- **Why:**
+  - `Catalog:Provider=wikidata` makes Wikidata (CC0) the whole catalog, but it has no ratings or where-to-watch and thin
+    episode lists outside well-known shows, so it can't replace TVmaze for everyone.
+  - Run beside TVmaze, it could fill the shows TVmaze lacks, and Memorable lines, the TV atlas and Research could find a
+    Wikidata show by its own item rather than a TVmaze id.
+- **What:**
+  - Register both providers and pick one per show by `Show.Source` in the synchronizer, refresh, creatives, cast
+    credits, namesakes and history resolving (about ten queries filter by the provider's name today).
+  - Search both, preferring TVmaze where both have the show (Wikidata's TVmaze id, P8600, links them).
+  - Quotes and settings: look a Wikidata show up by its item.
+- **Done when:** a show only Wikidata has can be found, imported, refreshed and followed alongside TVmaze's.
+
 ### D1. Planned episodes per season
 
 **P2 · M**
