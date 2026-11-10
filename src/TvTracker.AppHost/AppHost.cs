@@ -279,11 +279,7 @@ foreach (var (key, value) in Microsoft.Extensions.Configuration.ConfigurationExt
 // until it's ready, search matches titles only. Not started for an in-process model: the built-in server models
 // are the dmr/ ones, and a custom one says Source: Server.
 var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
-// The model's name on Model Runner, for Open WebUI's document search: a configured model's own, else the built-in one's.
-var servedEmbeddingModel = builder.Configuration[$"Embeddings:Models:{embeddingModelId}:ServedModel"] is { Length: > 0 } configuredServed
-    ? configuredServed
-    : embeddingModelId == "dmr/nomic-embed-text-v1.5" ? "ai/nomic-embed-text-v1.5" : "ai/qwen3-embedding:0.6b";
-// The chat model Open WebUI chats with and Research drafts insights with; pulled with the dashboard's command. The
+// The chat model Research drafts insights with; pulled with the dashboard's command. The
 // default is small enough for a CPU (qwen3 0.6B, ~400 MB).
 var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/qwen3:0.6B-Q4_K_M";
 researchApi.WithEnvironment("Research__ChatModel", chatModel);
@@ -299,14 +295,6 @@ else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunner
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
     researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
-
-    // Open WebUI runs in a container, where localhost is the container itself.
-    var fromContainer = new UriBuilder(modelRunnerUrl);
-    if (fromContainer.Host is "localhost" or "127.0.0.1")
-    {
-        fromContainer.Host = "host.docker.internal";
-    }
-    AddOpenWebUi(ReferenceExpression.Create($"{fromContainer.Uri.ToString().TrimEnd('/')}/engines/v1"), null);
 }
 else
 {
@@ -326,7 +314,7 @@ else
         commandOptions: new HttpCommandOptions
         {
             Method = HttpMethod.Post,
-            Description = $"Pulls {chatModel} for chatting in Open WebUI, and drafting research insights. Large models take minutes.",
+            Description = $"Pulls {chatModel} for drafting research insights. Large models take minutes.",
             IconName = "ArrowDownload",
             PrepareRequest = context =>
             {
@@ -334,44 +322,6 @@ else
                 return Task.CompletedTask;
             }
         });
-
-    AddOpenWebUi(ReferenceExpression.Create($"{modelRunner.GetEndpoint("http")}/engines/v1"), modelRunner);
-}
-
-// Open WebUI: a web UI for Model Runner, to see the models it serves and chat with any chat model pulled into it
-// ("open-webui" on the dashboard). Development only: sign-in is off, so anyone who can reach it can use it. Its
-// document search embeds with Model Runner's embedding model too, so it downloads no model of its own at start.
-// The image is about 6 GB; ModelRunner:OpenWebUi = false leaves it out.
-void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<ContainerResource>? modelRunner)
-{
-    if (string.Equals(builder.Configuration["ModelRunner:OpenWebUi"], "false", StringComparison.OrdinalIgnoreCase))
-    {
-        return;
-    }
-
-    var openWebUi = builder.AddContainer("open-webui", "ghcr.io/open-webui/open-webui", "v0.7.2")
-        .WithHttpEndpoint(targetPort: 8080, name: "http")
-        .WithVolume("tvtracker-open-webui", "/app/backend/data")
-        .WithEnvironment("WEBUI_NAME", $"{appName} · Model Runner")
-        .WithEnvironment("WEBUI_AUTH", "False")
-        .WithEnvironment("ENABLE_OLLAMA_API", "False")
-        .WithEnvironment("OPENAI_API_BASE_URL", modelRunnerApi)
-        .WithEnvironment("OPENAI_API_KEY", "model-runner")
-        .WithEnvironment("RAG_EMBEDDING_ENGINE", "openai")
-        .WithEnvironment("RAG_OPENAI_API_BASE_URL", modelRunnerApi)
-        .WithEnvironment("RAG_OPENAI_API_KEY", "model-runner")
-        .WithEnvironment("RAG_EMBEDDING_MODEL", servedEmbeddingModel)
-        .WithEnvironment("ENABLE_EVALUATION_ARENA_MODELS", "False")
-        .WithEnvironment("ANONYMIZED_TELEMETRY", "False")
-        // The AppHost owns this config, so Open WebUI reads it from here on every start instead of keeping its first
-        // copy in its database.
-        .WithEnvironment("ENABLE_PERSISTENT_CONFIG", "False")
-        .WithHttpHealthCheck("/health")
-        .WithLifetime(ContainerLifetime.Persistent);
-    if (modelRunner is not null)
-    {
-        openWebUi.WaitFor(modelRunner);
-    }
 }
 
 // Search asks the sync worker to import matches from the provider. Until the worker is up, search uses what the catalog has.
