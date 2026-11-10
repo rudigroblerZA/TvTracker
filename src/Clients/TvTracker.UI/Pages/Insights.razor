@@ -1,5 +1,6 @@
 @page "/insights"
 @inject AnalyticsClient Analytics
+@inject FeatureFlagStore Flags
 @inject CatalogClient Catalog
 
 <PageTitle>Insights · @Brand.AppName</PageTitle>
@@ -172,13 +173,13 @@
     }
 
     /// <summary>
-    /// Optional: hidden when the season-verdict flag is off (404) or the call fails.
+    /// Optional: not asked for while the season-verdict flag is off, and hidden when the call fails.
     /// </summary>
     private async Task LoadVerdictsAsync()
     {
         try
         {
-            verdicts = await Analytics.GetSeasonVerdictsAsync();
+            verdicts = await Flags.IsEnabledAsync(FeatureFlags.SeasonVerdict) ? await Analytics.GetSeasonVerdictsAsync() : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

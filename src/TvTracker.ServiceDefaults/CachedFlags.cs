@@ -29,8 +29,8 @@ public sealed class CachedFlags(IFeatureClient client, IMemoryCache cache)
     public static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Whether <paramref name="flag"/> is on for <paramref name="context"/>, defaulting to on (fail open) when flagd
-    /// can't answer.
+    /// Whether <paramref name="flag"/> is on for <paramref name="context"/>, or its flagd.json default
+    /// (<see cref="FeatureFlags.DefaultFor"/>) when flagd can't answer.
     /// </summary>
     public async Task<bool> IsEnabledAsync(string flag, EvaluationContext context, CancellationToken cancellationToken = default)
     {
@@ -39,7 +39,7 @@ public sealed class CachedFlags(IFeatureClient client, IMemoryCache cache)
         {
             return known;
         }
-        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultValue, context, cancellationToken: cancellationToken);
+        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultFor(flag), context, cancellationToken: cancellationToken);
         cache.Set(key, enabled, CacheFor);
         return enabled;
     }

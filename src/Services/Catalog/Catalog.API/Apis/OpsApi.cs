@@ -363,7 +363,7 @@ public static class OpsApi
         var flags = new List<OpsFlag>();
         foreach (var key in keys)
         {
-            flags.Add(new OpsFlag(key, await features.GetBooleanValueAsync(key, FeatureFlags.DefaultValue, cancellationToken: ct)));
+            flags.Add(new OpsFlag(key, await features.GetBooleanValueAsync(key, FeatureFlags.DefaultFor(key), cancellationToken: ct)));
         }
         return flags;
     }
