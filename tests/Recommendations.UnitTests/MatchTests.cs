@@ -5,7 +5,7 @@ using TvTracker.IntegrationEvents;
 namespace Recommendations.UnitTests;
 
 /// <summary>
-/// How two shows are matched (CONTEXT.md, Recommendations): content similarity plus a nanogenre bonus, scaled by DNA
+/// How two shows are matched: content similarity plus a nanogenre bonus, scaled by DNA
 /// affinity between 0.5 and 1, so DNA reorders shows that are already alike and never makes an unrelated show similar.
 /// </summary>
 public class MatchTests

@@ -6,7 +6,7 @@ using static Analytics.UnitTests.Build;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// The essential cut at "lean" (see CONTEXT.md, Essential cut).
+/// The essential cut at "lean".
 /// </summary>
 public class EssentialCutTests
 {

@@ -4,7 +4,7 @@ using static Analytics.API.Apis.StreaksApi;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// Streaks: days and weeks in a row, and shows kept up with as they air (see CONTEXT.md, Streaks).
+/// Streaks: days and weeks in a row, and shows kept up with as they air.
 /// </summary>
 public class StreaksTests
 {

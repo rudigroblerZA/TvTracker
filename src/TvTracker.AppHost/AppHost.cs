@@ -97,7 +97,7 @@ var identityAdminClientSecret = Secret("identity-admin-client-secret", "tvtracke
 var mcpClientSecret = Secret("mcp-client-secret", "tvtracker-mcp-dev-secret");
 var mcpGatewayKey = Secret("mcp-gateway-key", "tvtracker-gateway-dev-key");
 var appAdminPassword = Secret("app-admin-password", "admin");
-// The internal client other services sign in as to call the sync worker's imports, replay and overrides (BACKLOG S2).
+// The internal client other services sign in as to call the sync worker's imports, replay and overrides.
 var internalClientSecret = Secret("internal-client-secret", "tvtracker-internal-dev-secret");
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configurati
     webApp.WithEnvironment("Affiliates__TestNetworkKey", testNetworkKey);
 }
 
-// Payments. A deployment sells through Stripe (CONTEXT.md, Payments and Production decisions): its secret key and webhook
+// Payments. A deployment sells through Stripe: its secret key and webhook
 // signing secret are secret parameters, the customer portal's login link and the plan page's public address plain ones,
 // all required. Running locally, Stripe sells in test mode once its key is given (user secrets:
 // Parameters:stripe-secret-key and stripe-webhook-secret, from `stripe listen`; README, Payments); otherwise the test

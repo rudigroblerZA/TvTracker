@@ -3,7 +3,7 @@ using Analytics.Worker.Insights;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// Next season's rating and premiere (see CONTEXT.md, Forecasts).
+/// Next season's rating and premiere.
 /// </summary>
 public class ForecastTests
 {

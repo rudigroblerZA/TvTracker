@@ -3,7 +3,7 @@ using Research.API.Services;
 namespace Research.UnitTests;
 
 /// <summary>
-/// The daily check's loose matches, with CONTEXT.md's cases: a network by containment or initials, a premiere at
+/// The daily check's loose matches, with the cases it was tuned on: a network by containment or initials, a premiere at
 /// Wikidata's precision, episodes within 2 or 10%. Too strict lists every show as different; too loose hides the
 /// differences a moderator should see.
 /// </summary>

@@ -21,7 +21,7 @@ public sealed class QuotesService(IServiceScopeFactory scopeFactory, TimeProvide
     : BackgroundService
 {
     /// <summary>
-    /// Shows are found on Wikidata by their TVmaze id (P8600), so only TVmaze's shows are looked up (BACKLOG D2).
+    /// Shows are found on Wikidata by their TVmaze id (P8600), so only TVmaze's shows are looked up.
     /// </summary>
     private const string Provider = CatalogSources.TvMaze;
     private const int LookupBatch = 100;

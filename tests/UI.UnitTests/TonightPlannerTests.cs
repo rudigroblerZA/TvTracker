@@ -4,7 +4,7 @@ using TvTracker.UI.Services;
 namespace UI.UnitTests;
 
 /// <summary>
-/// Tonight's planner on the rules CONTEXT.md gives: it runs over by at most max(5 minutes, a twelfth of the evening),
+/// Tonight's planner's rules: it runs over by at most max(5 minutes, a twelfth of the evening),
 /// "one show" plans one, and a mix uses up to three shows, none taking more than three-quarters of the evening unless
 /// that would leave it under three-quarters full.
 /// </summary>

@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Wikidata's statements read as the catalog's fields (CONTEXT.md, Catalog sync: Wikidata), with the shows the rules
+/// Wikidata's statements read as the catalog's fields, with the shows the rules
 /// were checked on.
 /// </summary>
 public class WikidataMappingTests

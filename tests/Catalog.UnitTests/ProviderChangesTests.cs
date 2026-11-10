@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;
 
-/// <summary>Refreshing what TVmaze changed, and the slower schedule behind it (see CONTEXT.md, TVmaze budget).</summary>
+/// <summary>Refreshing what TVmaze changed, and the slower schedule behind it.</summary>
 public class ProviderChangesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

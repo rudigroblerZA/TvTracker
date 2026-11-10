@@ -4,7 +4,7 @@ using Analytics.Data;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// Show value, shared by the backlog and time off (see CONTEXT.md, Show value).
+/// Show value, shared by the backlog and time off.
 /// </summary>
 public class ShowValueTests
 {

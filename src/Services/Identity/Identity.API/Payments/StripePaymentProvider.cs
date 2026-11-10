@@ -8,7 +8,7 @@ using TvTracker.Payments;
 namespace Identity.API.Payments;
 
 /// <summary>
-/// Stripe (BACKLOG F1; the decision is in CONTEXT.md, Production decisions), over its REST API with a plain HttpClient:
+/// Stripe, over its REST API with a plain HttpClient:
 /// the app needs four calls and three webhook events, which isn't worth an SDK and its release train.
 /// <list type="bullet">
 /// <item><b>Checkout:</b> a Checkout Session in subscription mode for the <see cref="CheckoutSession"/>'s own amount and

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Affiliate links: which program covers a click, the link it becomes, and the report (see CONTEXT.md, Affiliate links).
+/// Affiliate links: which program covers a click, the link it becomes, and the report.
 /// </summary>
 public class AffiliateTests
 {

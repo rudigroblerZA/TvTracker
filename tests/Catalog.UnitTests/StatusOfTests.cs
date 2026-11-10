@@ -6,7 +6,7 @@ using static Catalog.UnitTests.CatalogOverridesTests;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// A show the provider still calls running after four quiet years is presumed ended (see CONTEXT.md, Presumed ended).
+/// A show the provider still calls running after four quiet years is presumed ended.
 /// </summary>
 public class StatusOfTests
 {

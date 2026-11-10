@@ -4,7 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// The readings every insight shares (see CONTEXT.md, Shared readings).
+/// The readings every insight shares.
 /// </summary>
 public class CopyRulesTests
 {

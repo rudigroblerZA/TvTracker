@@ -6,9 +6,8 @@ namespace Catalog.SyncWorker.Providers.Wikidata;
 
 /// <summary>
 /// Wikidata's query service and Wikipedia's page summaries for the catalog provider, gently: one request at a time and
-/// at least a second apart, interactive callers first, since Wikimedia limits a shared address hard (CONTEXT.md,
-/// Research). A 429's Retry-After holds every caller off until it passes: background work waits it out once (up to a
-/// minute), and anything else gets an <see cref="HttpRequestException"/> for the 429, which every sync loop already
+/// at least a second apart, interactive callers first, since Wikimedia limits a shared address hard. A 429's
+/// Retry-After holds every caller off until it passes: background work waits it out once (up to a minute), and anything else gets an <see cref="HttpRequestException"/> for the 429, which every sync loop already
 /// treats as "skip this show, try again later", as it does TVmaze's. A 502, 503 or
 /// 504, which the query service gives now and then under load, is tried once more 5 s later; nothing else is retried,
 /// as with the other Wikimedia clients: the standard resilience handler would retry a 429 until its timeout.

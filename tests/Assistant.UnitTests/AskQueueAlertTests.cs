@@ -3,7 +3,7 @@ using Assistant.API.Alerts;
 namespace Assistant.UnitTests;
 
 /// <summary>
-/// Ask's queue alert (CONTEXT.md, Alerts): ten minutes for the oldest question, or ten waiting.
+/// Ask's queue alert: ten minutes for the oldest question, or ten waiting.
 /// </summary>
 public class AskQueueAlertTests
 {
