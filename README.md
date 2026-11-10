@@ -91,16 +91,9 @@ default model, so semantic search needs nothing installed beyond Docker.
 - **Other servers:** any server with the same `POST /embeddings` API works (llama.cpp, Ollama, vLLM).
 - **When it's down,** or doesn't have the model, search answers with title matches only, and the sync worker
   embeds once it's back. Each service logs one warning per outage.
-- **Open WebUI** (`open-webui` on the dashboard): a web UI for Model Runner, to see what it serves and chat with it.
-  - **Sign-in is off,** since it's for development; it's named after the app (`Branding:AppName`).
-  - **Chat needs a chat model.** Model Runner only has the embedding model until you pull one: the `model-runner`
-    resource on the dashboard has a "Pull ai/qwen3:0.6B-Q4_K_M" command (another model: `ModelRunner:ChatModel`), or run
-    `docker model pull` against your own Model Runner. It shows in Open WebUI once pulled.
-  - **Its document search** embeds with the same embedding model, so it downloads no model of its own.
-  - **With your own Model Runner** (`ModelRunner:Url`), it's reached from the container through
-    `host.docker.internal`; the pull command is only on the AppHost's container.
-  - **Size:** the image is about 6 GB. `ModelRunner:OpenWebUi` = `false` leaves it out. Not started for an
-    in-process embedding model, since there's no Model Runner then.
+- **A chat model** (for research drafts): Model Runner only has the embedding model until you pull one. The
+  `model-runner` resource on the dashboard has a "Pull ai/qwen3:0.6B-Q4_K_M" command (another model:
+  `ModelRunner:ChatModel`), or run `docker model pull` against your own Model Runner.
 - **Another model:** add it under `Embeddings:Models:{id}` with `Source: Server`, `ServedModel` (e.g.
   `ai/embeddinggemma`), `Dimensions: 384`, `MaxDistance`, and the model's `QueryPrefix` and `DocumentPrefix`.
   - Set `Truncate: true` for a model trained to be shortened (Matryoshka models such as Qwen3-Embedding, nomic and EmbeddingGemma):
@@ -560,12 +553,11 @@ Useful local addresses:
 | Keycloak admin console | http://localhost:8080 (admin / admin) |
 | RabbitMQ management | link on the Aspire dashboard |
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
-| DbGate (browse and query every database) | link on the Aspire dashboard (`dbgate`), already connected to Postgres |
 
 ### Unit tests and CI
 
 Unit tests cover the services' rules (title matching, crossovers, Wikiquote parsing, overrides, streaks, the essential
-cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation, Ask's guards) and
+cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation) and
 the shared UI's history import and Tonight's planner. They need no database, network or running AppHost:
 
 ```bash
@@ -576,7 +568,6 @@ dotnet test tests/Notifications.UnitTests
 dotnet test tests/Research.UnitTests
 dotnet test tests/Identity.UnitTests
 dotnet test tests/Ratings.UnitTests
-dotnet test tests/Assistant.UnitTests
 dotnet test tests/UI.UnitTests
 ```
 
@@ -720,47 +711,6 @@ dotnet run -- cleanup --prefix persona-                  # remove them and every
   through those events in order, so Social shows a persona's name, and Analytics their insights, once they catch up
   (Analytics' insights also wait for its hourly run).
 
-### MCP server (internal queries)
-
-`mcp-server` (http://localhost:5112/mcp) is a read-only [MCP](https://modelcontextprotocol.io) server over the
-catalog, Analytics and saved research, so an MCP client can answer questions like "landman insights" or "hidden gems in drama" from
-the running app. Add it to Claude Code with:
-
-```bash
-claude mcp add --transport http tvtracker http://localhost:5112/mcp
-```
-
-| Tool | Answers |
-| --- | --- |
-| `show_insights` | Everything computed about a show: season ratings, top episodes, consistency and arc, when it gets good, the landing, DNA, tags, forecasts, viewing |
-| `show_details` | The catalog record: summary, status, genres, nanogenres, seasons, cast and creators (with person ids), next and latest episode, where to watch |
-| `search_shows` | Search by title or description, as in the app (imports from TVmaze when missing) |
-| `season_episodes`, `show_universe`, `holiday_episodes` | A season's episodes; the franchise a show is in; a holiday's best-known episodes |
-| `show_research` | The show's saved research: the checked insight with its sources, and the checked facts |
-| `discover_list`, `upcoming_premieres`, `top_episodes` | Discover's lists, premieres with catch-up time, best-rated episodes |
-| `person`, `person_insights` | A person's credits; their insights and, for creators, their fingerprint |
-| `network_reports` | Each network's report card (endings, renewals, waits, best shows) against the whole catalog |
-
-- **Shows by name:** every show argument takes a title ("landman") or an id. A title goes through catalog search
-  and takes the exact match, else the most popular.
-- **Nothing personal:** it signs in to Analytics as its own Keycloak client (`tvtracker-mcp`, client credentials), so
-  there is no user, and only figures that already follow the 5-user rule come back. Image URLs are left out.
-- **Access:** development only, with no sign-in. Set `Mcp:ApiKey` to run it anywhere else; callers then send it as
-  `Authorization: Bearer <key>`.
-
-**MCP gateway** (`mcp-gateway`, http://localhost:5113/mcp): one endpoint in front of the app's MCP servers, which is
-what Open WebUI uses.
-- **Open WebUI:** the AppHost adds the gateway as an MCP tool server called after the app ("TV Tracker"), on for
-  everyone. In a chat, turn it on from the tools button, then ask "landman insights". A chat model has to be pulled
-  first (the "Pull …" command on `model-runner`); small models call tools less reliably.
-- **Key:** every caller sends `Authorization: Bearer <Gateway:ApiKey>` (`tvtracker-gateway-dev-key` in development):
-  `claude mcp add --transport http tvtracker-gateway http://localhost:5113/mcp --header "Authorization: Bearer tvtracker-gateway-dev-key"`.
-- **More servers:** add `Gateway:Servers:{name}:Url` (and optionally `BearerToken`, and `Tools` to expose only some)
-  to the AppHost's configuration; their tools join the same list. Tools keep their names unless two servers share one,
-  which then become `{server}_{tool}`.
-- **Logs:** every call is logged with its server, outcome and time (the `mcp-gateway` resource on the dashboard). A
-  server that's down is left out of the list until it answers, and a failed call reconnects and retries once.
-
 ### Ops dashboard
 
 http://localhost:5102/ops (Catalog.API) is a one-page developer dashboard, refreshed every 10 seconds:
@@ -806,7 +756,6 @@ Each service checks a few conditions a minute (the first two minutes after start
 | `dead-letters` | Catalog.API | `tvtracker_dead_letters` holds anything (see the ops page to replay) |
 | `insights-run` | Analytics.Worker | the last insights run failed, or none finished in two intervals |
 | `tvmaze-errors` | Catalog.SyncWorker | 10%+ of 20 or more TVmaze calls in 15 minutes failed (5xx, no answer, 429) |
-| `ask-queue` | Assistant.API | the oldest unanswered question is 10 minutes old, or 10 are waiting |
 
 A firing alert shows three ways: the service turns **Degraded** on the Aspire dashboard (its `/health` names the alert;
 still 200, so nothing restarts it), one error log `Alert {Alert} firing: …` (and an information log when it's resolved),
@@ -815,7 +764,7 @@ backend's alert rules. `Alerts:Interval` and `Alerts:FirstCheck` change the timi
 
 ### Feature flags
 
-Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, Ask, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, While you wait, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
+Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reunion radar, the Show DNA panel, DNA twins, When it gets good, Creator fingerprint, the TV time machine, Does it stick the landing?, Previously on…, the catch-up planner, Is it worth going back?, Backlog triage, Fits your time off, the spoiler shield, Where do I know them from?, Holiday episodes, Research, episode notes, the season verdict, the character trail, the watch-now button, crossover alerts, the weekly digest, taste twins, the awards shelf, network report cards, Year in TV, mixtapes, the worth-it score, Guess the show, Call it, Six degrees, Your TV life, Where the cast went next, From the makers, Spoiler watch, Memorable lines, Who said it?, Your TV clock, the TV atlas, Episode lengths, Between seasons, Cast ages, Characters' names, Title formulas, the episode grid, Birthdays, Milestones, Same name, Far from home, Streaks, Bring your history, episode duels, the waiting room, While you wait, Social (following and the feed), the forecasts and nanogenres sit behind [OpenFeature](https://openfeature.dev) feature flags,
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
@@ -842,7 +791,6 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 | `season-verdict` | The season verdict on show pages, Insights' "Seasons that just ended", its endpoint and its notifications |
 | `research` | The Research section on show pages, `/research` and its pages, the Settings link, and Research.API's endpoints |
 | `research-assistant` | The research assistant's runs (checked once a run), its "Run now" endpoint and the section on `/research` |
-| `ask` | `/ask`, its Insights card, and Assistant.API's endpoints |
 | `character-trail` | Character links on show pages' cast, the trail page, and its endpoint |
 | `episode-notes` | Episode notes on the research page and the essential cut, and Research.API's notes endpoints |
 | `watch-now` | The "▶ Watch on Netflix" button on show pages |
@@ -895,8 +843,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 Free, Plus and Family, behind the `plans` flag. Plus and Family are bought on `/settings/plan` through a payment
 provider: Stripe in a deployment (and locally once its test key is given), else, in development, a test provider.
 
-- **Insights by plan:** Plus and Family add 18 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
-  Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, Ask, spoiler watch, Your TV life, Your TV
+- **Insights by plan:** Plus and Family add 17 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
+  Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, spoiler watch, Your TV life, Your TV
   clock, Your services, forecasts, From the makers you love, While you wait); everything else is free. A plan is a set of feature flags: each of those flags has a
   plan rule in `Flags/flagd.json` (`"plans": "plus,family"` in its metadata), and an admin can put any feature into the
   paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Plus tag and its page says what
@@ -984,7 +932,7 @@ read-only, without signing in or having an account.
   - My shows: lists.
   - Discover: Prestige picks, Blend, Mixtape, Guess the show, Six degrees, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
-  - Insights: Ask, the time machine and holiday episodes.
+  - Insights: the time machine and holiday episodes.
   - Stats: Year in TV.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
 - **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
@@ -1057,11 +1005,8 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
-| Assistant.API | `src/Services/Assistant` | "Ask the app": Model Runner's chat model answers questions by calling the MCP tools through the gateway |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
-| Mcp.Server | `src/Services/Mcp/Mcp.Server` | Read-only MCP tools over Catalog, Analytics and Research for internal queries |
-| Mcp.Gateway | `src/Services/Mcp/Mcp.Gateway` | One MCP endpoint with an API key in front of the MCP servers; Open WebUI's tool server |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
 | TvTracker.UI | `src/Clients/TvTracker.UI` | Every page and component, shared by web and mobile |
 | WebApp | `src/Clients/WebApp` | Blazor web app; OIDC sign-in, tokens kept server-side in Redis, browser push |
@@ -1306,7 +1251,6 @@ How events flow:
         asked, and a failed run is tried again in an hour.
       - **API:** `GET /api/v1/research/queue` (moderators), and `GET /api/v1/shows/facts?limit=` on Catalog.API (the
         popular shows' network, premiere date and aired episodes; behind the `research` flag).
-    - **MCP:** `show_research` returns the saved record.
     - **API** (Research.API, port 5114): `GET /api/v1/shows/{id}/research` (public), and for moderators
       `GET /api/v1/research`, `GET /api/v1/research/{id}`, `POST /api/v1/research/{id}/gather`,
       `POST /api/v1/research/{id}/sources` (`{ "url" }`), `PUT|DELETE /api/v1/research/{id}/sources/{sourceId}`,
@@ -1317,21 +1261,6 @@ How events flow:
     - **Your data:** the research versions you saved and the episode notes you wrote are in your data export
       (`GET /api/v1/me/export` on Research.API, gathered by Identity's), and your name comes off them when you delete
       your account.
-  - **Ask** (`/ask`, signed in; linked from Insights): questions about shows in plain words ("Landman
-    insights", "hidden gems in drama", "who created Severance?"), answered by Model Runner's chat model, which looks
-    things up with the app's MCP tools (catalog, insights, Discover lists, premieres, saved research).
-    - **Grounded, and shows its work:** the model is told to answer only from what the tools returned. Each answer lists
-      what it looked up ("How I got this"), and links the shows it names that a tool returned.
-    - **Follow-ups:** "which of those is shortest?" carries the last two questions and answers.
-    - **A small model:** the default, qwen3 0.6B (`ModelRunner:ChatModel`), runs on a CPU and takes 10 s to 2 minutes
-      an answer. It picks the right tools, but often misreads what they return: on Severance it named the cast as
-      creators, and on Breaking Bad it read "ends as it ran" as a great finale. A larger chat model answers better
-      where the hardware allows; none was tried here, since only the 0.6B one could be pulled.
-    - **Limits:** questions are answered one at a time; each person may have one waiting and ask 20 an hour.
-      Questions are kept in memory for 2 hours and never stored; a restart forgets them.
-    - **Nothing personal:** the tools have no user, so it knows shows, not your watches or ratings.
-    - **API** (Assistant.API, port 5115): `POST /api/v1/ask` (`{ "question", "previousId" }`, 202 with the question's
-      state), `GET /api/v1/ask/{id}` (poll until `answered` or `failed`), `GET /api/v1/ask/about`. Behind the `ask` flag.
   - **Character trail** (`/people/{personId}/characters/{showId}`, from a show page's cast, where a character name
     reads "Karen Page · 4 shows"): every show where the same actor plays the same character, in the order they first
     aired.
@@ -1673,7 +1602,7 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 ## Before production
 
 - Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
-  `identity-admin-client-secret`, `mcp-client-secret`, `internal-client-secret`, `mcp-gateway-key`, `app-admin-password` and
+  `identity-admin-client-secret`, `internal-client-secret`, `app-admin-password` and
   `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
   password into Keycloak's realm on start.
 - Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the

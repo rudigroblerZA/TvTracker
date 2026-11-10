@@ -18,8 +18,6 @@
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
-    <!-- Community Toolkit: DbGate, a web UI for the Postgres databases. Released separately from Aspire. -->
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" Version="13.6.1" />
     <!-- Community Toolkit: flagd, the OpenFeature flag server. -->
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="13.6.1" />
   </ItemGroup>
@@ -66,10 +64,6 @@
   </ItemGroup>
   <ItemGroup Label="Tools">
     <PackageVersion Include="System.CommandLine" Version="2.0.14" />
-  </ItemGroup>
-  <ItemGroup Label="MCP">
-    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.1" />
-    <PackageVersion Include="ModelContextProtocol.Core" Version="2.3.1" />
   </ItemGroup>
   <ItemGroup Label="Messaging and delivery">
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />

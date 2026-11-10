@@ -49,7 +49,7 @@ public static class ClientRateLimiting
 
     /// <summary>
     /// Who a request counts against, and whether that's a shared bucket for other services rather than a person. A
-    /// Keycloak service account's token (client credentials: Mcp.Server's <c>tvtracker-mcp</c>, Ask's tools) has a
+    /// Keycloak service account's token (client credentials, such as <c>tvtracker-internal</c>) has a
     /// <c>sub</c> too, but speaks for many people at once, so it counts as a service.
     /// </summary>
     public static (string Key, bool Shared) PartitionKey(HttpContext context)

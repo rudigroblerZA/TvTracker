@@ -10,15 +10,14 @@ using Microsoft.Extensions.Logging;
 namespace TvTracker;
 
 /// <summary>
-/// A service's own access token, for calls made as the service rather than for a user: Mcp.Server reading Analytics
-/// (<c>tvtracker-mcp</c>), and the callers of the sync worker's internal APIs (<c>tvtracker-internal</c>, which the sync
-/// worker requires; <see cref="Microsoft.Extensions.Hosting.AuthenticationExtensions.InternalPolicy"/>). It signs in with
+/// A service's own access token, for calls made as the service rather than for a user: the callers of the sync
+/// worker's internal APIs (<c>tvtracker-internal</c>, which the sync worker requires; <see cref="Microsoft.Extensions.Hosting.AuthenticationExtensions.InternalPolicy"/>). It signs in with
 /// the client-credentials grant as <c>{section}:ClientId</c> / <c>{section}:ClientSecret</c>; the token carries the
 /// services' audience and no person, and is kept until 80% of its lifetime.
 /// <para>
 /// Keycloak imports the realm only on its first start. A realm made before a client existed gets it from Identity.API on
 /// start (<c>Keycloak:ServiceClients</c>), or, in development, here, when the service has the master realm's admin
-/// (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>; only Mcp.Server is given it).
+/// (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>; no service is given it today).
 /// </para>
 /// </summary>
 public sealed class ServiceToken(HttpClient http, IConfiguration config, IHostEnvironment environment, ILogger<ServiceToken> logger,

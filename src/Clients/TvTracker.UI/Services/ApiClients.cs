@@ -19,10 +19,9 @@ public static class ApiClients
     public const string Analytics = "analytics";
     public const string Social = "social";
     public const string Research = "research";
-    public const string Assistant = "assistant";
 
     public static readonly IReadOnlyList<string> All =
-        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social, Research, Assistant];
+        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social, Research];
 }
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
@@ -1057,20 +1056,3 @@ public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t,
         SendAsync<ResearchSaveResult>(ApiClients.Research, HttpMethod.Post, $"api/v1/research/{showId}/save", new { Insight = insight, Facts = facts }, ct);
 }
 
-public sealed class AssistantClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
-{
-    /// <summary>
-    /// Whether the assistant is set up, and its model.
-    /// </summary>
-    public Task<AssistantAbout?> GetAboutAsync(CancellationToken ct = default) =>
-        GetAsync<AssistantAbout>(ApiClients.Assistant, "api/v1/ask/about", ct);
-
-    /// <summary>
-    /// Queues a question; the answer comes from <see cref="GetAsync"/> once it's ready.
-    /// </summary>
-    public Task<AssistantAsk?> AskAsync(string question, Guid? previousId, CancellationToken ct = default) =>
-        SendAsync<AssistantAsk>(ApiClients.Assistant, HttpMethod.Post, "api/v1/ask", new { Question = question, PreviousId = previousId }, ct);
-
-    public Task<AssistantAsk?> GetAsync(Guid id, CancellationToken ct = default) =>
-        GetAsync<AssistantAsk>(ApiClients.Assistant, $"api/v1/ask/{id}", ct);
-}

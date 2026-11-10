@@ -47,11 +47,11 @@ public class ClientRateLimitingTests
     [Fact]
     public void A_service_accounts_token_counts_as_a_service_not_a_person()
     {
-        // Keycloak's client-credentials token for Mcp.Server: a sub, but it speaks for every Ask user at once.
+        // Keycloak's client-credentials token for a service: a sub, but it speaks for many people at once.
         var context = Request("8c0f-service-account-user", "203.0.113.9");
         context.User = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim("sub", "8c0f"), new Claim("preferred_username", "service-account-tvtracker-mcp"), new Claim("azp", "tvtracker-mcp")], "test"));
+            [new Claim("sub", "8c0f"), new Claim("preferred_username", "service-account-tvtracker-internal"), new Claim("azp", "tvtracker-internal")], "test"));
 
-        Assert.Equal(("service:tvtracker-mcp", true), ClientRateLimiting.PartitionKey(context));
+        Assert.Equal(("service:tvtracker-internal", true), ClientRateLimiting.PartitionKey(context));
     }
 }

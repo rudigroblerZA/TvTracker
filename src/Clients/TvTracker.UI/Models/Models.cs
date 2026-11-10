@@ -754,18 +754,6 @@ public record ResearchSaveResult(SavedResearch Saved, IReadOnlyList<ResearchCata
 /// <param name="Outcome">"applied" or "removed".</param>
 public record ResearchCatalogOutcome(string Key, string Field, string Outcome);
 
-// Ask the app (Assistant.API)
-
-public record AssistantAbout(bool Available, string Model, int PerHour);
-
-public record AssistantStep(string Tool, string Arguments, bool Failed);
-
-public record AssistantShow(Guid Id, string Title);
-
-/// <param name="Status">"queued", "thinking", "answered" or "failed".</param>
-public record AssistantAsk(Guid Id, string Question, Guid? PreviousId, string Status, int Ahead, List<AssistantStep> Steps, string? Answer,
-    List<AssistantShow> Shows, string? Problem, DateTime AskedAtUtc, double? Seconds);
-
 /// <summary>
 /// Network report cards: every network with enough catalog shows, and the whole catalog to compare with.
 /// </summary>

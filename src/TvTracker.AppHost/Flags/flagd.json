@@ -438,13 +438,6 @@
       "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows.", "name": "Year in TV", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
-    "ask": {
-      "state": "ENABLED",
-      "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
-      "metadata": { "description": "Ask the app: questions about shows answered by the local model with the app's MCP tools (signed in).", "name": "Ask the app", "plans": "plus,family" },
-      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
-    },
     "research": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
