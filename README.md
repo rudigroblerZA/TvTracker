@@ -768,6 +768,30 @@ Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reuni
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
+**On by default: a core ten.** Tracking, Up Next, the calendar, search, Discover, For you, ratings, lists, stats and
+notifications have no flag and are always there. Of the 72 flagged features, flagd.json turns on these and leaves the
+other 62 off (built and documented below, but hidden, with their endpoints answering 404):
+
+| Flag | Why it stays on |
+| --- | --- |
+| `history-import` | Bringing a TV Time or Trakt history is how someone switches trackers |
+| `spoiler-shield` | A tracker that spoils the next episode loses trust |
+| `watch-now` | Where to watch, on every show page |
+| `waiting-room` | When each caught-up show is back |
+| `forecasts` | "What's next" on show pages: when the next season is likely, and whether you'll finish |
+| `tonight-plan` | What to watch tonight, the daily question |
+| `universes` | Franchise timelines and watch order, the clearest thing other trackers don't have |
+| `essential-cut` | The shorter way through a long show |
+| `social` | Following people and the feed |
+| `list-links` | A list anyone can open by link, which brings people in |
+
+- **Plans, payments and the Family plan are off,** so nothing is limited by plan and the three features above that
+  were Plus (Tonight's plan, the essential cut, forecasts) are open to everyone. Turn `plans` and `payments` back on
+  to sell them.
+- **Off features' background jobs still run** (Wikiquote lines, the atlas, cast credits, nanogenres, research
+  checks), so turning a flag back on shows its feature at once.
+- **To bring one back,** set its `defaultVariant` to `"on"`, or use Settings → Admin → Feature flags.
+
 | Flag | Gates |
 | --- | --- |
 | `blend` | `/blend`, its Discover card (and nav link when signed out), the "Blend … with another show" link on show pages |
