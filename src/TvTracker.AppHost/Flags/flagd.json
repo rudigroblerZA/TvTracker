@@ -4,7 +4,7 @@
     "blend": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Blend: shows that sit between two others (/blend, and the link on show pages)." }
     },
     "universes": {
@@ -30,27 +30,27 @@
     "makers": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "From the same creators: the other shows by a show's creators and developers, on show pages." }
     },
     "makers-for-you": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "From the makers you love: the creators behind the shows you love, and their other shows you haven't seen (/makers, and its link on For you).", "name": "From the makers you love", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "reunion-radar": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Reunion radar: shows where actors from shows you love work together again (/reunions, and its link on For you).", "name": "Reunion radar", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "show-dna": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Show DNA: the trait profile on show pages. Recommendations use DNA either way." }
     },
     "forecasts": {
@@ -63,70 +63,70 @@
     "nanogenres": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Nanogenres: chips on show pages, /nanogenres browse pages, and the search filter. Recommendations use them either way." }
     },
     "dna-twins": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages.", "name": "DNA twins", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "gets-good": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "When it gets good: the section on show pages, the nudge in Will you finish it?, and the Worth the wait discovery list." }
     },
     "creator-fingerprint": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Creator fingerprint: a creator's signature style, shows made their way and kindred creators, on person pages." }
     },
     "time-machine": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "TV time machine: /time-machine (this week in TV history, or any date's week), its teaser on Home and link on Insights." }
     },
     "endings": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Does it stick the landing?: the section on ended shows' pages, and the Great endings discovery list." }
     },
     "refresher": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Previously on…: a rewatch refresher on the show page after a long break, and the Back after a break list on Up Next.", "name": "Previously on…", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "catch-up": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next.", "name": "Catch-up planner", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "worth-going-back": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Is it worth going back?: for dropped shows, whether what's left gets better, on the show page and the backlog." }
     },
     "backlog-triage": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Backlog triage: /backlog ranks followed shows not started by how much they're worth your time, with verdicts." }
     },
     "time-off": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Fits your time off: /time-off suggests finished shows to watch start to end in the hours you have." }
     },
     "spoiler-shield": {
@@ -144,44 +144,44 @@
     "tonight-together": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share.", "name": "Tonight for two", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "community-insights": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Community insights: viewers' tips on show and episode pages, ranked by how many found them helpful." }
     },
     "corrections": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Corrections: viewers suggest fixes to show and episode data; moderators accept them into the catalog." }
     },
     "known-faces": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Where do I know them from? On a show's cast, the other shows the user has watched each actor in." }
     },
     "holiday-episodes": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
     "milestones": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
     },
     "affiliates": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Affiliate links: where-to-watch clicks go through a counted redirect (wrapped in a program's link when one covers the service), and admins see the clicks, conversions and revenue." }
     },
     "history-import": {
@@ -193,142 +193,142 @@
     "streaks": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Streaks: days and weeks in a row of watching, and shows kept up with (each new episode within a week of airing)." }
     },
     "far-from-home": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Far from home: main cast born outside the country a show is set in, and where each country's casts were born." }
     },
     "namesakes": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Same name: remakes, revivals and namesakes of a show, found by title, with shared cast marked." }
     },
     "birthdays": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Birthdays: the catalog's actors born on a day, what they turn and what they're known for, and the viewer's birthday twins." }
     },
     "episode-grid": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Episode grid: every episode's rating by season on the show page, with the best and weakest episodes and the best run." }
     },
     "title-formulas": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Title formulas: shows whose episode titles follow a pattern (Friends' \"The One…\", Stranger Things' \"Chapter…\")." }
     },
     "character-names": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Characters' names: TV characters who share a first name, the most common names, and each name by decade." }
     },
     "cast-ages": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Cast ages: each main cast member's age at a show's latest episode, who grew up on screen, and the youngest and oldest casts." }
     },
     "season-gaps": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Between seasons: each show's waits between seasons, and the longest waits, revivals and shows still waiting." }
     },
     "episode-lengths": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Episode lengths: how long a show's episodes run season by season, and the shows that grew or shrank most." }
     },
     "tv-atlas": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "TV atlas: where your shows are set, on a world map, and where each show is set on its page." }
     },
     "tv-clock": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Your TV clock: when you watch, what kind of viewer that makes you, and your sittings.", "name": "Your TV clock", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "who-said-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Who said it?: a quiz of lines from episodes you've watched." }
     },
     "memorable-lines": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Memorable lines: quotes from Wikiquote on show and episode pages." }
     },
     "spoiler-watch": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Spoiler watch: how exposed you are to spoilers for your shows right now, and when it calms down.", "name": "Spoiler watch", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "cast-afterwards": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Where the cast went next: on a show page, each main cast member's roles since the show ended (or started)." }
     },
     "tv-life": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Your TV life: every year of your life with the biggest premieres and finales, and what you watched.", "name": "Your TV life", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "six-degrees": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Six degrees: the shortest chain of shared actors between any two shows, and a challenge to beat." }
     },
     "call-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Call it: predict a season's rating before it premieres, and see whether you beat the forecast model." }
     },
     "show-puzzle": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Guess the show: a daily puzzle, one popular show found in six guesses with clues." }
     },
     "season-verdict": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Season verdict: how a season that just ended did, on show pages, on Insights and as a notification to followers." }
     },
     "character-trail": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Character trail: every show where an actor plays the same character, in air order, with your progress, from the show page's cast." }
     },
     "episode-notes": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Episode notes: moderators mark episodes essential or skippable with a source on the research page, and the essential cut follows them." }
     },
     "watch-now": {
@@ -340,38 +340,38 @@
     "crossover-alerts": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Crossover alerts: a notification when a crossover across a followed universe's shows is near, and \"Crossover ahead\" on Up Next with what to catch up on first." }
     },
     "weekly-digest": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Weekly digest: one email a week, at the user's day and hour, instead of an email per alert; its setting and preview in Settings." }
     },
     "taste-twins": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Taste twins: anonymous people whose ratings track yours, and what they loved that you haven't seen (5-user rule).", "name": "Taste twins", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "awards-shelf": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Awards shelf: awards from saved research on show pages, and Prestige picks: the most-awarded shows you haven't started." }
     },
     "network-reports": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Network report cards: how each network's and streamer's shows rate, end, come back and how long they keep you waiting." }
     },
     "episode-duels": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Episode duels: rank a show's episodes you've watched by picking the better of two." }
     },
     "waiting-room": {
@@ -383,34 +383,34 @@
     "while-you-wait": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "While you wait: for each show you're caught up on, a finished show you can watch whole before it's back, chosen for how alike they are (/while-you-wait).", "name": "While you wait", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "mixtape": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them.", "name": "Mixtape", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "your-services": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Your services (Plus and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards.", "name": "Your services", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "family-plan": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Family plan: the owner invites up to 5 people by link, and each gets Plus's benefits from the one subscription." }
     },
     "payments": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Payments: buy Plus or Family from the plan page through the payment provider (in development, the test provider's page at /dev/payments), and cancel or resume." }
     },
     "list-links": {
@@ -422,32 +422,32 @@
     "plans": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Plans: Free and Plus. Free accounts get 3 lists and can't share them; off, nobody has a limit. Also the plan page and admins' plans page." }
     },
     "worth-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Is it worth it?: a 0-100 score on show pages, with the parts behind it, and the Worth your time discovery list." }
     },
     "year-in-tv": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows.", "name": "Year in TV", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "research": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Research: moderators enrich a show from Wikidata, Wikipedia, TMDB and pasted pages, with a model-drafted insight; the saved research shows on the show page and overrides catalog fields." }
     },
     "research-assistant": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "on",
+      "defaultVariant": "off",
       "metadata": { "description": "Research assistant: a few times a day, gathers sources and queues a draft for the top of the research queue (research due a refresh, then popular unresearched shows), for a moderator to review and save. It never saves." }
     }
   }
