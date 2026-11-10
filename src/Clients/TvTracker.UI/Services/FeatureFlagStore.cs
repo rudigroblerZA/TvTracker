@@ -66,7 +66,7 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
             return planFeatures;
         }
         var context = FeatureFlags.ContextFor((await authState.GetAuthenticationStateAsync()).User);
-        var details = await Task.WhenAll(FlagKeys.Select(async key => (key, details: await client.GetBooleanDetailsAsync(key, FeatureFlags.DefaultValue, context))));
+        var details = await Task.WhenAll(FlagKeys.Select(async key => (key, details: await client.GetBooleanDetailsAsync(key, FeatureFlags.DefaultFor(key), context))));
         planFeatures = details
             .Where(d => d.details.FlagMetadata?.GetString(FeatureFlags.PlansMetadata) is { Length: > 0 })
             .Select(d => new PlanFeature(d.key, d.details.FlagMetadata!.GetString(FeatureFlags.NameMetadata) ?? d.key,
@@ -96,8 +96,8 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
             return cached.Enabled;
         }
 
-        // OpenFeature never throws for a failed evaluation; it returns the default (on), so an outage keeps features.
-        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultValue, context);
+        // OpenFeature never throws for a failed evaluation; it returns the flag's flagd.json default.
+        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultFor(flag), context);
         cache[key] = (enabled, DateTimeOffset.UtcNow);
         return enabled;
     }

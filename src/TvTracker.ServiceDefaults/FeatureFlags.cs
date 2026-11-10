@@ -6,7 +6,7 @@ namespace TvTracker;
 /// <summary>
 /// The feature flags, by their keys in flagd (src/TvTracker.AppHost/Flags/flagd.json). Shared by the services and the
 /// UI (TvTracker.UI links this file), so both sides gate a feature by the same key. Every flag is a boolean whose
-/// default is <see cref="DefaultValue"/>.
+/// fallback is <see cref="DefaultFor"/>.
 /// </summary>
 public static class FeatureFlags
 {
@@ -88,16 +88,25 @@ public static class FeatureFlags
     public const string Payments = "payments";
 
     /// <summary>
-    /// What a flag evaluates to when flagd is down, unreachable or doesn't know the flag: on. A flag server outage
-    /// shouldn't take features away; turning one off is a deliberate change in flagd.json.
+    /// The flags flagd.json turns on (its <c>defaultVariant</c>); every other flag is off there. A test keeps the two
+    /// in step.
     /// </summary>
-    public const bool DefaultValue = true;
+    public static readonly IReadOnlySet<string> OnByDefault = new HashSet<string>
+    {
+        HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
+    };
+
+    /// <summary>
+    /// What <paramref name="flag"/> evaluates to when flagd is down, unreachable or doesn't know it: what flagd.json
+    /// says by default. A flag server outage neither takes features away nor brings back the ones turned off.
+    /// </summary>
+    public static bool DefaultFor(string flag) => OnByDefault.Contains(flag);
 
     /// <summary>
     /// The context attribute that carries the caller's plan ("free", "plus", "family"; see <c>Plans</c>). A flag in a plan
     /// has a targeting rule that turns it off when <c>plan</c> is set and isn't one of the flag's plans (<see cref="PlanRule"/>).
     /// No <c>plan</c> means "not known" (the plan service is down, or the <see cref="Plans"/> flag is off), and the flag
-    /// stays on: fail open, like everything else here.
+    /// isn't limited by plan: its default variant decides.
     /// </summary>
     public const string PlanAttribute = "plan";
 

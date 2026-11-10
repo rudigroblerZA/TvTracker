@@ -769,8 +769,8 @@ served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboa
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
 **On by default: a core ten.** Tracking, Up Next, the calendar, search, Discover, For you, ratings, lists, stats and
-notifications have no flag and are always there. Of the 72 flagged features, flagd.json turns on these and leaves the
-other 62 off (built and documented below, but hidden, with their endpoints answering 404):
+notifications have no flag and are always there. Of the flagged features above, flagd.json turns on these ten and
+leaves the rest off (built and documented below, but hidden, with their endpoints answering 404):
 
 | Flag | Why it stays on |
 | --- | --- |
@@ -785,12 +785,9 @@ other 62 off (built and documented below, but hidden, with their endpoints answe
 | `social` | Following people and the feed |
 | `list-links` | A list anyone can open by link, which brings people in |
 
-- **Plans, payments and the Family plan are off,** so nothing is limited by plan and the three features above that
-  were Plus (Tonight's plan, the essential cut, forecasts) are open to everyone. Turn `plans` and `payments` back on
-  to sell them.
+- **Plans, payments and the Family plan are off;** see [Plans](#plans).
 - **Off features' background jobs still run** (Wikiquote lines, the atlas, cast credits, nanogenres, research
   checks), so turning a flag back on shows its feature at once.
-- **To bring one back,** set its `defaultVariant` to `"on"`, or use Settings → Admin → Feature flags.
 
 | Flag | Gates |
 | --- | --- |
@@ -835,7 +832,8 @@ other 62 off (built and documented below, but hidden, with their endpoints answe
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 | `while-you-wait` | `/while-you-wait`, its Up Next and waiting-room links, and its endpoint (Plus and Family) |
 
-- **Turning one off:** set its `defaultVariant` to `"off"`.
+- **Turning one off or on:** set its `defaultVariant` to `"off"` or `"on"`. When one comes on for good, add it to
+  `FeatureFlags.OnByDefault` too (a unit test fails until the two agree).
   - The UI then hides its links and sections, and its pages say "Not available".
   - Its API endpoints answer 404.
   - The UI keeps an answer for up to 30 seconds.
@@ -846,7 +844,9 @@ other 62 off (built and documented below, but hidden, with their endpoints answe
   ```
 
   flagd's `fractional` operator does percentage rollouts on `targetingKey`.
-- **If flagd is down:** every flag is on, so a flag server outage never takes features away.
+- **If flagd is down:** each flag is what flagd.json says by default (`FeatureFlags.OnByDefault` in code), so a flag
+  server outage neither takes features away nor brings back the ones turned off. Targeting and the admins' overrides
+  don't apply until it's back.
 - **From the app:** admins get Settings → Admin → Feature flags (`/settings/flags`). Each flag can follow
   flagd.json, or be turned on or off for everyone.
   - **Admins:** the Keycloak usernames in `Admin:Users` in the AppHost's `appsettings.json`: the `admin` account
@@ -864,7 +864,9 @@ other 62 off (built and documented below, but hidden, with their endpoints answe
 
 ### Plans
 
-Free, Plus and Family, behind the `plans` flag. Plus and Family are bought on `/settings/plan` through a payment
+Free, Plus and Family, behind the `plans` flag. **Off by default,** with `payments` and `family-plan`: nothing is
+limited by plan, and the paid features that are on (Tonight's plan, the essential cut, forecasts) are open to
+everyone. Turn `plans` and `payments` on to sell them. Plus and Family are bought on `/settings/plan` through a payment
 provider: Stripe in a deployment (and locally once its test key is given), else, in development, a test provider.
 
 - **Insights by plan:** Plus and Family add 17 insights (essential cut, Tonight's plan and Tonight for two, catch-up,

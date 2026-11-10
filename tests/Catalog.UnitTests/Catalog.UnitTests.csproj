@@ -13,4 +13,8 @@
     <ProjectReference Include="..\..\src\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\src\TvTracker.AppHost\Flags\flagd.json" Link="flagd.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

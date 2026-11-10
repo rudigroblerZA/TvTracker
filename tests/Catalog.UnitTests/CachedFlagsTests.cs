@@ -76,9 +76,11 @@ public class CachedFlagsTests
     }
 
     [Fact]
-    public async Task An_unknown_flag_fails_open()
+    public async Task A_flag_flagd_cant_answer_for_is_its_default()
     {
         var (flags, _, _) = await BuildAsync([]);
-        Assert.True(await flags.IsEnabledAsync("missing", FeatureFlags.ContextFor(null), TestContext.Current.CancellationToken));
+        var context = FeatureFlags.ContextFor(null);
+        Assert.True(await flags.IsEnabledAsync(FeatureFlags.Universes, context, TestContext.Current.CancellationToken));
+        Assert.False(await flags.IsEnabledAsync(FeatureFlags.Payments, context, TestContext.Current.CancellationToken));
     }
 }

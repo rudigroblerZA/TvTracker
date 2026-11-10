@@ -1,6 +1,7 @@
 @page "/up-next"
 @inject TrackingClient Tracking
 @inject AnalyticsClient Analytics
+@inject FeatureFlagStore Flags
 
 <PageTitle>Up Next · @Brand.AppName</PageTitle>
 
@@ -177,14 +178,22 @@
         }
     }
 
+    /// <summary>
+    /// A flagged section's data, or null without asking for it while its flag is off.
+    /// </summary>
+    private async Task<T?> OptionalAsync<T>(string flag, Func<Task<T?>> load) where T : class =>
+        await Flags.IsEnabledAsync(flag) ? await load() : null;
+
     private async Task LoadAsync()
     {
         error = null;
         try
         {
             items = await Tracking.GetUpNextAsync() ?? [];
-            refreshers = await LoadRefreshersAsync();
-            catchUps = await LoadCatchUpsAsync();
+            var refreshersTask = OptionalAsync(FeatureFlags.Refresher, LoadRefreshersAsync);
+            var catchUpsTask = OptionalAsync(FeatureFlags.CatchUp, LoadCatchUpsAsync);
+            refreshers = await refreshersTask;
+            catchUps = await catchUpsTask;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
