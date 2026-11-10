@@ -4,7 +4,7 @@ using Research.API.Services;
 namespace Research.UnitTests;
 
 /// <summary>
-/// When saved research is due a refresh, and when the research assistant may prepare a show (CONTEXT.md, Research).
+/// When saved research is due a refresh, and when the research assistant may prepare a show.
 /// </summary>
 public class RefreshTests
 {

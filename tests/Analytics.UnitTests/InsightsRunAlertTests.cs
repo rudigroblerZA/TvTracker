@@ -3,7 +3,7 @@ using Analytics.Worker;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// The insights-run alert (CONTEXT.md, Alerts): a failed last run fires at once, and a run that never finishes fires once
+/// The insights-run alert: a failed last run fires at once, and a run that never finishes fires once
 /// two intervals and the start's delay have gone by.
 /// </summary>
 public class InsightsRunAlertTests

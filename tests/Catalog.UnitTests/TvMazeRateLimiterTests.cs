@@ -4,8 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// TVmaze's budget: 18 calls in any 10 seconds, interactive calls first, background calls capped at 12 (see CONTEXT.md,
-/// TVmaze budget).
+/// TVmaze's budget: 18 calls in any 10 seconds, interactive calls first, background calls capped at 12.
 /// </summary>
 public class TvMazeRateLimiterTests
 {

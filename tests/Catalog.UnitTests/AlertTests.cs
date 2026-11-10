@@ -10,7 +10,7 @@ using TvTracker.Persistence;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// The alerts' rules as CONTEXT.md states them (Alerts), and the monitor's: an alert is said once when it starts and once
+/// The alerts' rules, and the monitor's: an alert is said once when it starts and once
 /// when it stops, and a check that can't look leaves the alert as it was.
 /// </summary>
 public class AlertTests

@@ -7,7 +7,7 @@ using TvTracker;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Flag answers kept a few seconds per flag and context (CONTEXT.md, Feature flags): a cached answer is reused, and a
+/// Flag answers kept a few seconds per flag and context: a cached answer is reused, and a
 /// flag that targets plans is never answered with another context's result.
 /// </summary>
 public class CachedFlagsTests

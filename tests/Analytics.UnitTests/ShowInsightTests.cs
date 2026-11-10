@@ -6,7 +6,7 @@ using static Analytics.UnitTests.Build;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// The worker's show stages, on a show built in memory (see CONTEXT.md, When it gets good, Does it stick the landing?, Season verdict).
+/// The worker's show stages, on a show built in memory.
 /// </summary>
 public class ShowInsightTests
 {

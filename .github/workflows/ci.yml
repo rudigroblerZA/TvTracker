@@ -1,5 +1,5 @@
 # Builds the services, the web app and the tools, and runs every unit-test project, on each pull request and on main.
-# The MAUI app needs its workload and is left out (BACKLOG Q3). The tests run on Microsoft.Testing.Platform
+# The MAUI app needs its workload and is left out. The tests run on Microsoft.Testing.Platform
 # (global.json), so `dotnet test <project>` runs each one as the docs show.
 name: CI
 

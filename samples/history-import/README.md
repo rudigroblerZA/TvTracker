@@ -1,7 +1,7 @@
 # Sample history exports
 
 Made-up viewing histories in each format the import page (`/settings/import`) reads, for trying it out. Real exports
-hold people's account data, so these were built to the layouts the parser expects (CONTEXT.md, Bring your history).
+hold people's account data, so these were built to the layouts the parser expects.
 The shows use real TheTVDB ids, checked against TVmaze's `lookup/shows?thetvdb=`, so they resolve to the right shows; the
 IMDb files use real IMDb ids.
 Times are made up, mostly in 2024.

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Who may call the sync worker's internal APIs (BACKLOG S2): a service signed in as the internal client. A person's token
+/// Who may call the sync worker's internal APIs: a service signed in as the internal client. A person's token
 /// is refused however valid, and so is another service account, such as the MCP server's.
 /// </summary>
 public class InternalCallerTests

@@ -6,7 +6,7 @@ using TvTracker.Persistence;
 namespace Analytics.Worker.IntegrationEvents;
 
 /// <summary>
-/// The inbox pattern every handler follows (see CONTEXT.md, "Consuming"): skip an event already processed, apply it,
+/// The inbox pattern every handler follows: skip an event already processed, apply it,
 /// mark it processed, save. Here the whole of that runs in one transaction through the execution strategy, so a
 /// handler that deletes with <c>ExecuteDelete</c> before adding rows (a show's cast) can't be left half done by a
 /// transient failure at the save: either the event is applied and marked, or nothing changed and RabbitMQ's retry

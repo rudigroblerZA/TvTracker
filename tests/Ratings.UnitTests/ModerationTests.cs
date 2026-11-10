@@ -5,7 +5,7 @@ using Ratings.API.Services;
 namespace Ratings.UnitTests;
 
 /// <summary>
-/// The light moderation layer as CONTEXT.md states it: blocked terms are refused as whole words, a link holds a post for
+/// The light moderation layer: blocked terms are refused as whole words, a link holds a post for
 /// review, and moderators are Admin:Users plus Moderation:Users.
 /// </summary>
 public class ModerationTests

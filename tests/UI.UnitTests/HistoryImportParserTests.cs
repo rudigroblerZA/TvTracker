@@ -4,7 +4,7 @@ namespace UI.UnitTests;
 
 /// <summary>
 /// Bring your history's parser on the sample exports (samples/history-import), whose README says what each should give,
-/// and the rules CONTEXT.md states: zone-less times in the viewer's zone, one watch per episode, account files unread.
+/// and the parser's rules: zone-less times in the viewer's zone, one watch per episode, account files unread.
 /// </summary>
 public class HistoryImportParserTests
 {

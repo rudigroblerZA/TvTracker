@@ -3,7 +3,7 @@ using Catalog.Data;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Where-to-watch links: a show's page only under a known service's show-page path (see CONTEXT.md, Where to watch).
+/// Where-to-watch links: a show's page only under a known service's show-page path.
 /// </summary>
 public class StreamingServicesTests
 {

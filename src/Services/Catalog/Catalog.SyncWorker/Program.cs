@@ -13,7 +13,7 @@ using TvTracker.IntegrationEvents;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-// The import, replay and override APIs answer only other services' internal client (BACKLOG S2).
+// The import, replay and override APIs answer only other services' internal client.
 builder.AddDefaultAuthentication();
 
 // The schema is created by Catalog.API; the AppHost starts this worker once that service is healthy.

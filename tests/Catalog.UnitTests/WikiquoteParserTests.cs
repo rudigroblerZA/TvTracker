@@ -3,7 +3,7 @@ using Catalog.SyncWorker.Quotes;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Memorable lines from Wikiquote's wikitext (see CONTEXT.md, Memorable lines).
+/// Memorable lines from Wikiquote's wikitext.
 /// </summary>
 public class WikiquoteParserTests
 {

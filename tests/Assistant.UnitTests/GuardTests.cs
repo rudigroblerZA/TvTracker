@@ -5,7 +5,7 @@ using Assistant.API.Services;
 namespace Assistant.UnitTests;
 
 /// <summary>
-/// Ask the app's guards, on the mistakes CONTEXT.md records qwen3 0.6B making: discover_list without its list, the list
+/// Ask the app's guards, on the mistakes qwen3 0.6B was seen making: discover_list without its list, the list
 /// "drama", a made-up id, and links matched as whole words so "Lost" isn't found in "lostness".
 /// </summary>
 public class GuardTests

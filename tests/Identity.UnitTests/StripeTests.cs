@@ -6,7 +6,7 @@ using TvTracker.Payments;
 namespace Identity.UnitTests;
 
 /// <summary>
-/// Stripe's webhooks read into the app's events (CONTEXT.md, Payments): signed with the endpoint's secret, both invoice
+/// Stripe's webhooks read into the app's events: signed with the endpoint's secret, both invoice
 /// shapes (before and after API version 2025-03-31), a cancellation only when that's what changed, and everything else
 /// acknowledged rather than refused.
 /// </summary>

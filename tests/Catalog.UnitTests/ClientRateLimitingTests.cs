@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// Who a request counts against, as CONTEXT.md states it: the signed-in user, else the client address the gateway or web
+/// Who a request counts against: the signed-in user, else the client address the gateway or web
 /// app added (the last X-Forwarded-For entry, since earlier ones come from the client), else a shared bucket for services.
 /// </summary>
 public class ClientRateLimitingTests

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Alerts (CONTEXT.md, Alerts): the check interface and the monitor that runs them. Its own project, with only the
+    Alerts: the check interface and the monitor that runs them. Its own project, with only the
     framework, so the persistence library can register the outbox check without taking ServiceDefaults' packages.
   -->
 

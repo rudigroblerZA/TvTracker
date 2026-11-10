@@ -3,7 +3,7 @@ using Catalog.API.Services;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// The matching rules behind universes, the character trail and reunions (see CONTEXT.md, Universes).
+/// The matching rules behind universes, the character trail and reunions.
 /// </summary>
 public class UniversesTests
 {

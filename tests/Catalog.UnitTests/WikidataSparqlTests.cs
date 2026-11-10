@@ -6,7 +6,7 @@ using Microsoft.Extensions.Time.Testing;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// The Wikidata client's two lanes and its 429 cool-off (CONTEXT.md, Catalog sync: Wikidata): a person's request goes
+/// The Wikidata client's two lanes and its 429 cool-off: a person's request goes
 /// before background queries already waiting, and fails at once while Wikimedia has asked everyone to wait.
 /// </summary>
 public class WikidataSparqlTests

@@ -3,7 +3,7 @@ using Catalog.API.Apis;
 namespace Catalog.UnitTests;
 
 /// <summary>
-/// The show-page facts found in the catalog's own data, with CONTEXT.md's cases: title formulas (Friends' "The One",
+/// The show-page facts found in the catalog's own data, with the cases they were checked on: title formulas (Friends' "The One",
 /// numbered chapters, placeholders), characters' names (titles and role words out) and episode-length verdicts (a sitcom
 /// from 22 to 26 minutes stays steady).
 /// </summary>

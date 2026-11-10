@@ -4,8 +4,7 @@ using TvTracker.IntegrationEvents;
 namespace Analytics.UnitTests;
 
 /// <summary>
-/// While you wait: a return in view, a budget from the pace, picks that fit and resemble the awaited show, each picked once
-/// (see CONTEXT.md, While you wait).
+/// While you wait: a return in view, a budget from the pace, picks that fit and resemble the awaited show, each picked once.
 /// </summary>
 public class WhileYouWaitTests
 {
