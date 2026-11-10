@@ -724,6 +724,8 @@ a.chip { text-decoration: none; }
 /* Tool links on hub pages */
 
 .tool-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 4px 0 20px; }
+/* Every card's flag off: no empty row and no gap. */
+.tool-links:not(:has(*)) { display: none; }
 .tool-link { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--surface); color: inherit;
     border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; }
 .tool-link strong { color: var(--accent); }
