@@ -13,7 +13,7 @@ public sealed record AlertState(bool Firing, string Detail);
 
 /// <summary>
 /// One condition someone should hear about: an outbox that stopped publishing, dead letters, a failed
-/// insights run, TVmaze errors, Ask's queue. A check only looks; <see cref="AlertMonitor"/> runs it and says so.
+/// insights run, TVmaze errors. A check only looks; <see cref="AlertMonitor"/> runs it and says so.
 /// </summary>
 public interface IAlertCheck
 {

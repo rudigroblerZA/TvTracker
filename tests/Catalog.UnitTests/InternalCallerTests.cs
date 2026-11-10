@@ -5,7 +5,7 @@ namespace Catalog.UnitTests;
 
 /// <summary>
 /// Who may call the sync worker's internal APIs: a service signed in as the internal client. A person's token
-/// is refused however valid, and so is another service account, such as the MCP server's.
+/// is refused however valid, and so is another service account, such as a reporting job's.
 /// </summary>
 public class InternalCallerTests
 {
@@ -26,6 +26,6 @@ public class InternalCallerTests
 
     [Fact]
     public void Another_service_account_is_not() =>
-        Assert.False(AuthenticationExtensions.IsInternalCaller(Token(("sub", "2"), ("azp", "tvtracker-mcp"), ("client_id", "tvtracker-mcp"),
-            ("preferred_username", "service-account-tvtracker-mcp")), Internal));
+        Assert.False(AuthenticationExtensions.IsInternalCaller(Token(("sub", "2"), ("azp", "tvtracker-reports"), ("client_id", "tvtracker-reports"),
+            ("preferred_username", "service-account-tvtracker-reports")), Internal));
 }

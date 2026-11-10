@@ -33,10 +33,6 @@ var postgres = builder.AddPostgres("postgres")
 // from the image tag, and doesn't recognise pgvector's tags as Postgres 18.
 postgres.WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql");
 
-// DbGate (Community Toolkit): a web UI for browsing and querying every database, already connected. Open it from the
-// dashboard's "dbgate" resource.
-postgres.WithDbGate(dbGate => dbGate.WithLifetime(ContainerLifetime.Persistent));
-
 // One database per service: no service reads another's tables.
 var identityDb = postgres.AddDatabase("identitydb");
 var catalogDb = postgres.AddDatabase("catalogdb");
@@ -91,11 +87,9 @@ var flagd = builder.AddFlagd("flagd")
     .WithArgs("--uri", "file:./flags/overrides.json")
     .WithLifetime(ContainerLifetime.Persistent);
 
-// The Keycloak clients' secrets, the MCP gateway's key and the app admin's password (see Secret above).
+// The Keycloak clients' secrets and the app admin's password (see Secret above).
 var webClientSecret = Secret("web-client-secret", "tvtracker-web-dev-secret");
 var identityAdminClientSecret = Secret("identity-admin-client-secret", "tvtracker-identity-admin-dev-secret");
-var mcpClientSecret = Secret("mcp-client-secret", "tvtracker-mcp-dev-secret");
-var mcpGatewayKey = Secret("mcp-gateway-key", "tvtracker-gateway-dev-key");
 var appAdminPassword = Secret("app-admin-password", "admin");
 // The internal client other services sign in as to call the sync worker's imports, replay and overrides.
 var internalClientSecret = Secret("internal-client-secret", "tvtracker-internal-dev-secret");
@@ -114,7 +108,6 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-web", webClientSecret)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-identity-admin", identityAdminClientSecret)
-    .WithEnvironment("Keycloak__ClientSecrets__tvtracker-mcp", mcpClientSecret)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-internal", internalClientSecret)
     .WithEnvironment("Keycloak__ServiceClients__tvtracker-internal", "Internal service calls")
     .WithEnvironment("Flags__Directory", flagsDirectory)
@@ -200,46 +193,6 @@ var researchApi = builder.AddProject<Projects.Research_API>("research-api")
 if (builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
 {
     researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
-}
-
-// Internal MCP server (http://localhost:5112/mcp): read-only tools over the catalog and Analytics, for questions like
-// "landman insights" from an MCP client. It signs in to Analytics as its own Keycloak client, which it creates in
-// development if the realm predates it. Development only unless Mcp:ApiKey is set.
-var mcpServer = builder.AddProject<Projects.Mcp_Server>("mcp-server")
-    .WithReference(catalogApi)
-    .WithReference(analyticsApi)
-    .WithEnvironment("Identity__Url", keycloakUrl)
-    .WithReference(researchApi)
-    .WithEnvironment("Mcp__ClientSecret", mcpClientSecret)
-    .WithEnvironment("Keycloak__AdminUsername", "admin")
-    .WithEnvironment("Keycloak__AdminPassword", keycloakAdminPassword)
-    .WaitFor(keycloak)
-    .WithHttpHealthCheck("/health");
-
-// MCP gateway (http://localhost:5113/mcp): one endpoint, with an API key, in front of the app's MCP servers
-// (Gateway:Servers:{name}:Url, optionally BearerToken and a Tools allow-list), logging every call. Open WebUI uses it.
-// More servers can be added under Gateway:Servers in this project's configuration.
-var mcpGateway = builder.AddProject<Projects.Mcp_Gateway>("mcp-gateway")
-    .WithEnvironment("Gateway__ApiKey", mcpGatewayKey)
-    .WithEnvironment("Gateway__Servers__tvtracker__Url", ReferenceExpression.Create($"{mcpServer.GetEndpoint("http")}/mcp"))
-    .WaitFor(mcpServer)
-    .WithHttpHealthCheck("/health");
-// Ask the app: questions about shows, answered by Model Runner's chat model calling the app's MCP tools through the
-// gateway (its endpoint and model are set with Model Runner's below). Signed in, behind the "ask" flag.
-var assistantApi = builder.AddProject<Projects.Assistant_API>("assistant-api")
-    .WithReference(flagd).WithReference(identityApi)
-    .WithEnvironment("Identity__Url", keycloakUrl)
-    .WithEnvironment("Assistant__GatewayUrl", ReferenceExpression.Create($"{mcpGateway.GetEndpoint("http")}/mcp"))
-    .WithEnvironment("Assistant__GatewayKey", mcpGatewayKey)
-    .WaitFor(mcpGateway)
-    .WithHttpHealthCheck("/health");
-
-foreach (var server in builder.Configuration.GetSection("Gateway:Servers").GetChildren())
-{
-    foreach (var setting in server.GetChildren().Where(c => c.Value is not null))
-    {
-        mcpGateway.WithEnvironment($"Gateway__Servers__{server.Key}__{setting.Key}", setting.Value);
-    }
 }
 
 // The data export collects each service's data for the user.
@@ -330,11 +283,10 @@ var embeddingModelId = builder.Configuration["Embeddings:Model"] ?? "";
 var servedEmbeddingModel = builder.Configuration[$"Embeddings:Models:{embeddingModelId}:ServedModel"] is { Length: > 0 } configuredServed
     ? configuredServed
     : embeddingModelId == "dmr/nomic-embed-text-v1.5" ? "ai/nomic-embed-text-v1.5" : "ai/qwen3-embedding:0.6b";
-// The chat model Open WebUI chats with, Research drafts insights with and the assistant answers with; pulled with the
-// dashboard's command. The default is the smallest that calls tools reliably (qwen3 0.6B, ~400 MB, fine on a CPU).
+// The chat model Open WebUI chats with and Research drafts insights with; pulled with the dashboard's command. The
+// default is small enough for a CPU (qwen3 0.6B, ~400 MB).
 var chatModel = builder.Configuration["ModelRunner:ChatModel"] is { Length: > 0 } configuredChat ? configuredChat : "ai/qwen3:0.6B-Q4_K_M";
 researchApi.WithEnvironment("Research__ChatModel", chatModel);
-assistantApi.WithEnvironment("Assistant__ChatModel", chatModel);
 var servedModel = embeddingModelId.StartsWith("dmr/", StringComparison.Ordinal)
     || string.Equals(builder.Configuration[$"Embeddings:Models:{embeddingModelId}:Source"], "Server", StringComparison.OrdinalIgnoreCase);
 if (!servedModel)
@@ -347,7 +299,6 @@ else if (builder.Configuration["ModelRunner:Url"] is { Length: > 0 } modelRunner
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint);
     researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
-    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Open WebUI runs in a container, where localhost is the container itself.
     var fromContainer = new UriBuilder(modelRunnerUrl);
@@ -368,7 +319,6 @@ else
     catalogApi.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     catalogSync.WithEnvironment("Embeddings__Endpoint", endpoint).WaitFor(modelRunner);
     researchApi.WithEnvironment("Research__ChatEndpoint", endpoint);
-    assistantApi.WithEnvironment("Assistant__ChatEndpoint", endpoint);
 
     // Model Runner serves only the embedding model until a chat model is pulled: this adds a "Pull <model>" command to
     // the model-runner resource on the dashboard (Model Runner's own pull API, which the sync worker also uses).
@@ -376,7 +326,7 @@ else
         commandOptions: new HttpCommandOptions
         {
             Method = HttpMethod.Post,
-            Description = $"Pulls {chatModel} for chatting in Open WebUI, drafting research insights and answering Ask. Large models take minutes.",
+            Description = $"Pulls {chatModel} for chatting in Open WebUI, and drafting research insights. Large models take minutes.",
             IconName = "ArrowDownload",
             PrepareRequest = context =>
             {
@@ -413,13 +363,9 @@ void AddOpenWebUi(ReferenceExpression modelRunnerApi, IResourceBuilder<Container
         .WithEnvironment("RAG_EMBEDDING_MODEL", servedEmbeddingModel)
         .WithEnvironment("ENABLE_EVALUATION_ARENA_MODELS", "False")
         .WithEnvironment("ANONYMIZED_TELEMETRY", "False")
-        // The app's MCP tools ("landman insights"), through the gateway, on for every chat's tool list. The AppHost owns
-        // this config, so Open WebUI reads it from here on every start instead of keeping its first copy in its database.
-        // Keep the closing braces apart: ReferenceExpression turns "}}" in its literal text into "}".
-        .WithEnvironment("TOOL_SERVER_CONNECTIONS", ReferenceExpression.Create(
-            $"[{{\"type\":\"mcp\",\"url\":\"{mcpGateway.GetEndpoint("http")}/mcp\",\"path\":\"\",\"auth_type\":\"bearer\",\"key\":\"{mcpGatewayKey}\",\"config\":{{\"enable\":true}},\"info\":{{\"id\":\"tvtracker\",\"name\":\"{appName}\",\"description\":\"Shows, insights, discovery lists and premieres from the catalog and Analytics\"}} }}]"))
+        // The AppHost owns this config, so Open WebUI reads it from here on every start instead of keeping its first
+        // copy in its database.
         .WithEnvironment("ENABLE_PERSISTENT_CONFIG", "False")
-        .WithReference(mcpGateway).WaitFor(mcpGateway)
         .WithHttpHealthCheck("/health")
         .WithLifetime(ContainerLifetime.Persistent);
     if (modelRunner is not null)
@@ -459,8 +405,7 @@ builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi)
-    .WithReference(assistantApi);
+    .WithReference(researchApi);
 
 // WebApp:PublicUrl: the web app's address when it's reached through one forwarded address only (a cloud session's
 // preview), where the browser can't reach Keycloak. Sign-in then goes through the web app (SignInThroughWebApp), and
@@ -490,8 +435,7 @@ var webApp = builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi)
-    .WithReference(assistantApi);
+    .WithReference(researchApi);
 if (!string.IsNullOrEmpty(webPublicUrl))
 {
     webApp.WithEnvironment("WebApp__PublicUrl", webPublicUrl);

@@ -695,20 +695,6 @@ a.chip { text-decoration: none; }
 .episode-note-row { display: grid; grid-template-columns: 6rem 1fr 8rem; gap: 8px; }
 @media (max-width: 520px) { .episode-note-row { grid-template-columns: 5rem 1fr; } .episode-note-row label:last-child { grid-column: 1 / -1; } }
 
-/* Ask the app */
-.ask-intro { max-width: 72ch; }
-.ask-examples { margin: 12px 0 4px; }
-.ask-examples .chip { text-align: left; }
-.ask-turns { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 18px; max-width: 72ch; }
-.ask-question { margin: 0 0 6px auto; width: fit-content; max-width: 85%; padding: 8px 12px; border-radius: 12px 12px 2px 12px;
-    background: color-mix(in srgb, var(--accent) 12%, transparent); overflow-wrap: anywhere; }
-.ask-answer { line-height: 1.6; overflow-wrap: anywhere; }
-.ask-answer p { margin: 0 0 6px; }
-.ask-steps ul { margin: 4px 0 0; padding-left: 18px; }
-.ask-form { display: grid; gap: 8px; max-width: 72ch; position: sticky; bottom: 0; padding: 8px 0; background: var(--bg); }
-.ask-form textarea { width: 100%; font: inherit; resize: vertical; }
-.ask-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
 /* Seasons that just ended (Insights): the backlog's toned list, each item a block of text rather than a row */
 .season-verdicts > li { display: block; overflow-wrap: anywhere; }
 

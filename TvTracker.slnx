@@ -30,10 +30,7 @@
     <Project Path="src/Services/Analytics/Analytics.Data/Analytics.Data.csproj" />
     <Project Path="src/Services/Analytics/Analytics.Worker/Analytics.Worker.csproj" />
     <Project Path="src/Services/Analytics/Analytics.API/Analytics.API.csproj" />
-    <Project Path="src/Services/Mcp/Mcp.Gateway/Mcp.Gateway.csproj" />
-    <Project Path="src/Services/Mcp/Mcp.Server/Mcp.Server.csproj" />
     <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
-    <Project Path="src/Services/Assistant/Assistant.API/Assistant.API.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />

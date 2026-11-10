@@ -102,7 +102,7 @@ public class FactCandidate
 }
 
 /// <summary>
-/// A saved version of a show's research. The latest is the trusted record: what the show page and the MCP tools show,
+/// A saved version of a show's research. The latest is the trusted record: what the show page shows,
 /// and the source of the catalog fields it overrides. Earlier versions stay as history.
 /// </summary>
 public class SavedResearch

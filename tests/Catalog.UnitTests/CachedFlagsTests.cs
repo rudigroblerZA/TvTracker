@@ -36,33 +36,33 @@ public class CachedFlagsTests
     [Fact]
     public async Task A_cached_answer_is_reused_until_it_expires()
     {
-        var (flags, provider, clock) = await BuildAsync(new() { ["ask"] = OffFor("never") });
+        var (flags, provider, clock) = await BuildAsync(new() { ["year-in-tv"] = OffFor("never") });
         var context = FeatureFlags.ContextFor(null);
-        Assert.True(await flags.IsEnabledAsync("ask", context, TestContext.Current.CancellationToken));
+        Assert.True(await flags.IsEnabledAsync("year-in-tv", context, TestContext.Current.CancellationToken));
 
         // Turned off for everyone; the cached answer stands for CachedFlags.CacheFor.
         await provider.UpdateFlagsAsync(new Dictionary<string, Flag>
         {
-            ["ask"] = new Flag<bool>(new Dictionary<string, bool> { ["on"] = true, ["off"] = false }, "off")
+            ["year-in-tv"] = new Flag<bool>(new Dictionary<string, bool> { ["on"] = true, ["off"] = false }, "off")
         });
 
-        Assert.True(await flags.IsEnabledAsync("ask", context, TestContext.Current.CancellationToken));
-        Assert.False(await flags.IsEnabledAsync("ask", FeatureFlags.ContextFor(null, "plus"), TestContext.Current.CancellationToken));
+        Assert.True(await flags.IsEnabledAsync("year-in-tv", context, TestContext.Current.CancellationToken));
+        Assert.False(await flags.IsEnabledAsync("year-in-tv", FeatureFlags.ContextFor(null, "plus"), TestContext.Current.CancellationToken));
 
         // Past CacheFor, the flag is asked again and the change shows.
         clock.UtcNow += CachedFlags.CacheFor + TimeSpan.FromSeconds(1);
-        Assert.False(await flags.IsEnabledAsync("ask", context, TestContext.Current.CancellationToken));
+        Assert.False(await flags.IsEnabledAsync("year-in-tv", context, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Each_plan_gets_its_own_answer()
     {
-        var (flags, _, _) = await BuildAsync(new() { ["ask"] = OffFor(FeatureFlags.FreePlan) });
+        var (flags, _, _) = await BuildAsync(new() { ["year-in-tv"] = OffFor(FeatureFlags.FreePlan) });
         var ct = TestContext.Current.CancellationToken;
 
-        Assert.False(await flags.IsEnabledAsync("ask", FeatureFlags.ContextFor(null, FeatureFlags.FreePlan), ct));
-        Assert.True(await flags.IsEnabledAsync("ask", FeatureFlags.ContextFor(null, "plus"), ct));
-        Assert.True(await flags.IsEnabledAsync("ask", FeatureFlags.ContextFor(null), ct));
+        Assert.False(await flags.IsEnabledAsync("year-in-tv", FeatureFlags.ContextFor(null, FeatureFlags.FreePlan), ct));
+        Assert.True(await flags.IsEnabledAsync("year-in-tv", FeatureFlags.ContextFor(null, "plus"), ct));
+        Assert.True(await flags.IsEnabledAsync("year-in-tv", FeatureFlags.ContextFor(null), ct));
     }
 
     [Fact]
@@ -71,8 +71,8 @@ public class CachedFlagsTests
         static EvaluationContext With(params string[] groups) => EvaluationContext.Builder()
             .SetTargetingKey("u").Set("groups", new Value(groups.Select(g => new Value(g)).ToList())).Build();
 
-        Assert.NotEqual(CachedFlags.KeyOf("ask", With("a")), CachedFlags.KeyOf("ask", With("b")));
-        Assert.Equal(CachedFlags.KeyOf("ask", With("a", "b")), CachedFlags.KeyOf("ask", With("a", "b")));
+        Assert.NotEqual(CachedFlags.KeyOf("year-in-tv", With("a")), CachedFlags.KeyOf("year-in-tv", With("b")));
+        Assert.Equal(CachedFlags.KeyOf("year-in-tv", With("a", "b")), CachedFlags.KeyOf("year-in-tv", With("a", "b")));
     }
 
     [Fact]

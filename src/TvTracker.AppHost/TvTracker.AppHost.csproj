@@ -10,16 +10,12 @@
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Flagd" />
-    <PackageReference Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Services\Identity\Identity.API\Identity.API.csproj" />
     <ProjectReference Include="..\Services\Catalog\Catalog.API\Catalog.API.csproj" />
-    <ProjectReference Include="..\Services\Mcp\Mcp.Server\Mcp.Server.csproj" />
     <ProjectReference Include="..\Services\Research\Research.API\Research.API.csproj" />
-    <ProjectReference Include="..\Services\Assistant\Assistant.API\Assistant.API.csproj" />
-    <ProjectReference Include="..\Services\Mcp\Mcp.Gateway\Mcp.Gateway.csproj" />
     <ProjectReference Include="..\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
     <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" />
     <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />

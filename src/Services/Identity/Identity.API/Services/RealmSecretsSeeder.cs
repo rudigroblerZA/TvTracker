@@ -7,8 +7,7 @@ namespace Identity.API.Services;
 /// <item><b>Why:</b> the realm file carries the development values and Keycloak imports it only on its first start, so a
 /// deployment's realm would otherwise keep secrets anyone can read in the repository. With this, the AppHost's secret
 /// parameters are the one place they're set.</item>
-/// <item><b>Through the master realm's admin</b> (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>), as the MCP server
-/// creates its client: Identity's own service account can manage users but not clients, and its secret is one of those
+/// <item><b>Through the master realm's admin</b> (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>): Identity's own service account can manage users but not clients, and its secret is one of those
 /// being set.</item>
 /// <item><b>Service clients</b> (<c>Keycloak:ServiceClients:{clientId}</c> = its display name, such as
 /// <c>tvtracker-internal</c>, which other services use to call the sync worker) are created when the realm lacks them,
