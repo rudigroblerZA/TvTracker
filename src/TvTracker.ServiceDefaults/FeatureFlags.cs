@@ -158,6 +158,8 @@ public static class FeatureFlags
     /// <summary>
     /// The same context for a user known by id rather than by a request's claims: a background job acting for them
     /// (Notifications deciding, per follower, whether a flagged alert goes out).
+    /// It carries no plan, so a plan rule never applies: use it only for flags that aren't part of a plan (a test
+    /// checks the notification flags have none), or the alert reaches people whose plan doesn't have the feature.
     /// </summary>
     public static EvaluationContext ContextForUser(string userId, string? email) => Context(userId, email, plan: null);
 

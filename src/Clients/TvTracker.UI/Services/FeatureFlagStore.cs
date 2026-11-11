@@ -30,7 +30,7 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
 
     private readonly ConcurrentDictionary<(string Flag, string? User, string? Plan), (bool Enabled, DateTimeOffset At)> cache = new();
     private (string? User, string? Plan, DateTimeOffset At)? plan;
-    private IReadOnlyList<PlanFeature>? planFeatures;
+    private (IReadOnlyList<PlanFeature> Features, DateTimeOffset At)? planFeatures;
 
     public async Task<bool> IsEnabledAsync(string flag) => await EvaluateAsync(flag, await PlanAsync());
 
@@ -65,16 +65,18 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
     /// <summary>
     /// The features that are part of some plans only, from the flags' own metadata (<see cref="FeatureFlags.PlansMetadata"/>
     /// and <see cref="FeatureFlags.NameMetadata"/>), so the plan page lists what flagd.json and the flags page say.
+    /// Only features that are turned on; the same for every user. Kept for <see cref="CacheFor"/>, like a flag's answer,
+    /// and not kept at all when flagd couldn't answer (no flag came back with metadata).
     /// </summary>
     public async Task<IReadOnlyList<PlanFeature>> PlanFeaturesAsync()
     {
-        if (planFeatures is not null)
+        if (planFeatures is { } known && DateTimeOffset.UtcNow - known.At < CacheFor)
         {
-            return planFeatures;
+            return known.Features;
         }
         var context = FeatureFlags.ContextFor((await authState.GetAuthenticationStateAsync()).User);
         var details = await Task.WhenAll(FlagKeys.Select(async key => (key, details: await client.GetBooleanDetailsAsync(key, FeatureFlags.DefaultFor(key), context))));
-        planFeatures = details
+        var found = details
             // Without a plan in the context no plan rule applies, so Value is the flag's own state: a feature that's
             // turned off isn't part of any plan.
             .Where(d => d.details.Value && d.details.FlagMetadata?.GetString(FeatureFlags.PlansMetadata) is { Length: > 0 })
@@ -82,7 +84,11 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
                 d.details.FlagMetadata.GetString(FeatureFlags.PlansMetadata)!.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
             .OrderBy(f => f.Name, StringComparer.CurrentCulture)
             .ToList();
-        return planFeatures;
+        if (details.Any(d => d.details.FlagMetadata is not null))
+        {
+            planFeatures = (found, DateTimeOffset.UtcNow);
+        }
+        return found;
     }
 
     /// <summary>

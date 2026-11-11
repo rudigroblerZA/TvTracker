@@ -59,7 +59,8 @@
                 }
             </Feature>
 
-            @* Both columns come from the shared Plans limits, so this table says what the services enforce. *@
+            @* The limits and each plan's base line come from the shared Plans, and the insights from the flags, so this
+               table says what the services enforce. *@
             <div class="plan-grid">
                 @foreach (var key in Plans.All)
                 {
@@ -69,30 +70,18 @@
                         <ul class="plan-features">
                             <li>@(limits.MaxLists is { } max ? $"Up to {max} lists" : "As many lists as you like")</li>
                             <li>@(limits.ShareLists ? "Share lists on your profile or by link" : "Lists are just for you")</li>
-                            @if (limits.TrackServices)
-                            {
-                                <Feature Flag="@FeatureFlags.YourServices">
-                                    <li>Your services: what each streaming service costs per hour you watch</li>
-                                </Feature>
-                            }
                             @if (key == Plans.Family)
                             {
                                 <li>@($"Shared with up to {Plans.FamilyMembers} people you invite")</li>
                             }
-                            @* Family has Pro's features, said once below, not listed again. *@
-                            @if (features is not null && key != Plans.Family)
+                            <li>@Plans.Includes(key)</li>
+                            @if (Added(key) is { Count: > 0 } added)
                             {
-                                var mine = features.Where(f => f.Plans.Contains(key)).ToList();
-                                @if (mine.Count > 0)
-                                {
-                                    <li>
-                                        <span>@(mine.Count == 1 ? "1 more insight: " : $"{mine.Count} more insights: ")</span>
-                                        <span class="muted">@string.Join(", ", mine.Select(f => f.Name))</span>
-                                    </li>
-                                }
+                                <li>
+                                    <span>@(added.Count == 1 ? "And 1 insight: " : $"And {added.Count} insights: ")</span>
+                                    <span class="muted">@string.Join(", ", added.Select(f => f.Name))</span>
+                                </li>
                             }
-                            <li>@(key == Plans.Free ? "Tracking, ratings, lists and the basic insights"
-                                : key == Plans.Family ? $"Everything in {Plans.Name(Plans.Plus)}" : $"Everything in {Plans.Name(Plans.Free)}")</li>
                         </ul>
                         @if (key == plan.Plan)
                         {
@@ -141,6 +130,14 @@
     /// <summary>
     /// A plan can be bought when a provider sells them and no subscription is running (switching is cancel, then buy).
     /// </summary>
+    /// <summary>
+    /// The flagged insights a plan's card lists: the ones it has that the plan it builds on (<see cref="Plans.Includes"/>)
+    /// doesn't. Family builds on Pro and has the same features, so it lists none.
+    /// </summary>
+    private List<PlanFeature> Added(string key) => (features ?? [])
+        .Where(f => f.Plans.Contains(key) && (key == Plans.Free || !f.Plans.Contains(key == Plans.Family ? Plans.Plus : Plans.Free)))
+        .ToList();
+
     private bool CanBuy => prices?.Provider is not null && subscription is not { Active: true };
 
     private string Money(decimal amount) => prices!.Currency == "USD"
