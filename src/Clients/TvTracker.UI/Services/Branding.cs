@@ -1,3 +1,5 @@
+using TvTracker.UI.Components;
+
 namespace TvTracker.UI.Services;
 
 /// <summary>
@@ -70,45 +72,34 @@ public sealed record CatalogCredit(string Name, string Url);
 /// <summary>
 /// A catalog source as the UI describes it.
 /// </summary>
-/// <param name="Name">As pages say it ("Details from TVmaze").</param>
-/// <param name="Url">The source's site; null for the invented development catalog.</param>
+/// <param name="Name">As pages say it when nobody is credited ("our development catalog"), and in sentences about the source.</param>
 /// <param name="ImagesFrom">Whose servers show pictures are loaded from, for the privacy policy.</param>
 /// <param name="Licence">What its data comes under.</param>
-/// <param name="AlsoCredited">Others whose text the source brings with it, credited beside it in the footer (Wikipedia's overviews with Wikidata).</param>
-public sealed record CatalogSourceInfo(string Name, string? Url, string ImagesFrom, CatalogLicence Licence = CatalogLicence.CcBySa,
-    params CatalogCredit[] AlsoCredited)
+/// <param name="Credits">Who is credited for its data, the source first, then anyone whose text it brings with it (Wikipedia's overviews with Wikidata); none for invented data.</param>
+public sealed record CatalogSourceInfo(string Name, string ImagesFrom, CatalogLicence Licence, IReadOnlyList<CatalogCredit> Credits)
 {
-    private static readonly CatalogSourceInfo TvMaze = new("TVmaze", "https://www.tvmaze.com", "TVmaze");
+    private static readonly CatalogSourceInfo TvMaze =
+        new("TVmaze", "TVmaze", CatalogLicence.CcBySa, [new("TVmaze", "https://www.tvmaze.com")]);
 
     private static readonly Dictionary<string, CatalogSourceInfo> Sources = new()
     {
         ["tvmaze"] = TvMaze,
-        ["tvdb"] = new("TheTVDB", "https://thetvdb.com", "TheTVDB", CatalogLicence.Own),
-        ["wikidata"] = new("Wikidata", "https://www.wikidata.org", "Wikimedia Commons", CatalogLicence.CcBySa,
-            new CatalogCredit("Wikipedia", "https://en.wikipedia.org")),
-        ["mock"] = new("our development catalog", null, "a placeholder image service", CatalogLicence.Invented)
+        ["tvdb"] = new("TheTVDB", "TheTVDB", CatalogLicence.Own, [new("TheTVDB", "https://thetvdb.com")]),
+        ["wikidata"] = new("Wikidata", "Wikimedia Commons", CatalogLicence.CcBySa,
+            [new("Wikidata", "https://www.wikidata.org"), new("Wikipedia", "https://en.wikipedia.org")]),
+        ["mock"] = new("our development catalog", "a placeholder image service", CatalogLicence.Invented, [])
     };
 
     /// <summary>
-    /// The source with that key (<c>Catalog:Provider</c>); TVmaze, the default provider, for one not known.
+    /// The source with that key (<c>Catalog:Provider</c>; the keys are Catalog.Data's CatalogSources, which the UI
+    /// doesn't reference); TVmaze, the default provider, for one not known.
     /// </summary>
     public static CatalogSourceInfo For(string source) => Sources.GetValueOrDefault(source, TvMaze);
 
     /// <summary>
-    /// Everyone credited in the footer, the source first; none for invented data.
+    /// Everyone show data comes from, for the privacy policy ("TVmaze, Wikidata and Wikiquote"): those credited (the
+    /// source by name when nobody is), then the two every catalog takes quotes and facts from.
     /// </summary>
-    public IReadOnlyList<CatalogCredit> Credits => Url is null ? [] : [new(Name, Url), .. AlsoCredited];
-
-    /// <summary>
-    /// Everyone show data comes from, for the privacy policy ("TVmaze, Wikidata and Wikiquote"): the source and those
-    /// credited with it, then the two every catalog takes quotes and facts from.
-    /// </summary>
-    public string DataFrom
-    {
-        get
-        {
-            var names = new[] { Name }.Concat(AlsoCredited.Select(c => c.Name)).Concat(["Wikidata", "Wikiquote"]).Distinct().ToList();
-            return string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
-        }
-    }
+    public string DataFrom =>
+        Format.List((Credits.Count > 0 ? Credits.Select(c => c.Name) : [Name]).Concat(["Wikidata", "Wikiquote"]).Distinct().ToList());
 }

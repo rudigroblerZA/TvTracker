@@ -1,7 +1,13 @@
-@* The catalog's credited sources as links, joined with "and": "TVmaze", "Wikidata and Wikipedia". One line of markup, so
-   no stray space lands before whatever punctuation follows it. *@
-@for (var i = 0; i < Brand.Catalog.Credits.Count; i++)
+@* The catalog's source as pages name it: those credited for its data as links, joined with "and" ("TVmaze", "Wikidata and
+   Wikipedia"), or the source's plain name when nobody is (the invented development catalog). The footer, the terms
+   and people's pages all use it. Each link and its separator are one line of markup, so no stray space lands before
+   whatever punctuation follows the component. *@
+@{ var credits = Brand.Catalog.Credits; }
+@if (credits.Count == 0)
 {
-    var credit = Brand.Catalog.Credits[i];
-    @(i > 0 ? " and " : "")<a href="@credit.Url" target="_blank" rel="noopener">@credit.Name</a>
+    @Brand.Catalog.Name
+}
+@for (var i = 0; i < credits.Count; i++)
+{
+    @(i > 0 ? " and " : "")<a href="@credits[i].Url" target="_blank" rel="noopener">@credits[i].Name</a>
 }

@@ -37,8 +37,7 @@
 
     <h2>The show information and insights</h2>
     <ul>
-        @* The name and what follows it are one expression each, on one line, so no space lands before the comma. *@
-        <li>Show and episode data comes from @SourceLink@(Brand.Catalog.Licence switch
+        <li>Show and episode data comes from <CatalogCredits />@(Brand.Catalog.Licence switch
             {
                 CatalogLicence.Own => ", under its own licence. Quotes and some facts come",
                 CatalogLicence.Invented => ", which is invented. Quotes and some facts come",
@@ -91,21 +90,3 @@
         }
     </p>
 </article>
-
-@code {
-    /// <summary>
-    /// The catalog's source by name, linked to its site when it has one. Built as one piece of markup, since a Razor
-    /// fragment left a space between the link and the comma after it. The name and address are the app's own
-    /// (<see cref="CatalogSourceInfo"/>), and encoded all the same.
-    /// </summary>
-    private MarkupString SourceLink
-    {
-        get
-        {
-            var name = System.Net.WebUtility.HtmlEncode(Brand.Catalog.Name);
-            return (MarkupString)(Brand.Catalog.Url is { } url
-                ? $"<a href=\"{System.Net.WebUtility.HtmlEncode(url)}\" target=\"_blank\" rel=\"noopener\">{name}</a>"
-                : name);
-        }
-    }
-}
