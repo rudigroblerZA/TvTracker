@@ -40,6 +40,22 @@ public static class Plans
     /// "Free", "Pro" or "Family", as the UI and error messages name the plan. The paid plan's key stays "plus"
     /// (<see cref="Plus"/>): stored plans, events and the payment provider's records carry it.
     /// </summary>
+    /// <summary>
+    /// What a plan starts from, before the insights its flags add: Free's own basics, and for a paid plan the plan
+    /// below it. The plan page and the landing page say it in these words.
+    /// </summary>
+    public static string Includes(string? plan) => plan switch
+    {
+        Plus => $"Everything in {Name(Free)}",
+        Family => $"Everything in {Name(Plus)}",
+        _ => FreeIncludes
+    };
+
+    /// <summary>
+    /// What a free account has.
+    /// </summary>
+    public const string FreeIncludes = "Tracking, ratings, lists and the basic insights";
+
     public static string Name(string? plan) => plan switch
     {
         Plus => "Pro",
