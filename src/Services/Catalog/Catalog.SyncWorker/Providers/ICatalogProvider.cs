@@ -4,7 +4,8 @@ using TvTracker.IntegrationEvents;
 namespace Catalog.SyncWorker.Providers;
 
 /// <summary>
-/// Source of show data. Implementations: TvMazeCatalogProvider (default), WikidataCatalogProvider and MockCatalogProvider.
+/// Source of show data. Implementations: TvMazeCatalogProvider (default), WikidataCatalogProvider, TvdbCatalogProvider and
+/// MockCatalogProvider.
 /// A real provider should also respect the provider's rate limits.
 /// </summary>
 public interface ICatalogProvider

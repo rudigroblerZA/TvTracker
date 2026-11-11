@@ -11,10 +11,10 @@ public static class UiServiceCollectionExtensions
     /// <see cref="IAccessTokenProvider"/>, <see cref="IAuthActions"/>, <see cref="IPlatformServices"/>
     /// an AuthenticationStateProvider and OpenFeature's IFeatureClient; <see cref="IOfflineStore"/> defaults to online-only.
     /// <paramref name="appName"/>, <paramref name="operatorName"/> and <paramref name="contactEmail"/> white-label the UI
-    /// (<see cref="Branding"/>).
+    /// (<see cref="Branding"/>); <paramref name="catalogSource"/> is the catalog's provider, for the footer's credit.
     /// </summary>
     public static IServiceCollection AddTvTrackerUi(this IServiceCollection services, Func<string, Uri> baseAddressFor, string? appName = null,
-        string? operatorName = null, string? contactEmail = null)
+        string? operatorName = null, string? contactEmail = null, string? catalogSource = null)
     {
         foreach (var name in ApiClients.All)
         {
@@ -30,7 +30,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<FeatureFlagStore>();
         services.AddScoped<SpoilerShield>();
         services.AddScoped<ThemeStore>();
-        services.AddSingleton(new Branding(appName, operatorName, contactEmail));
+        services.AddSingleton(new Branding(appName, operatorName, contactEmail, catalogSource));
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();

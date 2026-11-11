@@ -23,11 +23,29 @@
         @Body
     </main>
 
-    @* TVmaze data is licensed CC BY-SA, which requires this credit. *@
+    @* The credit the catalog's source asks for: TVmaze's data is CC BY-SA, TheTVDB's licence words its own, and
+       Wikidata's (CC0) needs none but is named all the same. *@
     <footer class="app-footer muted small">
         <p class="footer-links"><a href="privacy">Privacy</a><a href="terms">Terms</a></p>
-        Show data from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>
-        (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)
+        @switch (Brand.CatalogSource)
+        {
+            case "tvdb":
+                <text>Metadata provided by <a href="https://thetvdb.com" target="_blank" rel="noopener">TheTVDB</a>.
+                    Please consider adding missing information or subscribing.</text>
+                break;
+            case "wikidata":
+                <text>Show data from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
+                    and <a href="https://en.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>
+                    (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
+                break;
+            case "mock":
+                <text>Invented show data, for development</text>
+                break;
+            default:
+                <text>Show data from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>
+                    (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
+                break;
+        }
     </footer>
 </div>
 
