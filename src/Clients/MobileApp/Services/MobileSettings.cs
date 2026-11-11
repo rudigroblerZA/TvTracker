@@ -15,6 +15,13 @@ public static class MobileSettings
     public const string AppName = "TV Tracker";
 
     /// <summary>
+    /// Where the backend's catalog comes from (its <c>Catalog:Provider</c>: "tvmaze", "wikidata", "tvdb" or "mock"), for
+    /// the credit the source's licence requires in the footer and what the terms and privacy pages name. The web app
+    /// reads it from configuration; a phone build can't, so set it to match the backend before a release.
+    /// </summary>
+    public const string CatalogSource = "tvmaze";
+
+    /// <summary>
     /// Mobile BFF ("http" launch profile, port 5110).
     /// </summary>
     public static Uri BffAddress => new($"http://{Host}:5110/");

@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text;
 using Catalog.SyncWorker.Providers.Tvdb;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Catalog.UnitTests;
 
@@ -31,11 +34,14 @@ public class TvdbClientTests
     private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static (TvdbClient Client, IOptions<TvdbOptions> Options) Client(FakeTvdb tvdb, string? pin = null)
+    private static (TvdbClient Client, IOptions<TvdbOptions> Options) Client(FakeTvdb tvdb, string? pin = null, TimeProvider? time = null)
     {
-        var options = Options.Create(new TvdbOptions { ApiKey = "key-1", Pin = pin, FeaturedCountries = ["usa", "gbr"] });
-        return (new TvdbClient(tvdb, options), options);
+        var options = Options.Create(new TvdbOptions { ApiKey = "key-1", Pin = pin });
+        return (new TvdbClient(tvdb, options, time ?? TimeProvider.System), options);
     }
+
+    private static TvdbCatalogProvider Provider(TvdbClient client, IOptions<TvdbOptions> options) =>
+        new(client, options, TimeProvider.System, NullLogger<TvdbCatalogProvider>.Instance);
 
     [Fact]
     public async Task It_signs_in_with_the_key_once_and_sends_the_token()
@@ -96,7 +102,7 @@ public class TvdbClientTests
             request.RequestUri!.AbsolutePath.EndsWith("/login") ? Json("""{ "data": { "token": "t" } }""")
             : Json("""{ "status": "failure", "message": "Not Found" }""", HttpStatusCode.NotFound));
         var (client, options) = Client(tvdb);
-        var provider = new TvdbCatalogProvider(client, options, TimeProvider.System);
+        var provider = Provider(client, options);
 
         Assert.Null(await provider.GetShowAsync("424242", TestContext.Current.CancellationToken));
         Assert.Null(await provider.LookUpShowByTvdbAsync("424242", TestContext.Current.CancellationToken));
@@ -111,12 +117,12 @@ public class TvdbClientTests
         var tvdb = new FakeTvdb((request, _) => request.RequestUri!.PathAndQuery switch
         {
             "/v4/login" => Json("""{ "data": { "token": "t" } }"""),
-            "/v4/series/7/extended" => Json("""{ "data": { "id": 7, "name": "Long Show", "status": { "name": "Continuing" }, "firstAired": "2020-01-01" } }"""),
-            "/v4/series/7/episodes/default?page=0" => Json("""
+            "/v4/series/7/extended?meta=translations" => Json("""{ "data": { "id": 7, "name": "Long Show", "originalLanguage": "eng", "status": { "name": "Continuing" }, "firstAired": "2020-01-01" } }"""),
+            "/v4/series/7/episodes/official?page=0" => Json("""
                 { "data": { "episodes": [ { "id": 1, "name": "One", "aired": "2020-01-01", "number": 1, "seasonNumber": 1 } ] },
-                  "links": { "next": "https://tvdb.test/v4/series/7/episodes/default?page=1" } }
+                  "links": { "next": "https://tvdb.test/v4/series/7/episodes/official?page=1" } }
                 """),
-            "/v4/series/7/episodes/default?page=1" => Json("""
+            "/v4/series/7/episodes/official?page=1" => Json("""
                 { "data": { "episodes": [ { "id": 2, "name": "Two", "aired": "2020-01-08", "number": 2, "seasonNumber": 1 } ] },
                   "links": { "next": null } }
                 """),
@@ -124,7 +130,7 @@ public class TvdbClientTests
         });
         var (client, options) = Client(tvdb);
 
-        var show = await new TvdbCatalogProvider(client, options, TimeProvider.System).GetShowAsync("7", TestContext.Current.CancellationToken);
+        var show = await Provider(client, options).GetShowAsync("7", TestContext.Current.CancellationToken);
 
         Assert.Equal(["One", "Two"], show!.Episodes.Select(e => e.Title));
     }
@@ -149,7 +155,7 @@ public class TvdbClientTests
         });
         var (client, options) = Client(tvdb);
 
-        var changed = await new TvdbCatalogProvider(client, options, TimeProvider.System)
+        var changed = await Provider(client, options)
             .GetChangedShowsAsync(TimeSpan.FromHours(2), TestContext.Current.CancellationToken);
 
         Assert.Equal(["10", "20"], changed!.Keys.Order());
@@ -170,10 +176,147 @@ public class TvdbClientTests
         });
         var (client, options) = Client(tvdb);
 
-        var ids = await new TvdbCatalogProvider(client, options, TimeProvider.System)
+        var ids = await Provider(client, options)
             .GetPopularShowIdsAsync(2, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(["1", "3"], ids);
         Assert.All(tvdb.Requests.Skip(1), r => Assert.Contains("lang=eng&sort=score&sortType=desc", r));
+    }
+
+    [Fact]
+    public async Task A_refused_key_isnt_tried_again_for_a_while()
+    {
+        var time = new FakeTimeProvider();
+        var tvdb = new FakeTvdb((_, _) => Json("""{ "status": "failure", "message": "InvalidAPIKey: apikey invalid" }""", HttpStatusCode.Unauthorized));
+        var (client, _) = Client(tvdb, time: time);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync<TvdbSeries>("series/1", TestContext.Current.CancellationToken));
+        }
+        Assert.Equal(["POST /v4/login"], tvdb.Requests);
+
+        time.Advance(TvdbClient.RefusedFor);
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync<TvdbSeries>("series/1", TestContext.Current.CancellationToken));
+        Assert.Equal(2, tvdb.Requests.Count);
+    }
+
+    [Fact]
+    public async Task An_answer_that_cant_be_read_is_a_failed_request()
+    {
+        var tvdb = new FakeTvdb((request, _) =>
+            request.RequestUri!.AbsolutePath.EndsWith("/login") ? Json("""{ "data": { "token": "t" } }""")
+            : Json("""{ "data": { "id": "not a number" } }"""));
+        var (client, _) = Client(tvdb);
+
+        // The synchronizer skips a show on HttpRequestException; a JsonException would end its whole round.
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync<TvdbSeries>("series/1", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_show_in_another_language_is_read_in_ours_where_TheTVDB_has_it()
+    {
+        var tvdb = new FakeTvdb((request, _) => request.RequestUri!.PathAndQuery switch
+        {
+            "/v4/login" => Json("""{ "data": { "token": "t" } }"""),
+            "/v4/series/9/extended?meta=translations" => Json("""
+                { "data": { "id": 9, "name": "오징어 게임", "overview": "한국어 줄거리", "originalLanguage": "kor", "originalCountry": "kor",
+                    "firstAired": "2021-09-17", "status": { "name": "Ended" },
+                    "translations": {
+                      "nameTranslations": [ { "language": "kor", "name": "오징어 게임" }, { "language": "eng", "name": "Squid Game" } ],
+                      "overviewTranslations": [ { "language": "eng", "overview": "Players risk their lives." } ] } } }
+                """),
+            "/v4/series/9/episodes/official?page=0" => Json("""
+                { "data": { "episodes": [
+                    { "id": 1, "name": "무궁화 꽃이 피던 날", "aired": "2021-09-17", "number": 1, "seasonNumber": 1 },
+                    { "id": 2, "name": "지옥", "aired": "2021-09-17", "number": 2, "seasonNumber": 1 } ] }, "links": { "next": null } }
+                """),
+            // The translated listing carries its episodes inside the series; the second has no English name.
+            "/v4/series/9/episodes/official/eng?page=0" => Json("""
+                { "data": { "series": { "id": 9, "episodes": [
+                    { "id": 1, "name": "Red Light, Green Light", "overview": "The game begins.", "number": 1, "seasonNumber": 1 },
+                    { "id": 2, "name": null, "number": 2, "seasonNumber": 1 } ] } }, "links": { "next": null } }
+                """),
+            var other => throw new InvalidOperationException($"Not expected: {other}")
+        });
+        var (client, options) = Client(tvdb);
+
+        var show = await Provider(client, options).GetShowAsync("9", TestContext.Current.CancellationToken);
+
+        Assert.Equal("Squid Game", show!.Title);
+        Assert.Equal("Players risk their lives.", show.Overview);
+        Assert.Equal(["Red Light, Green Light", "지옥"], show.Episodes.Select(e => e.Title));
+        Assert.Equal("The game begins.", show.Episodes[0].Overview);
+    }
+
+    [Fact]
+    public async Task A_series_with_nothing_in_aired_order_is_read_in_its_default_order()
+    {
+        var tvdb = new FakeTvdb((request, _) => request.RequestUri!.PathAndQuery switch
+        {
+            "/v4/login" => Json("""{ "data": { "token": "t" } }"""),
+            "/v4/series/5/extended?meta=translations" => Json("""{ "data": { "id": 5, "name": "Odd", "originalLanguage": "eng" } }"""),
+            "/v4/series/5/episodes/official?page=0" => Json("""{ "data": { "episodes": [] } }"""),
+            "/v4/series/5/episodes/default?page=0" => Json("""{ "data": { "episodes": [ { "id": 1, "name": "Only", "number": 1, "seasonNumber": 1 } ] } }"""),
+            var other => throw new InvalidOperationException($"Not expected: {other}")
+        });
+        var (client, options) = Client(tvdb);
+
+        var show = await Provider(client, options).GetShowAsync("5", TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Only"], show!.Episodes.Select(e => e.Title));
+    }
+
+    [Fact]
+    public async Task Created_records_count_as_changes_and_deleted_ones_dont()
+    {
+        var tvdb = new FakeTvdb((request, _) =>
+        {
+            var query = request.RequestUri!.PathAndQuery;
+            Assert.DoesNotContain("action=", query);
+            return query == "/v4/login" ? Json("""{ "data": { "token": "t" } }""")
+                : query.Contains("type=series") ? Json("""{ "data": [ { "recordId": 30, "timeStamp": 1700000000, "methodInt": 3 } ] }""")
+                : Json("""
+                    { "data": [ { "recordId": 601, "seriesId": 10, "timeStamp": 1700000500, "methodInt": 1 },
+                                { "recordId": 602, "seriesId": 40, "timeStamp": 1700000600, "methodInt": 3 } ] }
+                    """);
+        });
+        var (client, options) = Client(tvdb);
+
+        var changed = await Provider(client, options).GetChangedShowsAsync(TimeSpan.FromHours(2), TestContext.Current.CancellationToken);
+
+        // A new episode of show 10; show 30 and show 40's episode were deleted.
+        Assert.Equal(["10"], changed!.Keys);
+    }
+
+    [Fact]
+    public async Task A_feed_longer_than_the_page_limit_gives_what_was_read()
+    {
+        var pages = 0;
+        var tvdb = new FakeTvdb((request, _) =>
+        {
+            var query = request.RequestUri!.PathAndQuery;
+            return query == "/v4/login" ? Json("""{ "data": { "token": "t" } }""")
+                : query.Contains("type=people") ? Json($$"""{ "data": [ { "recordId": {{++pages}}, "timeStamp": 1700000000 } ], "links": { "next": "more" } }""")
+                : throw new InvalidOperationException($"Not expected: {query}");
+        });
+        var (client, options) = Client(tvdb);
+
+        var changed = await Provider(client, options).GetChangedPeopleAsync(TimeSpan.FromDays(7), TestContext.Current.CancellationToken);
+
+        Assert.Equal(100, changed!.Count);
+    }
+
+    [Fact]
+    public void Featured_countries_default_to_the_US_and_UK_and_a_setting_replaces_them()
+    {
+        Assert.Equal(["usa", "gbr"], new TvdbOptions().Countries);
+        Assert.Equal(["jpn"], new TvdbOptions { FeaturedCountries = ["jpn"] }.Countries);
+
+        // As configuration binds it: the setting alone, not added to the defaults.
+        var bound = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Tvdb:FeaturedCountries:0"] = "jpn" })
+            .Build().GetSection("Tvdb").Get<TvdbOptions>()!;
+        Assert.Equal(["jpn"], bound.Countries);
     }
 }

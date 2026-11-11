@@ -18,6 +18,50 @@ public sealed class Branding(string? appName = null, string? operatorName = null
     /// </summary>
     public string CatalogSource { get; } = string.IsNullOrWhiteSpace(catalogSource) ? "tvmaze" : catalogSource.Trim().ToLowerInvariant();
 
+    /// <summary>
+    /// The source's name as pages say it ("Details from TVmaze"), so the terms, the privacy policy and people's pages
+    /// name the source the catalog really has.
+    /// </summary>
+    public string CatalogSourceName => CatalogSource switch
+    {
+        "tvdb" => "TheTVDB",
+        "wikidata" => "Wikidata",
+        "mock" => "our development catalog",
+        _ => "TVmaze"
+    };
+
+    /// <summary>
+    /// The source's site; null for the invented development catalog.
+    /// </summary>
+    public string? CatalogSourceUrl => CatalogSource switch
+    {
+        "tvdb" => "https://thetvdb.com",
+        "wikidata" => "https://www.wikidata.org",
+        "mock" => null,
+        _ => "https://www.tvmaze.com"
+    };
+
+    /// <summary>
+    /// Whose servers show pictures are loaded from, for the privacy policy.
+    /// </summary>
+    public string CatalogImagesFrom => CatalogSource switch
+    {
+        "tvdb" => "TheTVDB",
+        "wikidata" => "Wikimedia Commons",
+        "mock" => "a placeholder image service",
+        _ => "TVmaze"
+    };
+
+    /// <summary>
+    /// The licence the source's data comes under, as the terms state it.
+    /// </summary>
+    public string CatalogLicence => CatalogSource switch
+    {
+        "tvdb" => "TheTVDB's licence",
+        "mock" => "no licence (it's invented)",
+        _ => "the CC BY-SA licence"
+    };
+
     public const string DefaultAppName = "TV Tracker";
 
     public string AppName { get; } = string.IsNullOrWhiteSpace(appName) ? DefaultAppName : appName.Trim();

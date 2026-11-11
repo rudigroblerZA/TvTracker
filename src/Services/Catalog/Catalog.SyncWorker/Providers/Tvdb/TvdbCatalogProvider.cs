@@ -10,12 +10,14 @@ namespace Catalog.SyncWorker.Providers.Tvdb;
 /// and, by its licence, a credit to TheTVDB wherever its data shows (the app's footer carries it).
 /// <para>
 /// What it has that the others lack: a show's ids are TheTVDB's own, so a TV Time history imports without a lookup.
-/// What it doesn't have: ratings, where to watch, similar shows and air times (episodes have a day); people come
-/// without birthdays, and a person's acting credits elsewhere aren't read (their record doesn't say enough about each
+/// Titles, overviews and episode names are read in <see cref="TvdbOptions.Language"/> where TheTVDB has them, and
+/// episodes in aired order. What it doesn't have: ratings, where to watch and similar shows; an episode's air time is
+/// its day at the series' time (<see cref="TvdbMapping.AirsAt"/>); people come without birthdays, and a person's acting credits elsewhere aren't read (their record doesn't say enough about each
 /// show), so the features built on those stay empty for TheTVDB's shows.
 /// </para>
 /// </summary>
-public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> options, TimeProvider time) : ICatalogProvider
+public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> options, TimeProvider time, ILogger<TvdbCatalogProvider> logger)
+    : ICatalogProvider
 {
     private const int SearchLimit = 20;
 
@@ -25,9 +27,10 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     private const int MaxEpisodePages = 40;
 
     /// <summary>
-    /// Pages of the update feed read for one answer; past it the feed counts as not kept that far back.
+    /// Pages of the update feed read for one answer. The feed is everything TheTVDB changed, not only our shows, so a
+    /// week of it (asked for when the worker starts) runs long; past this many pages what was read is used as it is.
     /// </summary>
-    private const int MaxUpdatePages = 40;
+    private const int MaxUpdatePages = 100;
 
     private static readonly TimeSpan FeaturedFor = TimeSpan.FromDays(1);
 
@@ -60,7 +63,7 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
         var language = Uri.EscapeDataString(options.Value.FeaturedLanguage);
         var shows = new List<TvdbSeries>();
         var pages = 0;
-        foreach (var country in options.Value.FeaturedCountries)
+        foreach (var country in options.Value.Countries)
         {
             var found = await tvdb.GetAsync<List<TvdbSeries>>(
                 $"series/filter?country={Uri.EscapeDataString(country)}&lang={language}&sort=score&sortType=desc", cancellationToken);
@@ -92,7 +95,7 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
         var found = await tvdb.GetAsync<List<TvdbSearchResult>>(
             $"search?query={Uri.EscapeDataString(query.Trim())}&type=series&limit={limit}", ct);
         return (found?.Data ?? [])
-            .Select(Summary)
+            .Select(hit => Summary(hit, options.Value.Language))
             .OfType<ProviderShowSummary>()
             .DistinctBy(s => s.ExternalId)
             .Take(limit)
@@ -123,11 +126,8 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     /// </summary>
     public async Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default)
     {
-        if (await UpdatesAsync("series", within, cancellationToken) is not { } series
-            || await UpdatesAsync("episodes", within, cancellationToken) is not { } episodes)
-        {
-            return null;
-        }
+        var series = await UpdatesAsync("series", within, cancellationToken);
+        var episodes = await UpdatesAsync("episodes", within, cancellationToken);
         var changed = new Dictionary<string, DateTimeOffset>();
         foreach (var (id, at) in series.Select(u => (u.RecordId, u.TimeStamp))
             .Concat(episodes.Where(u => u.SeriesId is > 0).Select(u => (u.SeriesId!.Value, u.TimeStamp))))
@@ -143,49 +143,78 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     }
 
     public async Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedPeopleAsync(TimeSpan within, CancellationToken cancellationToken = default) =>
-        await UpdatesAsync("people", within, cancellationToken) is { } people
-            ? people.GroupBy(u => Text(u.RecordId)).ToDictionary(g => g.Key, g => DateTimeOffset.FromUnixTimeSeconds(g.Max(u => u.TimeStamp)))
-            : null;
+        (await UpdatesAsync("people", within, cancellationToken))
+            .GroupBy(u => Text(u.RecordId)).ToDictionary(g => g.Key, g => DateTimeOffset.FromUnixTimeSeconds(g.Max(u => u.TimeStamp)));
 
     /// <summary>
-    /// The records of a type updated within a time; null when that's more than <see cref="MaxUpdatePages"/> pages, so a
-    /// part of the list is never taken for the whole.
+    /// The records of a type created or updated within a time (deletions left out). Never null: the answer only marks
+    /// shows due for a refresh sooner, so when the feed runs past <see cref="MaxUpdatePages"/> the part read is still
+    /// worth having, and the shows it misses are refreshed on their timers.
     /// </summary>
-    private async Task<List<TvdbUpdate>?> UpdatesAsync(string type, TimeSpan within, CancellationToken ct)
+    private async Task<List<TvdbUpdate>> UpdatesAsync(string type, TimeSpan within, CancellationToken ct)
     {
         var since = (time.GetUtcNow() - within).ToUnixTimeSeconds();
         var updates = new List<TvdbUpdate>();
         for (var page = 0; page < MaxUpdatePages; page++)
         {
-            var found = await tvdb.GetAsync<List<TvdbUpdate>>($"updates?since={since}&type={type}&action=update&page={page}", ct);
-            updates.AddRange(found?.Data ?? []);
+            // No action filter: a new episode is a creation, and "update" alone would leave it out.
+            var found = await tvdb.GetAsync<List<TvdbUpdate>>($"updates?since={since}&type={type}&page={page}", ct);
+            updates.AddRange((found?.Data ?? []).Where(u => u.MethodInt != TvdbUpdate.Deleted));
             if (found?.Data is not { Count: > 0 } || found.Links?.Next is null)
             {
                 return updates;
             }
         }
-        return null;
+        logger.LogInformation("TheTVDB's {Type} updates since {Since} run past {Pages} pages; using the {Count} read",
+            type, DateTimeOffset.FromUnixTimeSeconds(since), MaxUpdatePages, updates.Count);
+        return updates;
     }
 
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
     {
-        if (!IsId(externalId) || (await tvdb.GetAsync<TvdbSeries>($"series/{externalId}/extended", cancellationToken))?.Data is not { } series)
+        var language = options.Value.Language;
+        if (!IsId(externalId)
+            || (await tvdb.GetAsync<TvdbSeries>($"series/{externalId}/extended?meta=translations", cancellationToken))?.Data is not { } series)
         {
             return null;
         }
 
-        // In the series' default order (aired order, unless TheTVDB's editors chose another for it).
-        var episodes = new List<TvdbEpisode>();
-        for (var page = 0; page < MaxEpisodePages; page++)
+        var episodes = await EpisodesAsync(externalId, null, cancellationToken);
+        // A show made in another language: its episodes again in ours, for the names and overviews TheTVDB has.
+        if (!string.Equals(series.OriginalLanguage, language, StringComparison.OrdinalIgnoreCase))
         {
-            var found = await tvdb.GetAsync<TvdbEpisodePage>($"series/{externalId}/episodes/default?page={page}", cancellationToken);
-            episodes.AddRange(found?.Data?.Episodes ?? []);
-            if (found?.Data?.Episodes is not { Count: > 0 } || found.Links?.Next is null)
+            episodes = WithTranslations(episodes, await EpisodesAsync(externalId, language, cancellationToken)).ToList();
+        }
+        return Show(series, episodes, Today, language);
+    }
+
+    /// <summary>
+    /// A show's episodes in aired order ("official"), page by page, in a language when one is given. Aired order, not
+    /// the series' default (which can be DVD or absolute): it's the order the seasons' names belong to and the one a
+    /// TV Time history numbers episodes by. A series with nothing in aired order is read in its default.
+    /// </summary>
+    private async Task<List<TvdbEpisode>> EpisodesAsync(string externalId, string? language, CancellationToken ct)
+    {
+        foreach (var order in new[] { "official", "default" })
+        {
+            var episodes = new List<TvdbEpisode>();
+            for (var page = 0; page < MaxEpisodePages; page++)
             {
-                break;
+                var found = await tvdb.GetAsync<TvdbEpisodePage>(
+                    $"series/{externalId}/episodes/{order}{(language is null ? "" : "/" + Uri.EscapeDataString(language))}?page={page}", ct);
+                var read = found?.Data?.All ?? [];
+                episodes.AddRange(read);
+                if (read.Count == 0 || found?.Links?.Next is null)
+                {
+                    break;
+                }
+            }
+            if (episodes.Count > 0)
+            {
+                return episodes;
             }
         }
-        return Show(series, episodes, Today);
+        return [];
     }
 
     /// <summary>

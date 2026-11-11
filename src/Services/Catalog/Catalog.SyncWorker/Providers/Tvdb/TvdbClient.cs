@@ -26,9 +26,22 @@ public sealed class TvdbOptions
     public string? Pin { get; set; }
 
     /// <summary>
-    /// Countries of origin whose best-scored shows are imported proactively, as TheTVDB's three-letter codes.
+    /// Countries of origin whose best-scored shows are imported proactively, as TheTVDB's three-letter codes; "usa" and
+    /// "gbr" when not set. No default here: configuration adds to an array that has one instead of replacing it, so
+    /// the defaults could never be taken out.
     /// </summary>
-    public string[] FeaturedCountries { get; set; } = ["usa", "gbr"];
+    public string[]? FeaturedCountries { get; set; }
+
+    /// <summary>
+    /// <see cref="FeaturedCountries"/>, or the defaults.
+    /// </summary>
+    public IReadOnlyList<string> Countries => FeaturedCountries is { Length: > 0 } set ? set : ["usa", "gbr"];
+
+    /// <summary>
+    /// The language titles, overviews and episode names are wanted in, as TheTVDB's three-letter code: a show made in
+    /// another language is read in this one where TheTVDB has the translation.
+    /// </summary>
+    public string Language { get; set; } = "eng";
 
     /// <summary>
     /// The original language of those shows, as TheTVDB's three-letter code.
@@ -42,10 +55,16 @@ public sealed class TvdbOptions
 /// TheTVDB's v4 API: signs in with the key for a bearer token (valid about a month), keeps it, and signs in again when
 /// a request is refused. A singleton, so every caller shares the token; at most <see cref="MaxAtOnce"/> requests at a time.
 /// </summary>
-public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOptions> options)
+public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOptions> options, TimeProvider time)
 {
     public const string HttpClientName = "tvdb";
     private const int MaxAtOnce = 4;
+
+    /// <summary>
+    /// How long a refused sign-in stands before the key is tried again: with a wrong or revoked key every background
+    /// job would otherwise send TheTVDB a new sign-in for each request, for as long as the worker runs.
+    /// </summary>
+    public static readonly TimeSpan RefusedFor = TimeSpan.FromMinutes(5);
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -55,6 +74,7 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
     private readonly SemaphoreSlim gate = new(MaxAtOnce);
     private readonly SemaphoreSlim signIn = new(1);
     private string? token;
+    private DateTimeOffset refusedUntil = DateTimeOffset.MinValue;
 
     /// <summary>
     /// The response to a GET of <paramref name="path"/> (relative to the API's base), or null when TheTVDB has no such
@@ -83,7 +103,16 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
                     return null;
                 }
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<TvdbEnvelope<T>>(Json, ct);
+                try
+                {
+                    return await response.Content.ReadFromJsonAsync<TvdbEnvelope<T>>(Json, ct);
+                }
+                catch (JsonException ex)
+                {
+                    // As a failed request, which every caller already handles one show at a time; a JsonException
+                    // would pass their catches and end the whole round.
+                    throw new HttpRequestException($"TheTVDB answered {path} in a form that couldn't be read: {ex.Message}", ex);
+                }
             }
         }
         finally
@@ -91,6 +120,9 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
             gate.Release();
         }
     }
+
+    private static HttpRequestException Refused() =>
+        new("TheTVDB refused the API key (Tvdb:ApiKey, and Tvdb:Pin if the key needs one).", null, HttpStatusCode.Unauthorized);
 
     /// <summary>
     /// A token other than <paramref name="stale"/>: the one another caller just got, or a new one.
@@ -104,6 +136,10 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
             {
                 return current;
             }
+            if (time.GetUtcNow() < refusedUntil)
+            {
+                throw Refused();
+            }
             var body = new Dictionary<string, string> { ["apikey"] = options.Value.ApiKey ?? "" };
             if (!string.IsNullOrWhiteSpace(options.Value.Pin))
             {
@@ -112,7 +148,9 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
             using var response = await http.PostAsJsonAsync("login", body, ct);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                throw new HttpRequestException("TheTVDB refused the API key (Tvdb:ApiKey, and Tvdb:Pin if the key needs one).", null, response.StatusCode);
+                token = null;
+                refusedUntil = time.GetUtcNow() + RefusedFor;
+                throw Refused();
             }
             response.EnsureSuccessStatusCode();
             var signedIn = await response.Content.ReadFromJsonAsync<TvdbEnvelope<TvdbLogin>>(Json, ct);
@@ -145,17 +183,17 @@ public sealed record TvdbCompany(string? Name, string? Country);
 public sealed record TvdbGenre(string? Name);
 
 /// <param name="Type">TheTVDB's artwork type: 1 banner, 2 poster, 3 background (for a series).</param>
-public sealed record TvdbArtwork(string? Image, int Type, double? Score, string? Language);
+public sealed record TvdbArtwork(string? Image, int? Type, double? Score, string? Language);
 
 /// <param name="Type">"official" (aired order), "dvd", "absolute", …</param>
 public sealed record TvdbSeasonType(string? Type);
 
-public sealed record TvdbSeason(int Number, string? Name, TvdbSeasonType? Type);
+public sealed record TvdbSeason(int? Number, string? Name, TvdbSeasonType? Type);
 
 /// <summary>
 /// The series a person's credit is on, as their record carries it.
 /// </summary>
-public sealed record TvdbRecordInfo(string? Name, string? Image, string? Year);
+public sealed record TvdbRecordInfo(string? Name, string? Image);
 
 /// <summary>
 /// A credit: a character an actor plays, or a crew role (then <paramref name="Name"/> is usually empty).
@@ -167,12 +205,28 @@ public sealed record TvdbCharacter(long Id, string? Name, long? PeopleId, string
 /// <param name="Aired">The day it first aired ("2008-01-20"); TheTVDB has no time of day per episode.</param>
 public sealed record TvdbEpisode(long Id, string? Name, string? Overview, string? Aired, int? Runtime, int? Number, int? SeasonNumber);
 
-public sealed record TvdbEpisodePage(List<TvdbEpisode>? Episodes);
+/// <summary>
+/// A page of a series' episodes. The translated listing carries them inside the series record; either place is read.
+/// </summary>
+public sealed record TvdbEpisodePage(List<TvdbEpisode>? Episodes, TvdbSeries? Series)
+{
+    public List<TvdbEpisode> All => Episodes ?? Series?.Episodes ?? [];
+}
+
+/// <summary>
+/// A name or an overview in one language.
+/// </summary>
+public sealed record TvdbTranslation(string? Language, string? Name, string? Overview);
+
+/// <summary>
+/// A record's translations, with <c>meta=translations</c>.
+/// </summary>
+public sealed record TvdbTranslations(List<TvdbTranslation>? NameTranslations, List<TvdbTranslation>? OverviewTranslations);
 
 public sealed record TvdbSeries(long Id, string? Name, string? Overview, string? Image, string? FirstAired, string? LastAired,
     TvdbStatus? Status, string? OriginalCountry, string? OriginalLanguage, double? Score, TvdbCompany? OriginalNetwork,
     TvdbCompany? LatestNetwork, List<TvdbGenre>? Genres, List<TvdbArtwork>? Artworks, List<TvdbSeason>? Seasons,
-    List<TvdbCharacter>? Characters);
+    List<TvdbCharacter>? Characters, string? AirsTime = null, TvdbTranslations? Translations = null, List<TvdbEpisode>? Episodes = null);
 
 /// <summary>
 /// A search hit; search has its own field names.
@@ -186,7 +240,8 @@ public sealed record TvdbSearchResult(
     string? Country,
     [property: JsonPropertyName("primary_language")] string? PrimaryLanguage,
     string? Status,
-    string? Type);
+    string? Type,
+    Dictionary<string, string>? Translations = null);
 
 /// <summary>
 /// What a remote id (IMDb's, …) belongs to: one of a series, a movie, a person, an episode or a company.
@@ -196,6 +251,10 @@ public sealed record TvdbRemoteMatch(TvdbSeries? Series);
 /// <param name="RecordType">"series", "episodes", "people", …</param>
 /// <param name="TimeStamp">When it changed, in Unix seconds.</param>
 /// <param name="SeriesId">The episode's series; only on episode records.</param>
-public sealed record TvdbUpdate(string? RecordType, long RecordId, long TimeStamp, long? SeriesId);
+/// <param name="MethodInt">1 created, 2 updated, 3 deleted.</param>
+public sealed record TvdbUpdate(string? RecordType, long RecordId, long TimeStamp, long? SeriesId, int? MethodInt = null)
+{
+    public const int Deleted = 3;
+}
 
 public sealed record TvdbPerson(long Id, string? Name, List<TvdbCharacter>? Characters);

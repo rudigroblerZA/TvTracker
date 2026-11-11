@@ -102,7 +102,8 @@ public class TvdbMappingTests
         // The dated record wins over its undated duplicate.
         Assert.Equal("349232", pilot.ExternalId);
         Assert.Equal("Pilot", pilot.Title);
-        Assert.Equal(new DateTimeOffset(2008, 1, 20, 0, 0, 0, TimeSpan.Zero), pilot.AirsAtUtc);
+        // No air time on the series: 20:00 in New York, which is 01:00 UTC the next day in January.
+        Assert.Equal(new DateTimeOffset(2008, 1, 21, 1, 0, 0, TimeSpan.Zero), pilot.AirsAtUtc);
         Assert.Equal(58, pilot.RuntimeMinutes);
         Assert.Equal("Episode 2", episodes[1].Title);
         Assert.Null(episodes[1].RuntimeMinutes);
@@ -116,7 +117,7 @@ public class TvdbMappingTests
         Assert.Equal([1, 2], seasons.Select(s => s.Number));
         Assert.Equal("Season 1", seasons[0].Name);
         Assert.Equal("The Second", seasons[1].Name);
-        Assert.Equal(new DateTimeOffset(2009, 3, 8, 0, 0, 0, TimeSpan.Zero), seasons[1].PremieresAtUtc);
+        Assert.Equal(new DateOnly(2009, 3, 8), DateOnly.FromDateTime(seasons[1].PremieresAtUtc!.Value.ToOffset(TimeSpan.FromHours(-5)).DateTime));
     }
 
     [Fact]
@@ -191,6 +192,50 @@ public class TvdbMappingTests
         Assert.Equal("US", summary.Country);
         Assert.Equal("english", summary.Language);
         Assert.Null(TvdbMapping.Summary(hits[1]));
+    }
+
+    [Fact]
+    public void An_episode_airs_on_its_day_at_the_series_time_in_its_countrys_time_zone()
+    {
+        // 21:00 Eastern: 02:00 UTC the next day in winter, 01:00 in summer.
+        Assert.Equal(new DateTimeOffset(2008, 1, 21, 2, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2008, 1, 20), "21:00", "usa"));
+        Assert.Equal(new DateTimeOffset(2013, 8, 12, 1, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2013, 8, 11), "21:00", "usa"));
+        // 23:00 in Tokyo is 14:00 UTC the same day.
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 14, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "23:00", "jpn"));
+        // No time: the evening there, never the midnight before.
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), null, "gbr"));
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "soon", "gbr"));
+        // A country not listed: the time as UTC.
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 21, 30, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "21:30", "isl"));
+        // 02:30 on the night the clocks go forward doesn't exist in New York: an hour later.
+        Assert.Equal(new DateTimeOffset(2024, 3, 10, 7, 30, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 3, 10), "02:30", "usa"));
+    }
+
+    [Fact]
+    public void A_search_hit_is_titled_in_our_language_when_it_has_the_translation()
+    {
+        var hit = JsonSerializer.Deserialize<TvdbSearchResult>("""
+            { "tvdb_id": "383275", "name": "오징어 게임", "translations": { "eng": "Squid Game", "kor": "오징어 게임" } }
+            """, TvdbClient.Json)!;
+
+        Assert.Equal("Squid Game", TvdbMapping.Summary(hit)!.Title);
+        Assert.Equal("오징어 게임", TvdbMapping.Summary(hit, "fra")!.Title);
+    }
+
+    [Fact]
+    public void A_record_with_fields_missing_or_null_still_reads()
+    {
+        var series = JsonSerializer.Deserialize<TvdbSeries>("""
+            { "id": 3, "name": "Sparse",
+              "artworks": [ { "image": "/a.jpg", "type": null } ],
+              "seasons": [ { "number": null, "name": "?" } ],
+              "characters": [ { "id": 1, "peopleType": "Actor", "series": { "name": "X", "year": 2020 } } ] }
+            """, TvdbClient.Json)!;
+
+        var show = TvdbMapping.Show(series, [], Today);
+        Assert.Equal("Sparse", show.Title);
+        Assert.Null(show.BackdropUrl);
+        Assert.Empty(show.Seasons);
     }
 
     [Theory]
