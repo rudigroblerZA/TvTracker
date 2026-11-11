@@ -75,7 +75,9 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         var context = FeatureFlags.ContextFor((await authState.GetAuthenticationStateAsync()).User);
         var details = await Task.WhenAll(FlagKeys.Select(async key => (key, details: await client.GetBooleanDetailsAsync(key, FeatureFlags.DefaultFor(key), context))));
         planFeatures = details
-            .Where(d => d.details.FlagMetadata?.GetString(FeatureFlags.PlansMetadata) is { Length: > 0 })
+            // Without a plan in the context no plan rule applies, so Value is the flag's own state: a feature that's
+            // turned off isn't part of any plan.
+            .Where(d => d.details.Value && d.details.FlagMetadata?.GetString(FeatureFlags.PlansMetadata) is { Length: > 0 })
             .Select(d => new PlanFeature(d.key, d.details.FlagMetadata!.GetString(FeatureFlags.NameMetadata) ?? d.key,
                 d.details.FlagMetadata.GetString(FeatureFlags.PlansMetadata)!.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
             .OrderBy(f => f.Name, StringComparer.CurrentCulture)

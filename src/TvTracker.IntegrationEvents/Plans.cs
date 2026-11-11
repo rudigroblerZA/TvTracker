@@ -14,7 +14,8 @@ public static class Plans
     public const string Plus = "plus";
 
     /// <summary>
-    /// Plus for the owner and up to <see cref="FamilyMembers"/> people they invite, on one subscription.
+    /// Pro's features for the owner and up to <see cref="FamilyMembers"/> people they invite, on one subscription:
+    /// the same features as Pro, for more people.
     /// </summary>
     public const string Family = "family";
 
@@ -36,11 +37,12 @@ public static class Plans
     public static PlanLimits Limits(string? plan) => plan is Plus or Family ? PlusLimits : FreeLimits;
 
     /// <summary>
-    /// "Free", "Plus" or "Family", as the UI and error messages name the plan.
+    /// "Free", "Pro" or "Family", as the UI and error messages name the plan. The paid plan's key stays "plus"
+    /// (<see cref="Plus"/>): stored plans, events and the payment provider's records carry it.
     /// </summary>
     public static string Name(string? plan) => plan switch
     {
-        Plus => "Plus",
+        Plus => "Pro",
         Family => "Family",
         _ => "Free"
     };
