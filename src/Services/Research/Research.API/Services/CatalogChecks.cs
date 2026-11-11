@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using TvTracker;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -36,8 +37,14 @@ namespace Research.API.Services;
 /// 2 episodes and 10%: specials and double episodes are counted differently.</item>
 /// </list>
 /// </summary>
-public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time, ILogger<CatalogChecks> logger) : BackgroundService
+public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time, [FromKeyedServices(CatalogChecks.JobName)] JobRun run,
+    ILogger<CatalogChecks> logger) : BackgroundService
 {
+    /// <summary>
+    /// The job's name for the import CLI (<c>tvtracker-import wikidata run research</c>), which can run it now.
+    /// </summary>
+    public const string JobName = "research";
+
     /// <summary>
     /// How many of the catalog's most popular shows are checked (and listed in the queue).
     /// </summary>
@@ -50,7 +57,9 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
     private static readonly TimeSpan BetweenBatches = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MaxWait = TimeSpan.FromMinutes(30);
     private const int Attempts = 3;
-    private static readonly HttpClient Http = ExternalSources.CreateClient();
+    // Longer than the usual 20 s: a batch of 100 shows the query service hasn't answered lately took 14 s, and its own
+    // limit is 60 s. A timeout used to end the whole check.
+    private static readonly HttpClient Http = ExternalSources.CreateClient(TimeSpan.FromSeconds(70));
 
     private const string Sparql = """
         SELECT ?tvmaze ?item (GROUP_CONCAT(DISTINCT CONCAT(STR(?start), "@", STR(?precision)); separator="|") AS ?starts)
@@ -86,24 +95,54 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(FirstDelay, time, stoppingToken);
+        await run.SleepAsync(FirstDelay, time, stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             var next = Interval;
+            run.RoundStarted();
             try
             {
-                await CheckAsync(stoppingToken);
+                if (await ResearchIsOnAsync(stoppingToken))
+                {
+                    // One round is the whole check, so nothing is left due after it.
+                    run.RoundEnded(await CheckAsync(stoppingToken), 0, time.GetUtcNow().UtcDateTime);
+                }
+                else
+                {
+                    // The catalog refuses the shows' facts while Research is off (404), so nothing to check with.
+                    run.RoundEnded(0, null, time.GetUtcNow().UtcDateTime, ResearchOff);
+                }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // Not only "not an OperationCanceledException": a request that times out is a TaskCanceledException too, and
+            // one escaping here would stop the whole service.
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "Catalog checks against Wikidata failed; trying again in an hour");
+                run.RoundEnded(0, null, time.GetUtcNow().UtcDateTime, ex.Message);
                 next = RetryRun;
             }
-            await Task.Delay(next, time, stoppingToken);
+            await run.SleepAsync(next, time, stoppingToken);
         }
     }
 
-    private async Task CheckAsync(CancellationToken ct)
+    /// <summary>
+    /// Why a round did nothing while the <c>research</c> flag is off; shown by the import CLI.
+    /// </summary>
+    public const string ResearchOff = "Not run: the research feature flag is off.";
+
+    /// <summary>
+    /// The <c>research</c> flag, for everyone (checked once a round, as the research assistant does).
+    /// </summary>
+    private async Task<bool> ResearchIsOnAsync(CancellationToken ct)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<CachedFlags>().IsEnabledAsync(FeatureFlags.Research, FeatureFlags.ContextFor(null), ct);
+    }
+
+    /// <summary>
+    /// The whole check; how many shows it compared.
+    /// </summary>
+    private async Task<int> CheckAsync(CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
         var catalog = scope.ServiceProvider.GetRequiredService<CatalogReader>();
@@ -217,6 +256,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         });
         logger.LogInformation("Checked {Shows} popular shows against Wikidata ({Found} found there): {Differences} differences, {Awarded} with awards",
             shows.Count, wikidata.Count, checks.Count, shelf.Count);
+        return shows.Count;
     }
 
     /// <summary>

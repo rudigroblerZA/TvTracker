@@ -424,6 +424,11 @@ public sealed class CatalogSynchronizer(
         {
             p = CatalogOverrides.Apply(p, overrides, show.Episodes.ToDictionary(e => e.Id, e => e.ExternalId));
         }
+        // What the provider (and the overrides) leave empty, from Wikidata when the gap-fill job found it.
+        if (show is not null && (string.IsNullOrWhiteSpace(p.Overview) || string.IsNullOrWhiteSpace(p.Network) || p.FirstAirDate is null || string.IsNullOrWhiteSpace(p.PosterUrl)))
+        {
+            p = Supplement.CatalogSupplements.Fill(p, await db.Supplements.AsNoTracking().FirstOrDefaultAsync(s => s.ShowId == show.Id, ct));
+        }
         if (show is null)
         {
             show = new Show

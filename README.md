@@ -656,6 +656,43 @@ the sync worker's APIs answer nothing else: in development its default secret wo
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
 
+### Wikidata jobs
+
+Three background jobs add [Wikidata](https://www.wikidata.org)'s data to the catalog, each on its own slow timer.
+The same tool runs them now and follows them:
+
+```bash
+dotnet run --project src/Tools/Catalog.ImportCli -- wikidata run              # all three
+dotnet run --project src/Tools/Catalog.ImportCli -- wikidata run atlas fill   # only these
+dotnet run --project src/Tools/Catalog.ImportCli -- wikidata status
+```
+
+| Job | Service | What it does | On its own |
+| --- | --- | --- | --- |
+| `atlas` | Sync worker | Where each show is set and filmed, for the TV atlas | 25 shows every 2 minutes; each show again after 30 days |
+| `fill` | Sync worker | Gap-fill: an overview, network, premiere date and poster for shows that lack one | 25 shows every 2 minutes; each show again after 30 days |
+| `research` | Research.API | The 300 most popular shows compared with Wikidata (network, premiere, episode count), and their awards | Once a day |
+
+- **Run now** works through everything due, batch after batch, without the pauses; `run` follows until the jobs
+  have caught up (`--detach` doesn't follow; Ctrl+C stops following, not the jobs).
+- **Gap-fill** finds a show's Wikidata item by the provider's id (TVmaze's or TheTVDB's) and keeps what Wikidata has
+  in its own table (`show_supplements`), never in the show itself.
+  - **Only empty fields:** the synchronizer puts a value in on each sync while the provider gives none, so a refresh
+    doesn't empty it again, and the provider's value wins as soon as it has one. A correction or saved research still
+    wins over both.
+  - **The overview** is the English Wikipedia article's lead, else Wikidata's one-line description; the poster is the
+    item's image, which for some shows is a logo or title card.
+  - A show with something to fill in is refreshed at once, which publishes the change like any other.
+- **A job that can't run says why:** `atlas` needs the catalog to be TVmaze's (it finds shows by TVmaze id), `fill`
+  TVmaze's or TheTVDB's, and `research` the `research` feature flag (off by default; the catalog refuses the shows'
+  facts without it).
+- **Addresses:** the sync worker's as for imports, and Research.API's at `http://localhost:5114` (`--research-url` or
+  `TVTRACKER_RESEARCH_URL`). Both are asked as the internal client.
+- **Exit codes:** 0 caught up, 2 a job was off or its last round failed, 1 unreachable.
+- **API** (internal client only): `GET /api/v1/wikidata/jobs` and `POST /api/v1/wikidata/jobs/{atlas|fill}/run` on
+  the sync worker; `GET /api/v1/research/checks` and `POST /api/v1/research/checks/run` on Research.API. A job's state
+  lives in its service's memory.
+
 ### Load testing
 
 `tvtracker-load` (`src/Tools/TvTracker.LoadGen`) generates load against a running AppHost. Load-test users sign in

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using TvTracker;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -24,7 +25,8 @@ namespace Catalog.SyncWorker.Settings;
 /// and a failed round is simply tried again in the next. A plain client with one try, as Research's sources.
 /// </para>
 /// </summary>
-public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, IConfiguration configuration, ILogger<SettingsService> logger)
+public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, IConfiguration configuration,
+    [FromKeyedServices(Supplement.WikidataJobs.Atlas)] JobRun run, ILogger<SettingsService> logger)
     : BackgroundService
 {
     /// <summary>
@@ -65,47 +67,59 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
     {
         if (CatalogSources.Configured(configuration) != Provider)
         {
+            run.TurnOff("Off: the catalog isn't from TVmaze, and shows are found by their TVmaze id.");
             logger.LogInformation("The TV atlas: off, since the catalog isn't from TVmaze and shows are found by their TVmaze id");
             return;
         }
-        await Task.Delay(FirstDelay, time, stoppingToken);
+        await run.SleepAsync(FirstDelay, time, stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             var next = Idle;
+            run.RoundStarted();
             try
             {
-                if (await LookUpAsync(stoppingToken) > 0)
+                var (looked, due) = await LookUpAsync(stoppingToken);
+                run.RoundEnded(looked, due, time.GetUtcNow().UtcDateTime);
+                if (looked > 0)
                 {
                     next = Round;
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // Not only "not an OperationCanceledException": a request that times out is a TaskCanceledException too, and
+            // one escaping here would stop the whole service.
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "TV atlas: looking up settings failed; trying again in {Round}", Round);
+                run.RoundEnded(0, null, time.GetUtcNow().UtcDateTime, ex.Message);
                 next = Round;
             }
-            await Task.Delay(next, time, stoppingToken);
+            // Asked to run now (tvtracker-import wikidata run atlas): straight on to the next batch.
+            if (!run.Requested)
+            {
+                await run.SleepAsync(next, time, stoppingToken);
+            }
         }
     }
 
     /// <summary>
-    /// One batch of due shows: their settings replaced, and their lookup stamped. Returns how many were due.
+    /// One batch: how many shows were looked up, and how many are still due after it.
     /// </summary>
-    private async Task<int> LookUpAsync(CancellationToken ct)
+    private async Task<(int Looked, int Due)> LookUpAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var now = time.GetUtcNow().UtcDateTime;
         var staleBefore = now - LookupAfter;
-        var due = await db.Shows.AsNoTracking()
-            .Where(s => s.Source == Provider && !db.SettingLookups.Any(l => l.ShowId == s.Id && l.CheckedAtUtc >= staleBefore))
+        var waiting = db.Shows.AsNoTracking()
+            .Where(s => s.Source == Provider && !db.SettingLookups.Any(l => l.ShowId == s.Id && l.CheckedAtUtc >= staleBefore));
+        var due = await waiting
             .OrderByDescending(s => s.Popularity)
             .Select(s => new { s.Id, s.ExternalId })
             .Take(Batch)
             .ToListAsync(ct);
         if (due.Count == 0)
         {
-            return 0;
+            return (0, 0);
         }
 
         var places = (await WithRetryAsync(() => QueryAsync(due.Select(s => s.ExternalId), ct), ct)).ToLookup(p => p.ExternalId);
@@ -136,7 +150,7 @@ public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvi
         logger.LogInformation("TV atlas: looked up {Shows} shows, {Set} with a setting, {Filmed} with a filming location",
             due.Count, due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Set)),
             due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Filmed)));
-        return due.Count;
+        return (due.Count, await waiting.CountAsync(ct));
     }
 
     /// <summary>

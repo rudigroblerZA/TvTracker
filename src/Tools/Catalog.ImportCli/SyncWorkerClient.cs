@@ -30,15 +30,22 @@ public record BulkImportProblem(string Item, string Reason);
 /// <summary>
 /// The sync worker couldn't be reached or refused the request; the message is meant for the user.
 /// </summary>
+/// <summary>
+/// Mirrors TvTracker.JobStatus: how a background job that adds Wikidata's data is doing.
+/// </summary>
+public record JobStatus(string Name, string State, bool Requested, int? Due, int Done, DateTime? LastRunAtUtc, string? LastError, string? Note);
+
 public sealed class CliException(string message) : Exception(message);
 
 /// <summary>
 /// Calls the sync worker's internal bulk import endpoints (/api/v1/imports/bulk), signed in as the internal client
 /// (tvtracker-internal, client credentials), which is all those endpoints accept.
 /// </summary>
-public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSecret) : IDisposable
+public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSecret, string service = "the sync worker") : IDisposable
 {
     private const string ClientId = "tvtracker-internal";
+    private string Capitalised => char.ToUpperInvariant(service[0]) + service[1..];
+
     private readonly HttpClient _http = new() { BaseAddress = baseUrl, Timeout = TimeSpan.FromSeconds(30) };
     private DateTimeOffset _tokenRefreshAt;
 
@@ -88,6 +95,33 @@ public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSec
         return response.StatusCode == HttpStatusCode.Accepted;
     }
 
+    /// <summary>
+    /// The jobs a service lists at <paramref name="path"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<JobStatus>> GetJobsAsync(string path, CancellationToken ct)
+    {
+        using var response = await SendAsync(() => _http.GetAsync(path, ct));
+        if (!response.IsSuccessStatusCode)
+        {
+            throw Unexpected(response);
+        }
+        return await response.Content.ReadFromJsonAsync<List<JobStatus>>(ct) ?? [];
+    }
+
+    /// <summary>
+    /// Asks for a job to run now. Started is false when the job is off (its status says why).
+    /// </summary>
+    public async Task<(bool Started, JobStatus Status)> RunJobAsync(string path, CancellationToken ct)
+    {
+        using var response = await SendAsync(() => _http.PostAsync(path, null, ct));
+        if (response.StatusCode is not (HttpStatusCode.Accepted or HttpStatusCode.Conflict))
+        {
+            throw Unexpected(response);
+        }
+        var status = await response.Content.ReadFromJsonAsync<JobStatus>(ct) ?? throw Unexpected(response);
+        return (response.StatusCode == HttpStatusCode.Accepted, status);
+    }
+
     public void Dispose() => _http.Dispose();
 
     private async Task<HttpResponseMessage> SendAsync(Func<Task<HttpResponseMessage>> send)
@@ -98,13 +132,17 @@ public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSec
             var response = await send();
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
-                throw new CliException($"The sync worker refused the internal client's token ({(int)response.StatusCode}). Check --client-secret.");
+                throw new CliException($"{Capitalised} refused the internal client's token ({(int)response.StatusCode}). Check --client-secret.");
             }
             return response;
         }
         catch (HttpRequestException ex)
         {
-            throw new CliException($"Couldn't reach the sync worker at {_http.BaseAddress} ({ex.Message}). Is the AppHost running?");
+            throw new CliException($"Couldn't reach {service} at {_http.BaseAddress} ({ex.Message}). Is the AppHost running?");
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            throw new CliException($"{Capitalised} at {_http.BaseAddress} didn't answer within {_http.Timeout.TotalSeconds:0} seconds. Is it still running?");
         }
     }
 
@@ -141,5 +179,5 @@ public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSec
     }
 
     private CliException Unexpected(HttpResponseMessage response) =>
-        new($"The sync worker at {_http.BaseAddress} answered {(int)response.StatusCode} {response.ReasonPhrase}.");
+        new($"{Capitalised} at {_http.BaseAddress} answered {(int)response.StatusCode} {response.ReasonPhrase}.");
 }
