@@ -8,7 +8,9 @@ using Catalog.SyncWorker.Providers.Tvdb;
 using Catalog.SyncWorker.Providers.Wikidata;
 using Catalog.SyncWorker.Quotes;
 using Catalog.SyncWorker.Settings;
+using Catalog.SyncWorker.Supplement;
 using Microsoft.Extensions.Options;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +32,19 @@ builder.Services.AddIntegrationEventOutbox<CatalogContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
+// Wikidata's query service, for the Wikidata provider and for the gap-fill job whatever the provider. One try per
+// request, within the service's own 60 s limit: Wikimedia's 429s are waited out by the client.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddHttpClient(WikidataSparql.HttpClientName, http =>
+    {
+        http.Timeout = TimeSpan.FromSeconds(70);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker-catalog/1.0 (+https://github.com/rudigroblerZA/TvTracker)");
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = System.Net.DecompressionMethods.All })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+builder.Services.AddSingleton<WikidataSparql>();
+
 // Catalog:Provider picks the data source: "tvmaze" (default), "wikidata" (CC0), "tvdb" (TheTVDB, with an API key) or
 // "mock" for invented offline data.
 var catalogProvider = CatalogSources.Configured(builder.Configuration);
@@ -39,17 +54,6 @@ if (catalogProvider == CatalogSources.Mock)
 }
 else if (catalogProvider == CatalogSources.Wikidata)
 {
-    // One try per request, within the query service's own 60 s limit: Wikimedia's 429s are waited out by the client.
-#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
-    builder.Services.AddHttpClient(WikidataSparql.HttpClientName, http =>
-        {
-            http.Timeout = TimeSpan.FromSeconds(70);
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker-catalog/1.0 (+https://github.com/rudigroblerZA/TvTracker)");
-        })
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = System.Net.DecompressionMethods.All })
-        .RemoveAllResilienceHandlers();
-#pragma warning restore EXTEXP0001
-    builder.Services.AddSingleton<WikidataSparql>();
     builder.Services.AddSingleton<ICatalogProvider, WikidataCatalogProvider>();
 }
 else if (catalogProvider == CatalogSources.Tvdb)
@@ -97,7 +101,12 @@ builder.Services.AddHostedService<CastCreditsService>();
 // Memorable lines from Wikiquote, for show and episode pages.
 builder.Services.AddHostedService<QuotesService>();
 // Where shows are set, from Wikidata, for the TV atlas.
+// Each can be run now from the import CLI (tvtracker-import wikidata): the job and the endpoint share its JobRun.
+builder.Services.AddKeyedSingleton(WikidataJobs.Atlas, new JobRun(WikidataJobs.Atlas, "Shows whose setting and filming places are looked up."));
+builder.Services.AddKeyedSingleton(WikidataJobs.Fill, new JobRun(WikidataJobs.Fill, "Shows without an overview, network, premiere date or poster, asked about on Wikidata."));
 builder.Services.AddHostedService<SettingsService>();
+// Gaps in shows (overview, network, premiere date, poster) filled from Wikidata.
+builder.Services.AddHostedService<WikidataSupplementService>();
 builder.Services.AddHostedService<Catalog.SyncWorker.Namesakes.NamesakesService>();
 
 // Vectors of each show's text, for semantic search in Catalog.API.
@@ -115,5 +124,6 @@ app.UseDefaultAuthentication();
 // they aren't routed by the BFF either.
 app.MapImportApi();
 app.MapOverridesApi();
+app.MapWikidataJobsApi();
 
 app.Run();

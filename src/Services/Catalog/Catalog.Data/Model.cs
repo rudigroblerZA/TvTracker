@@ -390,6 +390,34 @@ public static class ShowSettingKinds
 }
 
 /// <summary>
+/// What Wikidata has for a show's fields the provider may leave empty, and when it was last asked (found or not). Not
+/// the show's own values: the synchronizer fills a field from here only while the provider gives none, on every sync,
+/// so a refresh doesn't empty it again and the provider's value wins as soon as it has one.
+/// </summary>
+public class ShowSupplement
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>
+    /// The Wikidata item ("Q1079"); null when Wikidata has no item with the provider's id.
+    /// </summary>
+    public string? Item { get; set; }
+
+    /// <summary>
+    /// The English Wikipedia article's lead, else Wikidata's one-line description. Only read when the show had none.
+    /// </summary>
+    public string? Overview { get; set; }
+
+    public string? Network { get; set; }
+
+    public DateOnly? FirstAirDate { get; set; }
+
+    public string? PosterUrl { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
+/// <summary>
 /// When a show's settings were last looked up on Wikidata, found or not.
 /// </summary>
 public class ShowSettingLookup

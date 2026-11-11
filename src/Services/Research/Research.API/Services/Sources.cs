@@ -14,9 +14,9 @@ public static class ExternalSources
     /// 429 to shared addresses) has a fallback, while the handler's backoff on 429 used up the request's 30 s. Wikimedia
     /// asks API clients to identify themselves with a contact.
     /// </summary>
-    public static HttpClient CreateClient() => new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
+    public static HttpClient CreateClient(TimeSpan? timeout = null) => new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
     {
-        Timeout = TimeSpan.FromSeconds(20),
+        Timeout = timeout ?? TimeSpan.FromSeconds(20),
         DefaultRequestHeaders = { { "User-Agent", "TvTracker-research/1.0 (+https://github.com/rudigroblerZA/TvTracker)" } }
     };
 }

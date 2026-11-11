@@ -19,7 +19,7 @@ namespace Catalog.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
@@ -770,6 +770,36 @@ namespace Catalog.Data.Migrations
                     b.ToTable("show_setting_lookups", (string)null);
                 });
 
+            modelBuilder.Entity("Catalog.Data.ShowSupplement", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("FirstAirDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Item")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Network")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Overview")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PosterUrl")
+                        .HasColumnType("text");
+
+                    b.HasKey("ShowId");
+
+                    b.ToTable("show_supplements", (string)null);
+                });
+
             modelBuilder.Entity("Catalog.Data.WatchProvider", b =>
                 {
                     b.Property<Guid>("Id")
@@ -987,6 +1017,15 @@ namespace Catalog.Data.Migrations
                     b.HasOne("Catalog.Data.Show", null)
                         .WithOne()
                         .HasForeignKey("Catalog.Data.ShowSettingLookup", "ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.ShowSupplement", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithOne()
+                        .HasForeignKey("Catalog.Data.ShowSupplement", "ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

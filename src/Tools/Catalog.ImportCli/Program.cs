@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Catalog.ImportCli;
 
-// tvtracker-import: bulk imports shows into the catalog. The sync worker does the work (one job at a time, under
+// tvtracker-import: bulk imports shows into the catalog, and (wikidata) runs the jobs that add Wikidata's data to it. The sync worker does the work (one job at a time, under
 // TVmaze's rate limit, about two shows a second); this tool starts the job and shows its progress.
 // Stopping the tool (Ctrl+C) doesn't stop the import: use `cancel` for that.
 
@@ -76,9 +76,40 @@ cancel.SetAction(async (parse, ct) =>
     return 0;
 });
 
+// wikidata: the background jobs that add Wikidata's data to the catalog, run now instead of on their timers.
+// "atlas" and "fill" are the sync worker's, "research" is Research.API's.
+var researchUrlOption = new Option<string>("--research-url")
+{
+    Description = "Research.API's address, for the research job (or set TVTRACKER_RESEARCH_URL)",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_RESEARCH_URL") ?? "http://localhost:5114",
+    Recursive = true
+};
+var jobsArgument = new Argument<string[]>("job")
+{
+    Description = "Which to run: atlas (where shows are set and filmed), fill (overview, network, premiere date and poster for shows " +
+        "without), research (popular shows checked against Wikidata, and their awards). All three when none is given.",
+    Arity = ArgumentArity.ZeroOrMore
+};
+jobsArgument.AcceptOnlyFromAmong(WikidataJob.Names);
+var wikidataRun = new Command("run", "Run the jobs now and follow them until they've caught up (unless --detach)") { jobsArgument };
+wikidataRun.SetAction((parse, ct) => RunWikidataAsync(parse, parse.GetValue(jobsArgument) is { Length: > 0 } given ? given : WikidataJob.Names, ct));
+var wikidataStatus = new Command("status", "Show how each job is doing");
+wikidataStatus.SetAction(async (parse, ct) =>
+{
+    foreach (var job in await WikidataStatusAsync(parse, WikidataJob.Names, ct))
+    {
+        Console.WriteLine(Describe(job));
+    }
+    return 0;
+});
+var wikidata = new Command("wikidata", "Run the jobs that add Wikidata's data to the catalog, or see how they're doing")
+{
+    wikidataRun, wikidataStatus, researchUrlOption
+};
+
 var root = new RootCommand("Bulk import shows from TVmaze into the TV Tracker catalog, through the sync worker")
 {
-    titles, ids, top, status, cancel, urlOption, keycloakOption, secretOption, detachOption
+    titles, ids, top, status, cancel, wikidata, urlOption, keycloakOption, secretOption, detachOption
 };
 
 try
@@ -90,6 +121,102 @@ catch (CliException ex)
 {
     Console.Error.WriteLine(ex.Message);
     return 1;
+}
+
+// Asks each job to run, then polls every two seconds until none is still at it. A job that's off, or that fails, is
+// reported and makes the exit code 2; the others carry on.
+async Task<int> RunWikidataAsync(ParseResult parse, IReadOnlyList<string> names, CancellationToken ct)
+{
+    names = names.Distinct().ToList();
+    var skipped = false;
+    using (var sync = Connect(parse))
+    using (var research = ConnectResearch(parse))
+    {
+        foreach (var name in names)
+        {
+            var (started, job) = await WikidataJob.ClientFor(name, sync, research).RunJobAsync(WikidataJob.RunPath(name), ct);
+            Console.WriteLine(started ? $"Started {name}." : $"{name}: {job.Note ?? "off"}");
+            skipped |= !started;
+        }
+    }
+    if (parse.GetValue(detachOption))
+    {
+        Console.WriteLine("Follow them with `tvtracker-import wikidata status`.");
+        return skipped ? 2 : 0;
+    }
+
+    var interactive = !Console.IsOutputRedirected;
+    string? last = null;
+    IReadOnlyList<JobStatus> jobs;
+    try
+    {
+        while (true)
+        {
+            jobs = await WikidataStatusAsync(parse, names, ct);
+            var line = string.Join(" · ", jobs.Where(j => j.State != "off").Select(Brief));
+            if (interactive)
+            {
+                Console.Write($"\r{line.PadRight(Math.Max(line.Length, last?.Length ?? 0))}");
+            }
+            else if (line != last)
+            {
+                Console.WriteLine(line);
+            }
+            last = line;
+            if (!jobs.Any(j => j.Requested))
+            {
+                break;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        }
+    }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Stopped following; the jobs carry on. `tvtracker-import wikidata status` to see them.");
+        return 130;
+    }
+
+    if (interactive)
+    {
+        Console.WriteLine();
+    }
+    foreach (var job in jobs)
+    {
+        Console.WriteLine(Describe(job));
+    }
+    return skipped || jobs.Any(j => j.LastError is not null) ? 2 : 0;
+}
+
+async Task<IReadOnlyList<JobStatus>> WikidataStatusAsync(ParseResult parse, IReadOnlyList<string> names, CancellationToken ct)
+{
+    var jobs = new List<JobStatus>();
+    if (names.Any(n => n != WikidataJob.Research))
+    {
+        using var sync = Connect(parse);
+        jobs.AddRange(await sync.GetJobsAsync(WikidataJob.SyncJobsPath, ct));
+    }
+    if (names.Contains(WikidataJob.Research))
+    {
+        using var research = ConnectResearch(parse);
+        jobs.AddRange(await research.GetJobsAsync(WikidataJob.ResearchJobsPath, ct));
+    }
+    return jobs.Where(j => names.Contains(j.Name)).OrderBy(j => names.ToList().IndexOf(j.Name)).ToList();
+}
+
+static string Brief(JobStatus job) =>
+    $"{job.Name}: {job.Done} done" + (job.Due is > 0 ? $", {job.Due} to go" : "") + (job.State == "running" ? "…" : "");
+
+static string Describe(JobStatus job)
+{
+    if (job.State == "off")
+    {
+        return $"{job.Name}: {job.Note ?? "off"}";
+    }
+    var line = $"{job.Name}: {job.State}{(job.Requested ? " (asked to run now)" : "")}, {job.Done} done" +
+        (job.Due is { } due ? $", {due} to go" : "") +
+        (job.LastRunAtUtc is { } at ? $", last round {at:yyyy-MM-dd HH:mm} UTC" : ", no round yet");
+    return job.LastError is { } error ? $"{line}\n  last round: {error}" : line;
 }
 
 async Task<int> StartAsync(ParseResult parse, BulkImportRequest request, CancellationToken ct)
@@ -217,6 +344,12 @@ SyncWorkerClient Connect(ParseResult parse) =>
             ? new SyncWorkerClient(url, keycloak, parse.GetValue(secretOption)!)
             : throw new CliException("--keycloak must be an http(s) address, like http://localhost:8080.")
         : throw new CliException($"--url must be an http(s) address, like http://localhost:5107.");
+
+SyncWorkerClient ConnectResearch(ParseResult parse) =>
+    Uri.TryCreate(parse.GetValue(researchUrlOption), UriKind.Absolute, out var url) && url.Scheme is "http" or "https"
+        && Uri.TryCreate(parse.GetValue(keycloakOption), UriKind.Absolute, out var keycloak) && keycloak.Scheme is "http" or "https"
+        ? new SyncWorkerClient(url, keycloak, parse.GetValue(secretOption)!, "Research.API")
+        : throw new CliException("--research-url and --keycloak must be http(s) addresses, like http://localhost:5114.");
 
 static string[] ReadAll(TextReader reader) => reader.ReadToEnd().Split('\n');
 

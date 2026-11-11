@@ -20,6 +20,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<ShowSetting> Settings => Set<ShowSetting>();
     public DbSet<ShowSettingLookup> SettingLookups => Set<ShowSettingLookup>();
+    public DbSet<ShowSupplement> Supplements => Set<ShowSupplement>();
     public DbSet<ShowNamesake> Namesakes => Set<ShowNamesake>();
     public DbSet<ShowNamesakeLookup> NamesakeLookups => Set<ShowNamesakeLookup>();
     public DbSet<PersonMadeShow> MadeShows => Set<PersonMadeShow>();
@@ -153,6 +154,15 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(s => s.Name).HasMaxLength(256);
             entity.Property(s => s.Country).HasMaxLength(128);
             entity.HasIndex(s => s.PlaceId);
+        });
+
+        modelBuilder.Entity<ShowSupplement>(entity =>
+        {
+            entity.ToTable("show_supplements");
+            entity.HasKey(s => s.ShowId);
+            entity.Property(s => s.Item).HasMaxLength(16);
+            entity.Property(s => s.Network).HasMaxLength(128);
+            entity.HasOne<Show>().WithOne().HasForeignKey<ShowSupplement>(s => s.ShowId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ShowSettingLookup>(entity =>
