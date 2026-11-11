@@ -178,22 +178,18 @@
         }
     }
 
-    /// <summary>
-    /// A flagged section's data, or null without asking for it while its flag is off.
-    /// </summary>
-    private async Task<T?> OptionalAsync<T>(string flag, Func<Task<T?>> load) where T : class =>
-        await Flags.IsEnabledAsync(flag) ? await load() : null;
-
     private async Task LoadAsync()
     {
         error = null;
         try
         {
             items = await Tracking.GetUpNextAsync() ?? [];
-            var refreshersTask = OptionalAsync(FeatureFlags.Refresher, LoadRefreshersAsync);
-            var catchUpsTask = OptionalAsync(FeatureFlags.CatchUp, LoadCatchUpsAsync);
-            refreshers = await refreshersTask;
-            catchUps = await catchUpsTask;
+            // Together; WhenAll waits for both, so neither is left running when one fails.
+            var refreshersTask = Flags.IfEnabledAsync(FeatureFlags.Refresher, LoadRefreshersAsync);
+            var catchUpsTask = Flags.IfEnabledAsync(FeatureFlags.CatchUp, LoadCatchUpsAsync);
+            await Task.WhenAll(refreshersTask, catchUpsTask);
+            refreshers = refreshersTask.Result;
+            catchUps = catchUpsTask.Result;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

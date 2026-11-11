@@ -14,7 +14,7 @@ public class FlagDefaultsTests
     {
         using var file = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "flagd.json")));
         var on = file.RootElement.GetProperty("flags").EnumerateObject()
-            .Where(f => f.Value.GetProperty("defaultVariant").GetString() == "on")
+            .Where(f => f.Value.GetProperty("variants").GetProperty(f.Value.GetProperty("defaultVariant").GetString()!).GetBoolean())
             .Select(f => f.Name);
 
         Assert.Equal(FeatureFlags.OnByDefault.Order(), on.Order());

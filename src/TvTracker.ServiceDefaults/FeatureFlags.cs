@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using OpenFeature;
 using OpenFeature.Model;
 
 namespace TvTracker;
@@ -101,6 +102,14 @@ public static class FeatureFlags
     /// says by default. A flag server outage neither takes features away nor brings back the ones turned off.
     /// </summary>
     public static bool DefaultFor(string flag) => OnByDefault.Contains(flag);
+
+    /// <summary>
+    /// Whether <paramref name="flag"/> is on, falling back to <see cref="DefaultFor"/> when flagd can't answer. Read
+    /// flags through this, so no caller goes back to a fixed default.
+    /// </summary>
+    public static Task<bool> IsOnAsync(this IFeatureClient client, string flag, EvaluationContext? context = null,
+        CancellationToken cancellationToken = default) =>
+        client.GetBooleanValueAsync(flag, DefaultFor(flag), context, cancellationToken: cancellationToken);
 
     /// <summary>
     /// The context attribute that carries the caller's plan ("free", "plus", "family"; see <c>Plans</c>). A flag in a plan

@@ -15,10 +15,10 @@
         @* The landing page: what the app is, for someone who isn't signed in. Each claim is a feature that's on by
            default (FeatureFlags.OnByDefault, or not flagged): keep it in step when a flag's default changes. *@
         <section class="landing-hero">
-            <h1>Know what to watch next, and whether it's worth it</h1>
+            <h1>Know what to watch next, and never lose your place</h1>
             <p class="landing-lead">
-                @Brand.AppName tracks every show you follow, tells you when the next episode airs, and reads the ratings of
-                every episode so you know which are worth your time.
+                @Brand.AppName tracks every show you follow, tells you when the next episode airs and when a show you're
+                caught up on is back, and plans what to watch tonight.
             </p>
             <div class="landing-actions">
                 <button class="btn" @onclick="SignUpAsync">Get started free</button>
@@ -49,12 +49,12 @@
         </section>
 
         <Feature Flag="@FeatureFlags.Plans">
-        <section class="landing-plans">
-            <h2>Free, with Plus when you want more</h2>
-            <p>Following, tracking, ratings, lists, calendars and the insights about shows are free. <strong>Plus</strong>
-                adds the tools that read your own viewing: tonight's plan, the essential cut of a long show, catching up
-                before a premiere, your year in TV and more. <strong>Family</strong> shares Plus with up to five people.</p>
-        </section>
+            <section class="landing-plans">
+                <h2>Free, with Plus when you want more</h2>
+                <p>Following, tracking, ratings, lists and calendars are free. <strong>Plus</strong> adds the tools that read
+                    your own viewing, such as tonight's plan and the essential cut of a long show. <strong>Family</strong>
+                    shares Plus with up to five people.</p>
+            </section>
         </Feature>
     </NotAuthorized>
 </AuthorizeView>

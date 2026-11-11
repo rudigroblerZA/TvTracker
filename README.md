@@ -7,8 +7,9 @@ that share one Razor component library. The design behind it is in the "TV Track
 > **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
 > The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
 
-What sets it apart: universes and their timelines, the essential cut, blend, the reunion radar, where you know an actor
-from, show DNA, nanogenres, search by meaning and computed show tags, each described below.
+What sets it apart: universes and their timelines, the essential cut, Tonight's plan, the waiting room with forecasts
+of when a show is back, search by meaning and computed show tags. Many more features are built but off by default
+(see [Feature flags](#feature-flags)); each is described below.
 
 ## Prerequisites
 
@@ -557,8 +558,8 @@ Useful local addresses:
 ### Unit tests and CI
 
 Unit tests cover the services' rules (title matching, crossovers, Wikiquote parsing, overrides, streaks, the essential
-cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation) and
-the shared UI's history import and Tonight's planner. They need no database, network or running AppHost:
+cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation), that the
+flags on in flagd.json match `FeatureFlags.OnByDefault`, and the shared UI's history import and Tonight's planner. They need no database, network or running AppHost:
 
 ```bash
 dotnet test tests/Catalog.UnitTests
@@ -768,9 +769,9 @@ Blend, Universes, Essential cut, Tonight's plan (and planning it for two), Reuni
 served by [flagd](https://flagd.dev) (the `flagd` resource on the Aspire dashboard). Flags live in
 `src/TvTracker.AppHost/Flags/flagd.json`, and an edit applies while everything runs, with no restart.
 
-**On by default: a core ten.** Tracking, Up Next, the calendar, search, Discover, For you, ratings, lists, stats and
-notifications have no flag and are always there. Of the flagged features above, flagd.json turns on these ten and
-leaves the rest off (built and documented below, but hidden, with their endpoints answering 404):
+**On by default: a small core.** Tracking, Up Next, the calendar, search, Discover, For you, ratings, lists, stats and
+notifications have no flag and are always there. Of the flagged features above, flagd.json turns on these and leaves
+the rest off (built and documented below, but hidden, with their endpoints answering 404):
 
 | Flag | Why it stays on |
 | --- | --- |
