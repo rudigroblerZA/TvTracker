@@ -91,9 +91,9 @@
         <li><strong>Streaming services</strong> you open from a show page: the link goes through us so we can count clicks
             per service, without recording who clicked. Some links carry an affiliate code, so the service may pay us a
             commission on a sign-up.</li>
-        <li><strong>Show pictures</strong> are loaded by your browser or phone from @Brand.CatalogImagesFrom, which therefore sees your
+        <li><strong>Show pictures</strong> are loaded by your browser or phone from @Brand.Catalog.ImagesFrom, which therefore sees your
             device's network address, as any website you visit does.</li>
-        <li>Our show data comes from @(Brand.CatalogSource == "wikidata" ? "Wikidata and Wikiquote" : $"{Brand.CatalogSourceName}, Wikidata and Wikiquote"). We fetch it ourselves, and send them nothing about
+        <li>Our show data comes from @(Brand.Catalog.DataFrom). We fetch it ourselves, and send them nothing about
             you; when you import a history, the titles of shows we don't yet have are looked up there, without your
             name.</li>
         <li>We use hosting and infrastructure providers to run the service, who process data only on our behalf.</li>

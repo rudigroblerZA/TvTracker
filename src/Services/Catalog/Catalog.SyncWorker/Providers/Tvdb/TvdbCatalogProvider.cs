@@ -60,7 +60,7 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     /// </summary>
     public async Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default)
     {
-        var language = Uri.EscapeDataString(options.Value.FeaturedLanguage);
+        var language = Uri.EscapeDataString(options.Value.Language);
         var shows = new List<TvdbSeries>();
         var pages = 0;
         foreach (var country in options.Value.Countries)
@@ -126,8 +126,10 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     /// </summary>
     public async Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default)
     {
-        var series = await UpdatesAsync("series", within, cancellationToken);
-        var episodes = await UpdatesAsync("episodes", within, cancellationToken);
+        var seriesFeed = UpdatesAsync("series", within, cancellationToken);
+        var episodesFeed = UpdatesAsync("episodes", within, cancellationToken);
+        await Task.WhenAll(seriesFeed, episodesFeed);
+        var (series, episodes) = (seriesFeed.Result, episodesFeed.Result);
         var changed = new Dictionary<string, DateTimeOffset>();
         foreach (var (id, at) in series.Select(u => (u.RecordId, u.TimeStamp))
             .Concat(episodes.Where(u => u.SeriesId is > 0).Select(u => (u.SeriesId!.Value, u.TimeStamp))))
@@ -147,27 +149,23 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
             .GroupBy(u => Text(u.RecordId)).ToDictionary(g => g.Key, g => DateTimeOffset.FromUnixTimeSeconds(g.Max(u => u.TimeStamp)));
 
     /// <summary>
-    /// The records of a type created or updated within a time (deletions left out). Never null: the answer only marks
-    /// shows due for a refresh sooner, so when the feed runs past <see cref="MaxUpdatePages"/> the part read is still
+    /// The records of a type created or updated within a time (deletions left out). Always a list, so
+    /// <see cref="GetChangedShowsAsync"/> and <see cref="GetChangedPeopleAsync"/> never answer null (the interface allows
+    /// it for providers without a feed): the answer only marks shows due for a refresh sooner, so when the feed runs past <see cref="MaxUpdatePages"/> the part read is still
     /// worth having, and the shows it misses are refreshed on their timers.
     /// </summary>
     private async Task<List<TvdbUpdate>> UpdatesAsync(string type, TimeSpan within, CancellationToken ct)
     {
         var since = (time.GetUtcNow() - within).ToUnixTimeSeconds();
-        var updates = new List<TvdbUpdate>();
-        for (var page = 0; page < MaxUpdatePages; page++)
+        // No action filter: a new episode is a creation, and "update" alone would leave it out.
+        var (updates, complete) = await tvdb.PagesAsync<List<TvdbUpdate>, TvdbUpdate>(
+            page => $"updates?since={since}&type={type}&page={page}", found => found, MaxUpdatePages, ct);
+        if (!complete)
         {
-            // No action filter: a new episode is a creation, and "update" alone would leave it out.
-            var found = await tvdb.GetAsync<List<TvdbUpdate>>($"updates?since={since}&type={type}&page={page}", ct);
-            updates.AddRange((found?.Data ?? []).Where(u => u.MethodInt != TvdbUpdate.Deleted));
-            if (found?.Data is not { Count: > 0 } || found.Links?.Next is null)
-            {
-                return updates;
-            }
+            logger.LogInformation("TheTVDB's {Type} updates since {Since} run past {Pages} pages; using the {Count} read",
+                type, DateTimeOffset.FromUnixTimeSeconds(since), MaxUpdatePages, updates.Count);
         }
-        logger.LogInformation("TheTVDB's {Type} updates since {Since} run past {Pages} pages; using the {Count} read",
-            type, DateTimeOffset.FromUnixTimeSeconds(since), MaxUpdatePages, updates.Count);
-        return updates;
+        return updates.Where(u => u.MethodInt != TvdbUpdate.Deleted).ToList();
     }
 
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
@@ -179,43 +177,31 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
             return null;
         }
 
-        var episodes = await EpisodesAsync(externalId, null, cancellationToken);
-        // A show made in another language: its episodes again in ours, for the names and overviews TheTVDB has.
-        if (!string.Equals(series.OriginalLanguage, language, StringComparison.OrdinalIgnoreCase))
+        var foreign = !string.Equals(series.OriginalLanguage, language, StringComparison.OrdinalIgnoreCase);
+        var original = EpisodesAsync(externalId, "official", null, cancellationToken);
+        // A show made in another language: its episodes again in ours, for the names and overviews TheTVDB has. Both
+        // listings at once; they're independent, and the client limits how many requests run together.
+        var translated = foreign ? EpisodesAsync(externalId, "official", language, cancellationToken) : Task.FromResult(new List<TvdbEpisode>());
+        await Task.WhenAll(original, translated);
+        var episodes = original.Result;
+        if (episodes.Count == 0)
         {
-            episodes = WithTranslations(episodes, await EpisodesAsync(externalId, language, cancellationToken)).ToList();
+            // Nothing in aired order: the series' default order, in both languages.
+            episodes = await EpisodesAsync(externalId, "default", null, cancellationToken);
+            translated = foreign ? EpisodesAsync(externalId, "default", language, cancellationToken) : translated;
         }
-        return Show(series, episodes, Today, language);
+        return Show(series, foreign ? WithTranslations(episodes, await translated) : episodes, Today, language);
     }
 
     /// <summary>
-    /// A show's episodes in aired order ("official"), page by page, in a language when one is given. Aired order, not
-    /// the series' default (which can be DVD or absolute): it's the order the seasons' names belong to and the one a
-    /// TV Time history numbers episodes by. A series with nothing in aired order is read in its default.
+    /// A show's episodes in an order, page by page, in a language when one is given. Aired order ("official") is asked
+    /// for first, not the series' default (which can be DVD or absolute): it's the order the seasons' names belong to
+    /// and the one a TV Time history numbers episodes by.
     /// </summary>
-    private async Task<List<TvdbEpisode>> EpisodesAsync(string externalId, string? language, CancellationToken ct)
-    {
-        foreach (var order in new[] { "official", "default" })
-        {
-            var episodes = new List<TvdbEpisode>();
-            for (var page = 0; page < MaxEpisodePages; page++)
-            {
-                var found = await tvdb.GetAsync<TvdbEpisodePage>(
-                    $"series/{externalId}/episodes/{order}{(language is null ? "" : "/" + Uri.EscapeDataString(language))}?page={page}", ct);
-                var read = found?.Data?.All ?? [];
-                episodes.AddRange(read);
-                if (read.Count == 0 || found?.Links?.Next is null)
-                {
-                    break;
-                }
-            }
-            if (episodes.Count > 0)
-            {
-                return episodes;
-            }
-        }
-        return [];
-    }
+    private async Task<List<TvdbEpisode>> EpisodesAsync(string externalId, string order, string? language, CancellationToken ct) =>
+        (await tvdb.PagesAsync<TvdbEpisodePage, TvdbEpisode>(
+            page => $"series/{externalId}/episodes/{order}{(language is null ? "" : "/" + Uri.EscapeDataString(language))}?page={page}",
+            found => found.All, MaxEpisodePages, ct)).Items;
 
     /// <summary>
     /// How many shows they created or executive-produced, and the first ten as TheTVDB lists them. The shows they made

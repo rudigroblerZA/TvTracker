@@ -102,17 +102,18 @@ public static class TvdbMapping
     public static string? Country(string? code) => code is not null && Countries.TryGetValue(code.Trim(), out var two) ? two : null;
 
     /// <summary>
-    /// The time zone a country's networks give air times in (the eastern one for the US and Canada, as schedules do).
+    /// The time zone a country's networks give air times in (the eastern one for the US and Canada, as schedules do),
+    /// by the two-letter code <see cref="Country"/> gives, so the countries are listed once.
     /// </summary>
-    private static readonly Dictionary<string, string> TimeZones = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> TimeZones = new()
     {
-        ["usa"] = "America/New_York", ["can"] = "America/Toronto", ["gbr"] = "Europe/London", ["irl"] = "Europe/Dublin",
-        ["aus"] = "Australia/Sydney", ["nzl"] = "Pacific/Auckland", ["jpn"] = "Asia/Tokyo", ["kor"] = "Asia/Seoul",
-        ["chn"] = "Asia/Shanghai", ["ind"] = "Asia/Kolkata", ["deu"] = "Europe/Berlin", ["fra"] = "Europe/Paris",
-        ["esp"] = "Europe/Madrid", ["ita"] = "Europe/Rome", ["nld"] = "Europe/Amsterdam", ["bel"] = "Europe/Brussels",
-        ["swe"] = "Europe/Stockholm", ["dnk"] = "Europe/Copenhagen", ["dan"] = "Europe/Copenhagen", ["nor"] = "Europe/Oslo",
-        ["fin"] = "Europe/Helsinki", ["pol"] = "Europe/Warsaw", ["tur"] = "Europe/Istanbul", ["isr"] = "Asia/Jerusalem",
-        ["bra"] = "America/Sao_Paulo", ["mex"] = "America/Mexico_City", ["zaf"] = "Africa/Johannesburg"
+        ["US"] = "America/New_York", ["CA"] = "America/Toronto", ["GB"] = "Europe/London", ["IE"] = "Europe/Dublin",
+        ["AU"] = "Australia/Sydney", ["NZ"] = "Pacific/Auckland", ["JP"] = "Asia/Tokyo", ["KR"] = "Asia/Seoul",
+        ["CN"] = "Asia/Shanghai", ["IN"] = "Asia/Kolkata", ["DE"] = "Europe/Berlin", ["FR"] = "Europe/Paris",
+        ["ES"] = "Europe/Madrid", ["IT"] = "Europe/Rome", ["NL"] = "Europe/Amsterdam", ["BE"] = "Europe/Brussels",
+        ["SE"] = "Europe/Stockholm", ["DK"] = "Europe/Copenhagen", ["NO"] = "Europe/Oslo", ["FI"] = "Europe/Helsinki",
+        ["PL"] = "Europe/Warsaw", ["TR"] = "Europe/Istanbul", ["IL"] = "Asia/Jerusalem", ["BR"] = "America/Sao_Paulo",
+        ["MX"] = "America/Mexico_City", ["ZA"] = "Africa/Johannesburg"
     };
 
     /// <summary>
@@ -121,47 +122,48 @@ public static class TvdbMapping
     private static readonly TimeOnly Evening = new(20, 0);
 
     /// <summary>
-    /// When an episode airs, in UTC. TheTVDB gives the day per episode and one time for the series ("21:00"), in the
-    /// time of the show's country.
+    /// When a show's episodes air, in UTC, from the day of each. TheTVDB gives the day per episode and one time for the
+    /// series ("21:00"), in the time of the show's country; both are worked out once here for all its episodes.
     /// <list type="bullet">
     /// <item><b>No time given:</b> 20:00 there. Midnight would count a US evening episode as aired, and tell its
     /// followers, a day early.</item>
-    /// <item><b>A country not listed here:</b> the time is taken as UTC.</item>
+    /// <item><b>A country not listed here</b> (or a machine without its zone's data): the time is taken as UTC.</item>
     /// </list>
     /// </summary>
-    public static DateTimeOffset AirsAt(DateOnly day, string? airsTime, string? country)
+    public static Func<DateOnly, DateTimeOffset> AirTimes(string? airsTime, string? country)
     {
-        var local = day.ToDateTime(
-            TimeOnly.TryParseExact(airsTime?.Trim(), ["HH:mm", "H:mm", "HH:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var given)
-                ? given
-                : Evening);
-        if (country is not null && TimeZones.TryGetValue(country.Trim(), out var zoneId))
+        var time = TimeOnly.TryParseExact(airsTime?.Trim(), ["HH:mm", "H:mm", "HH:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var given)
+            ? given
+            : Evening;
+        var zone = Country(country) is { } code && TimeZones.TryGetValue(code, out var id) && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+            ? found
+            : TimeZoneInfo.Utc;
+        return day =>
         {
-            try
+            var local = day.ToDateTime(time);
+            // A time skipped by the clocks going forward doesn't exist there: an hour later does.
+            if (zone.IsInvalidTime(local))
             {
-                var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
-                // A time skipped by the clocks going forward doesn't exist there: an hour later does.
-                if (zone.IsInvalidTime(local))
-                {
-                    local = local.AddHours(1);
-                }
-                return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
+                local = local.AddHours(1);
             }
-            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-            {
-                // A machine without that zone's data: as for a country not listed.
-            }
-        }
-        return new DateTimeOffset(local, TimeSpan.Zero);
+            return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
+        };
     }
+
+    /// <summary>
+    /// When one episode airs (<see cref="AirTimes"/>).
+    /// </summary>
+    public static DateTimeOffset AirsAt(DateOnly day, string? airsTime, string? country) => AirTimes(airsTime, country)(day);
 
     /// <summary>
     /// Regular episodes in order, one per season and number: specials (season 0) and unnumbered episodes are left out,
     /// as with the other providers. <paramref name="airsTime"/> and <paramref name="country"/> are the series'
-    /// (<see cref="AirsAt"/>).
+    /// (<see cref="AirTimes"/>).
     /// </summary>
-    public static IReadOnlyList<ProviderEpisode> Episodes(IEnumerable<TvdbEpisode> episodes, string? airsTime = null, string? country = null) =>
-        episodes
+    public static IReadOnlyList<ProviderEpisode> Episodes(IEnumerable<TvdbEpisode> episodes, string? airsTime, string? country)
+    {
+        var airsAt = AirTimes(airsTime, country);
+        return episodes
             .Where(e => e is { SeasonNumber: > 0, Number: > 0 })
             .GroupBy(e => (e.SeasonNumber!.Value, e.Number!.Value))
             // TheTVDB can hold a duplicate of an episode: the dated one, then the older record.
@@ -173,10 +175,11 @@ public static class TvdbMapping
                 e.Number!.Value,
                 string.IsNullOrWhiteSpace(e.Name) ? $"Episode {e.Number}" : Truncate(e.Name.Trim()),
                 string.IsNullOrWhiteSpace(e.Overview) ? null : e.Overview.Trim(),
-                Date(e.Aired) is { } day ? AirsAt(day, airsTime, country) : null,
+                Date(e.Aired) is { } day ? airsAt(day) : null,
                 e.Runtime is > 0 and <= 600 ? e.Runtime : null,
                 null))
             .ToList();
+    }
 
     /// <summary>
     /// A season for each one with episodes, named as TheTVDB names it in aired order, else "Season N".
@@ -272,7 +275,7 @@ public static class TvdbMapping
     /// A show from its extended record and its episodes. Its title and overview are in <paramref name="language"/>
     /// when the record carries that translation (asked for with <c>meta=translations</c>), else as TheTVDB has them.
     /// </summary>
-    public static ProviderShow Show(TvdbSeries series, IEnumerable<TvdbEpisode> allEpisodes, DateOnly today, string language = "eng")
+    public static ProviderShow Show(TvdbSeries series, IEnumerable<TvdbEpisode> allEpisodes, DateOnly today, string language)
     {
         series = series with
         {
@@ -311,7 +314,7 @@ public static class TvdbMapping
     /// A search hit as a summary, titled in <paramref name="language"/> when the hit has that translation; search
     /// gives neither an end date nor a score.
     /// </summary>
-    public static ProviderShowSummary? Summary(TvdbSearchResult hit, string language = "eng") =>
+    public static ProviderShowSummary? Summary(TvdbSearchResult hit, string language) =>
         hit.TvdbId is { } id && IsId(id)
         && (hit.Translations?.GetValueOrDefault(language)?.Trim() is { Length: > 0 } translated ? translated : hit.Name?.Trim()) is { Length: > 0 } title
             ? new ProviderShowSummary(id, Truncate(title), Image(hit.ImageUrl), Date(hit.FirstAirTime), null,

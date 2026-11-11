@@ -517,7 +517,7 @@ takes three or four requests, so a history import adds missing shows more slowly
   says of a running show, so none reads as renewed or cancelled. Memorable lines, the TV atlas and Research find
   shows by their TVmaze id and stay empty, as with Wikidata.
 - **Featured and popular shows** are TheTVDB's best-scored for `Tvdb:FeaturedCountries` (`usa` and `gbr` unless set;
-  setting it replaces them) in `Tvdb:FeaturedLanguage` (`eng`): its filter answers one list per country, so a bulk import of "the most popular"
+  setting it replaces them) whose original language is `Tvdb:Language` (`eng`): its filter answers one list per country, so a bulk import of "the most popular"
   reaches only as far as those lists. Its score, an open-ended count, becomes the catalog's 0-100 popularity by its logarithm.
 - **The credit:** TheTVDB's licence asks for its attribution wherever the data shows; the footer carries it
   ("Metadata provided by TheTVDB…") when this provider is configured, and the terms, the privacy policy and people's
