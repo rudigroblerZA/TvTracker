@@ -35,6 +35,13 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
     public async Task<bool> IsEnabledAsync(string flag) => await EvaluateAsync(flag, await PlanAsync());
 
     /// <summary>
+    /// A flagged section's data from <paramref name="load"/>, or null without calling it while <paramref name="flag"/>
+    /// is off, so a page doesn't fetch what it won't show.
+    /// </summary>
+    public async Task<T?> IfEnabledAsync<T>(string flag, Func<Task<T?>> load) where T : class =>
+        await IsEnabledAsync(flag) ? await load() : null;
+
+    /// <summary>
     /// The plan that would turn <paramref name="flag"/> on when it's off for the user only because of their plan
     /// (Plus first, then Family); null when it's on, or off for every plan.
     /// </summary>
@@ -97,7 +104,7 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         }
 
         // OpenFeature never throws for a failed evaluation; it returns the flag's flagd.json default.
-        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultFor(flag), context);
+        var enabled = await client.IsOnAsync(flag, context);
         cache[key] = (enabled, DateTimeOffset.UtcNow);
         return enabled;
     }

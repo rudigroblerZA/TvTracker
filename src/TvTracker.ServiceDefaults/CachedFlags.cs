@@ -39,7 +39,7 @@ public sealed class CachedFlags(IFeatureClient client, IMemoryCache cache)
         {
             return known;
         }
-        var enabled = await client.GetBooleanValueAsync(flag, FeatureFlags.DefaultFor(flag), context, cancellationToken: cancellationToken);
+        var enabled = await client.IsOnAsync(flag, context, cancellationToken);
         cache.Set(key, enabled, CacheFor);
         return enabled;
     }

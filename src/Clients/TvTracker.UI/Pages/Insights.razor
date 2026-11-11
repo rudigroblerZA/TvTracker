@@ -179,7 +179,7 @@
     {
         try
         {
-            verdicts = await Flags.IsEnabledAsync(FeatureFlags.SeasonVerdict) ? await Analytics.GetSeasonVerdictsAsync() : null;
+            verdicts = await Flags.IfEnabledAsync(FeatureFlags.SeasonVerdict, () => Analytics.GetSeasonVerdictsAsync());
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
