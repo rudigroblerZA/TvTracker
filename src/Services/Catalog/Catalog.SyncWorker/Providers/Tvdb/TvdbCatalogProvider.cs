@@ -185,6 +185,9 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
         catch
         {
             await both.CancelAsync();
+            // Until both have stopped, so neither is still using the token when it's disposed; what the cancelled
+            // one throws isn't the failure to report.
+            await Task.WhenAll(one, two).ContinueWith(_ => { }, TaskScheduler.Default);
             throw;
         }
     }

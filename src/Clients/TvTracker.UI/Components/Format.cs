@@ -6,6 +6,16 @@ public static class Format
 {
     public static string EpisodeCode(int season, int episode) => $"S{season:00}E{episode:00}";
 
+    /// <summary>
+    /// Names as a sentence lists them: "A", "A and B", "A, B and C". Empty for none.
+    /// </summary>
+    public static string List(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => "",
+        1 => names[0],
+        _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}"
+    };
+
     public static string Status(ShowStatus status) => status switch
     {
         ShowStatus.Upcoming => "Upcoming",

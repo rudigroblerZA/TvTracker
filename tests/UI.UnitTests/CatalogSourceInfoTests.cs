@@ -32,6 +32,15 @@ public class CatalogSourceInfoTests
     }
 
     [Fact]
+    public void Names_list_as_a_sentence_does()
+    {
+        Assert.Equal("", TvTracker.UI.Components.Format.List([]));
+        Assert.Equal("A", TvTracker.UI.Components.Format.List(["A"]));
+        Assert.Equal("A and B", TvTracker.UI.Components.Format.List(["A", "B"]));
+        Assert.Equal("A, B and C", TvTracker.UI.Components.Format.List(["A", "B", "C"]));
+    }
+
+    [Fact]
     public void Each_source_has_its_licence_and_an_unknown_one_reads_as_TVmaze()
     {
         Assert.Equal(CatalogLicence.CcBySa, CatalogSourceInfo.For("tvmaze").Licence);

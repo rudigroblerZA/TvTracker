@@ -46,9 +46,6 @@
     /// <summary>
     /// "Albuquerque (United States), London and Paris (France)", the country left off a place that is one.
     /// </summary>
-    private static string Names(IReadOnlyList<AtlasPlace> places)
-    {
-        var names = places.Select(p => p.Country is { } c && c != p.Name ? $"{p.Name} ({c})" : p.Name).ToList();
-        return names.Count == 1 ? names[0] : $"{string.Join(", ", names[..^1])} and {names[^1]}";
-    }
+    private static string Names(IReadOnlyList<AtlasPlace> places) =>
+        Format.List(places.Select(p => p.Country is { } c && c != p.Name ? $"{p.Name} ({c})" : p.Name).ToList());
 }
