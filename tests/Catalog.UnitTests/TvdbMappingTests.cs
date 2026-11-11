@@ -62,7 +62,7 @@ public class TvdbMappingTests
     private static ProviderShow Show() => TvdbMapping.Show(
         JsonSerializer.Deserialize<TvdbSeries>(Series, TvdbClient.Json)!,
         JsonSerializer.Deserialize<List<TvdbEpisode>>(Episodes, TvdbClient.Json)!,
-        Today);
+        Today, "eng");
 
     [Fact]
     public void A_series_reads_as_a_show()
@@ -184,14 +184,14 @@ public class TvdbMappingTests
             ]
             """, TvdbClient.Json)!;
 
-        var summary = TvdbMapping.Summary(hits[0])!;
+        var summary = TvdbMapping.Summary(hits[0], "eng")!;
         Assert.Equal("121361", summary.ExternalId);
         Assert.Equal("Game of Thrones", summary.Title);
         Assert.Equal(new DateOnly(2011, 4, 17), summary.Premiered);
         Assert.Equal("HBO", summary.Network);
         Assert.Equal("US", summary.Country);
         Assert.Equal("english", summary.Language);
-        Assert.Null(TvdbMapping.Summary(hits[1]));
+        Assert.Null(TvdbMapping.Summary(hits[1], "eng"));
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class TvdbMappingTests
             { "tvdb_id": "383275", "name": "오징어 게임", "translations": { "eng": "Squid Game", "kor": "오징어 게임" } }
             """, TvdbClient.Json)!;
 
-        Assert.Equal("Squid Game", TvdbMapping.Summary(hit)!.Title);
+        Assert.Equal("Squid Game", TvdbMapping.Summary(hit, "eng")!.Title);
         Assert.Equal("오징어 게임", TvdbMapping.Summary(hit, "fra")!.Title);
     }
 
@@ -232,7 +232,7 @@ public class TvdbMappingTests
               "characters": [ { "id": 1, "peopleType": "Actor", "series": { "name": "X", "year": 2020 } } ] }
             """, TvdbClient.Json)!;
 
-        var show = TvdbMapping.Show(series, [], Today);
+        var show = TvdbMapping.Show(series, [], Today, "eng");
         Assert.Equal("Sparse", show.Title);
         Assert.Null(show.BackdropUrl);
         Assert.Empty(show.Seasons);

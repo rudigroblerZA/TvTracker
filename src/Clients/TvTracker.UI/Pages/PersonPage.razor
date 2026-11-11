@@ -39,9 +39,9 @@ else
             }
             <p class="muted small">
                 In @(person.Credits.Count + (person.Made?.Count ?? 0)) @(person.Credits.Count + (person.Made?.Count ?? 0) == 1 ? "show" : "shows") in the catalog.
-                @if (Brand.CatalogSourceUrl is { } source)
+                @if (Brand.Catalog.Url is { } source)
                 {
-                    <text>Details from <a href="@source" target="_blank" rel="noopener">@Brand.CatalogSourceName</a>.</text>
+                    <text>Details from <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>.</text>
                 }
             </p>
         </div>
@@ -107,7 +107,7 @@ else
         var parts = new List<string>();
         if (career.Created > 0) parts.Add($"created {career.Created}");
         if (career.ExecutiveProduced > 0) parts.Add($"executive producer on {career.ExecutiveProduced}");
-        return $"Behind the camera on {career.Shows} shows on {Brand.CatalogSourceName}" + (parts.Count > 0 ? $": {string.Join(", ", parts)}." : ".");
+        return $"Behind the camera on {career.Shows} shows on {Brand.Catalog.Name}" + (parts.Count > 0 ? $": {string.Join(", ", parts)}." : ".");
     }
 
     /// <summary>

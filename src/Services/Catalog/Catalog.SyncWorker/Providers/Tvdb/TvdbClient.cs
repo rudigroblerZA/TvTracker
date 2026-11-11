@@ -39,14 +39,10 @@ public sealed class TvdbOptions
 
     /// <summary>
     /// The language titles, overviews and episode names are wanted in, as TheTVDB's three-letter code: a show made in
-    /// another language is read in this one where TheTVDB has the translation.
+    /// another language is read in this one where TheTVDB has the translation. Also the original language of the
+    /// featured shows.
     /// </summary>
     public string Language { get; set; } = "eng";
-
-    /// <summary>
-    /// The original language of those shows, as TheTVDB's three-letter code.
-    /// </summary>
-    public string FeaturedLanguage { get; set; } = "eng";
 
     public int FeaturedCount { get; set; } = 40;
 }
@@ -119,6 +115,27 @@ public sealed class TvdbClient(IHttpClientFactory httpFactory, IOptions<TvdbOpti
         {
             gate.Release();
         }
+    }
+
+    /// <summary>
+    /// A paged listing read to its end: pages from 0 until one is empty or names no next page, at most
+    /// <paramref name="maxPages"/>. Complete is false when it stopped at that limit with more to come.
+    /// </summary>
+    public async Task<(List<TItem> Items, bool Complete)> PagesAsync<TPage, TItem>(Func<int, string> path, Func<TPage, IEnumerable<TItem>> items,
+        int maxPages, CancellationToken ct) where TPage : class
+    {
+        var all = new List<TItem>();
+        for (var page = 0; page < maxPages; page++)
+        {
+            var found = await GetAsync<TPage>(path(page), ct);
+            var read = found?.Data is { } data ? items(data).ToList() : [];
+            all.AddRange(read);
+            if (read.Count == 0 || found?.Links?.Next is null)
+            {
+                return (all, true);
+            }
+        }
+        return (all, false);
     }
 
     private static HttpRequestException Refused() =>

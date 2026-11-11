@@ -27,24 +27,19 @@
        Wikidata's (CC0) needs none but is named all the same. *@
     <footer class="app-footer muted small">
         <p class="footer-links"><a href="privacy">Privacy</a><a href="terms">Terms</a></p>
-        @switch (Brand.CatalogSource)
+        @if (Brand.Catalog.Url is not { } source)
         {
-            case "tvdb":
-                <text>Metadata provided by <a href="https://thetvdb.com" target="_blank" rel="noopener">TheTVDB</a>.
-                    Please consider adding missing information or subscribing.</text>
-                break;
-            case "wikidata":
-                <text>Show data from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
-                    and <a href="https://en.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>
-                    (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
-                break;
-            case "mock":
-                <text>Invented show data, for development</text>
-                break;
-            default:
-                <text>Show data from <a href="https://www.tvmaze.com" target="_blank" rel="noopener">TVmaze</a>
-                    (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
-                break;
+            <text>Invented show data, for development</text>
+        }
+        else if (Brand.Catalog.OwnLicence)
+        {
+            <text>Metadata provided by <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>.
+                Please consider adding missing information or subscribing.</text>
+        }
+        else
+        {
+            <text>Show data from <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>
+                (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
         }
     </footer>
 </div>
