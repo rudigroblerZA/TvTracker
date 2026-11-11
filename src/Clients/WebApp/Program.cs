@@ -91,7 +91,7 @@ builder.Services.AddRazorComponents()
 
 // The web app calls each service directly; "https+http://<name>" is resolved by Aspire service discovery.
 builder.Services.AddTvTrackerUi(name => new Uri($"https+http://{name}-api/"), builder.Configuration["Branding:AppName"],
-    builder.Configuration["Branding:Operator"], builder.Configuration["Branding:ContactEmail"]);
+    builder.Configuration["Branding:Operator"], builder.Configuration["Branding:ContactEmail"], builder.Configuration["Catalog:Provider"]);
 
 // Services rate limit per visitor (the UI forwards each browser's IP), so a 429 is one visitor's answer, not a sign the
 // service is down. Don't retry it (every retry spends another of their requests) and don't let it trip the circuit

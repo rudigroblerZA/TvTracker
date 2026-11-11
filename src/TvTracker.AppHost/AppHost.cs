@@ -246,12 +246,24 @@ var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync"
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-// Where the catalog comes from: TVmaze unless the AppHost's Catalog:Provider says "wikidata" (CC0) or "mock". Catalog.API
-// is told too, since it matches the provider's ids (history imports, character trails) by the shows' source.
-if (builder.Configuration["Catalog:Provider"] is { Length: > 0 } catalogProvider)
+// Where the catalog comes from: TVmaze unless the AppHost's Catalog:Provider says "wikidata" (CC0), "tvdb" (TheTVDB) or
+// "mock". Catalog.API is told too, since it matches the provider's ids (history imports, character trails) by the
+// shows' source; the web app is told further down, for the footer's credit.
+var catalogProvider = builder.Configuration["Catalog:Provider"] is { Length: > 0 } configuredProvider ? configuredProvider.Trim().ToLowerInvariant() : null;
+if (catalogProvider is not null)
 {
     catalogApi.WithEnvironment("Catalog__Provider", catalogProvider);
     catalogSync.WithEnvironment("Catalog__Provider", catalogProvider);
+}
+// TheTVDB needs the project's API key: a secret parameter (locally, user secrets: Parameters:tvdb-api-key), and a
+// subscriber's PIN when the key is on TheTVDB's user-supported model (Parameters:tvdb-pin).
+if (catalogProvider == "tvdb")
+{
+    catalogSync.WithEnvironment("Tvdb__ApiKey", builder.AddParameter("tvdb-api-key", secret: true));
+    if (builder.Configuration["Parameters:tvdb-pin"] is { Length: > 0 })
+    {
+        catalogSync.WithEnvironment("Tvdb__Pin", builder.AddParameter("tvdb-pin", secret: true));
+    }
 }
 
 // The sync worker's callers sign in as the internal client; the worker accepts nothing else on its internal APIs.
@@ -371,6 +383,7 @@ var webApp = builder.AddProject<Projects.WebApp>("webapp")
     // Who runs the app and how to reach them, for the privacy policy and terms (README, Privacy and terms).
     .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
     .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "")
+    .WithEnvironment("Catalog__Provider", catalogProvider ?? "")
     .WithExternalHttpEndpoints()
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)

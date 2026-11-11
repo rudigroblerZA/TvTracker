@@ -10,8 +10,14 @@ namespace TvTracker.UI.Services;
 /// app by name and point to Settings for the rights it serves there.
 /// </para>
 /// </summary>
-public sealed class Branding(string? appName = null, string? operatorName = null, string? contactEmail = null)
+public sealed class Branding(string? appName = null, string? operatorName = null, string? contactEmail = null, string? catalogSource = null)
 {
+    /// <summary>
+    /// Where the catalog's data comes from (<c>Catalog:Provider</c>: "tvmaze", "wikidata", "tvdb" or "mock"), for the
+    /// credit in the footer that TVmaze's and TheTVDB's licences require. TVmaze when not said.
+    /// </summary>
+    public string CatalogSource { get; } = string.IsNullOrWhiteSpace(catalogSource) ? "tvmaze" : catalogSource.Trim().ToLowerInvariant();
+
     public const string DefaultAppName = "TV Tracker";
 
     public string AppName { get; } = string.IsNullOrWhiteSpace(appName) ? DefaultAppName : appName.Trim();

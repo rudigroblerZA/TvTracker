@@ -4,6 +4,7 @@ using Catalog.Embeddings;
 using Catalog.SyncWorker;
 using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
+using Catalog.SyncWorker.Providers.Tvdb;
 using Catalog.SyncWorker.Providers.Wikidata;
 using Catalog.SyncWorker.Quotes;
 using Catalog.SyncWorker.Settings;
@@ -29,7 +30,8 @@ builder.Services.AddIntegrationEventOutbox<CatalogContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Catalog:Provider picks the data source: "tvmaze" (default), "wikidata" (CC0) or "mock" for invented offline data.
+// Catalog:Provider picks the data source: "tvmaze" (default), "wikidata" (CC0), "tvdb" (TheTVDB, with an API key) or
+// "mock" for invented offline data.
 var catalogProvider = CatalogSources.Configured(builder.Configuration);
 if (catalogProvider == CatalogSources.Mock)
 {
@@ -49,6 +51,23 @@ else if (catalogProvider == CatalogSources.Wikidata)
 #pragma warning restore EXTEXP0001
     builder.Services.AddSingleton<WikidataSparql>();
     builder.Services.AddSingleton<ICatalogProvider, WikidataCatalogProvider>();
+}
+else if (catalogProvider == CatalogSources.Tvdb)
+{
+    // Without a key every request would be refused, so the worker says so at start instead.
+    builder.Services.AddOptions<TvdbOptions>()
+        .Bind(builder.Configuration.GetSection("Tvdb"))
+        .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey),
+            "Catalog:Provider is \"tvdb\" but Tvdb:ApiKey isn't set (the AppHost's tvdb-api-key parameter).")
+        .Validate(o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _) && o.BaseUrl.EndsWith('/'), "Tvdb:BaseUrl must be an absolute address ending in a slash.")
+        .ValidateOnStart();
+    builder.Services.AddHttpClient(TvdbClient.HttpClientName, (sp, http) =>
+    {
+        http.BaseAddress = new Uri(sp.GetRequiredService<IOptions<TvdbOptions>>().Value.BaseUrl);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker/1.0");
+    });
+    builder.Services.AddSingleton<TvdbClient>();
+    builder.Services.AddSingleton<ICatalogProvider, TvdbCatalogProvider>();
 }
 else
 {

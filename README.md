@@ -466,6 +466,7 @@ count them toward its circuit breaker, so one visitor hitting the limit can't af
 ForwardedHeaders in the web app so it sees browsers' addresses rather than the proxy's. Separately, at most 30 new search terms a minute go to TVmaze across all callers; past that, search
 answers from the catalog. Limits are under `SearchRateLimit` in Catalog.API's configuration (see `SearchRateLimitOptions`).
 
+The catalog has one source at a time, set by `Catalog:Provider`: `tvmaze` (the default), `wikidata`, `tvdb` or `mock`.
 To work offline, set `Catalog:Provider` to `mock` to use `MockCatalogProvider`: 12 invented shows whose air dates are relative
 to the current week, so there are always episodes that aired recently and episodes coming up. Shows are stored per provider,
 so switching leaves the other provider's shows in the database without refreshing them. Set it in the AppHost's
@@ -482,7 +483,43 @@ they stay empty for Wikidata's shows (the first two say so in the log and don't 
 second apart, with searches and history imports ahead of background work, since Wikimedia limits addresses hard; a show
 takes three or four requests, so a history import adds missing shows more slowly than with TVmaze.
 
-TVmaze data is licensed CC BY-SA; the app footer carries the required credit (Wikidata's needs none). TVmaze has no keywords, "similar shows" or
+**TheTVDB as the catalog** (`Catalog:Provider=tvdb`): the catalog from [TheTVDB](https://thetvdb.com)'s v4 API.
+
+- **It needs a key.** TheTVDB gives one per project (a licensed key, or a free one on its user-supported model, which
+  also needs a subscriber's PIN). Give it to the AppHost as a secret parameter, in its user secrets locally:
+
+  ```bash
+  cd src/TvTracker.AppHost
+  dotnet user-secrets set "Catalog:Provider" "tvdb"
+  dotnet user-secrets set "Parameters:tvdb-api-key" "<your key>"
+  dotnet user-secrets set "Parameters:tvdb-pin" "<a subscriber's PIN>"   # only for a user-supported key
+  ```
+
+  A deployment gives `tvdb-api-key` like its other secrets. With the parameter unset, the Aspire dashboard asks for
+  it and the sync worker waits; started on its own without `Tvdb:ApiKey`, the worker stops at start and says so. A key
+  TheTVDB refuses shows as failed requests in the worker's log, and searches find nothing new.
+- **What comes from it:** shows with their poster, backdrop and banner, network, genres and status; seasons and regular
+  episodes (in the show's default order, specials left out) with air dates, runtimes and overviews; the main cast with
+  their characters; creators and executive producers, and how many shows each has made. Search is TheTVDB's own.
+  Imported shows are refreshed from its update feed, hourly, as with TVmaze.
+- **TV Time histories fit best here:** a TV Time export identifies shows by their TheTVDB id, which is this provider's
+  own id, so no lookup is needed. IMDb exports are matched through TheTVDB's remote-id search.
+- **What it doesn't have:** ratings, where to watch and similar shows; episodes have a day rather than a time (they
+  count as aired from the start of that day, UTC); people come without birthdays, and an actor's other shows aren't
+  read, so the reunion radar and "where you know them from" have nothing for these shows. "Continuing" is all TheTVDB
+  says of a running show, so none reads as renewed or cancelled. Memorable lines, the TV atlas and Research find
+  shows by their TVmaze id and stay empty, as with Wikidata.
+- **Featured and popular shows** are TheTVDB's best-scored for `Tvdb:FeaturedCountries` (`usa` and `gbr`) in
+  `Tvdb:FeaturedLanguage` (`eng`): its filter answers one list per country, so a bulk import of "the most popular"
+  reaches only as far as those lists. Its score, an open-ended count, becomes the catalog's 0-100 popularity by its logarithm.
+- **The credit:** TheTVDB's licence asks for its attribution wherever the data shows; the footer carries it
+  ("Metadata provided by TheTVDB…") when this provider is configured. Read its terms before running a public
+  deployment: a commercial app needs a licensed key.
+- **Not tried against the live API:** the provider is written to TheTVDB's published v4 specification and tested with
+  responses shaped as it documents them; no key was at hand to run it for real.
+
+Each source's credit is in the app footer: TVmaze's data is licensed CC BY-SA, which requires it; TheTVDB's licence
+words its own; Wikidata's (CC0) needs none, but its Wikipedia overviews are CC BY-SA. TVmaze has no keywords, "similar shows" or
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 

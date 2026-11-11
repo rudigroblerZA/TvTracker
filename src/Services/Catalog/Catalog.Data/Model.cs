@@ -8,7 +8,7 @@ public class Show
     public Guid Id { get; set; }
 
     /// <summary>
-    /// Which provider the show came from ("tvmaze", "wikidata" or "mock"; see <see cref="CatalogSources"/>).
+    /// Which provider the show came from ("tvmaze", "wikidata", "tvdb" or "mock"; see <see cref="CatalogSources"/>).
     /// </summary>
     public required string Source { get; set; }
 

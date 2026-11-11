@@ -10,12 +10,14 @@ public static class CatalogSources
 {
     public const string TvMaze = "tvmaze";
     public const string Wikidata = "wikidata";
+    public const string Tvdb = "tvdb";
     public const string Mock = "mock";
 
     public static string Configured(IConfiguration configuration) =>
         configuration["Catalog:Provider"]?.Trim().ToLowerInvariant() switch
         {
             Wikidata => Wikidata,
+            Tvdb => Tvdb,
             Mock => Mock,
             _ => TvMaze
         };
