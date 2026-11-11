@@ -497,23 +497,32 @@ takes three or four requests, so a history import adds missing shows more slowly
 
   A deployment gives `tvdb-api-key` like its other secrets. With the parameter unset, the Aspire dashboard asks for
   it and the sync worker waits; started on its own without `Tvdb:ApiKey`, the worker stops at start and says so. A key
-  TheTVDB refuses shows as failed requests in the worker's log, and searches find nothing new.
+  TheTVDB refuses shows as failed requests in the worker's log, and searches find nothing new; the worker then
+  waits 5 minutes before trying the key again, so it doesn't send TheTVDB a sign-in for every request.
 - **What comes from it:** shows with their poster, backdrop and banner, network, genres and status; seasons and regular
-  episodes (in the show's default order, specials left out) with air dates, runtimes and overviews; the main cast with
+  episodes (in aired order, specials left out) with air dates, runtimes and overviews; the main cast with
   their characters; creators and executive producers, and how many shows each has made. Search is TheTVDB's own.
-  Imported shows are refreshed from its update feed, hourly, as with TVmaze.
+  Imported shows are refreshed from its update feed (records created or updated), hourly, as with TVmaze. The feed is
+  everything TheTVDB changed, so the week read when the worker starts stops at 100 pages and uses what it read.
+- **In English:** a show made in another language is titled and described in `Tvdb:Language` (`eng`) where TheTVDB has
+  the translation, its episodes too (their listing is read a second time for that), and search hits likewise; what
+  has no translation stays in the original.
+- **Air times:** TheTVDB has a day per episode and one time for the series, in the show's country. An episode airs
+  on its day at that time in the country's time zone (Eastern for the US and Canada); with no time given, at 20:00
+  there, so an evening episode isn't announced a day early. A country the app has no zone for is read as UTC.
 - **TV Time histories fit best here:** a TV Time export identifies shows by their TheTVDB id, which is this provider's
   own id, so no lookup is needed. IMDb exports are matched through TheTVDB's remote-id search.
-- **What it doesn't have:** ratings, where to watch and similar shows; episodes have a day rather than a time (they
-  count as aired from the start of that day, UTC); people come without birthdays, and an actor's other shows aren't
+- **What it doesn't have:** ratings, where to watch and similar shows; people come without birthdays, and an actor's other shows aren't
   read, so the reunion radar and "where you know them from" have nothing for these shows. "Continuing" is all TheTVDB
   says of a running show, so none reads as renewed or cancelled. Memorable lines, the TV atlas and Research find
   shows by their TVmaze id and stay empty, as with Wikidata.
-- **Featured and popular shows** are TheTVDB's best-scored for `Tvdb:FeaturedCountries` (`usa` and `gbr`) in
-  `Tvdb:FeaturedLanguage` (`eng`): its filter answers one list per country, so a bulk import of "the most popular"
+- **Featured and popular shows** are TheTVDB's best-scored for `Tvdb:FeaturedCountries` (`usa` and `gbr` unless set;
+  setting it replaces them) in `Tvdb:FeaturedLanguage` (`eng`): its filter answers one list per country, so a bulk import of "the most popular"
   reaches only as far as those lists. Its score, an open-ended count, becomes the catalog's 0-100 popularity by its logarithm.
 - **The credit:** TheTVDB's licence asks for its attribution wherever the data shows; the footer carries it
-  ("Metadata provided by TheTVDB…") when this provider is configured. Read its terms before running a public
+  ("Metadata provided by TheTVDB…") when this provider is configured, and the terms, the privacy policy and people's
+  pages name TheTVDB as the source. The phone app can't read the backend's setting: set `MobileSettings.CatalogSource`
+  to `tvdb` before building it. Read TheTVDB's terms before running a public
   deployment: a commercial app needs a licensed key.
 - **Not tried against the live API:** the provider is written to TheTVDB's published v4 specification and tested with
   responses shaped as it documents them; no key was at hand to run it for real.

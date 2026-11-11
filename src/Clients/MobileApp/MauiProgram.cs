@@ -40,7 +40,7 @@ public static class MauiProgram
 
         // Every API call goes through the Mobile BFF, e.g. {bff}/catalog/api/v1/shows.
         var bff = MobileSettings.BffAddress;
-        builder.Services.AddTvTrackerUi(name => new Uri(bff, $"{name}/"), MobileSettings.AppName);
+        builder.Services.AddTvTrackerUi(name => new Uri(bff, $"{name}/"), MobileSettings.AppName, catalogSource: MobileSettings.CatalogSource);
 
         // Feature flags: flagd's OFREP API, proxied by the BFF ({bff}/features/ofrep/v1/...).
         builder.Services.AddOpenFeature(openFeature =>
