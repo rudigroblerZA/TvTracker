@@ -225,7 +225,7 @@ members whose credits haven't been fetched yet are counted as pending. It works 
   with their other shows, coming (soonest first) and newest first, with years and rating; projects TVmaze has
   in development with no date come last. Breaking Bad lists Vince Gilligan's Better
   Call Saul, Battle Creek and Pluribus. Shows outside the catalog link to a search, which imports them. It works signed out.
-- **From the makers you love** (`/makers`, from For you; `makers-for-you` flag, Plus and Family): the creators and
+- **From the makers you love** (`/makers`, from For you; `makers-for-you` flag, Pro and Family): the creators and
   developers behind your 4- and 5-star shows and the ones you follow or watch, weighted by how much you love their
   shows. It lists what's new or coming from them, then their shows you haven't seen, best first: each pick's score is
   its makers' love × its rating / 10, and it says who made it and which of your shows you know them from.
@@ -693,9 +693,9 @@ dotnet run -- cleanup --prefix persona-                  # remove them and every
 | `persona-priya` | Priya Nair, Kolkata: whole seasons of science fiction in a few late nights | Your TV clock (night, binges), Fits your time off, While you wait, Will you finish it? |
 | `persona-walt` | Walt Brennan, Chicago: period drama, nothing watched for seven months, shows stopped part way, a planned backlog | Previously on…, Is it worth going back?, Backlog triage, Will you finish it? (stalled) |
 | `persona-nia` | Nia Dlamini, Johannesburg: an account and nothing else | Every empty state, the first follow, Bring your history |
-| `persona-kenji` | Kenji Watanabe, Sydney: anime, on **Plus**, a day ahead of UTC | Plus features (Essential cut on long anime, Tonight's plan, the reunion radar, Mixtape), dates near midnight |
+| `persona-kenji` | Kenji Watanabe, Sydney: anime, on **Pro**, a day ahead of UTC | Pro features (Essential cut on long anime, Tonight's plan, the reunion radar, Mixtape), dates near midnight |
 | `persona-rosa` | Rosa Alvarez, Los Angeles: comedy, owns a **Family** plan | The plan page's family section (invite link, members), Tonight for two with Leo |
-| `persona-leo` | Leo Alvarez, Los Angeles: Rosa's family member | Plus through a family without paying, the member's plan page, Tonight for two with Rosa |
+| `persona-leo` | Leo Alvarez, Los Angeles: Rosa's family member | Pro through a family without paying, the member's plan page, Tonight for two with Rosa |
 | `persona-mira` | Mira Novak, Berlin: crime and legal drama, a **moderator** (Moderation:Users in the AppHost's development settings), many comments | The moderation page, Research and episode notes; her follow request to Sam stays pending |
 | `persona-sam` | Sam Okafor, Toronto: legal and medical drama, a **private profile** | Follow requests (Marco's approved, Mira's waiting), what others see of a private profile |
 
@@ -704,7 +704,7 @@ dotnet run -- cleanup --prefix persona-                  # remove them and every
   air, bingeing, or stopping months ago. Their full name and their own time zone mark a persona whose history is seeded (a new account
   starts with its Keycloak name in UTC), so a rerun skips it.
 - **Who they are** is set again on every run, as the app's admin (`--app-admin-password`, `admin` in development) and as
-  themselves: Kenji's Plus and Rosa's Family plan, Leo joining Rosa's family, Sam's private profile, the follows between
+  themselves: Kenji's Pro and Rosa's Family plan, Leo joining Rosa's family, Sam's private profile, the follows between
   them, and Sam approving Marco. The plans need the `plans` flag on to make a difference.
 - **They follow each other** (Tess is the most followed), so the social feed and "people you follow" on show pages have
   something in them. Nia follows no one and no one follows her.
@@ -786,7 +786,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `social` | Following people and the feed |
 | `list-links` | A list anyone can open by link, which brings people in |
 
-- **Plans, payments and the Family plan are off;** see [Plans](#plans).
+- **Plans, payments and the Family plan are on too** (they're switches, not features to use); see [Plans](#plans).
 - **Off features' background jobs still run** (Wikiquote lines, the atlas, cast credits, nanogenres, research
   checks), so turning a flag back on shows its feature at once.
 
@@ -799,7 +799,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `tonight-together` | Tonight for two: the "Watching" choice on `/tonight`, the link on people's pages, and its endpoint |
 | `reunion-radar` | `/reunions` and its link on For you |
 | `makers` | From the same creators on show pages, and its endpoint |
-| `makers-for-you` | `/makers` and its link on For you, and the loved-shows and for-you endpoints (Plus and Family) |
+| `makers-for-you` | `/makers` and its link on For you, and the loved-shows and for-you endpoints (Pro and Family) |
 | `show-dna` | The Show DNA panel on show pages (recommendations use DNA either way) |
 | `dna-twins` | "Made like this, about something else" on show pages, and its endpoint |
 | `endings` | "Does it stick the landing?" on ended shows' pages, and the Great endings list on Discover |
@@ -831,7 +831,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
-| `while-you-wait` | `/while-you-wait`, its Up Next and waiting-room links, and its endpoint (Plus and Family) |
+| `while-you-wait` | `/while-you-wait`, its Up Next and waiting-room links, and its endpoint (Pro and Family) |
 
 - **Turning one off or on:** set its `defaultVariant` to `"off"` or `"on"`. When one comes on for good, add it to
   `FeatureFlags.OnByDefault` too (a unit test fails until the two agree).
@@ -865,25 +865,40 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 
 ### Plans
 
-Free, Plus and Family, behind the `plans` flag. **Off by default,** with `payments` and `family-plan`: nothing is
-limited by plan, and the paid features that are on (Tonight's plan, the essential cut, forecasts) are open to
-everyone. Turn `plans` and `payments` on to sell them. Plus and Family are bought on `/settings/plan` through a payment
+Three plans, behind the `plans` flag (on by default, with `payments` and `family-plan`), on top of what a visitor
+without an account gets:
+
+| Who | Gets |
+| --- | --- |
+| **Not registered** | The catalog: shows, episodes, people, search, the calendar and Universes. No insights: those need an account (the services refuse a signed-out caller) |
+| **Free** (registered) | Tracking, ratings, lists, history import, following people, and the basic insights: a show's Insights panel, the Insights and Discover pages, stats, the waiting room, the spoiler shield |
+| **Pro** | Every insight that's turned on: Free's, plus Tonight's plan, the essential cut and forecasts today |
+| **Family** | The same features as Pro, for the owner and up to 5 people they invite |
+
+- **A plan is a set of feature flags:** a Pro feature has `"plans": "plus,family"` in its flag's metadata. A feature
+  that's turned off is in no plan: turn its flag on to add it to Pro (or to everyone, without the plan rule).
+- **The name:** the paid plan is "Pro" everywhere a person reads it. Its key is still `plus` (in flagd.json, stored
+  plans, events and the payment provider's records), so nothing stored had to change.
+- **With `plans` off,** nothing is limited by plan and Pro's features are open to every account.
+
+Pro and Family are bought on `/settings/plan` through a payment
 provider: Stripe in a deployment (and locally once its test key is given), else, in development, a test provider.
 
-- **Insights by plan:** Plus and Family add 17 insights (essential cut, Tonight's plan and Tonight for two, catch-up,
+- **Insights by plan:** 17 features carry the Pro rule (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, spoiler watch, Your TV life, Your TV
-  clock, Your services, forecasts, From the makers you love, While you wait); everything else is free. A plan is a set of feature flags: each of those flags has a
+  clock, Your services, forecasts, From the makers you love, While you wait); the three that are turned on are what
+  Pro adds today, and `/settings/plan` lists only those. Each of those flags has a
   plan rule in `Flags/flagd.json` (`"plans": "plus,family"` in its metadata), and an admin can put any feature into the
-  paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Plus tag and its page says what
-  Plus adds; `/settings/plan` lists each plan's insights from the flags. The services refuse a locked insight (404).
-- **Free:** tracking, ratings and lists without a plan limit (up to the service's cap of 100 lists). **Plus:** Your
-  services and the Plus features. Every plan can share lists, on its profile and by link. Lists were capped at 3 on
-  Free and sharing was Plus-only at first; both opened to everyone, since a cap on lists is a cap on tracking and
+  paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Pro tag and its page says what
+  Pro adds; `/settings/plan` lists each plan's insights from the flags. The services refuse a locked insight (404).
+- **Free:** tracking, ratings and lists without a plan limit (up to the service's cap of 100 lists). **Pro:** Your
+  services and the Pro features. Every plan can share lists, on its profile and by link. Lists were capped at 3 on
+  Free and sharing was Pro-only at first; both opened to everyone, since a cap on lists is a cap on tracking and
   shared lists bring people in.
-- **Family** (`family-plan` flag): Plus for the owner and up to 5 people they invite, on one subscription.
+- **Family** (`family-plan` flag): Pro for the owner and up to 5 people they invite, on one subscription.
   - **Inviting:** `/settings/family` gives the owner an invite link (`/family/join/{token}`), which they can share or
     turn off. Whoever opens it signs in (or signs up) and joins while there's room.
-  - **Members** get Plus's benefits while the owner pays for Family, with their own lists, ratings and watches; the
+  - **Members** get Pro's benefits while the owner pays for Family, with their own lists, ratings and watches; the
     owner sees only their names. A person is in one family at most; an owner with members can't join another.
   - **Leaving:** a member can leave, the owner can remove them, and a family ends when its owner stops paying for it or
     deletes their account. Anything made on the plan stays, as with any downgrade.
@@ -892,10 +907,10 @@ provider: Stripe in a deployment (and locally once its test key is given), else,
     `GET /api/v1/family/invites/{token}` and `POST /api/v1/family/join` (`{"token":…}`; 409 with the reason when the
     family is full, ended, or you're in another).
 - **Buying** (`payments` flag): each paid plan's card on `/settings/plan` has its price by the month and by the year,
-  for your profile's region. Plus is $2.99 a month or $29.99 a year, Family $4.99 or $49.99; other regions' prices are
+  for your profile's region. Pro is $2.99 a month or $29.99 a year, Family $4.99 or $49.99; other regions' prices are
   set in `Payments:Prices` on Identity.API. A purchase takes you to the provider's checkout and back, and the plan
   changes as soon as the provider confirms the payment (within seconds). One subscription at a time: to switch between
-  Plus and Family, cancel and buy the other.
+  Pro and Family, cancel and buy the other.
   - **Cancelling:** you keep the plan until the period you paid for ends, then go back to Free (nothing you made goes),
     and you can take the cancellation back until then. If a renewal never arrives, the plan ends 3 days after the period
     (`Payments:GraceDays`).
@@ -926,7 +941,7 @@ provider: Stripe in a deployment (and locally once its test key is given), else,
 - **Where it shows:** `/settings/plan` compares the plans and shows yours. If a plan has a list limit again, the lists
   page says "2 of 3 lists on Free" and turns Create off at it. Lists and sharing still go through the plan's
   `MaxLists` and `ShareLists`, so a plan can get a limit back without new plumbing.
-- **Nothing is taken away:** lists made before the limits, or while on Plus, stay, shared ones stay shared, and a free
+- **Nothing is taken away:** lists made before the limits, or while on Pro, stay, shared ones stay shared, and a free
   user can still edit, unshare or delete them. Only a new list or a new share is refused.
 - **Setting a plan:** admins (`Admin:Users`) search people and pick a plan on `/settings/plans`. A change reaches
   Tracking within seconds.
@@ -967,7 +982,7 @@ read-only, without signing in or having an account.
 ### Landing page, privacy and terms
 
 - **Landing page:** signed out, Home (`/`) opens with what the app does, "Get started free" (Keycloak's sign-in page,
-  where Register creates the account), the four things that set it apart, and what Free, Plus and Family include, with
+  where Register creates the account), the four things that set it apart, and what Free, Pro and Family include, with
   Trending below. Signed in, Home is unchanged.
 - **Privacy** (`/privacy`) and **Terms** (`/terms`), linked from every page's footer and readable signed out. They
   describe what the app actually does: what's stored and why, what stays on the device, what others see (activity,
@@ -1327,7 +1342,7 @@ How events flow:
       [Stream-Wiser](https://stream-wiser.com/prices)); MGM+ and discovery+ are shown without one, since it couldn't
       be confirmed. Directory: `NetworkServices` in IntegrationEvents.
     - **API:** `GET /api/v1/insights/networks` on Analytics.API, signed in (`baseline` is the whole catalog).
-  - **Your services** (`/services`, from the report cards; Plus and Family; `your-services` flag): pick the streaming
+  - **Your services** (`/services`, from the report cards; Pro and Family; `your-services` flag): pick the streaming
     services you pay for.
     - **The report:** your monthly total, and per service the hours you watched on it in the last 30 days, its cost per
       hour, the shows behind them, and the shows you follow with episodes on it in the next 30 days.
@@ -1360,7 +1375,7 @@ How events flow:
     back first: the next episode or season premiere when it's dated, else the forecast from the show's own past waits
     (with "overdue" past its range), with how often comparable shows came back as a weak signal.
     - **API:** `GET /api/v1/me/waiting` on Analytics.API, signed in.
-  - **While you wait** (`/while-you-wait`, linked from Up Next and the waiting room; `while-you-wait` flag, Plus and
+  - **While you wait** (`/while-you-wait`, linked from Up Next and the waiting room; `while-you-wait` flag, Pro and
     Family): for each show you're caught up on that's back between a week and six months from now (dated, or a
     forecast's likely month), up to three finished shows you haven't started that you can watch from start to end before
     it returns, at your own pace over the last 8 weeks (5 hours a week assumed when you've watched nothing lately). Picks

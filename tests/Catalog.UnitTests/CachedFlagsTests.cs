@@ -81,6 +81,6 @@ public class CachedFlagsTests
         var (flags, _, _) = await BuildAsync([]);
         var context = FeatureFlags.ContextFor(null);
         Assert.True(await flags.IsEnabledAsync(FeatureFlags.Universes, context, TestContext.Current.CancellationToken));
-        Assert.False(await flags.IsEnabledAsync(FeatureFlags.Payments, context, TestContext.Current.CancellationToken));
+        Assert.False(await flags.IsEnabledAsync(FeatureFlags.Blend, context, TestContext.Current.CancellationToken));
     }
 }

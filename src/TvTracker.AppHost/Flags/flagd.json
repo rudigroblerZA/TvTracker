@@ -398,20 +398,20 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "off",
-      "metadata": { "description": "Your services (Plus and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards.", "name": "Your services", "plans": "plus,family" },
+      "metadata": { "description": "Your services (Pro and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards.", "name": "Your services", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "family-plan": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "Family plan: the owner invites up to 5 people by link, and each gets Plus's benefits from the one subscription." }
+      "defaultVariant": "on",
+      "metadata": { "description": "Family plan: the owner invites up to 5 people by link, and each gets Pro's features from the one subscription." }
     },
     "payments": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "Payments: buy Plus or Family from the plan page through the payment provider (in development, the test provider's page at /dev/payments), and cancel or resume." }
+      "defaultVariant": "on",
+      "metadata": { "description": "Payments: buy Pro or Family from the plan page through the payment provider (in development, the test provider's page at /dev/payments), and cancel or resume." }
     },
     "list-links": {
       "state": "ENABLED",
@@ -422,8 +422,8 @@
     "plans": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "Plans: Free, Plus and Family, each a set of features; off, nothing is limited by plan. Also the plan page and admins' plans page." }
+      "defaultVariant": "on",
+      "metadata": { "description": "Plans: Free (basic insights), Pro (every insight) and Family (Pro for more people), each a set of features; off, nothing is limited by plan. Also the plan page and admins' plans page." }
     },
     "worth-it": {
       "state": "ENABLED",
