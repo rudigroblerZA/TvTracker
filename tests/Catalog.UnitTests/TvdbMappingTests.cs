@@ -198,17 +198,17 @@ public class TvdbMappingTests
     public void An_episode_airs_on_its_day_at_the_series_time_in_its_countrys_time_zone()
     {
         // 21:00 Eastern: 02:00 UTC the next day in winter, 01:00 in summer.
-        Assert.Equal(new DateTimeOffset(2008, 1, 21, 2, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2008, 1, 20), "21:00", "usa"));
-        Assert.Equal(new DateTimeOffset(2013, 8, 12, 1, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2013, 8, 11), "21:00", "usa"));
+        Assert.Equal(new DateTimeOffset(2008, 1, 21, 2, 0, 0, TimeSpan.Zero), TvdbMapping.AirTimes("21:00", "usa")(new(2008, 1, 20)));
+        Assert.Equal(new DateTimeOffset(2013, 8, 12, 1, 0, 0, TimeSpan.Zero), TvdbMapping.AirTimes("21:00", "usa")(new(2013, 8, 11)));
         // 23:00 in Tokyo is 14:00 UTC the same day.
-        Assert.Equal(new DateTimeOffset(2024, 4, 6, 14, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "23:00", "jpn"));
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 14, 0, 0, TimeSpan.Zero), TvdbMapping.AirTimes("23:00", "jpn")(new(2024, 4, 6)));
         // No time: the evening there, never the midnight before.
-        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), null, "gbr"));
-        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "soon", "gbr"));
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirTimes(null, "gbr")(new(2024, 4, 6)));
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 19, 0, 0, TimeSpan.Zero), TvdbMapping.AirTimes("soon", "gbr")(new(2024, 4, 6)));
         // A country not listed: the time as UTC.
-        Assert.Equal(new DateTimeOffset(2024, 4, 6, 21, 30, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 4, 6), "21:30", "isl"));
+        Assert.Equal(new DateTimeOffset(2024, 4, 6, 21, 30, 0, TimeSpan.Zero), TvdbMapping.AirTimes("21:30", "isl")(new(2024, 4, 6)));
         // 02:30 on the night the clocks go forward doesn't exist in New York: an hour later.
-        Assert.Equal(new DateTimeOffset(2024, 3, 10, 7, 30, 0, TimeSpan.Zero), TvdbMapping.AirsAt(new(2024, 3, 10), "02:30", "usa"));
+        Assert.Equal(new DateTimeOffset(2024, 3, 10, 7, 30, 0, TimeSpan.Zero), TvdbMapping.AirTimes("02:30", "usa")(new(2024, 3, 10)));
     }
 
     [Fact]

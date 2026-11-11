@@ -12,7 +12,7 @@ namespace Catalog.SyncWorker.Providers.Tvdb;
 /// What it has that the others lack: a show's ids are TheTVDB's own, so a TV Time history imports without a lookup.
 /// Titles, overviews and episode names are read in <see cref="TvdbOptions.Language"/> where TheTVDB has them, and
 /// episodes in aired order. What it doesn't have: ratings, where to watch and similar shows; an episode's air time is
-/// its day at the series' time (<see cref="TvdbMapping.AirsAt"/>); people come without birthdays, and a person's acting credits elsewhere aren't read (their record doesn't say enough about each
+/// its day at the series' time (<see cref="TvdbMapping.AirTimes"/>); people come without birthdays, and a person's acting credits elsewhere aren't read (their record doesn't say enough about each
 /// show), so the features built on those stay empty for TheTVDB's shows.
 /// </para>
 /// </summary>
@@ -60,7 +60,7 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     /// </summary>
     public async Task<IReadOnlyList<string>> GetPopularShowIdsAsync(int count, Action<int>? onPage = null, CancellationToken cancellationToken = default)
     {
-        var language = Uri.EscapeDataString(options.Value.Language);
+        var language = Uri.EscapeDataString(options.Value.FeaturedLanguage);
         var shows = new List<TvdbSeries>();
         var pages = 0;
         foreach (var country in options.Value.Countries)
@@ -126,10 +126,8 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
     /// </summary>
     public async Task<IReadOnlyDictionary<string, DateTimeOffset>?> GetChangedShowsAsync(TimeSpan within, CancellationToken cancellationToken = default)
     {
-        var seriesFeed = UpdatesAsync("series", within, cancellationToken);
-        var episodesFeed = UpdatesAsync("episodes", within, cancellationToken);
-        await Task.WhenAll(seriesFeed, episodesFeed);
-        var (series, episodes) = (seriesFeed.Result, episodesFeed.Result);
+        var (series, episodes) = await TogetherAsync(
+            ct => UpdatesAsync("series", within, ct), ct => UpdatesAsync("episodes", within, ct), cancellationToken);
         var changed = new Dictionary<string, DateTimeOffset>();
         foreach (var (id, at) in series.Select(u => (u.RecordId, u.TimeStamp))
             .Concat(episodes.Where(u => u.SeriesId is > 0).Select(u => (u.SeriesId!.Value, u.TimeStamp))))
@@ -160,12 +158,35 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
         // No action filter: a new episode is a creation, and "update" alone would leave it out.
         var (updates, complete) = await tvdb.PagesAsync<List<TvdbUpdate>, TvdbUpdate>(
             page => $"updates?since={since}&type={type}&page={page}", found => found, MaxUpdatePages, ct);
+        var kept = updates.Where(u => u.MethodInt != TvdbUpdate.Deleted).ToList();
         if (!complete)
         {
             logger.LogInformation("TheTVDB's {Type} updates since {Since} run past {Pages} pages; using the {Count} read",
-                type, DateTimeOffset.FromUnixTimeSeconds(since), MaxUpdatePages, updates.Count);
+                type, DateTimeOffset.FromUnixTimeSeconds(since), MaxUpdatePages, kept.Count);
         }
-        return updates.Where(u => u.MethodInt != TvdbUpdate.Deleted).ToList();
+        return kept;
+    }
+
+    /// <summary>
+    /// Two independent reads at once (the client limits how many requests run together). When one fails the other is
+    /// cancelled, so it doesn't read on to its last page for a result nobody will use.
+    /// </summary>
+    private static async Task<(T1, T2)> TogetherAsync<T1, T2>(Func<CancellationToken, Task<T1>> first, Func<CancellationToken, Task<T2>> second,
+        CancellationToken ct)
+    {
+        using var both = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var (one, two) = (first(both.Token), second(both.Token));
+        try
+        {
+            // The first to finish: awaited so that its failure, if that's how it ended, stops the other.
+            await await Task.WhenAny(one, two);
+            return (await one, await two);
+        }
+        catch
+        {
+            await both.CancelAsync();
+            throw;
+        }
     }
 
     public async Task<ProviderShow?> GetShowAsync(string externalId, CancellationToken cancellationToken = default)
@@ -177,31 +198,36 @@ public sealed class TvdbCatalogProvider(TvdbClient tvdb, IOptions<TvdbOptions> o
             return null;
         }
 
-        var foreign = !string.Equals(series.OriginalLanguage, language, StringComparison.OrdinalIgnoreCase);
-        var original = EpisodesAsync(externalId, "official", null, cancellationToken);
-        // A show made in another language: its episodes again in ours, for the names and overviews TheTVDB has. Both
-        // listings at once; they're independent, and the client limits how many requests run together.
-        var translated = foreign ? EpisodesAsync(externalId, "official", language, cancellationToken) : Task.FromResult(new List<TvdbEpisode>());
-        await Task.WhenAll(original, translated);
-        var episodes = original.Result;
-        if (episodes.Count == 0)
+        if (string.Equals(series.OriginalLanguage, language, StringComparison.OrdinalIgnoreCase))
         {
-            // Nothing in aired order: the series' default order, in both languages.
-            episodes = await EpisodesAsync(externalId, "default", null, cancellationToken);
-            translated = foreign ? EpisodesAsync(externalId, "default", language, cancellationToken) : translated;
+            return Show(series, await EpisodesAsync(externalId, null, cancellationToken), Today, language);
         }
-        return Show(series, foreign ? WithTranslations(episodes, await translated) : episodes, Today, language);
+        // A show made in another language: its episodes again in ours, for the names and overviews TheTVDB has.
+        var (original, translated) = await TogetherAsync(
+            ct => EpisodesAsync(externalId, null, ct), ct => EpisodesAsync(externalId, language, ct), cancellationToken);
+        return Show(series, WithTranslations(original, translated), Today, language);
     }
 
     /// <summary>
-    /// A show's episodes in an order, page by page, in a language when one is given. Aired order ("official") is asked
-    /// for first, not the series' default (which can be DVD or absolute): it's the order the seasons' names belong to
-    /// and the one a TV Time history numbers episodes by.
+    /// A show's episodes, page by page, in a language when one is given. In aired order ("official"), not the series'
+    /// default (which can be DVD or absolute): it's the order the seasons' names belong to and the one a TV Time
+    /// history numbers episodes by. A listing with nothing in aired order is read in the default one; each language
+    /// falls back on its own, and the two are matched by episode, so they needn't be in the same order.
     /// </summary>
-    private async Task<List<TvdbEpisode>> EpisodesAsync(string externalId, string order, string? language, CancellationToken ct) =>
-        (await tvdb.PagesAsync<TvdbEpisodePage, TvdbEpisode>(
-            page => $"series/{externalId}/episodes/{order}{(language is null ? "" : "/" + Uri.EscapeDataString(language))}?page={page}",
-            found => found.All, MaxEpisodePages, ct)).Items;
+    private async Task<List<TvdbEpisode>> EpisodesAsync(string externalId, string? language, CancellationToken ct)
+    {
+        foreach (var order in new[] { "official", "default" })
+        {
+            var (episodes, _) = await tvdb.PagesAsync<TvdbEpisodePage, TvdbEpisode>(
+                page => $"series/{externalId}/episodes/{order}{(language is null ? "" : "/" + Uri.EscapeDataString(language))}?page={page}",
+                found => found.All, MaxEpisodePages, ct);
+            if (episodes.Count > 0)
+            {
+                return episodes;
+            }
+        }
+        return [];
+    }
 
     /// <summary>
     /// How many shows they created or executive-produced, and the first ten as TheTVDB lists them. The shows they made

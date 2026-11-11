@@ -27,19 +27,18 @@
        Wikidata's (CC0) needs none but is named all the same. *@
     <footer class="app-footer muted small">
         <p class="footer-links"><a href="privacy">Privacy</a><a href="terms">Terms</a></p>
-        @if (Brand.Catalog.Url is not { } source)
+        @switch (Brand.Catalog.Licence)
         {
-            <text>Invented show data, for development</text>
-        }
-        else if (Brand.Catalog.OwnLicence)
-        {
-            <text>Metadata provided by <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>.
-                Please consider adding missing information or subscribing.</text>
-        }
-        else
-        {
-            <text>Show data from <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>
-                (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
+            case CatalogLicence.Invented:
+                <text>Invented show data, for development</text>
+                break;
+            case CatalogLicence.Own:
+                <text>Metadata provided by <CatalogCredits />. Please consider adding missing information or subscribing.</text>
+                break;
+            default:
+                <text>Show data from <CatalogCredits />
+                    (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a>)</text>
+                break;
         }
     </footer>
 </div>

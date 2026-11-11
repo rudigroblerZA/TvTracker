@@ -39,10 +39,15 @@ public sealed class TvdbOptions
 
     /// <summary>
     /// The language titles, overviews and episode names are wanted in, as TheTVDB's three-letter code: a show made in
-    /// another language is read in this one where TheTVDB has the translation. Also the original language of the
-    /// featured shows.
+    /// another language is read in this one where TheTVDB has the translation.
     /// </summary>
     public string Language { get; set; } = "eng";
+
+    /// <summary>
+    /// The original language of the featured shows, as TheTVDB's three-letter code. Not <see cref="Language"/>: reading
+    /// titles in German shouldn't cut the featured US and UK shows down to those made in German.
+    /// </summary>
+    public string FeaturedLanguage { get; set; } = "eng";
 
     public int FeaturedCount { get; set; } = 40;
 }

@@ -151,11 +151,6 @@ public static class TvdbMapping
     }
 
     /// <summary>
-    /// When one episode airs (<see cref="AirTimes"/>).
-    /// </summary>
-    public static DateTimeOffset AirsAt(DateOnly day, string? airsTime, string? country) => AirTimes(airsTime, country)(day);
-
-    /// <summary>
     /// Regular episodes in order, one per season and number: specials (season 0) and unnumbered episodes are left out,
     /// as with the other providers. <paramref name="airsTime"/> and <paramref name="country"/> are the series'
     /// (<see cref="AirTimes"/>).

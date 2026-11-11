@@ -1,0 +1,7 @@
+@* The catalog's credited sources as links, joined with "and": "TVmaze", "Wikidata and Wikipedia". One line of markup, so
+   no stray space lands before whatever punctuation follows it. *@
+@for (var i = 0; i < Brand.Catalog.Credits.Count; i++)
+{
+    var credit = Brand.Catalog.Credits[i];
+    @(i > 0 ? " and " : "")<a href="@credit.Url" target="_blank" rel="noopener">@credit.Name</a>
+}
