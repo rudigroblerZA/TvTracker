@@ -37,17 +37,13 @@
 
     <h2>The show information and insights</h2>
     <ul>
-        <li>Show and episode data comes from
-            @if (Brand.Catalog.Url is { } source)
+        @* The name and what follows it are one expression each, on one line, so no space lands before the comma. *@
+        <li>Show and episode data comes from @SourceLink@(Brand.Catalog.Licence switch
             {
-                <a href="@source" target="_blank" rel="noopener">@Brand.Catalog.Name</a>
-            }
-            else
-            {
-                @Brand.Catalog.Name
-            }
-            @(Brand.Catalog.OwnLicence ? ", under its own licence, and quotes and some facts" : ", and quotes and some facts") from Wikiquote and
-            Wikidata, under the
+                CatalogLicence.Own => ", under its own licence. Quotes and some facts come",
+                CatalogLicence.Invented => ", which is invented. Quotes and some facts come",
+                _ => ", and quotes and some facts"
+            }) from Wikiquote and Wikidata, under the
             <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA</a> licence.
             Pictures belong to their owners.</li>
         <li>Insights, forecasts and recommendations are worked out from that data and can be wrong. They're
@@ -95,3 +91,21 @@
         }
     </p>
 </article>
+
+@code {
+    /// <summary>
+    /// The catalog's source by name, linked to its site when it has one. Built as one piece of markup, since a Razor
+    /// fragment left a space between the link and the comma after it. The name and address are the app's own
+    /// (<see cref="CatalogSourceInfo"/>), and encoded all the same.
+    /// </summary>
+    private MarkupString SourceLink
+    {
+        get
+        {
+            var name = System.Net.WebUtility.HtmlEncode(Brand.Catalog.Name);
+            return (MarkupString)(Brand.Catalog.Url is { } url
+                ? $"<a href=\"{System.Net.WebUtility.HtmlEncode(url)}\" target=\"_blank\" rel=\"noopener\">{name}</a>"
+                : name);
+        }
+    }
+}

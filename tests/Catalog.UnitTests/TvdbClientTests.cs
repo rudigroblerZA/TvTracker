@@ -250,6 +250,26 @@ public class TvdbClientTests
     }
 
     [Fact]
+    public async Task A_translated_listing_with_nothing_in_aired_order_falls_back_on_its_own()
+    {
+        var tvdb = new FakeTvdb((request, _) => request.RequestUri!.PathAndQuery switch
+        {
+            "/v4/login" => Json("""{ "data": { "token": "t" } }"""),
+            "/v4/series/8/extended?meta=translations" => Json("""{ "data": { "id": 8, "name": "Dark", "originalLanguage": "deu" } }"""),
+            "/v4/series/8/episodes/official?page=0" => Json("""{ "data": { "episodes": [ { "id": 1, "name": "Geheimnisse", "number": 1, "seasonNumber": 1 } ] } }"""),
+            // TheTVDB has no aired-order listing in English for it (404), but has a default-order one.
+            "/v4/series/8/episodes/official/eng?page=0" => Json("""{ "status": "failure" }""", HttpStatusCode.NotFound),
+            "/v4/series/8/episodes/default/eng?page=0" => Json("""{ "data": { "series": { "id": 8, "episodes": [ { "id": 1, "name": "Secrets" } ] } } }"""),
+            var other => throw new InvalidOperationException($"Not expected: {other}")
+        });
+        var (client, options) = Client(tvdb);
+
+        var show = await Provider(client, options).GetShowAsync("8", TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Secrets"], show!.Episodes.Select(e => e.Title));
+    }
+
+    [Fact]
     public async Task A_series_with_nothing_in_aired_order_is_read_in_its_default_order()
     {
         var tvdb = new FakeTvdb((request, _) => request.RequestUri!.PathAndQuery switch
