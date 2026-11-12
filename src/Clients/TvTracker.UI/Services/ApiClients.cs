@@ -252,17 +252,24 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<AffiliatePrograms?> GetAffiliateProgramsAsync(CancellationToken ct = default) =>
         GetAsync<AffiliatePrograms>(ApiClients.Catalog, "api/v1/affiliates/programs", ct);
 
-    public Task SaveAffiliateProgramAsync(string name, SaveAffiliateProgram program, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Catalog, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct);
-
-    public Task DeleteAffiliateProgramAsync(string name, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Catalog, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct);
+    /// <summary>
+    /// False when it didn't happen: affiliate links are switched off, or the viewer isn't an admin.
+    /// </summary>
+    public async Task<bool> SaveAffiliateProgramAsync(string name, SaveAffiliateProgram program, CancellationToken ct = default) =>
+        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct) is not null;
 
     /// <summary>
-    /// Adds a test program for each main streaming service that has none; how many were added.
+    /// False when there was nothing to remove, or the viewer may not.
     /// </summary>
-    public Task<int> AddStarterAffiliateProgramsAsync(CancellationToken ct = default) =>
-        SendAsync<int>(ApiClients.Catalog, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
+    public async Task<bool> DeleteAffiliateProgramAsync(string name, CancellationToken ct = default) =>
+        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct) is not null;
+
+    /// <summary>
+    /// Adds a test program for each main streaming service that has none; how many were added, or null when it
+    /// didn't happen (switched off, or not an admin).
+    /// </summary>
+    public Task<int?> AddStarterAffiliateProgramsAsync(CancellationToken ct = default) =>
+        SendAsync<int?>(ApiClients.Catalog, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
 
     /// <summary>
     /// Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.

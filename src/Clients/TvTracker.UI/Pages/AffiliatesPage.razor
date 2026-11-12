@@ -1,3 +1,4 @@
+@using static TvTracker.UI.Services.ReportFormat
 @page "/settings/affiliates"
 @attribute [RequiresFeature(FeatureFlags.Affiliates)]
 @inject CatalogClient Catalog
@@ -45,7 +46,7 @@
                     <div class="muted">@($"sales reported, {Share(report.Conversions, report.AffiliatedClicks)} of program clicks")</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">@(report.Revenue.Count == 0 ? "–" : string.Join(" + ", report.Revenue.Select(m => Amount(m.Amount, m.Currency))))</div>
+                    <div class="stat-value">@Sum(report.Revenue.Select(m => (m.Amount, m.Currency)))</div>
                     <div class="muted">commission</div>
                 </div>
             </div>
@@ -148,8 +149,6 @@
 </AuthorizeView>
 
 @code {
-    private static readonly int[] Windows = [7, 30, 90];
-
     private AffiliateReport? report;
     private int days = 30;
     private bool loaded;
@@ -187,13 +186,6 @@
             loaded = true;
         }
     }
-
-    private static int Width(int value, int max) => max == 0 ? 0 : Math.Max(2, (int)Math.Round(100.0 * value / max));
-
-    private static string Share(int part, int whole) => whole == 0 ? "–" : ((double)part / whole).ToString("P0");
-
-    private static string Amount(decimal amount, string? currency, int decimals = 2) =>
-        $"{amount.ToString($"N{decimals}")} {currency}".Trim();
 
     private static string SurfaceName(string key) => key switch
     {

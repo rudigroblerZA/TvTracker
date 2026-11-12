@@ -1,3 +1,4 @@
+@using static TvTracker.UI.Services.ReportFormat
 @page "/settings/revenue"
 @inject IdentityClient Identity
 @inject CatalogClient Catalog
@@ -176,14 +177,13 @@
 </AuthorizeView>
 
 @code {
-    private static readonly int[] Windows = [7, 30, 90];
-
     private RevenueReport? revenue;
     private AffiliateReport? affiliates;
     private bool affiliatesOn;
     private int days = 30;
     private bool loaded;
     private string? error;
+    private int loads;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -195,23 +195,45 @@
 
     private async Task LoadAsync()
     {
+        // The window asked for last wins: an earlier answer arriving late is dropped.
+        var load = ++loads;
+        var window = days;
         error = null;
+        // Both reports at once; the affiliate one only while its flag is on, and its failure doesn't take the page down.
+        var revenueTask = Identity.GetRevenueReportAsync(window);
+        var affiliatesTask = AffiliatesAsync(window);
         try
         {
-            // Both reports at once; the affiliate one only while its flag is on.
-            var revenueTask = Identity.GetRevenueReportAsync(days);
-            var affiliatesTask = Flags.IfEnabledAsync(FeatureFlags.Affiliates, () => Catalog.GetAffiliateReportAsync(days));
-            affiliatesOn = await Flags.IsEnabledAsync(FeatureFlags.Affiliates);
-            await Task.WhenAll(revenueTask, affiliatesTask);
-            (revenue, affiliates) = (revenueTask.Result, affiliatesTask.Result);
+            var report = await revenueTask;
+            var (on, clicks) = await affiliatesTask;
+            if (load == loads)
+            {
+                (revenue, affiliatesOn, affiliates) = (report, on, clicks);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            error = ErrorNotice.Describe(ex);
+            if (load == loads)
+            {
+                // Not the last window's numbers under this window's button.
+                (revenue, affiliates, error) = (null, null, ErrorNotice.Describe(ex));
+            }
         }
         finally
         {
             loaded = true;
+        }
+    }
+
+    private async Task<(bool On, AffiliateReport? Report)> AffiliatesAsync(int window)
+    {
+        try
+        {
+            return await Flags.IsEnabledAsync(FeatureFlags.Affiliates) ? (true, await Catalog.GetAffiliateReportAsync(window)) : (false, null);
+        }
+        catch (HttpRequestException)
+        {
+            return (true, null);
         }
     }
 
@@ -230,13 +252,5 @@
 
     private static int FunnelMax(RevenueReport r) => Funnel(r).Max(s => s.Count);
 
-    private static int Width(int value, int max) => max == 0 || value == 0 ? 0 : Math.Max(2, (int)Math.Round(100.0 * value / max));
-
-    private static string Share(int part, int whole) => whole == 0 ? "–" : ((double)part / whole).ToString("P0");
-
-    /// <summary>
-    /// Money per currency, "12.50 USD + 89.00 ZAR"; a dash for none.
-    /// </summary>
-    private static string Sum(IReadOnlyList<Money> money) =>
-        money.Count == 0 ? "–" : string.Join(" + ", money.Select(m => $"{m.Amount:N2} {m.Currency}"));
+    private static string Sum(IReadOnlyList<Money> money) => ReportFormat.Sum(money.Select(m => (m.Amount, m.Currency)));
 }

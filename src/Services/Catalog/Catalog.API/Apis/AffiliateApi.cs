@@ -55,7 +55,7 @@ public record AffiliateProgramsDto(IReadOnlyList<AffiliateProgramSettingsDto> Pr
 /// key are the test network's, and what's given is ignored.
 /// </summary>
 public record SaveAffiliateProgramRequest(IReadOnlyList<string>? Services, IReadOnlyList<string>? Regions, string? Template, string? PostbackKey,
-    string? Currency, bool Test, bool Enabled = true);
+    string? Currency, bool Test, bool Enabled = true, bool New = false);
 
 /// <param name="Revenue">Commission reported in the window, per currency.</param>
 public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<MoneyDto> Revenue,
@@ -119,7 +119,7 @@ public static partial class AffiliateApi
     private static AffiliateProgramDto Describe(AffiliateProgram p) =>
         new(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p), p.Source, p.Test);
 
-    private static async Task<Results<NoContent, NotFound, ValidationProblem>> SaveProgramAsync(string name, SaveAffiliateProgramRequest request,
+    private static async Task<Results<Ok<string>, NotFound, ValidationProblem>> SaveProgramAsync(string name, SaveAffiliateProgramRequest request,
         ClaimsPrincipal user, IConfiguration config, CatalogContext db, AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
     {
         if (!Admins.Is(user, config))
@@ -136,13 +136,16 @@ public static partial class AffiliateApi
 
         var problem = !ProgramName().IsMatch(name) ? "A name is 1 to 64 lower-case letters, digits and hyphens: it's what the network's postback names."
             : name == AffiliateLinks.TestNetworkName ? "That name is the test network's own."
+            : request.New && existing is not null ? $"There's a program named {name} already: edit that one, or pick another name."
             : services.Count == 0 || services.Any(s => s.Length > 128) ? "Give at least one service, as where-to-watch names it (or * for all)."
             : regions.Any(r => r.Length != 2) ? "A region is a two-letter country code."
             : currency.Length != 3 || !currency.All(char.IsAsciiLetterUpper) ? "A currency is three letters, like USD."
             : request.Test ? null
+            : template.Length > 1024 ? "The link is at most 1,024 characters."
             : !AffiliateLinks.IsValid(new AffiliateProgram { Name = name, Services = services, Template = template, Currency = currency })
                 ? "The link must be an https address, with {url} where the service's link goes and {click} for the click id."
             : !template.Contains("{url}") ? "The link needs {url}, where the service's own link goes."
+            : !template.Contains("{click}") ? "The link needs {click}, the click id the network sends back with a sale: without it no sale can be matched."
             : key is null ? "Give a postback key: the secret the network sends with each sale."
             : key.Length is < 16 or > 256 ? "A postback key is 16 to 256 characters."
             : null;
@@ -161,33 +164,51 @@ public static partial class AffiliateApi
             existing.UpdatedAtUtc) = (services, regions, template, key, currency, request.Test, request.Enabled, now);
         await db.SaveChangesAsync(ct);
         programs.Forget();
-        return TypedResults.NoContent();
+        return TypedResults.Ok(name);
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteProgramAsync(string name, ClaimsPrincipal user, IConfiguration config,
+    private static async Task<Results<Ok<string>, NotFound>> DeleteProgramAsync(string name, ClaimsPrincipal user, IConfiguration config,
         CatalogContext db, AffiliatePrograms programs, CancellationToken ct)
     {
-        if (!Admins.Is(user, config) || await db.AffiliatePrograms.Where(p => p.Name == name.Trim().ToLowerInvariant()).ExecuteDeleteAsync(ct) == 0)
+        name = name.Trim().ToLowerInvariant();
+        if (!Admins.Is(user, config) || await db.AffiliatePrograms.Where(p => p.Name == name).ExecuteDeleteAsync(ct) == 0)
         {
             return TypedResults.NotFound();
         }
         programs.Forget();
-        return TypedResults.NoContent();
+        return TypedResults.Ok(name);
     }
 
     /// <summary>
-    /// Adds a test program for each main streaming service that has none (<see cref="StarterPrograms"/>).
+    /// Adds a test program for each main streaming service that has none (<see cref="StarterPrograms"/>), where the
+    /// test network runs: anywhere else they'd never be used.
     /// </summary>
-    private static async Task<Results<Ok<int>, NotFound>> AddStartersAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
+    private static async Task<Results<Ok<int>, NotFound, ValidationProblem>> AddStartersAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
         AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
     {
         if (!Admins.Is(user, config))
         {
             return TypedResults.NotFound();
         }
-        var missing = StarterPrograms.Missing(await db.AffiliatePrograms.Select(p => p.Name).ToListAsync(ct), time.GetUtcNow().UtcDateTime);
+        if (AffiliateLinks.TestNetwork(config) is null)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["program"] = ["The test network isn't running here, so test programs wouldn't be used."]
+            });
+        }
+        var missing = StarterPrograms.Missing(await db.AffiliatePrograms.AsNoTracking().ToListAsync(ct), time.GetUtcNow().UtcDateTime);
         db.AffiliatePrograms.AddRange(missing);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Someone else (or the seeder) added them at the same moment: they're there, and none are from this call.
+            db.ChangeTracker.Clear();
+            missing = [];
+        }
         programs.Forget();
         return TypedResults.Ok(missing.Count);
     }
@@ -245,7 +266,8 @@ public static partial class AffiliateApi
         string? amount, string? currency, string? key, CatalogContext db, AffiliatePrograms programs, TimeProvider time,
         CancellationToken ct)
     {
-        var found = (await programs.AllAsync(ct)).FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
+        // Switched-off programs too: a sale for a click sent before the switch still counts.
+        var found = (await programs.AllAsync(ct, includeOff: true)).FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
         if (found is null || !AffiliateLinks.KeyMatches(found, key) || !Guid.TryParse(click, out var clickId))
         {
             return TypedResults.NotFound();

@@ -99,16 +99,23 @@ public static class RevenueReport
             .Select(g => new RevenueMoneyDto(g.Key, g.Sum(r => r.Amount)))
             .OrderBy(m => m.Currency, StringComparer.Ordinal)
             .ToList();
+        var planOrder = Plans.All.ToList();
         var plans = active.GroupBy(s => (s.Plan, s.Interval))
             .Select(g => new RevenuePlanRowDto(g.Key.Plan, Plans.Name(g.Key.Plan), g.Key.Interval, g.Count(), g.Count(s => s.CancelAtPeriodEnd)))
-            .OrderBy(r => Plans.All.ToList().IndexOf(r.Plan)).ThenBy(r => r.Interval, StringComparer.Ordinal)
+            .OrderBy(r => planOrder.IndexOf(r.Plan)).ThenBy(r => r.Interval, StringComparer.Ordinal)
             .ToList();
+        // One pass over each list, not one per day.
+        var accountsOn = PerDay(newAccounts);
+        var paymentsOn = PerDay(receipts.Select(r => r.PaidAtUtc));
+        var startedOn = PerDay(started);
         var days = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(from.AddDays)
-            .Select(d => new RevenueDayDto(d, newAccounts.Count(a => DateOnly.FromDateTime(a) == d),
-                receipts.Count(r => DateOnly.FromDateTime(r.PaidAtUtc) == d), started.Count(s => DateOnly.FromDateTime(s) == d)))
+            .Select(d => new RevenueDayDto(d, accountsOn.GetValueOrDefault(d), paymentsOn.GetValueOrDefault(d), startedOn.GetValueOrDefault(d)))
             .ToList();
         return new RevenueReportDto(from, to, accounts, newAccounts.Count, paying, onPaidPlan,
             accounts == 0 ? 0 : Math.Round((double)paying / accounts, 4), monthly, received, checkoutsStarted, checkoutsCompleted, started.Count,
             ended, plans, days);
     }
+
+    private static Dictionary<DateOnly, int> PerDay(IEnumerable<DateTime> times) =>
+        times.GroupBy(DateOnly.FromDateTime).ToDictionary(g => g.Key, g => g.Count());
 }

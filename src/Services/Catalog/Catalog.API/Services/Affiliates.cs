@@ -123,8 +123,8 @@ public static class AffiliateLinks
         && (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback));
 
     /// <summary>
-    /// The development test network (<c>Affiliates:TestNetwork:Url</c> and <c>:Key</c>, set by the AppHost with
-    /// <c>Affiliates:TestNetwork=true</c>): every service, every region, its tracked link a page in the web app that can
+    /// The development test network (<c>Affiliates:TestNetwork:Url</c> and <c>:Key</c>, set by the AppHost when run locally
+    /// unless <c>Affiliates:TestNetwork=false</c>): every service, every region, its tracked link a page in the web app that can
     /// report a pretend sale through the real postback before sending the viewer on. Null when not configured.
     /// </summary>
     public static AffiliateProgram? TestNetwork(IConfiguration configuration) =>
@@ -158,11 +158,9 @@ public static class AffiliateLinks
 }
 
 /// <summary>
-/// App admins: Keycloak usernames in <c>Admin:Users</c>, as Identity's flags page reads them.
-/// </summary>
-/// <summary>
-/// Every affiliate program in force, in the order a click tries them: an admin's from Settings, then the
-/// configuration's, then the test network's catch-all. Kept a few seconds, so a click doesn't read the table each time
+/// Every affiliate program in force, in the order a click tries them: live ones from Settings, then the
+/// configuration's, then Settings' test programs, then the test network's catch-all, so a stand-in never takes a click
+/// a real program covers. Kept a few seconds, so a click doesn't read the table each time
 /// and a change in Settings applies almost at once (<see cref="Forget"/> makes it at once for the admin who made it).
 /// </summary>
 public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<AffiliateOptions> options, IConfiguration configuration, IMemoryCache cache)
@@ -170,26 +168,31 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
     private const string CacheKey = nameof(AffiliatePrograms);
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(15);
 
-    public async Task<IReadOnlyList<AffiliateProgram>> AllAsync(CancellationToken ct)
+    /// <param name="includeOff">Also the programs switched off in Settings: links don't use them, but a sale for a
+    /// click already sent through one still counts.</param>
+    public async Task<IReadOnlyList<AffiliateProgram>> AllAsync(CancellationToken ct, bool includeOff = false)
     {
         if (!cache.TryGetValue(CacheKey, out List<AffiliateProgramRecord>? records))
         {
             records = await db.AffiliatePrograms.AsNoTracking().ToListAsync(ct);
             cache.Set(CacheKey, records, CacheFor);
         }
-        return Merge(records!, options.CurrentValue.Programs, AffiliateLinks.TestNetwork(configuration));
+        return Merge(records!, options.CurrentValue.Programs, AffiliateLinks.TestNetwork(configuration), includeOff);
     }
 
     public void Forget() => cache.Remove(CacheKey);
 
     /// <summary>
-    /// Settings' programs that are switched on (a test one with the test network's link and key, or unusable without
-    /// one), then the configuration's that Settings doesn't name, then the test network's catch-all.
+    /// Settings' live programs that are switched on, then the configuration's that Settings doesn't name, then Settings'
+    /// test programs (with the test network's link and key, or unusable without one), then the test network's
+    /// catch-all. Within Settings, a program naming its services comes before one covering every service, then by name.
     /// </summary>
     public static IReadOnlyList<AffiliateProgram> Merge(IEnumerable<AffiliateProgramRecord> records, IEnumerable<AffiliateProgram> configured,
-        AffiliateProgram? testNetwork)
+        AffiliateProgram? testNetwork, bool includeOff = false)
     {
-        var fromSettings = records.Where(r => r.Enabled).OrderBy(r => r.Name, StringComparer.Ordinal).Select(r => new AffiliateProgram
+        var fromSettings = records.Where(r => r.Enabled || includeOff)
+            .OrderBy(r => r.Services.Contains(AffiliateLinks.AnyService)).ThenBy(r => r.Name, StringComparer.Ordinal)
+            .Select(r => new AffiliateProgram
         {
             Name = r.Name,
             Services = r.Services,
@@ -202,10 +205,13 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
         }).ToList();
         var named = records.Select(r => r.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var fromConfiguration = configured.Where(p => p.Source == AffiliateSources.Configuration && !named.Contains(p.Name));
-        return [.. fromSettings, .. fromConfiguration, .. testNetwork is null ? [] : new[] { testNetwork }];
+        return [.. fromSettings.Where(p => !p.Test), .. fromConfiguration, .. fromSettings.Where(p => p.Test), .. testNetwork is null ? [] : new[] { testNetwork }];
     }
 }
 
+/// <summary>
+/// App admins: Keycloak usernames in <c>Admin:Users</c>, as Identity's flags page reads them.
+/// </summary>
 public static class Admins
 {
     public static bool Is(ClaimsPrincipal user, IConfiguration config) =>
@@ -226,12 +232,14 @@ public static class StarterPrograms
     ];
 
     /// <summary>
-    /// The starter programs not in <paramref name="existing"/> yet, as records to add.
+    /// The starter programs to add: those whose name isn't taken and whose service no program in
+    /// <paramref name="existing"/> names yet, so a service with a program of its own isn't given a stand-in.
     /// </summary>
-    public static List<AffiliateProgramRecord> Missing(IEnumerable<string> existing, DateTime nowUtc)
+    public static List<AffiliateProgramRecord> Missing(IReadOnlyCollection<AffiliateProgramRecord> existing, DateTime nowUtc)
     {
-        var have = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return All.Where(p => !have.Contains(p.Name))
+        var names = existing.Select(r => r.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var covered = existing.SelectMany(r => r.Services).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return All.Where(p => !names.Contains(p.Name) && !covered.Contains(p.Service))
             .Select(p => new AffiliateProgramRecord
             {
                 Name = p.Name, Services = [p.Service], Currency = "USD", Test = true, Enabled = true, CreatedAtUtc = nowUtc, UpdatedAtUtc = nowUtc
