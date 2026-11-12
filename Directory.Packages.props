@@ -50,7 +50,7 @@
   <ItemGroup Label="Search (vectors)">
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
     <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
-    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="3.0.0" />
     <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
   </ItemGroup>
   <ItemGroup Label="Feature flags (OpenFeature)">
