@@ -559,13 +559,17 @@ link opens the web app's address in the browser and is counted there, as a signe
   as where-to-watch names them (`*` for all), two-letter regions (empty for all), the currency it pays in, the network's
   link and the postback key. Saved programs are in Catalog's database and take effect within a minute, no restart. The
   link must be an https address with `{url}` where the service's own link goes (escaped) and `{click}` for the click id;
-  the key is 16 characters or more and is never shown again. A program can be switched off without losing it.
+  the key is 16 characters or more and is never shown again. A program can be switched off without losing it: links
+  stop using it, and sales for clicks already sent through it still count. A removed program's later sales aren't
+  taken, so switch off rather than remove while sales may still come in. A click tries live programs from Settings
+  first (one naming its services before a `*` one), then configuration's, then test programs.
 - **Test programs**, for before there's a real deal: tick **Test program** and the program needs no link or key. Its
   clicks go through the built-in test network's page (below), named for the program, so the report has numbers per
   service from day one. **Add test programs for the main services** adds one each for Netflix, Prime Video, Disney+,
   Hulu, Apple TV, HBO Max, Paramount+ and Peacock; a fresh local database gets them on first start. Netflix has no
   public affiliate programme, so its entry stays a test one until there's a direct deal. Where the test network isn't
   running (production), test programs aren't used and their services get plain, still counted, links.
+  A service that already has a program doesn't get a starter test program.
 - **Programs in configuration** still work, under Catalog.API's `Affiliates:Programs` (re-read on change), for
   deployments that keep them with their secrets. A program in Settings with the same name wins:
 

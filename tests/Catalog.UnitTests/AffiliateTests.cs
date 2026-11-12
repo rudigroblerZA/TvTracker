@@ -217,6 +217,32 @@ public class AffiliateTests
         Assert.Contains(all, p => p is { Name: "netflix-test", Test: true, Enabled: true } && p.Services.SequenceEqual(["Netflix"]));
         Assert.Equal(StarterPrograms.All.Count, all.Count);
 
-        Assert.DoesNotContain(StarterPrograms.Missing(["NETFLIX-TEST", "hulu-test"], now), p => p.Name is "netflix-test" or "hulu-test");
+        // Not again by name, and not for a service that has a program of its own.
+        var missing = StarterPrograms.Missing([Record("NETFLIX-TEST", "Other", test: true), Record("hulu-us", "Hulu")], now);
+        Assert.DoesNotContain(missing, p => p.Name is "netflix-test" or "hulu-test");
+        Assert.Equal(StarterPrograms.All.Count - 2, missing.Count);
+    }
+
+    [Fact]
+    public void A_live_program_is_tried_before_a_test_one_whatever_their_names()
+    {
+        var test = AffiliateLinks.TestNetwork(WithTestNetwork());
+
+        var merged = AffiliatePrograms.Merge(
+            [Record("netflix-test", "Netflix", test: true), Record("all", "*"), Record("netflix-us", "Netflix")], [Prime], test);
+
+        // Live from Settings (naming its service before every-service), configuration, then the stand-ins.
+        Assert.Equal(["netflix-us", "all", "prime", "netflix-test", AffiliateLinks.TestNetworkName], merged.Select(p => p.Name));
+        Assert.Equal("netflix-us", AffiliateLinks.For(merged, "Netflix", "US")?.Name);
+    }
+
+    [Fact]
+    public void A_switched_off_program_is_not_linked_to_but_still_takes_its_sales()
+    {
+        IReadOnlyList<AffiliateProgramRecord> records = [Record("netflix-us", "Netflix", enabled: false)];
+
+        Assert.Empty(AffiliatePrograms.Merge(records, [], null));
+        var forPostbacks = Assert.Single(AffiliatePrograms.Merge(records, [], null, includeOff: true));
+        Assert.True(AffiliateLinks.KeyMatches(forPostbacks, "a-long-random-secret"));
     }
 }

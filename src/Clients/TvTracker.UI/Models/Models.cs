@@ -1319,10 +1319,10 @@ public record AffiliatePrograms(IReadOnlyList<AffiliateProgramSettings> Programs
     string PostbackUrl);
 
 /// <summary>
-/// A program to save; a null postback key keeps the one it has.
+/// A program to save; a null postback key keeps the one it has. <paramref name="New"/> refuses a name already taken.
 /// </summary>
 public record SaveAffiliateProgram(IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string? Template, string? PostbackKey, string Currency,
-    bool Test, bool Enabled);
+    bool Test, bool Enabled, bool New = false);
 
 /// <param name="Cancelling">Of <paramref name="Active"/>, those set to end with the period they've paid for.</param>
 public record RevenuePlanRow(string Plan, string Name, string Interval, int Active, int Cancelling);
