@@ -88,7 +88,11 @@ public static partial class AffiliateApi
         api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
 
         // Programs, set up by admins in Settings (404 for anyone else).
-        var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+        var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates)
+            .AddEndpointFilter(async (context, next) =>
+                Admins.Is(context.HttpContext.User, context.HttpContext.RequestServices.GetRequiredService<IConfiguration>())
+                    ? await next(context)
+                    : TypedResults.NotFound());
         programs.MapGet("/", GetProgramsAsync);
         programs.MapPut("/{name}", SaveProgramAsync);
         programs.MapDelete("/{name}", DeleteProgramAsync);
@@ -97,17 +101,14 @@ public static partial class AffiliateApi
 
     private const string PostbackPath = "/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={key}";
 
-    private static async Task<Results<Ok<AffiliateProgramsDto>, NotFound>> GetProgramsAsync(ClaimsPrincipal user, IConfiguration config,
-        CatalogContext db, AffiliatePrograms programs, CancellationToken ct)
+    private static async Task<Ok<AffiliateProgramsDto>> GetProgramsAsync(IConfiguration config, CatalogContext db,
+        IOptionsMonitor<AffiliateOptions> options, CancellationToken ct)
     {
-        if (!Admins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
-        var inForce = await programs.AllAsync(ct);
-        var usable = inForce.Where(p => p.Source == AffiliateSources.Settings && AffiliateLinks.IsValid(p)).Select(p => p.Name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Read fresh, not from the click path's cache: an admin sees their change at once.
         var records = await db.AffiliatePrograms.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct);
+        var inForce = AffiliatePrograms.Merge(records, options.CurrentValue.Programs, AffiliateLinks.TestNetwork(config));
+        var usable = inForce.Where(p => p.Source == AffiliateSources.Settings && p.Enabled && AffiliateLinks.IsValid(p)).Select(p => p.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return TypedResults.Ok(new AffiliateProgramsDto(
             records.Select(r => new AffiliateProgramSettingsDto(r.Name, r.Services, r.Regions, r.Test ? "" : r.Template, r.PostbackKey is { Length: > 0 },
                 r.Currency, r.Test, r.Enabled, usable.Contains(r.Name))).ToList(),
@@ -116,16 +117,12 @@ public static partial class AffiliateApi
             PostbackPath));
     }
 
-    private static AffiliateProgramDto Describe(AffiliateProgram p) =>
+    internal static AffiliateProgramDto Describe(AffiliateProgram p) =>
         new(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p), p.Source, p.Test);
 
-    private static async Task<Results<Ok<string>, NotFound, ValidationProblem>> SaveProgramAsync(string name, SaveAffiliateProgramRequest request,
-        ClaimsPrincipal user, IConfiguration config, CatalogContext db, AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
+    private static async Task<Results<Ok<string>, ValidationProblem>> SaveProgramAsync(string name, SaveAffiliateProgramRequest request,
+        CatalogContext db, AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
     {
-        if (!Admins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
         name = name.Trim().ToLowerInvariant();
         var services = (request.Services ?? []).Select(s => s.Trim()).Where(s => s.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var regions = (request.Regions ?? []).Select(r => r.Trim().ToUpperInvariant()).Where(r => r.Length > 0).Distinct().ToList();
@@ -167,11 +164,11 @@ public static partial class AffiliateApi
         return TypedResults.Ok(name);
     }
 
-    private static async Task<Results<Ok<string>, NotFound>> DeleteProgramAsync(string name, ClaimsPrincipal user, IConfiguration config,
-        CatalogContext db, AffiliatePrograms programs, CancellationToken ct)
+    private static async Task<Results<Ok<string>, NotFound>> DeleteProgramAsync(string name, CatalogContext db, AffiliatePrograms programs,
+        CancellationToken ct)
     {
         name = name.Trim().ToLowerInvariant();
-        if (!Admins.Is(user, config) || await db.AffiliatePrograms.Where(p => p.Name == name).ExecuteDeleteAsync(ct) == 0)
+        if (await db.AffiliatePrograms.Where(p => p.Name == name).ExecuteDeleteAsync(ct) == 0)
         {
             return TypedResults.NotFound();
         }
@@ -183,13 +180,9 @@ public static partial class AffiliateApi
     /// Adds a test program for each main streaming service that has none (<see cref="StarterPrograms"/>), where the
     /// test network runs: anywhere else they'd never be used.
     /// </summary>
-    private static async Task<Results<Ok<int>, NotFound, ValidationProblem>> AddStartersAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
+    private static async Task<Results<Ok<int>, ValidationProblem>> AddStartersAsync(IConfiguration config, CatalogContext db,
         AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
     {
-        if (!Admins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
         if (AffiliateLinks.TestNetwork(config) is null)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
@@ -267,7 +260,7 @@ public static partial class AffiliateApi
         CancellationToken ct)
     {
         // Switched-off programs too: a sale for a click sent before the switch still counts.
-        var found = (await programs.AllAsync(ct, includeOff: true)).FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
+        var found = (await programs.AllAsync(ct)).FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
         if (found is null || !AffiliateLinks.KeyMatches(found, key) || !Guid.TryParse(click, out var clickId))
         {
             return TypedResults.NotFound();
@@ -364,7 +357,7 @@ public static partial class AffiliateApi
         var showIds = clicks.Select(c => c.ShowId).Concat(conversions.Select(c => c.ShowId)).Distinct().ToList();
         var titles = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Title, ct);
 
-        return TypedResults.Ok(AffiliateReport.Build(from, to, clicks, conversions, titles, await programs.AllAsync(ct)));
+        return TypedResults.Ok(AffiliateReport.Build(from, to, clicks, conversions, titles, (await programs.AllAsync(ct)).Where(p => p.Enabled).ToList()));
     }
 
     private static async Task<string> PlanAsync(HttpContext http) =>
@@ -425,6 +418,6 @@ internal static class AffiliateReport
             conversions.Count,
             conversions.GroupBy(c => c.Currency).Select(g => new MoneyDto(g.Key, g.Sum(c => c.Amount))).OrderBy(m => m.Currency, StringComparer.Ordinal).ToList(),
             services, By(c => c.Surface, c => c.Surface), By(c => c.Plan, c => c.Plan), days, shows,
-            programs.Select(p => new AffiliateProgramDto(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p), p.Source, p.Test)).ToList());
+            programs.Select(AffiliateApi.Describe).ToList());
     }
 }

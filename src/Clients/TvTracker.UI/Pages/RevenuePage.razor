@@ -60,11 +60,12 @@
 
                 <h3>Free to paid, in this window</h3>
                 <ul class="bars wide-values">
-                    @foreach (var step in Funnel(revenue))
+                    @{ var steps = Funnel(revenue); var most = steps.Max(s => s.Count); }
+                    @foreach (var step in steps)
                     {
                         <li>
                             <span>@step.Name</span>
-                            <span class="bar" style="width:@(Width(step.Count, FunnelMax(revenue)))%"></span>
+                            <span class="bar" style="width:@(Width(step.Count, most))%"></span>
                             <span>@step.Count.ToString("N0")</span>
                         </li>
                     }
@@ -149,9 +150,8 @@
                     <table class="table">
                         <thead><tr><th>Day</th><th>New accounts</th><th>New subscriptions</th><th>Payments</th><th>Clicks out</th><th>Sales</th></tr></thead>
                         <tbody>
-                            @foreach (var day in revenue.Days.Reverse().Where(d => Active(d)))
+                            @foreach (var (day, clicks) in rows)
                             {
-                                var clicks = affiliates?.Days.FirstOrDefault(a => a.Day == day.Day);
                                 <tr>
                                     <td>@day.Day.ToString("d MMM")</td>
                                     <td>@day.NewAccounts.ToString("N0")</td>
@@ -164,7 +164,7 @@
                         </tbody>
                     </table>
                 </div>
-                @if (!revenue.Days.Any(Active))
+                @if (rows.Count == 0)
                 {
                     <p class="empty-state">Nothing in this window yet.</p>
                 }
@@ -180,6 +180,11 @@
     private RevenueReport? revenue;
     private AffiliateReport? affiliates;
     private bool affiliatesOn;
+
+    /// <summary>
+    /// The days worth a row (something happened, in either report), newest first, each with its affiliate numbers.
+    /// </summary>
+    private List<(RevenueDay Day, AffiliateDay? Clicks)> rows = [];
     private int days = 30;
     private bool loaded;
     private string? error;
@@ -209,6 +214,11 @@
             if (load == loads)
             {
                 (revenue, affiliatesOn, affiliates) = (report, on, clicks);
+                var byDay = clicks?.Days.ToDictionary(d => d.Day) ?? [];
+                rows = (report?.Days ?? []).Reverse()
+                    .Select(d => (Day: d, Clicks: byDay.GetValueOrDefault(d.Day)))
+                    .Where(r => r.Day.NewAccounts + r.Day.NewSubscriptions + r.Day.Payments + (r.Clicks?.Clicks ?? 0) + (r.Clicks?.Conversions ?? 0) > 0)
+                    .ToList();
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -237,20 +247,10 @@
         }
     }
 
-    /// <summary>
-    /// A day worth a row: something happened on it, in either report.
-    /// </summary>
-    private bool Active(RevenueDay day) =>
-        day.NewAccounts + day.NewSubscriptions + day.Payments > 0
-        || affiliates?.Days.FirstOrDefault(a => a.Day == day.Day) is { } a && a.Clicks + a.Conversions > 0;
-
     private static (string Name, int Count)[] Funnel(RevenueReport r) =>
     [
         ("New accounts", r.NewAccounts), ("Checkouts started", r.CheckoutsStarted), ("Checkouts paid", r.CheckoutsCompleted),
         ("New subscriptions", r.NewSubscriptions)
     ];
 
-    private static int FunnelMax(RevenueReport r) => Funnel(r).Max(s => s.Count);
-
-    private static string Sum(IReadOnlyList<Money> money) => ReportFormat.Sum(money.Select(m => (m.Amount, m.Currency)));
 }

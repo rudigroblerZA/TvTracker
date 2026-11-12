@@ -209,48 +209,48 @@
     private Task SaveAsync() => ChangeAsync(async () =>
     {
         var name = form!.Name.Trim().ToLowerInvariant();
-        if (!await Catalog.SaveAffiliateProgramAsync(name, new SaveAffiliateProgram(Split(form.Services), Split(form.Regions), form.Template,
-            string.IsNullOrWhiteSpace(form.PostbackKey) ? null : form.PostbackKey, form.Currency, form.Test, form.Enabled, New: !editing)))
-        {
-            error = NotDone;
-            return;
-        }
-        (form, notice) = (null, $"Saved {name}.");
-    });
+        return await Catalog.SaveAffiliateProgramAsync(name, new SaveAffiliateProgram(Split(form.Services), Split(form.Regions), form.Template,
+            string.IsNullOrWhiteSpace(form.PostbackKey) ? null : form.PostbackKey, form.Currency, form.Test, form.Enabled, New: !editing))
+            ? $"Saved {name}."
+            : null;
+    }, closeForm: true);
 
     private Task DeleteAsync(AffiliateProgramSettings program) => ChangeAsync(async () =>
-    {
-        if (!await Catalog.DeleteAffiliateProgramAsync(program.Name))
-        {
-            error = NotDone;
-            return;
-        }
-        (form, notice) = (null, $"Removed {program.Name}. What's counted for it stays in the report, but sales its network reports from now on aren't taken: switch a program off instead to keep counting those.");
-    });
+        await Catalog.DeleteAffiliateProgramAsync(program.Name)
+            ? $"Removed {program.Name}. What's counted for it stays in the report, but sales its network reports from now on aren't taken: switch a program off instead to keep counting those."
+            : null, closeForm: true);
 
-    private Task AddStartersAsync() => ChangeAsync(async () =>
+    private Task AddStartersAsync() => ChangeAsync(async () => await Catalog.AddStarterAffiliateProgramsAsync() switch
     {
-        if (await Catalog.AddStarterAffiliateProgramsAsync() is not { } added)
-        {
-            error = NotDone;
-            return;
-        }
-        notice = added == 0 ? "The main services all have a program already." : $"Added {added} test {(added == 1 ? "program" : "programs")}.";
+        null => null,
+        0 => "The main services all have a program already.",
+        1 => "Added 1 test program.",
+        var added => $"Added {added} test programs."
     });
 
     private const string NotDone = "That didn't go through: affiliate links are switched off, or you're no longer signed in as an admin.";
 
     /// <summary>
-    /// A change, then the list again and word to the page; a refusal shows the service's reason and keeps the form.
+    /// A change, then the list again and word to the page. <paramref name="change"/> gives what to say when done, or
+    /// null when it didn't happen; a refusal shows the service's reason and keeps the form.
     /// </summary>
-    private async Task ChangeAsync(Func<Task> change)
+    private async Task ChangeAsync(Func<Task<string?>> change, bool closeForm = false)
     {
         (busy, error, notice) = (true, null, null);
         try
         {
-            await change();
-            programs = await Catalog.GetAffiliateProgramsAsync() ?? programs;
-            await OnChanged.InvokeAsync();
+            if (await change() is { } done)
+            {
+                (notice, form) = (done, closeForm ? null : form);
+            }
+            else
+            {
+                error = NotDone;
+            }
+            // The list and the page's report are separate calls: both at once.
+            var list = Catalog.GetAffiliateProgramsAsync();
+            await Task.WhenAll(list, OnChanged.InvokeAsync());
+            programs = await list ?? programs;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

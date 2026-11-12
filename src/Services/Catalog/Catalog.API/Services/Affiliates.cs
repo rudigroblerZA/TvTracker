@@ -63,6 +63,12 @@ public sealed class AffiliateProgram
     /// A stand-in that goes through the test network.
     /// </summary>
     public bool Test { get; set; }
+
+    /// <summary>
+    /// False for a program switched off in Settings: links don't use it, but a sale for a click already sent through it
+    /// still counts.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>
@@ -93,12 +99,13 @@ public static class AffiliateSources
 public static class AffiliateLinks
 {
     /// <summary>
-    /// The first valid program covering the service in the region, if any.
+    /// The first valid, switched-on program covering the service in the region, if any.
     /// </summary>
     public static AffiliateProgram? For(IEnumerable<AffiliateProgram> programs, string service, string region) =>
-        programs.FirstOrDefault(p => IsValid(p)
+        programs.FirstOrDefault(p => p.Enabled
             && (p.Services.Contains(service, StringComparer.OrdinalIgnoreCase) || p.Services.Contains(AnyService))
-            && (p.Regions.Count == 0 || p.Regions.Contains(region, StringComparer.OrdinalIgnoreCase)));
+            && (p.Regions.Count == 0 || p.Regions.Contains(region, StringComparer.OrdinalIgnoreCase))
+            && IsValid(p));
 
     /// <summary>
     /// In <see cref="AffiliateProgram.Services"/>, every service.
@@ -158,7 +165,7 @@ public static class AffiliateLinks
 }
 
 /// <summary>
-/// Every affiliate program in force, in the order a click tries them: live ones from Settings, then the
+/// Every affiliate program, in the order a click tries them (ones switched off in Settings included, marked so): live ones from Settings, then the
 /// configuration's, then Settings' test programs, then the test network's catch-all, so a stand-in never takes a click
 /// a real program covers. Kept a few seconds, so a click doesn't read the table each time
 /// and a change in Settings applies almost at once (<see cref="Forget"/> makes it at once for the admin who made it).
@@ -168,29 +175,28 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
     private const string CacheKey = nameof(AffiliatePrograms);
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(15);
 
-    /// <param name="includeOff">Also the programs switched off in Settings: links don't use them, but a sale for a
-    /// click already sent through one still counts.</param>
-    public async Task<IReadOnlyList<AffiliateProgram>> AllAsync(CancellationToken ct, bool includeOff = false)
+    public async Task<IReadOnlyList<AffiliateProgram>> AllAsync(CancellationToken ct)
     {
-        if (!cache.TryGetValue(CacheKey, out List<AffiliateProgramRecord>? records))
+        if (!cache.TryGetValue(CacheKey, out IReadOnlyList<AffiliateProgram>? programs))
         {
-            records = await db.AffiliatePrograms.AsNoTracking().ToListAsync(ct);
-            cache.Set(CacheKey, records, CacheFor);
+            programs = Merge(await db.AffiliatePrograms.AsNoTracking().ToListAsync(ct), options.CurrentValue.Programs,
+                AffiliateLinks.TestNetwork(configuration));
+            cache.Set(CacheKey, programs, CacheFor);
         }
-        return Merge(records!, options.CurrentValue.Programs, AffiliateLinks.TestNetwork(configuration), includeOff);
+        return programs!;
     }
 
     public void Forget() => cache.Remove(CacheKey);
 
     /// <summary>
-    /// Settings' live programs that are switched on, then the configuration's that Settings doesn't name, then Settings'
+    /// Settings' live programs, then the configuration's that Settings doesn't name, then Settings'
     /// test programs (with the test network's link and key, or unusable without one), then the test network's
     /// catch-all. Within Settings, a program naming its services comes before one covering every service, then by name.
     /// </summary>
     public static IReadOnlyList<AffiliateProgram> Merge(IEnumerable<AffiliateProgramRecord> records, IEnumerable<AffiliateProgram> configured,
-        AffiliateProgram? testNetwork, bool includeOff = false)
+        AffiliateProgram? testNetwork)
     {
-        var fromSettings = records.Where(r => r.Enabled || includeOff)
+        var fromSettings = records
             .OrderBy(r => r.Services.Contains(AffiliateLinks.AnyService)).ThenBy(r => r.Name, StringComparer.Ordinal)
             .Select(r => new AffiliateProgram
         {
@@ -201,7 +207,8 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
             PostbackKey = r.Test ? testNetwork?.PostbackKey : r.PostbackKey,
             Currency = r.Currency,
             Source = AffiliateSources.Settings,
-            Test = r.Test
+            Test = r.Test,
+            Enabled = r.Enabled
         }).ToList();
         var named = records.Select(r => r.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var fromConfiguration = configured.Where(p => p.Source == AffiliateSources.Configuration && !named.Contains(p.Name));
@@ -245,42 +252,5 @@ public static class StarterPrograms
                 Name = p.Name, Services = [p.Service], Currency = "USD", Test = true, Enabled = true, CreatedAtUtc = nowUtc, UpdatedAtUtc = nowUtc
             })
             .ToList();
-    }
-}
-
-/// <summary>
-/// In development with the test network running, an empty programs table starts with <see cref="StarterPrograms"/>.
-/// Only when empty: programs an admin removed don't come back while any other is left.
-/// </summary>
-public sealed class AffiliateProgramSeeder(IServiceScopeFactory scopes, IHostEnvironment environment, IConfiguration configuration, TimeProvider time,
-    ILogger<AffiliateProgramSeeder> logger) : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        if (!environment.IsDevelopment() || AffiliateLinks.TestNetwork(configuration) is null)
-        {
-            return;
-        }
-        // The table may not be there yet: the database is migrated as the service starts.
-        for (var attempt = 0; attempt < 20 && !stoppingToken.IsCancellationRequested; attempt++)
-        {
-            try
-            {
-                await using var scope = scopes.CreateAsyncScope();
-                var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
-                if (!await db.AffiliatePrograms.AnyAsync(stoppingToken))
-                {
-                    db.AffiliatePrograms.AddRange(StarterPrograms.Missing([], time.GetUtcNow().UtcDateTime));
-                    await db.SaveChangesAsync(stoppingToken);
-                    logger.LogInformation("Affiliate programs: added {Count} test programs to start with", StarterPrograms.All.Count);
-                }
-                return;
-            }
-            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
-            {
-                logger.LogDebug(ex, "Affiliate programs: the table isn't ready yet; trying again");
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-            }
-        }
     }
 }

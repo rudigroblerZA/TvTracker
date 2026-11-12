@@ -46,7 +46,7 @@
                     <div class="muted">@($"sales reported, {Share(report.Conversions, report.AffiliatedClicks)} of program clicks")</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">@Sum(report.Revenue.Select(m => (m.Amount, m.Currency)))</div>
+                    <div class="stat-value">@Sum(report.Revenue)</div>
                     <div class="muted">commission</div>
                 </div>
             </div>
