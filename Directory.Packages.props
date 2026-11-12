@@ -11,8 +11,8 @@
     <!-- dotnet/runtime packages (Microsoft.Extensions.*), which service on their own numbers; MobileApp uses it too. -->
     <RuntimeVersion>10.0.14</RuntimeVersion>
     <EfCoreVersion>10.0.14</EfCoreVersion>
-    <OpenTelemetryVersion>1.20.1</OpenTelemetryVersion>
-    <OpenTelemetryInstrumentationVersion>1.20.1</OpenTelemetryInstrumentationVersion>
+    <OpenTelemetryVersion>1.21.0</OpenTelemetryVersion>
+    <OpenTelemetryInstrumentationVersion>1.21.0</OpenTelemetryInstrumentationVersion>
   </PropertyGroup>
   <ItemGroup Label="Aspire hosting (AppHost)">
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
