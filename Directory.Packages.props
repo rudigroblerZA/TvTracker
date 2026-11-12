@@ -63,7 +63,7 @@
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
   </ItemGroup>
   <ItemGroup Label="Tools">
-    <PackageVersion Include="System.CommandLine" Version="2.0.14" />
+    <PackageVersion Include="System.CommandLine" Version="3.0.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging and delivery">
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
