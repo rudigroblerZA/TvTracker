@@ -188,8 +188,9 @@ public class AffiliateTests
     {
         var merged = AffiliatePrograms.Merge([Record("netflix-us", "Netflix", enabled: false)], [Netflix, Prime], null);
 
-        // Switched off in Settings: not used, and the configuration's doesn't come back in its place.
-        Assert.Equal(["prime"], merged.Select(p => p.Name));
+        // Switched off in Settings: not linked to, and the configuration's doesn't come back in its place.
+        Assert.Equal(["netflix-us", "prime"], merged.Select(p => p.Name));
+        Assert.Null(AffiliateLinks.For(merged, "Netflix", "US"));
     }
 
     [Fact]
@@ -241,8 +242,8 @@ public class AffiliateTests
     {
         IReadOnlyList<AffiliateProgramRecord> records = [Record("netflix-us", "Netflix", enabled: false)];
 
-        Assert.Empty(AffiliatePrograms.Merge(records, [], null));
-        var forPostbacks = Assert.Single(AffiliatePrograms.Merge(records, [], null, includeOff: true));
-        Assert.True(AffiliateLinks.KeyMatches(forPostbacks, "a-long-random-secret"));
+        var program = Assert.Single(AffiliatePrograms.Merge(records, [], null));
+        Assert.Null(AffiliateLinks.For([program], "Netflix", "US"));
+        Assert.True(AffiliateLinks.KeyMatches(program, "a-long-random-secret"));
     }
 }

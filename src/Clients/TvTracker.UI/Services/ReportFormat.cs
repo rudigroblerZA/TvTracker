@@ -1,3 +1,6 @@
+using TvTracker.UI.Components;
+using TvTracker.UI.Models;
+
 namespace TvTracker.UI.Services;
 
 /// <summary>
@@ -19,7 +22,7 @@ public static class ReportFormat
     /// <summary>
     /// A part of a whole as a percentage; a dash when there's no whole.
     /// </summary>
-    public static string Share(int part, int whole) => whole == 0 ? "–" : ((double)part / whole).ToString("P0");
+    public static string Share(int part, int whole) => whole == 0 ? "–" : Format.Percent((double)part / whole);
 
     public static string Amount(decimal amount, string? currency, int decimals = 2) =>
         $"{amount.ToString($"N{decimals}")} {currency}".Trim();
@@ -27,6 +30,6 @@ public static class ReportFormat
     /// <summary>
     /// Money per currency, "12.50 USD + 89.00 ZAR"; a dash for none.
     /// </summary>
-    public static string Sum(IEnumerable<(decimal Amount, string Currency)> money) =>
+    public static string Sum(IEnumerable<Money> money) =>
         string.Join(" + ", money.Select(m => Amount(m.Amount, m.Currency))) is { Length: > 0 } sum ? sum : "–";
 }

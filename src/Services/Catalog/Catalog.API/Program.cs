@@ -17,12 +17,22 @@ builder.AddDefaultAuthentication();
 
 // Catalog.API owns the catalogdb schema; the sync worker waits for this service to be healthy.
 builder.AddCatalogDbContext();
-builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, _, ct) =>
+builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, services, ct) =>
 {
     // A migration may have just created the pgvector extension; connections opened earlier didn't know its types.
     var connection = (NpgsqlConnection)db.Database.GetDbConnection();
     await connection.OpenAsync(ct);
     await connection.ReloadTypesAsync(ct);
+
+    // In development with the test network running, an empty affiliate programs table starts with a test program per
+    // main service. Only when empty: programs an admin removed don't come back while any other is left.
+    if (services.GetRequiredService<IHostEnvironment>().IsDevelopment()
+        && AffiliateLinks.TestNetwork(services.GetRequiredService<IConfiguration>()) is not null
+        && !await db.AffiliatePrograms.AnyAsync(ct))
+    {
+        db.AffiliatePrograms.AddRange(StarterPrograms.Missing([], services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime));
+        await db.SaveChangesAsync(ct);
+    }
 });
 
 builder.AddRedisDistributedCache("redis");
@@ -72,7 +82,6 @@ builder.Services.AddSingleton<Crossovers>();
 // real program for a service still wins.
 builder.Services.Configure<AffiliateOptions>(builder.Configuration.GetSection("Affiliates"));
 builder.Services.AddScoped<AffiliatePrograms>();
-builder.Services.AddHostedService<AffiliateProgramSeeder>();
 
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
 builder.AddRabbitMQEventBus("eventbus");
