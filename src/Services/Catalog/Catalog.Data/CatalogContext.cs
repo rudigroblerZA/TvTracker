@@ -26,6 +26,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<PersonMadeShow> MadeShows => Set<PersonMadeShow>();
     public DbSet<OutboundClick> OutboundClicks => Set<OutboundClick>();
     public DbSet<AffiliateConversion> AffiliateConversions => Set<AffiliateConversion>();
+    public DbSet<AffiliateProgramRecord> AffiliatePrograms => Set<AffiliateProgramRecord>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -235,6 +236,18 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(c => c.Surface).HasMaxLength(32);
             entity.Property(c => c.Plan).HasMaxLength(16);
             entity.Property(c => c.Program).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<AffiliateProgramRecord>(entity =>
+        {
+            entity.ToTable("affiliate_programs");
+            entity.HasKey(p => p.Name);
+            entity.Property(p => p.Name).HasMaxLength(64);
+            entity.Property(p => p.Template).HasMaxLength(1024);
+            entity.Property(p => p.PostbackKey).HasMaxLength(256);
+            entity.Property(p => p.Currency).HasMaxLength(3);
+            entity.Property(p => p.Services).HasDefaultValueSql("'{}'");
+            entity.Property(p => p.Regions).HasDefaultValueSql("'{}'");
         });
 
         modelBuilder.Entity<AffiliateConversion>(entity =>

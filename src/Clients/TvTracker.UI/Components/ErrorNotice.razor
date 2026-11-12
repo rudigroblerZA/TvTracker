@@ -57,7 +57,7 @@
         }
         catch (System.Text.Json.JsonException)
         {
-            // Cut short at 300 characters, or not JSON.
+            // Cut short at 1,000 characters, or not JSON.
             return null;
         }
     }

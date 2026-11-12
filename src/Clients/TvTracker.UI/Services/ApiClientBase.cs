@@ -180,7 +180,7 @@ public abstract class ApiClientBase(
         }
     }
 
-    private static string Truncate(string s) => s.Length > 300 ? s[..300] : s;
+    private static string Truncate(string s) => s.Length > 1000 ? s[..1000] : s;
 }
 
 /// <summary>

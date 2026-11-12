@@ -107,6 +107,12 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<List<PlanUser>?> SearchPlanUsersAsync(string? term, CancellationToken ct = default) =>
         GetAsync<List<PlanUser>>(ApiClients.Identity, $"api/v1/admin/plans/users?q={Uri.EscapeDataString(term ?? "")}", ct);
 
+    /// <summary>
+    /// What subscriptions bring in over the last <paramref name="days"/> days; null for anyone but an admin.
+    /// </summary>
+    public Task<RevenueReport?> GetRevenueReportAsync(int days, CancellationToken ct = default) =>
+        GetAsync<RevenueReport>(ApiClients.Identity, $"api/v1/admin/revenue?days={days}", ct);
+
     public Task<PlanUser?> SetPlanAsync(string userId, string plan, CancellationToken ct = default) =>
         SendAsync<PlanUser>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/plans/users/{Uri.EscapeDataString(userId)}", new { plan }, ct);
 
@@ -239,6 +245,24 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// </summary>
     public Task<AffiliateReport?> GetAffiliateReportAsync(int days, CancellationToken ct = default) =>
         GetAsync<AffiliateReport>(ApiClients.Catalog, $"api/v1/affiliates/report?days={days}", ct);
+
+    /// <summary>
+    /// The affiliate programs admins set up in Settings, and the others in force; null for anyone but an admin.
+    /// </summary>
+    public Task<AffiliatePrograms?> GetAffiliateProgramsAsync(CancellationToken ct = default) =>
+        GetAsync<AffiliatePrograms>(ApiClients.Catalog, "api/v1/affiliates/programs", ct);
+
+    public Task SaveAffiliateProgramAsync(string name, SaveAffiliateProgram program, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Catalog, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct);
+
+    public Task DeleteAffiliateProgramAsync(string name, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Catalog, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct);
+
+    /// <summary>
+    /// Adds a test program for each main streaming service that has none; how many were added.
+    /// </summary>
+    public Task<int> AddStarterAffiliateProgramsAsync(CancellationToken ct = default) =>
+        SendAsync<int>(ApiClients.Catalog, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
 
     /// <summary>
     /// Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.

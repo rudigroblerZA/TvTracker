@@ -29,14 +29,16 @@ public static class TestAffiliateNetwork
             return;
         }
 
-        app.MapGet(Path, (string? u, string? click) => Page(u, click, null));
+        app.MapGet(Path, (string? u, string? click, string? program) => Page(u, click, Program(program), null));
 
         app.MapPost($"{Path}/sale", async (HttpRequest request, IHttpClientFactory clients, CancellationToken ct) =>
         {
             var form = await request.ReadFormAsync(ct);
             string? u = form["u"], click = form["click"], amount = form["amount"];
+            // Which program the click went through: a test program an admin set up in Settings, or the network's own catch-all.
+            var program = Program(form["program"]);
             var transaction = Guid.NewGuid().ToString("N");
-            var url = $"api/v1/affiliates/postback/test-network?click={Uri.EscapeDataString(click ?? "")}&transaction={transaction}" +
+            var url = $"api/v1/affiliates/postback/{program}?click={Uri.EscapeDataString(click ?? "")}&transaction={transaction}" +
                       $"&amount={Uri.EscapeDataString(amount ?? "0")}&currency=USD&key={Uri.EscapeDataString(key)}";
             string outcome;
             try
@@ -51,11 +53,17 @@ public static class TestAffiliateNetwork
             {
                 outcome = $"The postback failed: {ex.Message}";
             }
-            return Page(u, click, outcome);
+            return Page(u, click, program, outcome);
         }).DisableAntiforgery();
     }
 
-    private static IResult Page(string? u, string? click, string? outcome)
+    /// <summary>
+    /// The program's name when it's one a name can be (it goes into the postback's address), else the catch-all's.
+    /// </summary>
+    private static string Program(string? given) =>
+        given is { Length: > 0 and <= 64 } && given.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-') ? given : "test-network";
+
+    private static IResult Page(string? u, string? click, string program, string? outcome)
     {
         var destination = Uri.TryCreate(u, UriKind.Absolute, out var target) && (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp)
             ? target.AbsoluteUri
@@ -79,12 +87,13 @@ public static class TestAffiliateNetwork
               <p>This page stands in for an affiliate network while you try affiliate links locally. A real network would count
                  the click, send you on, and later report any sale back to the app.</p>
               <div class="card">
+                <div>Program: <code>{{E(program)}}</code></div>
                 <div>Click id: <code>{{E(click)}}</code></div>
                 <div>Destination: <code>{{E(destination ?? "(none)")}}</code></div>
               </div>
               {{(outcome is null ? "" : $"<p class=\"outcome\">{E(outcome)}</p>")}}
               <form method="post" action="{{Path}}/sale" class="card">
-                <input type="hidden" name="u" value="{{E(u)}}"><input type="hidden" name="click" value="{{E(click)}}">
+                <input type="hidden" name="u" value="{{E(u)}}"><input type="hidden" name="click" value="{{E(click)}}"><input type="hidden" name="program" value="{{E(program)}}">
                 <label>Commission (USD) <input name="amount" value="{{E(4.20m.ToString(CultureInfo.InvariantCulture))}}" inputmode="decimal" size="8"></label>
                 <button type="submit">Report a sale</button>
               </form>

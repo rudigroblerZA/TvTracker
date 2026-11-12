@@ -1,0 +1,250 @@
+@inject CatalogClient Catalog
+
+@* Affiliate programs, set up by admins: which services and regions a program covers and the network's tracked link. A
+   test program is a stand-in until there's a real deal: its clicks go through the built-in test network's page, where
+   a sale can be reported by hand, so the report has numbers per service from day one. *@
+<section>
+    <h2>Programs</h2>
+    <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+    @if (programs is not null)
+    {
+        @if (programs.Programs.Count == 0 && programs.Others.Count == 0)
+        {
+            <p class="muted">
+                None yet: every click goes to the service's own link and is still counted, so the table above is what each
+                service's traffic is worth to a deal.
+            </p>
+        }
+        @if (!programs.TestNetwork && programs.Programs.Any(p => p.Test))
+        {
+            <p class="notice">The test network isn't running here, so test programs aren't used: their services get plain links, still counted.</p>
+        }
+
+        @if (programs.Programs.Count > 0)
+        {
+            <div class="table-scroll">
+                <table class="table wide">
+                    <thead>
+                        <tr><th>Program</th><th>Services</th><th>Regions</th><th>Paid in</th><th>Kind</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var program in programs.Programs)
+                        {
+                            <tr>
+                                <td><strong>@program.Name</strong></td>
+                                <td>@string.Join(", ", program.Services)</td>
+                                <td>@(program.Regions.Count == 0 ? "Every region" : string.Join(", ", program.Regions))</td>
+                                <td>@program.Currency</td>
+                                <td>
+                                    <span class="tag">@(program.Test ? "Test" : "Live")</span>
+                                    @if (!program.Enabled)
+                                    {
+                                        @(" ")<span class="tag">Off</span>
+                                    }
+                                    else if (!program.Usable)
+                                    {
+                                        @(" ")<span class="tag tone-bad">Not used</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="inline">
+                                        <button class="btn btn-quiet small" disabled="@busy" @onclick="() => Edit(program)">Edit</button>
+                                        <button class="btn btn-danger small" disabled="@busy" @onclick="() => DeleteAsync(program)">Remove</button>
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (programs.Others.Count > 0)
+        {
+            <p class="muted small">
+                Also in force, from configuration:
+                @string.Join("; ", programs.Others.Select(p =>
+                    $"{p.Name} ({(p.Source == "test-network" ? "the test network, for every service no program covers" : string.Join(", ", p.Services))})")).
+            </p>
+        }
+
+        <div class="actions">
+            @if (form is null)
+            {
+                <button class="btn" disabled="@busy" @onclick="Add">Add a program</button>
+            }
+            @if (programs.TestNetwork)
+            {
+                <button class="btn btn-quiet" disabled="@busy" @onclick="AddStartersAsync">Add test programs for the main services</button>
+            }
+            @if (notice is not null)
+            {
+                <span class="muted small" role="status">@notice</span>
+            }
+        </div>
+
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnSubmit="SaveAsync" class="panel stack" aria-label="Affiliate program">
+                <h3>@(editing ? $"Edit {form.Name}" : "New program")</h3>
+                <label>
+                    Name
+                    <input @bind="form.Name" disabled="@editing" placeholder="netflix-us" maxlength="64" />
+                    <span class="muted small">Lower-case letters, digits and hyphens. The network names it in each sale it reports.</span>
+                </label>
+                <label>
+                    Services
+                    <input @bind="form.Services" placeholder="Netflix, Hulu" />
+                    <span class="muted small">As where-to-watch names them, separated by commas; * for every service.</span>
+                </label>
+                <label>
+                    Regions
+                    <input @bind="form.Regions" placeholder="US, GB" />
+                    <span class="muted small">Two-letter country codes; leave empty for every region.</span>
+                </label>
+                <label>
+                    Currency
+                    <input @bind="form.Currency" maxlength="3" size="4" />
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" @bind="form.Test" disabled="@(!programs.TestNetwork && !form.Test)" />
+                    <span>Test program: use the built-in test network until there's a real deal</span>
+                </label>
+                @if (!form.Test)
+                {
+                    <label>
+                        The network's link
+                        <input @bind="form.Template" placeholder="https://network.example/c/123?u={url}&subId1={click}" />
+                        <span class="muted small">An https address, with <code>{url}</code> where the service's own link goes and <code>{click}</code> for the click id.</span>
+                    </label>
+                    <label>
+                        Postback key
+                        <input type="password" @bind="form.PostbackKey" autocomplete="new-password"
+                               placeholder="@(form.HasPostbackKey ? "Leave empty to keep the one it has" : "A long random secret")" />
+                        <span class="muted small">
+                            The secret the network sends with each sale, 16 characters or more. It reports sales to
+                            <code>@programs.PostbackUrl.Replace("{name}", string.IsNullOrWhiteSpace(form.Name) ? "{name}" : form.Name.Trim())</code>
+                            on the mobile gateway's public address.
+                        </span>
+                    </label>
+                }
+                <label class="checkbox">
+                    <input type="checkbox" @bind="form.Enabled" />
+                    <span>Switched on</span>
+                </label>
+                <div class="actions">
+                    <button class="btn" type="submit" disabled="@busy">Save</button>
+                    <button class="btn btn-quiet" type="button" disabled="@busy" @onclick="() => form = null">Cancel</button>
+                </div>
+            </EditForm>
+        }
+    }
+</section>
+
+@code {
+    /// <summary>
+    /// Raised after a change, so the report above can show the programs as they now are.
+    /// </summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private AffiliatePrograms? programs;
+    private ProgramForm? form;
+    private bool editing;
+    private bool busy;
+    private string? error;
+    private string? notice;
+
+    private sealed class ProgramForm
+    {
+        public string Name { get; set; } = "";
+        public string Services { get; set; } = "";
+        public string Regions { get; set; } = "";
+        public string Currency { get; set; } = "USD";
+        public string Template { get; set; } = "";
+        public string PostbackKey { get; set; } = "";
+        public bool HasPostbackKey { get; set; }
+        public bool Test { get; set; }
+        public bool Enabled { get; set; } = true;
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            programs = await Catalog.GetAffiliateProgramsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private void Add()
+    {
+        (form, editing, notice) = (new ProgramForm { Test = programs?.TestNetwork == true }, false, null);
+    }
+
+    private void Edit(AffiliateProgramSettings program)
+    {
+        form = new ProgramForm
+        {
+            Name = program.Name,
+            Services = string.Join(", ", program.Services),
+            Regions = string.Join(", ", program.Regions),
+            Currency = program.Currency,
+            Template = program.Template,
+            HasPostbackKey = program.HasPostbackKey,
+            Test = program.Test,
+            Enabled = program.Enabled
+        };
+        (editing, notice) = (true, null);
+    }
+
+    private static List<string> Split(string text) =>
+        text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+
+    private Task SaveAsync() => ChangeAsync(async () =>
+    {
+        var name = form!.Name.Trim().ToLowerInvariant();
+        await Catalog.SaveAffiliateProgramAsync(name, new SaveAffiliateProgram(Split(form.Services), Split(form.Regions), form.Template,
+            string.IsNullOrWhiteSpace(form.PostbackKey) ? null : form.PostbackKey, form.Currency, form.Test, form.Enabled));
+        (form, notice) = (null, $"Saved {name}.");
+    });
+
+    private Task DeleteAsync(AffiliateProgramSettings program) => ChangeAsync(async () =>
+    {
+        await Catalog.DeleteAffiliateProgramAsync(program.Name);
+        (form, notice) = (null, $"Removed {program.Name}. Clicks and sales already counted for it stay in the report.");
+    });
+
+    private Task AddStartersAsync() => ChangeAsync(async () =>
+    {
+        var added = await Catalog.AddStarterAffiliateProgramsAsync();
+        notice = added == 0 ? "The main services all have a program already." : $"Added {added} test {(added == 1 ? "program" : "programs")}.";
+    });
+
+    /// <summary>
+    /// A change, then the list again and word to the page; a refusal shows the service's reason and keeps the form.
+    /// </summary>
+    private async Task ChangeAsync(Func<Task> change)
+    {
+        (busy, error, notice) = (true, null, null);
+        try
+        {
+            await change();
+            programs = await Catalog.GetAffiliateProgramsAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

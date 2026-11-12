@@ -1,0 +1,242 @@
+@page "/settings/revenue"
+@inject IdentityClient Identity
+@inject CatalogClient Catalog
+@inject FeatureFlagStore Flags
+
+<PageTitle>Revenue · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Revenue</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            Everything that can bring money in, in one place: subscriptions (free accounts becoming paying ones) and affiliate
+            commission from where-to-watch clicks. Counts only; nothing here names a person.
+        </p>
+
+        <div class="actions" role="group" aria-label="Window">
+            @foreach (var option in Windows)
+            {
+                <button class="btn @(days == option ? "" : "btn-quiet")" aria-pressed="@(days == option)" @onclick="() => SetDaysAsync(option)">
+                    @($"{option} days")
+                </button>
+            }
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (revenue is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(loaded ? "Only admins can see revenue." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p class="muted small">@($"{revenue.From:d MMM yyyy} to {revenue.To:d MMM yyyy}, UTC.")</p>
+
+            <section>
+                <h2>Subscriptions</h2>
+                <div class="stat-tiles">
+                    <div class="stat">
+                        <div class="stat-value">@Sum(revenue.MonthlyRecurring)</div>
+                        <div class="muted">a month from running subscriptions</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">@Sum(revenue.Received)</div>
+                        <div class="muted">received in this window</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">@revenue.PayingAccounts.ToString("N0")</div>
+                        <div class="muted">@($"paying accounts of {revenue.Accounts:N0}")</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">@revenue.PaidShare.ToString("P1")</div>
+                        <div class="muted">of accounts pay: the free-to-paid rate</div>
+                    </div>
+                </div>
+
+                <h3>Free to paid, in this window</h3>
+                <ul class="bars wide-values">
+                    @foreach (var step in Funnel(revenue))
+                    {
+                        <li>
+                            <span>@step.Name</span>
+                            <span class="bar" style="width:@(Width(step.Count, FunnelMax(revenue)))%"></span>
+                            <span>@step.Count.ToString("N0")</span>
+                        </li>
+                    }
+                </ul>
+                <p class="muted small">
+                    @($"{Share(revenue.CheckoutsCompleted, revenue.CheckoutsStarted)} of checkouts started were paid. ")
+                    @($"{revenue.Ended:N0} {(revenue.Ended == 1 ? "subscription" : "subscriptions")} ended. ")
+                    @($"{revenue.OnPaidPlan:N0} accounts are on a paid plan, counting family members and plans an admin set.")
+                </p>
+
+                @if (revenue.Plans.Count == 0)
+                {
+                    <p class="empty-state">No running subscriptions yet.</p>
+                }
+                else
+                {
+                    <div class="table-scroll">
+                        <table class="table">
+                            <thead><tr><th>Plan</th><th>Billed</th><th>Running</th><th>Set to end</th></tr></thead>
+                            <tbody>
+                                @foreach (var row in revenue.Plans)
+                                {
+                                    <tr>
+                                        <td>@row.Name</td>
+                                        <td>@(row.Interval == "year" ? "Yearly" : "Monthly")</td>
+                                        <td>@row.Active.ToString("N0")</td>
+                                        <td>@row.Cancelling.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section>
+                <div class="section-head">
+                    <h2>Affiliate links</h2>
+                    @if (affiliatesOn)
+                    {
+                        <a href="settings/affiliates">Details and programs</a>
+                    }
+                </div>
+                @if (!affiliatesOn)
+                {
+                    <p class="muted">Switched off: turn on the <code>affiliates</code> feature flag to count where-to-watch clicks.</p>
+                }
+                else if (affiliates is null)
+                {
+                    <p class="muted">No affiliate report right now.</p>
+                }
+                else
+                {
+                    <div class="stat-tiles">
+                        <div class="stat">
+                            <div class="stat-value">@Sum(affiliates.Revenue)</div>
+                            <div class="muted">commission reported</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@affiliates.Clicks.ToString("N0")</div>
+                            <div class="muted">@($"clicks out, {Share(affiliates.AffiliatedClicks, affiliates.Clicks)} through a program")</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@affiliates.Conversions.ToString("N0")</div>
+                            <div class="muted">@($"sales, {Share(affiliates.Conversions, affiliates.AffiliatedClicks)} of program clicks")</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@affiliates.Programs.Count(p => p.Valid && !p.Test).ToString("N0")</div>
+                            <div class="muted">@($"live programs, and {affiliates.Programs.Count(p => p.Valid && p.Test):N0} test")</div>
+                        </div>
+                    </div>
+                    @if (affiliates.Programs.Any(p => p.Valid && p.Test) && affiliates.Revenue.Count > 0)
+                    {
+                        <p class="muted small">Commission includes sales reported by hand on the test network: not real money.</p>
+                    }
+                }
+            </section>
+
+            <section>
+                <h2>By day</h2>
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead><tr><th>Day</th><th>New accounts</th><th>New subscriptions</th><th>Payments</th><th>Clicks out</th><th>Sales</th></tr></thead>
+                        <tbody>
+                            @foreach (var day in revenue.Days.Reverse().Where(d => Active(d)))
+                            {
+                                var clicks = affiliates?.Days.FirstOrDefault(a => a.Day == day.Day);
+                                <tr>
+                                    <td>@day.Day.ToString("d MMM")</td>
+                                    <td>@day.NewAccounts.ToString("N0")</td>
+                                    <td>@day.NewSubscriptions.ToString("N0")</td>
+                                    <td>@day.Payments.ToString("N0")</td>
+                                    <td>@((clicks?.Clicks ?? 0).ToString("N0"))</td>
+                                    <td>@((clicks?.Conversions ?? 0).ToString("N0"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (!revenue.Days.Any(Active))
+                {
+                    <p class="empty-state">Nothing in this window yet.</p>
+                }
+            </section>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p class="muted">Sign in as an admin to see revenue.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly int[] Windows = [7, 30, 90];
+
+    private RevenueReport? revenue;
+    private AffiliateReport? affiliates;
+    private bool affiliatesOn;
+    private int days = 30;
+    private bool loaded;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SetDaysAsync(int value)
+    {
+        days = value;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            // Both reports at once; the affiliate one only while its flag is on.
+            var revenueTask = Identity.GetRevenueReportAsync(days);
+            var affiliatesTask = Flags.IfEnabledAsync(FeatureFlags.Affiliates, () => Catalog.GetAffiliateReportAsync(days));
+            affiliatesOn = await Flags.IsEnabledAsync(FeatureFlags.Affiliates);
+            await Task.WhenAll(revenueTask, affiliatesTask);
+            (revenue, affiliates) = (revenueTask.Result, affiliatesTask.Result);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
+
+    /// <summary>
+    /// A day worth a row: something happened on it, in either report.
+    /// </summary>
+    private bool Active(RevenueDay day) =>
+        day.NewAccounts + day.NewSubscriptions + day.Payments > 0
+        || affiliates?.Days.FirstOrDefault(a => a.Day == day.Day) is { } a && a.Clicks + a.Conversions > 0;
+
+    private static (string Name, int Count)[] Funnel(RevenueReport r) =>
+    [
+        ("New accounts", r.NewAccounts), ("Checkouts started", r.CheckoutsStarted), ("Checkouts paid", r.CheckoutsCompleted),
+        ("New subscriptions", r.NewSubscriptions)
+    ];
+
+    private static int FunnelMax(RevenueReport r) => Funnel(r).Max(s => s.Count);
+
+    private static int Width(int value, int max) => max == 0 || value == 0 ? 0 : Math.Max(2, (int)Math.Round(100.0 * value / max));
+
+    private static string Share(int part, int whole) => whole == 0 ? "–" : ((double)part / whole).ToString("P0");
+
+    /// <summary>
+    /// Money per currency, "12.50 USD + 89.00 ZAR"; a dash for none.
+    /// </summary>
+    private static string Sum(IReadOnlyList<Money> money) =>
+        money.Count == 0 ? "–" : string.Join(" + ", money.Select(m => $"{m.Amount:N2} {m.Currency}"));
+}

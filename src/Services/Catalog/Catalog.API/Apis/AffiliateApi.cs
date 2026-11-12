@@ -31,7 +31,31 @@ public record AffiliateShowRowDto(Guid ShowId, string Title, int Clicks, int Con
 /// <summary>
 /// A configured program as the report shows it: never its template or key.
 /// </summary>
-public record AffiliateProgramDto(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid);
+/// <param name="Source">"settings", "configuration" or "test-network" (<see cref="AffiliateSources"/>).</param>
+/// <param name="Test">A stand-in that goes through the test network.</param>
+public record AffiliateProgramDto(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid,
+    string Source = AffiliateSources.Configuration, bool Test = false);
+
+/// <summary>
+/// A program as Settings edits it. The postback key is never sent back: <paramref name="HasPostbackKey"/> says one is set.
+/// </summary>
+/// <param name="Usable">In force: switched on and valid (a test program is only usable where the test network runs).</param>
+public record AffiliateProgramSettingsDto(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Template, bool HasPostbackKey,
+    string Currency, bool Test, bool Enabled, bool Usable);
+
+/// <param name="Programs">The programs set up in Settings.</param>
+/// <param name="Others">Programs from configuration and the test network's catch-all, which Settings can't change.</param>
+/// <param name="TestNetwork">Whether the test network is running here, so test programs work.</param>
+/// <param name="PostbackUrl">What a network calls to report a sale, with {name} for the program's.</param>
+public record AffiliateProgramsDto(IReadOnlyList<AffiliateProgramSettingsDto> Programs, IReadOnlyList<AffiliateProgramDto> Others, bool TestNetwork,
+    string PostbackUrl);
+
+/// <summary>
+/// A program to save. <paramref name="PostbackKey"/> null keeps the one it has; for a test program the template and
+/// key are the test network's, and what's given is ignored.
+/// </summary>
+public record SaveAffiliateProgramRequest(IReadOnlyList<string>? Services, IReadOnlyList<string>? Regions, string? Template, string? PostbackKey,
+    string? Currency, bool Test, bool Enabled = true);
 
 /// <param name="Revenue">Commission reported in the window, per currency.</param>
 public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<MoneyDto> Revenue,
@@ -49,7 +73,7 @@ public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int Aff
 /// <item><b>Postbacks aren't behind the flag:</b> sales reported after the links are turned off still count.</item>
 /// </list>
 /// </summary>
-public static class AffiliateApi
+public static partial class AffiliateApi
 {
     private const int MaxReportDays = 365;
     private const string SignedOut = "signed-out";
@@ -62,10 +86,117 @@ public static class AffiliateApi
             .RequireFeature(FeatureFlags.Affiliates);
         api.MapGet("/affiliates/postback/{program}", PostbackAsync);
         api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+
+        // Programs, set up by admins in Settings (404 for anyone else).
+        var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+        programs.MapGet("/", GetProgramsAsync);
+        programs.MapPut("/{name}", SaveProgramAsync);
+        programs.MapDelete("/{name}", DeleteProgramAsync);
+        programs.MapPost("/starters", AddStartersAsync);
     }
 
+    private const string PostbackPath = "/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={key}";
+
+    private static async Task<Results<Ok<AffiliateProgramsDto>, NotFound>> GetProgramsAsync(ClaimsPrincipal user, IConfiguration config,
+        CatalogContext db, AffiliatePrograms programs, CancellationToken ct)
+    {
+        if (!Admins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+        var inForce = await programs.AllAsync(ct);
+        var usable = inForce.Where(p => p.Source == AffiliateSources.Settings && AffiliateLinks.IsValid(p)).Select(p => p.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var records = await db.AffiliatePrograms.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct);
+        return TypedResults.Ok(new AffiliateProgramsDto(
+            records.Select(r => new AffiliateProgramSettingsDto(r.Name, r.Services, r.Regions, r.Test ? "" : r.Template, r.PostbackKey is { Length: > 0 },
+                r.Currency, r.Test, r.Enabled, usable.Contains(r.Name))).ToList(),
+            inForce.Where(p => p.Source != AffiliateSources.Settings).Select(Describe).ToList(),
+            AffiliateLinks.TestNetwork(config) is not null,
+            PostbackPath));
+    }
+
+    private static AffiliateProgramDto Describe(AffiliateProgram p) =>
+        new(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p), p.Source, p.Test);
+
+    private static async Task<Results<NoContent, NotFound, ValidationProblem>> SaveProgramAsync(string name, SaveAffiliateProgramRequest request,
+        ClaimsPrincipal user, IConfiguration config, CatalogContext db, AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
+    {
+        if (!Admins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+        name = name.Trim().ToLowerInvariant();
+        var services = (request.Services ?? []).Select(s => s.Trim()).Where(s => s.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var regions = (request.Regions ?? []).Select(r => r.Trim().ToUpperInvariant()).Where(r => r.Length > 0).Distinct().ToList();
+        var currency = (request.Currency ?? "USD").Trim().ToUpperInvariant();
+        var existing = await db.AffiliatePrograms.FirstOrDefaultAsync(p => p.Name == name, ct);
+        var key = request.Test ? null : request.PostbackKey?.Trim() is { Length: > 0 } given ? given : existing?.PostbackKey;
+        var template = request.Test ? "" : (request.Template ?? "").Trim();
+
+        var problem = !ProgramName().IsMatch(name) ? "A name is 1 to 64 lower-case letters, digits and hyphens: it's what the network's postback names."
+            : name == AffiliateLinks.TestNetworkName ? "That name is the test network's own."
+            : services.Count == 0 || services.Any(s => s.Length > 128) ? "Give at least one service, as where-to-watch names it (or * for all)."
+            : regions.Any(r => r.Length != 2) ? "A region is a two-letter country code."
+            : currency.Length != 3 || !currency.All(char.IsAsciiLetterUpper) ? "A currency is three letters, like USD."
+            : request.Test ? null
+            : !AffiliateLinks.IsValid(new AffiliateProgram { Name = name, Services = services, Template = template, Currency = currency })
+                ? "The link must be an https address, with {url} where the service's link goes and {click} for the click id."
+            : !template.Contains("{url}") ? "The link needs {url}, where the service's own link goes."
+            : key is null ? "Give a postback key: the secret the network sends with each sale."
+            : key.Length is < 16 or > 256 ? "A postback key is 16 to 256 characters."
+            : null;
+        if (problem is not null)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["program"] = [problem] });
+        }
+
+        var now = time.GetUtcNow().UtcDateTime;
+        if (existing is null)
+        {
+            existing = new AffiliateProgramRecord { Name = name, CreatedAtUtc = now };
+            db.AffiliatePrograms.Add(existing);
+        }
+        (existing.Services, existing.Regions, existing.Template, existing.PostbackKey, existing.Currency, existing.Test, existing.Enabled,
+            existing.UpdatedAtUtc) = (services, regions, template, key, currency, request.Test, request.Enabled, now);
+        await db.SaveChangesAsync(ct);
+        programs.Forget();
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, NotFound>> DeleteProgramAsync(string name, ClaimsPrincipal user, IConfiguration config,
+        CatalogContext db, AffiliatePrograms programs, CancellationToken ct)
+    {
+        if (!Admins.Is(user, config) || await db.AffiliatePrograms.Where(p => p.Name == name.Trim().ToLowerInvariant()).ExecuteDeleteAsync(ct) == 0)
+        {
+            return TypedResults.NotFound();
+        }
+        programs.Forget();
+        return TypedResults.NoContent();
+    }
+
+    /// <summary>
+    /// Adds a test program for each main streaming service that has none (<see cref="StarterPrograms"/>).
+    /// </summary>
+    private static async Task<Results<Ok<int>, NotFound>> AddStartersAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
+        AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
+    {
+        if (!Admins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+        var missing = StarterPrograms.Missing(await db.AffiliatePrograms.Select(p => p.Name).ToListAsync(ct), time.GetUtcNow().UtcDateTime);
+        db.AffiliatePrograms.AddRange(missing);
+        await db.SaveChangesAsync(ct);
+        programs.Forget();
+        return TypedResults.Ok(missing.Count);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[a-z0-9][a-z0-9-]{0,63}$")]
+    private static partial System.Text.RegularExpressions.Regex ProgramName();
+
     private static async Task<Results<Ok<OutboundDto>, NotFound, ValidationProblem>> OutboundAsync(OutboundRequest request, HttpContext http,
-        CatalogContext db, IOptionsMonitor<AffiliateOptions> options, TimeProvider time, CancellationToken ct)
+        CatalogContext db, AffiliatePrograms programs, TimeProvider time, CancellationToken ct)
     {
         if (!OutboundSurfaces.All.Contains(request.Surface) || request.Region is not { Length: 2 } || request.Provider is not { Length: > 0 and <= 128 })
         {
@@ -97,7 +228,7 @@ public static class AffiliateApi
             Plan = await PlanAsync(http),
             ClickedAtUtc = time.GetUtcNow().UtcDateTime
         };
-        var program = AffiliateLinks.For(options.CurrentValue, click.Service, region);
+        var program = AffiliateLinks.For(await programs.AllAsync(ct), click.Service, region);
         click.Program = program?.Name;
         db.OutboundClicks.Add(click);
         await db.SaveChangesAsync(ct);
@@ -111,10 +242,10 @@ public static class AffiliateApi
     /// nothing to someone guessing; a repeated transaction is answered as already counted.
     /// </summary>
     private static async Task<Results<Ok<string>, NotFound, ValidationProblem>> PostbackAsync(string program, string? click, string? transaction,
-        string? amount, string? currency, string? key, CatalogContext db, IOptionsMonitor<AffiliateOptions> options, TimeProvider time,
+        string? amount, string? currency, string? key, CatalogContext db, AffiliatePrograms programs, TimeProvider time,
         CancellationToken ct)
     {
-        var found = options.CurrentValue.Programs.FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
+        var found = (await programs.AllAsync(ct)).FirstOrDefault(p => string.Equals(p.Name, program, StringComparison.OrdinalIgnoreCase));
         if (found is null || !AffiliateLinks.KeyMatches(found, key) || !Guid.TryParse(click, out var clickId))
         {
             return TypedResults.NotFound();
@@ -173,7 +304,7 @@ public static class AffiliateApi
     /// The last <paramref name="days"/> days (UTC), for admins; anyone else gets 404, as with the flags page.
     /// </summary>
     private static async Task<Results<Ok<AffiliateReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
-        IOptionsMonitor<AffiliateOptions> options, TimeProvider time, int days = 30, CancellationToken ct = default)
+        AffiliatePrograms programs, TimeProvider time, int days = 30, CancellationToken ct = default)
     {
         if (!Admins.Is(user, config))
         {
@@ -211,7 +342,7 @@ public static class AffiliateApi
         var showIds = clicks.Select(c => c.ShowId).Concat(conversions.Select(c => c.ShowId)).Distinct().ToList();
         var titles = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Title, ct);
 
-        return TypedResults.Ok(AffiliateReport.Build(from, to, clicks, conversions, titles, options.CurrentValue.Programs));
+        return TypedResults.Ok(AffiliateReport.Build(from, to, clicks, conversions, titles, await programs.AllAsync(ct)));
     }
 
     private static async Task<string> PlanAsync(HttpContext http) =>
@@ -272,6 +403,6 @@ internal static class AffiliateReport
             conversions.Count,
             conversions.GroupBy(c => c.Currency).Select(g => new MoneyDto(g.Key, g.Sum(c => c.Amount))).OrderBy(m => m.Currency, StringComparer.Ordinal).ToList(),
             services, By(c => c.Surface, c => c.Surface), By(c => c.Plan, c => c.Plan), days, shows,
-            programs.Select(p => new AffiliateProgramDto(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p))).ToList());
+            programs.Select(p => new AffiliateProgramDto(p.Name, p.Services, p.Regions, p.Currency.ToUpperInvariant(), AffiliateLinks.IsValid(p), p.Source, p.Test)).ToList());
     }
 }

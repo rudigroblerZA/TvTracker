@@ -404,10 +404,11 @@ if (!string.IsNullOrEmpty(webPublicUrl))
     webApp.WithEnvironment("WebApp__PublicUrl", webPublicUrl);
 }
 
-// Affiliates:TestNetwork=true (running locally only): a pretend affiliate network covering every service, so affiliate
-// links, postbacks and the report can be tried without a real program. Where-to-watch clicks go through the web app's
-// /dev/affiliate-network page, which can report a sale (TestAffiliateNetwork, AffiliateLinks.TestNetwork).
-if (!builder.ExecutionContext.IsPublishMode && string.Equals(builder.Configuration["Affiliates:TestNetwork"], "true", StringComparison.OrdinalIgnoreCase))
+// The test affiliate network (running locally only; Affiliates:TestNetwork=false turns it off): a pretend network, so
+// affiliate links, postbacks and the report can be tried without a real program. Test programs set up in Settings, and
+// any service no program covers, send their where-to-watch clicks through the web app's /dev/affiliate-network page,
+// which can report a sale (TestAffiliateNetwork, AffiliateLinks.TestNetwork).
+if (!builder.ExecutionContext.IsPublishMode && !string.Equals(builder.Configuration["Affiliates:TestNetwork"], "false", StringComparison.OrdinalIgnoreCase))
 {
     const string testNetworkKey = "test-network-key";
     catalogApi
