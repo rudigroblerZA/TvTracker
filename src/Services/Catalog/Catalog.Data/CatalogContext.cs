@@ -42,6 +42,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.ToTable("shows");
             entity.HasIndex(s => new { s.Source, s.ExternalId }).IsUnique();
             entity.HasIndex(s => s.Title);
+            // For search: "contains" and near-spelling matches on the title (pg_trgm).
+            entity.HasIndex(s => s.Title, "IX_shows_Title_trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
             entity.HasIndex(s => s.Popularity);
             entity.HasIndex(s => s.NextRefreshAtUtc);
             entity.Property(s => s.Source).HasMaxLength(32);
@@ -85,6 +87,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.ToTable("people");
             // Not unique: different actors can share a name. The provider's id tells them apart.
             entity.HasIndex(p => p.Name);
+            entity.HasIndex(p => p.Name, "IX_people_Name_trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
             entity.HasIndex(p => p.ExternalId).IsUnique().HasFilter("\"ExternalId\" IS NOT NULL");
             entity.Property(p => p.Name).HasMaxLength(256);
             entity.Property(p => p.ExternalId).HasMaxLength(64);
@@ -264,6 +267,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
         });
 
         modelBuilder.HasPostgresExtension("vector");
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
         modelBuilder.Entity<ShowEmbedding>(entity =>
         {
             entity.ToTable("show_embeddings");

@@ -1,4 +1,5 @@
 @page "/search"
+@implements IDisposable
 @inject CatalogClient Catalog
 @inject NavigationManager Navigation
 @inject UserSession Session
@@ -8,7 +9,8 @@
 <h1>Search</h1>
 
 <form class="search-form" @onsubmit="SearchAsync">
-    <input type="search" placeholder="Search shows by title" @bind="query" aria-label="Search shows" />
+    <input type="search" placeholder="A title, an actor, or what it's about" value="@query" @oninput="OnInput" aria-label="Search shows"
+           autocomplete="off" />
     <select @bind="genre" aria-label="Genre">
         <option value="">All genres</option>
         @foreach (var g in genres)
@@ -40,6 +42,25 @@
     <button class="btn" type="submit" disabled="@searching">Search</button>
 </form>
 
+@if (suggestions is { Count: > 0 })
+{
+    @* As you type: shows already in the catalog, one click from their page. Enter searches properly, by meaning too. *@
+    <ul class="show-picker-suggestions search-suggestions" aria-label="Suggestions">
+        @foreach (var suggestion in suggestions)
+        {
+            <li>
+                <a href="shows/@suggestion.Id">
+                    <Poster Title="@suggestion.Title" Url="@suggestion.PosterUrl" Size="small" />
+                    <span>
+                        <span class="strong">@suggestion.Title</span>
+                        <span class="muted small">@(suggestion.Year is { } year ? $" ({year})" : "")</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
 <ErrorNotice Message="@error" OnRetry="SearchAsync" />
 
 @if (searching)
@@ -49,14 +70,70 @@
 }
 else if (results is not null)
 {
-    <p class="muted">@(results.TotalCount == 1 ? "1 result" : $"{results.TotalCount} results")</p>
-    <div class="card-grid">
-        @foreach (var show in results.Items)
+    @if (people.Count > 0)
+    {
+        <section aria-label="People">
+            <h2>People</h2>
+            <ul class="person-matches">
+                @foreach (var person in people)
+                {
+                    <li>
+                        <a href="people/@person.Id">
+                            <span class="strong">@person.Name</span>
+                            <span class="muted small">@string.Join(", ", person.KnownFor)</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (results.TotalCount == 0 && people.Count > 0)
+    {
+        <p class="muted">No shows by that name.</p>
+    }
+    else if (results.TotalCount == 0)
+    {
+        <p class="empty-state">
+            @(string.IsNullOrWhiteSpace(resultsQuery) ? "No shows match those filters." : $"No shows found for “{resultsQuery}”.")
+            Check the spelling, try fewer words, or describe it instead: “chemistry teacher turns to crime”.
+        </p>
+    }
+    else
+    {
+        // By title first; what's left is similar in meaning, under its own heading so it doesn't read as a wrong answer.
+        var byTitle = results.TitleCount ?? results.TotalCount;
+        var titled = results.Items.Take(byTitle).ToList();
+        var similar = results.Items.Skip(byTitle).ToList();
+        <p class="muted">
+            @(results.TitleCount is null ? Count(results.TotalCount, "result")
+                : byTitle == 0 ? "No titles match; these are similar in meaning."
+                : results.TotalCount == byTitle ? Count(byTitle, "result")
+                : $"{Count(byTitle, "title match", "title matches")}, and {results.TotalCount - byTitle} similar in meaning")
+        </p>
+        @if (titled.Count > 0)
         {
-            <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag"
-                      Subtitle="@(string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s))))" />
+            <div class="card-grid">
+                @foreach (var show in titled)
+                {
+                    <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag" Subtitle="@Subtitle(show)" />
+                }
+            </div>
         }
-    </div>
+        @if (similar.Count > 0)
+        {
+            @if (byTitle > 0)
+            {
+                <h2>Similar in meaning</h2>
+            }
+            <div class="card-grid">
+                @foreach (var show in similar)
+                {
+                    <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag" Subtitle="@Subtitle(show)" />
+                }
+            </div>
+        }
+    }
 
     @if (results.TotalCount > results.Page * results.PageSize)
     {
@@ -83,6 +160,40 @@ else if (results is not null)
     private List<ShowSummary> loaded = [];
     private string? error;
     private bool searching;
+    // The term the results shown are for (the box may have changed since).
+    private string? resultsQuery;
+    private List<PersonMatch> people = [];
+    private List<ShowSummary>? suggestions;
+    private CancellationTokenSource? pending;
+
+    private static string Count(int count, string one, string? many = null) => count == 1 ? $"1 {one}" : $"{count} {many ?? one + "s"}";
+
+    private static string Subtitle(ShowSummary show) =>
+        string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s)));
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString();
+        pending?.Cancel();
+        pending = new CancellationTokenSource();
+        var ct = pending.Token;
+        try
+        {
+            // Wait for a pause in typing, so suggestions follow the term rather than every keystroke.
+            await Task.Delay(250, ct);
+            suggestions = query?.Trim().Length >= 2 ? await Catalog.SuggestAsync(query.Trim(), ct) : null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke, or by the search itself.
+        }
+        catch (HttpRequestException)
+        {
+            suggestions = null;
+        }
+    }
+
+    public void Dispose() => pending?.Cancel();
 
     protected override async Task OnInitializedAsync()
     {
@@ -108,9 +219,15 @@ else if (results is not null)
     {
         error = null;
         searching = true;
+        pending?.Cancel();
+        suggestions = null;
         try
         {
+            var term = query?.Trim();
+            // People alongside the shows; a search without them is still a search.
+            var peopleTask = term?.Length >= 3 ? PeopleAsync(term) : Task.FromResult<List<PersonMatch>>([]);
             results = await Catalog.SearchAsync(query, genre, tag: tag, nanogenre: nanogenre);
+            (people, resultsQuery) = (await peopleTask, term);
             resultsTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
             resultsNanogenre = string.IsNullOrWhiteSpace(nanogenre) ? null : nanogenre;
             loaded = results?.Items.ToList() ?? [];
@@ -132,6 +249,18 @@ else if (results is not null)
         }
     }
 
+    private async Task<List<PersonMatch>> PeopleAsync(string term)
+    {
+        try
+        {
+            return await Catalog.SearchPeopleAsync(term) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
     private async Task LoadMoreAsync()
     {
         if (results is null)
@@ -139,7 +268,7 @@ else if (results is not null)
             return;
         }
 
-        var next = await Catalog.SearchAsync(query, genre, results.Page + 1, resultsTag, resultsNanogenre);
+        var next = await Catalog.SearchAsync(resultsQuery, genre, results.Page + 1, resultsTag, resultsNanogenre);
         if (next is not null)
         {
             loaded.AddRange(next.Items);

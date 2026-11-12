@@ -3,7 +3,14 @@ using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Apis;
 
-public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+/// <param name="TitleCount">For a search by term: how many of the results match by title (they come first); the rest
+/// are similar in meaning. Null when there's no such split.</param>
+public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int? TitleCount = null);
+
+/// <summary>
+/// A person found by name, with the shows they're best known for (most popular first).
+/// </summary>
+public record PersonMatchDto(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
 
 public record ShowSummaryDto(
     Guid Id,

@@ -23,7 +23,14 @@ public record UpdateProfile(string DisplayName, string? AvatarUrl, string TimeZo
 
 // Catalog
 
-public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+/// <param name="TitleCount">For a search by term: how many of the results match by title (they come first); the rest
+/// are similar in meaning. Null when there's no such split.</param>
+public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int? TitleCount = null);
+
+/// <summary>
+/// A person found by name, with the shows they're best known for.
+/// </summary>
+public record PersonMatch(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
 
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
