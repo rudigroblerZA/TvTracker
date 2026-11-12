@@ -414,6 +414,13 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); border-radius:
 .show-picker-suggestions button { display: flex; gap: 10px; align-items: center; width: 100%; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .show-picker-suggestions button:hover, .show-picker-suggestions button:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .show-picker-suggestions .poster.small { width: 32px; }
+/* The search page's suggestions are links to the shows; people found by name sit above the results. */
+.search-suggestions { margin: -8px 0 16px; max-width: 520px; box-shadow: var(--shadow-sm); }
+.search-suggestions a { display: flex; gap: 10px; align-items: center; padding: 6px; border-radius: 6px; color: var(--text); text-decoration: none; }
+.search-suggestions a:hover, .search-suggestions a:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.person-matches { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.person-matches a { display: flex; flex-direction: column; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); text-decoration: none; }
+.person-matches a:hover, .person-matches a:focus-visible { border-color: var(--accent); }
 
 /* Essential cut */
 

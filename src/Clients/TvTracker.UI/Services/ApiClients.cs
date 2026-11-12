@@ -420,6 +420,12 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// <summary>
     /// Catalog shows whose title contains the term, for suggest-as-you-type pickers; no provider import.
     /// </summary>
+    /// <summary>
+    /// People in the catalog's casts whose name matches, best known first.
+    /// </summary>
+    public Task<List<PersonMatch>?> SearchPeopleAsync(string term, CancellationToken ct = default) =>
+        GetAsync<List<PersonMatch>>(ApiClients.Catalog, $"api/v1/people/search?q={Uri.EscapeDataString(term)}", ct);
+
     public Task<List<ShowSummary>?> SuggestAsync(string term, CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, $"api/v1/shows/suggest?q={Uri.EscapeDataString(term)}", ct);
 

@@ -56,6 +56,14 @@ Search finds any show on TVmaze, not just imported ones. Before searching, Catal
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
 longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
 
+Search is forgiving about how a title is typed. Titles containing the term come first, best match first: the show
+whose title is the term (with or without a leading "The"), then titles with a word starting with it, then the rest,
+most popular first within each. When fewer than five titles contain it, titles spelled nearly the same follow
+(Postgres `pg_trgm`, accents ignored via `unaccent`): "breakng bad" finds Breaking Bad, "greys anatomy" Grey's Anatomy,
+"pokemon" Pokémon. The search page suggests catalog shows as you type (`GET /api/v1/shows/suggest`), lists people whose
+name matches above the results with the shows they're known for (`GET /api/v1/people/search?q=`, cast members only,
+rate-limited like search), and puts shows that match by meaning rather than title under their own heading.
+
 Search also matches by meaning. Results start with shows whose title contains the term (most popular first), followed
 by up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
 "cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
