@@ -31,6 +31,19 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
 
+    /// <summary>
+    /// How alike the term and the closest stretch of a name must be for search to call it near-spelled (trigram word
+    /// similarity, 0 to 1). Measured on the catalog: "breakng bad" against "Breaking Bad" scores 0.64, "severence"
+    /// against "Severance" 0.54, and the look-alikes to keep out sit at 0.50 ("pokemon" against "Poker Face").
+    /// </summary>
+    public const double NearSpellingThreshold = 0.52;
+
+    /// <summary>
+    /// A name as search compares it: lower case with accents removed (the database's <c>search_text</c> function).
+    /// Only for use in queries.
+    /// </summary>
+    public static string SearchText(string text) => throw new NotSupportedException("Only translated to SQL, in a query.");
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Ids are set by the app (Guid.CreateVersion7) before saving. Without ValueGeneratedNever, EF takes an entity
@@ -42,8 +55,6 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.ToTable("shows");
             entity.HasIndex(s => new { s.Source, s.ExternalId }).IsUnique();
             entity.HasIndex(s => s.Title);
-            // For search: "contains" and near-spelling matches on the title (pg_trgm).
-            entity.HasIndex(s => s.Title, "IX_shows_Title_trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
             entity.HasIndex(s => s.Popularity);
             entity.HasIndex(s => s.NextRefreshAtUtc);
             entity.Property(s => s.Source).HasMaxLength(32);
@@ -87,7 +98,6 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.ToTable("people");
             // Not unique: different actors can share a name. The provider's id tells them apart.
             entity.HasIndex(p => p.Name);
-            entity.HasIndex(p => p.Name, "IX_people_Name_trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
             entity.HasIndex(p => p.ExternalId).IsUnique().HasFilter("\"ExternalId\" IS NOT NULL");
             entity.Property(p => p.Name).HasMaxLength(256);
             entity.Property(p => p.ExternalId).HasMaxLength(64);
@@ -269,6 +279,9 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
         modelBuilder.HasPostgresExtension("vector");
         modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.HasPostgresExtension("unaccent");
+        // search_text and the trigram indexes on it (shows' titles, people's names) are created by the SearchText
+        // migration in SQL: EF can't model an index on an expression.
+        modelBuilder.HasDbFunction(typeof(CatalogContext).GetMethod(nameof(SearchText), [typeof(string)])!).HasName("search_text");
         modelBuilder.Entity<ShowEmbedding>(entity =>
         {
             entity.ToTable("show_embeddings");

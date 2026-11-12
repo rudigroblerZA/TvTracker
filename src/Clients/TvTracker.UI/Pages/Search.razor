@@ -9,7 +9,7 @@
 <h1>Search</h1>
 
 <form class="search-form" @onsubmit="SearchAsync">
-    <input type="search" placeholder="A title, an actor, or what it's about" value="@query" @oninput="OnInput" aria-label="Search shows"
+    <input type="search" placeholder="A title, an actor, or what it's about" @bind="query" @bind:event="oninput" @bind:after="SuggestAsync" aria-label="Search shows"
            autocomplete="off" />
     <select @bind="genre" aria-label="Genre">
         <option value="">All genres</option>
@@ -171,10 +171,12 @@ else if (results is not null)
     private static string Subtitle(ShowSummary show) =>
         string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s)));
 
-    private async Task OnInput(ChangeEventArgs e)
+    /// <summary>
+    /// Suggestions for what's typed so far. They're a nicety: whatever goes wrong, there are just none.
+    /// </summary>
+    private async Task SuggestAsync()
     {
-        query = e.Value?.ToString();
-        pending?.Cancel();
+        CancelPending();
         pending = new CancellationTokenSource();
         var ct = pending.Token;
         try
@@ -187,13 +189,20 @@ else if (results is not null)
         {
             // Superseded by a newer keystroke, or by the search itself.
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or System.Text.Json.JsonException)
         {
             suggestions = null;
         }
     }
 
-    public void Dispose() => pending?.Cancel();
+    private void CancelPending()
+    {
+        pending?.Cancel();
+        pending?.Dispose();
+        pending = null;
+    }
+
+    public void Dispose() => CancelPending();
 
     protected override async Task OnInitializedAsync()
     {
@@ -219,15 +228,16 @@ else if (results is not null)
     {
         error = null;
         searching = true;
-        pending?.Cancel();
+        Task<(string Term, List<PersonMatch> People)>? peopleTask = null;
+        CancelPending();
         suggestions = null;
         try
         {
             var term = query?.Trim();
             // People alongside the shows; a search without them is still a search.
-            var peopleTask = term?.Length >= 3 ? PeopleAsync(term) : Task.FromResult<List<PersonMatch>>([]);
+            peopleTask = term?.Length >= 3 ? PeopleAsync(term) : null;
             results = await Catalog.SearchAsync(query, genre, tag: tag, nanogenre: nanogenre);
-            (people, resultsQuery) = (await peopleTask, term);
+            (people, resultsQuery) = ([], term);
             resultsTag = string.IsNullOrWhiteSpace(tag) ? null : tag;
             resultsNanogenre = string.IsNullOrWhiteSpace(nanogenre) ? null : nanogenre;
             loaded = results?.Items.ToList() ?? [];
@@ -247,17 +257,30 @@ else if (results is not null)
         {
             searching = false;
         }
+        // The shows are on screen; people join them when they arrive, unless another search has started since.
+        if (peopleTask is not null)
+        {
+            StateHasChanged();
+            var found = await peopleTask;
+            if (resultsQuery == found.Term)
+            {
+                people = found.People;
+            }
+        }
     }
 
-    private async Task<List<PersonMatch>> PeopleAsync(string term)
+    /// <summary>
+    /// People for the term; none if the lookup fails in any way, since the search doesn't depend on them.
+    /// </summary>
+    private async Task<(string Term, List<PersonMatch> People)> PeopleAsync(string term)
     {
         try
         {
-            return await Catalog.SearchPeopleAsync(term) ?? [];
+            return (term, await Catalog.SearchPeopleAsync(term) ?? []);
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or OperationCanceledException or System.Text.Json.JsonException)
         {
-            return [];
+            return (term, []);
         }
     }
 

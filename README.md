@@ -58,14 +58,13 @@ longer than 10 seconds, search returns what the catalog already has, and the imp
 
 Search is forgiving about how a title is typed. Titles containing the term come first, best match first: the show
 whose title is the term (with or without a leading "The"), then titles with a word starting with it, then the rest,
-most popular first within each. When fewer than five titles contain it, titles spelled nearly the same follow
-(Postgres `pg_trgm`, accents ignored via `unaccent`): "breakng bad" finds Breaking Bad, "greys anatomy" Grey's Anatomy,
-"pokemon" Pokémon. The search page suggests catalog shows as you type (`GET /api/v1/shows/suggest`), lists people whose
-name matches above the results with the shows they're known for (`GET /api/v1/people/search?q=`, cast members only,
-rate-limited like search), and puts shows that match by meaning rather than title under their own heading.
+most popular first within each. Case and accents never matter ("elite" finds Élite, "pokemon" Pokémon). When fewer
+than five titles contain it, titles spelled nearly the same follow (Postgres `pg_trgm`): "breakng bad" finds Breaking
+Bad, "greys anatomy" Grey's Anatomy. Both kinds of match use a trigram index on the title with accents removed. The search page suggests catalog shows as you type (`GET /api/v1/shows/suggest`), lists people whose
+name matches above the results with the shows they're known for (`GET /api/v1/people/search?q=`, cast members
+only), and puts shows that match by meaning rather than title under their own heading.
 
-Search also matches by meaning. Results start with shows whose title contains the term (most popular first), followed
-by up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
+Search also matches by meaning. After the title matches come up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
 "cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
 Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The model (about 90 MB) is downloaded from
 Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
