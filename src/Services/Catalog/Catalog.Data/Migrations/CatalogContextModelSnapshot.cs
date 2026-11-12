@@ -363,11 +363,6 @@ namespace Catalog.Data.Migrations
 
                     b.HasIndex("Name");
 
-                    b.HasIndex(new[] { "Name" }, "IX_people_Name_trgm");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Name" }, "IX_people_Name_trgm"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Name" }, "IX_people_Name_trgm"), new[] { "gin_trgm_ops" });
-
                     b.ToTable("people", (string)null);
                 });
 
@@ -631,11 +626,6 @@ namespace Catalog.Data.Migrations
 
                     b.HasIndex("Source", "ExternalId")
                         .IsUnique();
-
-                    b.HasIndex(new[] { "Title" }, "IX_shows_Title_trgm");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Title" }, "IX_shows_Title_trgm"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Title" }, "IX_shows_Title_trgm"), new[] { "gin_trgm_ops" });
 
                     b.ToTable("shows", (string)null);
                 });

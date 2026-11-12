@@ -53,7 +53,9 @@ public static class CatalogApi
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
-        api.MapGet("/people/search", SearchPeopleAsync).RequireRateLimiting(SearchRateLimiting.Policy);
+        // Not rate limited, like suggestions: the search page asks for people with every search, which would halve
+        // what the search limit allows, and it reads the catalog only.
+        api.MapGet("/people/search", SearchPeopleAsync);
         api.MapGet("/people/{id:guid}", GetPersonAsync);
         api.MapGet("/schedule", GetScheduleAsync);
         api.MapGet("/genres", GetGenresAsync);
@@ -123,7 +125,7 @@ public static class CatalogApi
     }
 
     /// <summary>
-    /// Up to 6 people whose name contains the term (or, when none does, is spelled nearly like it, accents aside), those in the most
+    /// Up to 6 cast members whose name contains the term (or, when none does, is spelled nearly like it), those in the most
     /// popular shows first, each with the shows they're best known for.
     /// </summary>
     private static async Task<List<PersonMatchDto>> SearchPeopleAsync(CatalogContext db, string? q, CancellationToken ct)
@@ -134,11 +136,13 @@ public static class CatalogApi
             return [];
         }
 
-        var contains = TitleSearch.Contains(q);
-        var people = db.People.AsNoTracking().Where(p => EF.Functions.ILike(p.Name, contains, "\\"));
+        // Cast members only, and decided on those: a creator's name containing the term mustn't stop a near-spelled
+        // actor from being looked for.
+        var cast = db.People.AsNoTracking().Where(p => db.Cast.Any(c => c.PersonId == p.Id));
+        var people = TitleSearch.Matching(cast, q);
         if (q.Length >= TitleSearch.MinFuzzyLength && !await people.AnyAsync(ct))
         {
-            people = db.People.AsNoTracking().Where(p => EF.Functions.TrigramsWordSimilarity(EF.Functions.Unaccent(q), EF.Functions.Unaccent(p.Name)) >= TitleSearch.MinSimilarity);
+            people = TitleSearch.NearlySpelled(cast, q);
         }
 
         var found = await people
@@ -149,7 +153,6 @@ public static class CatalogApi
                 p.PhotoUrl,
                 Top = db.Cast.Where(c => c.PersonId == p.Id).Join(db.Shows, c => c.ShowId, s => s.Id, (c, s) => (double?)s.Popularity).Max()
             })
-            .Where(p => p.Top != null)
             .OrderByDescending(p => p.Top)
             .ThenBy(p => p.Name)
             .Take(6)
