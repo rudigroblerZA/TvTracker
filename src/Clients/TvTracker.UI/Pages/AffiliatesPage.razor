@@ -139,38 +139,7 @@
                 </section>
             }
 
-            <section>
-                <h2>Programs</h2>
-                @if (report.Programs.Count == 0)
-                {
-                    <p class="muted">
-                        None yet: every click goes to the service's own link and is still counted, so the table above is what each
-                        service's traffic is worth to a deal.
-                    </p>
-                }
-                else
-                {
-                    <ul class="plain-list">
-                        @foreach (var program in report.Programs)
-                        {
-                            <li>
-                                <strong>@program.Name</strong>
-                                <span class="muted">@($" · {string.Join(", ", program.Services)} · {(program.Regions.Count == 0 ? "every region" : string.Join(", ", program.Regions))} · paid in {program.Currency}")</span>
-                                @if (!program.Valid)
-                                {
-                                    <span class="tag tone-bad">@("not used: check its name, services, currency and https template")</span>
-                                }
-                            </li>
-                        }
-                    </ul>
-                }
-                <p class="muted small">
-                    Programs are set in Catalog.API's <code>Affiliates:Programs</code> (name, services, regions, an https template with
-                    <code>{url}</code> and <code>{click}</code>, a postback key and currency). Networks report sales to
-                    <code>/catalog/api/v1/affiliates/postback/{name}?click=…&amp;transaction=…&amp;amount=…&amp;key=…</code> on the mobile
-                    gateway's public address.
-                </p>
-            </section>
+            <AffiliateProgramsEditor OnChanged="LoadAsync" />
         }
     </Authorized>
     <NotAuthorized>

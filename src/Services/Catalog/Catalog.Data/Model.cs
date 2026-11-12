@@ -657,3 +657,50 @@ public static class CatalogOverrideFields
 
     public static bool IsEpisodeField(string field) => !ShowFields.Contains(field);
 }
+
+/// <summary>
+/// An affiliate program an admin set up in Settings: which services and regions it covers and the network's tracked
+/// link. Programs in Catalog.API's configuration (Affiliates:Programs) still work; one here with the same name wins.
+/// </summary>
+public class AffiliateProgramRecord
+{
+    /// <summary>
+    /// The program's name, as the network's postback gives it ("netflix-us"); lower case, the key.
+    /// </summary>
+    public required string Name { get; set; }
+
+    /// <summary>
+    /// The services it covers, as where-to-watch names them ("Netflix"); "*" for every service.
+    /// </summary>
+    public List<string> Services { get; set; } = [];
+
+    /// <summary>
+    /// Two-letter regions; none for every region.
+    /// </summary>
+    public List<string> Regions { get; set; } = [];
+
+    /// <summary>
+    /// The network's link, with {url} for the service's own link and {click} for the click id. Empty for a test
+    /// program, which takes the test network's.
+    /// </summary>
+    public string Template { get; set; } = "";
+
+    /// <summary>
+    /// What the network's postback must give as its key. Empty for a test program.
+    /// </summary>
+    public string? PostbackKey { get; set; }
+
+    public string Currency { get; set; } = "USD";
+
+    /// <summary>
+    /// A stand-in until there's a real deal: clicks go through the built-in test network (a page where a sale can be
+    /// reported by hand), where one is running; elsewhere the program isn't used.
+    /// </summary>
+    public bool Test { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+}

@@ -555,7 +555,19 @@ link opens the web app's address in the browser and is counted there, as a signe
   and their rate, commission per currency and per click, by day, service, link (button or list), the viewer's plan
   (signed out, free, plus, family), and the shows sending the most. Services with clicks and no program are named as
   worth a deal.
-- **Programs** go in Catalog.API's configuration, under `Affiliates:Programs`; the file is re-read on change, so no restart:
+- **Programs are set up in Settings** (`/settings/affiliates`, the Programs section, admins only): a name, the services
+  as where-to-watch names them (`*` for all), two-letter regions (empty for all), the currency it pays in, the network's
+  link and the postback key. Saved programs are in Catalog's database and take effect within a minute, no restart. The
+  link must be an https address with `{url}` where the service's own link goes (escaped) and `{click}` for the click id;
+  the key is 16 characters or more and is never shown again. A program can be switched off without losing it.
+- **Test programs**, for before there's a real deal: tick **Test program** and the program needs no link or key. Its
+  clicks go through the built-in test network's page (below), named for the program, so the report has numbers per
+  service from day one. **Add test programs for the main services** adds one each for Netflix, Prime Video, Disney+,
+  Hulu, Apple TV, HBO Max, Paramount+ and Peacock; a fresh local database gets them on first start. Netflix has no
+  public affiliate programme, so its entry stays a test one until there's a direct deal. Where the test network isn't
+  running (production), test programs aren't used and their services get plain, still counted, links.
+- **Programs in configuration** still work, under Catalog.API's `Affiliates:Programs` (re-read on change), for
+  deployments that keep them with their secrets. A program in Settings with the same name wins:
 
   ```json
   "Affiliates": {
@@ -569,23 +581,31 @@ link opens the web app's address in the browser and is counted there, as a signe
   }
   ```
 
-  `{url}` is the service's link (escaped) and `{click}` the click id. A template that isn't an https address, or a
-  program without a name, service or three-letter currency, isn't used, and the report says so.
+  A program that isn't valid isn't used, and the report says so.
 - **Sales** come from the network's server-to-server postback, to the mobile gateway's public address:
   `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
   key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
   counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
-- **Trying it locally:** run the AppHost with the test network on, turn the `affiliates` flag on, and click any
-  where-to-watch link. The click goes through a pretend network page in the web app, where **Report a sale** sends a
-  commission through the real postback and **Continue to the service** sends you on. The click and the sale then show
-  in `/settings/affiliates` (sign in as `admin`). Real programs you've configured still win for their services.
+- **Trying it locally:** the AppHost runs the test network by default, and the flag is on. Click any where-to-watch
+  link: it goes through a pretend network page in the web app (`/dev/affiliate-network`, the generic test link), where
+  **Report a sale** sends a commission through the real postback and **Continue to the service** sends you on. The
+  click and the sale then show in `/settings/affiliates` and `/settings/revenue` (sign in as `admin`). Live programs
+  still win for their services. To run without it:
 
   ```bash
-  dotnet run --project src/TvTracker.AppHost -- --Affiliates:TestNetwork true
+  dotnet run --project src/TvTracker.AppHost -- --Affiliates:TestNetwork false
   ```
 
 - **Privacy:** a click keeps the show, service, link, region, where it was clicked and the plan, never who clicked:
   no user id, address or browser. Nothing about clicks is in the data export or needs deleting with an account.
+
+**Revenue, in one place** (`/settings/revenue`, Settings → Admin, admins only): everything that can bring money in,
+over 7, 30 or 90 days. Subscriptions: what running subscriptions bring in a month per currency (a yearly plan counts
+as a twelfth), money received in the window, paying accounts and the share of all accounts that pay (the free-to-paid
+rate), the funnel from new accounts to checkouts started, checkouts paid and new subscriptions, how many ended, and
+who pays by plan and billing interval. Affiliate links: commission, clicks, sales and how many programs are live or
+test. Then both by day. Counts only: nothing names a person. The subscription half is Identity.API's
+`GET /api/v1/admin/revenue?days=30`; the affiliate half is Catalog's affiliate report.
 
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
@@ -869,6 +889,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `essential-cut` | The shorter way through a long show |
 | `social` | Following people and the feed |
 | `list-links` | A list anyone can open by link, which brings people in |
+| `affiliates` | Where-to-watch clicks counted and sent through affiliate programs: a way to earn |
 
 - **Plans, payments and the Family plan are on too** (they're switches, not features to use); see [Plans](#plans).
 - **Off features' background jobs still run** (Wikiquote lines, the atlas, cast credits, nanogenres, research

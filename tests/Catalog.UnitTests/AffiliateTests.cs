@@ -1,5 +1,6 @@
 ﻿using Catalog.API.Apis;
 using Catalog.API.Services;
+using Catalog.Data;
 using Microsoft.Extensions.Configuration;
 
 namespace Catalog.UnitTests;
@@ -36,7 +37,7 @@ public class AffiliateTests
     [InlineData("Prime Video", "DE", "prime")]
     [InlineData("Max", "US", null)]
     public void The_program_covering_a_service_and_region(string service, string region, string? program) =>
-        Assert.Equal(program, AffiliateLinks.For(Options, service, region)?.Name);
+        Assert.Equal(program, AffiliateLinks.For(Options.Programs, service, region)?.Name);
 
     [Fact]
     public void The_link_carries_the_escaped_address_and_the_click_id()
@@ -58,7 +59,7 @@ public class AffiliateTests
         var program = new AffiliateProgram { Name = "bad", Services = ["Netflix"], Template = template };
 
         Assert.False(AffiliateLinks.IsValid(program));
-        Assert.Null(AffiliateLinks.For(new AffiliateOptions { Programs = [program] }, "Netflix", "US"));
+        Assert.Null(AffiliateLinks.For([program], "Netflix", "US"));
     }
 
     [Theory]
@@ -79,9 +80,9 @@ public class AffiliateTests
         var test = AffiliateLinks.TestNetwork(config)!;
         var options = new AffiliateOptions { Programs = [Netflix, test] };
 
-        Assert.Equal("netflix-us", AffiliateLinks.For(options, "Netflix", "US")?.Name);
-        Assert.Equal(AffiliateLinks.TestNetworkName, AffiliateLinks.For(options, "Max", "GB")?.Name);
-        Assert.Equal("http://localhost:5120/dev/affiliate-network?u=https%3A%2F%2Fmax.com%2F&click=" + Guid.Empty.ToString("N"),
+        Assert.Equal("netflix-us", AffiliateLinks.For(options.Programs, "Netflix", "US")?.Name);
+        Assert.Equal(AffiliateLinks.TestNetworkName, AffiliateLinks.For(options.Programs, "Max", "GB")?.Name);
+        Assert.Equal("http://localhost:5120/dev/affiliate-network?u=https%3A%2F%2Fmax.com%2F&click=" + Guid.Empty.ToString("N") + "&program=test-network",
             AffiliateLinks.Wrap(test, "https://max.com/", Guid.Empty));
         Assert.Null(AffiliateLinks.TestNetwork(new ConfigurationBuilder().Build()));
     }
@@ -157,5 +158,65 @@ public class AffiliateTests
         Assert.Equal(7, report.Days.Count);
         Assert.Empty(report.Services);
         Assert.Empty(report.Revenue);
+    }
+
+    private static IConfiguration WithTestNetwork() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Affiliates:TestNetwork:Url"] = "http://localhost:5120", ["Affiliates:TestNetwork:Key"] = "test-network-key"
+    }).Build();
+
+    private static AffiliateProgramRecord Record(string name, string service, bool test = false, bool enabled = true) => new()
+    {
+        Name = name, Services = [service], Currency = "USD", Test = test, Enabled = enabled,
+        Template = test ? "" : "https://network.example/c/9?u={url}&s={click}", PostbackKey = test ? null : "a-long-random-secret"
+    };
+
+    [Fact]
+    public void Programs_from_Settings_come_first_then_configurations_then_the_test_networks_catch_all()
+    {
+        var test = AffiliateLinks.TestNetwork(WithTestNetwork());
+
+        var merged = AffiliatePrograms.Merge([Record("hulu-live", "Hulu")], [Netflix, Prime], test);
+
+        Assert.Equal(["hulu-live", "netflix-us", "prime", AffiliateLinks.TestNetworkName], merged.Select(p => p.Name));
+        Assert.Equal([AffiliateSources.Settings, AffiliateSources.Configuration, AffiliateSources.Configuration, AffiliateSources.TestNetwork],
+            merged.Select(p => p.Source));
+    }
+
+    [Fact]
+    public void A_program_in_Settings_replaces_the_configurations_of_that_name_even_when_switched_off()
+    {
+        var merged = AffiliatePrograms.Merge([Record("netflix-us", "Netflix", enabled: false)], [Netflix, Prime], null);
+
+        // Switched off in Settings: not used, and the configuration's doesn't come back in its place.
+        Assert.Equal(["prime"], merged.Select(p => p.Name));
+    }
+
+    [Fact]
+    public void A_test_program_takes_the_test_networks_link_and_key_and_is_unusable_without_one()
+    {
+        var withNetwork = AffiliatePrograms.Merge([Record("netflix-test", "Netflix", test: true)], [], AffiliateLinks.TestNetwork(WithTestNetwork()))[0];
+        Assert.True(AffiliateLinks.IsValid(withNetwork));
+        Assert.True(AffiliateLinks.KeyMatches(withNetwork, "test-network-key"));
+        var click = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        // The page is told which program the click belongs to, so a sale reported there counts against it.
+        Assert.Equal("http://localhost:5120/dev/affiliate-network?u=https%3A%2F%2Fwww.netflix.com%2Ftitle%2F1&click=11111111222233334444555555555555&program=netflix-test",
+            AffiliateLinks.Wrap(withNetwork, "https://www.netflix.com/title/1", click));
+
+        var without = AffiliatePrograms.Merge([Record("netflix-test", "Netflix", test: true)], [], null)[0];
+        Assert.False(AffiliateLinks.IsValid(without));
+        Assert.Null(AffiliateLinks.For([without], "Netflix", "US"));
+    }
+
+    [Fact]
+    public void Starter_programs_are_a_test_program_per_main_service_added_once()
+    {
+        var now = new DateTime(2026, 11, 12, 9, 0, 0, DateTimeKind.Utc);
+
+        var all = StarterPrograms.Missing([], now);
+        Assert.Contains(all, p => p is { Name: "netflix-test", Test: true, Enabled: true } && p.Services.SequenceEqual(["Netflix"]));
+        Assert.Equal(StarterPrograms.All.Count, all.Count);
+
+        Assert.DoesNotContain(StarterPrograms.Missing(["NETFLIX-TEST", "hulu-test"], now), p => p.Name is "netflix-test" or "hulu-test");
     }
 }

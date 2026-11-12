@@ -1,6 +1,10 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Catalog.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Catalog.API.Services;
 
@@ -49,6 +53,37 @@ public sealed class AffiliateProgram
     /// ISO 4217 code its commissions are paid in.
     /// </summary>
     public string Currency { get; set; } = "USD";
+
+    /// <summary>
+    /// Where the program comes from: <see cref="AffiliateSources"/>. Set by the app, not read from configuration.
+    /// </summary>
+    public string Source { get; set; } = AffiliateSources.Configuration;
+
+    /// <summary>
+    /// A stand-in that goes through the test network.
+    /// </summary>
+    public bool Test { get; set; }
+}
+
+/// <summary>
+/// Where an affiliate program is defined.
+/// </summary>
+public static class AffiliateSources
+{
+    /// <summary>
+    /// Set up by an admin in Settings (the affiliate_programs table); can be changed there.
+    /// </summary>
+    public const string Settings = "settings";
+
+    /// <summary>
+    /// Affiliates:Programs in Catalog.API's configuration.
+    /// </summary>
+    public const string Configuration = "configuration";
+
+    /// <summary>
+    /// The development test network's own catch-all, covering every service no program does.
+    /// </summary>
+    public const string TestNetwork = "test-network";
 }
 
 /// <summary>
@@ -60,8 +95,8 @@ public static class AffiliateLinks
     /// <summary>
     /// The first valid program covering the service in the region, if any.
     /// </summary>
-    public static AffiliateProgram? For(AffiliateOptions options, string service, string region) =>
-        options.Programs.FirstOrDefault(p => IsValid(p)
+    public static AffiliateProgram? For(IEnumerable<AffiliateProgram> programs, string service, string region) =>
+        programs.FirstOrDefault(p => IsValid(p)
             && (p.Services.Contains(service, StringComparer.OrdinalIgnoreCase) || p.Services.Contains(AnyService))
             && (p.Regions.Count == 0 || p.Regions.Contains(region, StringComparer.OrdinalIgnoreCase)));
 
@@ -74,7 +109,8 @@ public static class AffiliateLinks
     /// The program's tracked link for <paramref name="url"/> and the click.
     /// </summary>
     public static string Wrap(AffiliateProgram program, string url, Guid clickId) =>
-        program.Template.Replace("{url}", Uri.EscapeDataString(url)).Replace("{click}", clickId.ToString("N"));
+        program.Template.Replace("{url}", Uri.EscapeDataString(url)).Replace("{click}", clickId.ToString("N"))
+            .Replace("{program}", Uri.EscapeDataString(program.Name));
 
     /// <summary>
     /// A name, a service, a currency code, and a template that gives an absolute https address (or http to this machine,
@@ -97,11 +133,19 @@ public static class AffiliateLinks
             {
                 Name = TestNetworkName,
                 Services = [AnyService],
-                Template = url.TrimEnd('/') + "/dev/affiliate-network?u={url}&click={click}",
+                Template = TestTemplate(url),
                 PostbackKey = key,
-                Currency = "USD"
+                Currency = "USD",
+                Source = AffiliateSources.TestNetwork,
+                Test = true
             }
             : null;
+
+    /// <summary>
+    /// The test network's link: its page in the web app, told which program the click belongs to so a sale reported
+    /// there is counted against it.
+    /// </summary>
+    public static string TestTemplate(string webAppUrl) => webAppUrl.TrimEnd('/') + "/dev/affiliate-network?u={url}&click={click}&program={program}";
 
     public const string TestNetworkName = "test-network";
 
@@ -116,9 +160,119 @@ public static class AffiliateLinks
 /// <summary>
 /// App admins: Keycloak usernames in <c>Admin:Users</c>, as Identity's flags page reads them.
 /// </summary>
+/// <summary>
+/// Every affiliate program in force, in the order a click tries them: an admin's from Settings, then the
+/// configuration's, then the test network's catch-all. Kept a few seconds, so a click doesn't read the table each time
+/// and a change in Settings applies almost at once (<see cref="Forget"/> makes it at once for the admin who made it).
+/// </summary>
+public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<AffiliateOptions> options, IConfiguration configuration, IMemoryCache cache)
+{
+    private const string CacheKey = nameof(AffiliatePrograms);
+    private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(15);
+
+    public async Task<IReadOnlyList<AffiliateProgram>> AllAsync(CancellationToken ct)
+    {
+        if (!cache.TryGetValue(CacheKey, out List<AffiliateProgramRecord>? records))
+        {
+            records = await db.AffiliatePrograms.AsNoTracking().ToListAsync(ct);
+            cache.Set(CacheKey, records, CacheFor);
+        }
+        return Merge(records!, options.CurrentValue.Programs, AffiliateLinks.TestNetwork(configuration));
+    }
+
+    public void Forget() => cache.Remove(CacheKey);
+
+    /// <summary>
+    /// Settings' programs that are switched on (a test one with the test network's link and key, or unusable without
+    /// one), then the configuration's that Settings doesn't name, then the test network's catch-all.
+    /// </summary>
+    public static IReadOnlyList<AffiliateProgram> Merge(IEnumerable<AffiliateProgramRecord> records, IEnumerable<AffiliateProgram> configured,
+        AffiliateProgram? testNetwork)
+    {
+        var fromSettings = records.Where(r => r.Enabled).OrderBy(r => r.Name, StringComparer.Ordinal).Select(r => new AffiliateProgram
+        {
+            Name = r.Name,
+            Services = r.Services,
+            Regions = r.Regions,
+            Template = r.Test ? testNetwork?.Template ?? "" : r.Template,
+            PostbackKey = r.Test ? testNetwork?.PostbackKey : r.PostbackKey,
+            Currency = r.Currency,
+            Source = AffiliateSources.Settings,
+            Test = r.Test
+        }).ToList();
+        var named = records.Select(r => r.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var fromConfiguration = configured.Where(p => p.Source == AffiliateSources.Configuration && !named.Contains(p.Name));
+        return [.. fromSettings, .. fromConfiguration, .. testNetwork is null ? [] : new[] { testNetwork }];
+    }
+}
+
 public static class Admins
 {
     public static bool Is(ClaimsPrincipal user, IConfiguration config) =>
         user.FindFirstValue("preferred_username") is { } name
         && (config.GetSection("Admin:Users").Get<string[]>() ?? []).Contains(name, StringComparer.OrdinalIgnoreCase);
+}
+
+/// <summary>
+/// The streaming services given a test program to start with, so their clicks, and sales reported on the test
+/// network's page, are tracked per service before any real deal exists. Names are as where-to-watch lists them.
+/// </summary>
+public static class StarterPrograms
+{
+    public static readonly IReadOnlyList<(string Name, string Service)> All =
+    [
+        ("netflix-test", "Netflix"), ("prime-video-test", "Prime Video"), ("disney-plus-test", "Disney+"), ("hulu-test", "Hulu"),
+        ("apple-tv-test", "Apple TV"), ("hbo-max-test", "HBO Max"), ("paramount-plus-test", "Paramount+"), ("peacock-test", "Peacock")
+    ];
+
+    /// <summary>
+    /// The starter programs not in <paramref name="existing"/> yet, as records to add.
+    /// </summary>
+    public static List<AffiliateProgramRecord> Missing(IEnumerable<string> existing, DateTime nowUtc)
+    {
+        var have = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return All.Where(p => !have.Contains(p.Name))
+            .Select(p => new AffiliateProgramRecord
+            {
+                Name = p.Name, Services = [p.Service], Currency = "USD", Test = true, Enabled = true, CreatedAtUtc = nowUtc, UpdatedAtUtc = nowUtc
+            })
+            .ToList();
+    }
+}
+
+/// <summary>
+/// In development with the test network running, an empty programs table starts with <see cref="StarterPrograms"/>.
+/// Only when empty: programs an admin removed don't come back while any other is left.
+/// </summary>
+public sealed class AffiliateProgramSeeder(IServiceScopeFactory scopes, IHostEnvironment environment, IConfiguration configuration, TimeProvider time,
+    ILogger<AffiliateProgramSeeder> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (!environment.IsDevelopment() || AffiliateLinks.TestNetwork(configuration) is null)
+        {
+            return;
+        }
+        // The table may not be there yet: the database is migrated as the service starts.
+        for (var attempt = 0; attempt < 20 && !stoppingToken.IsCancellationRequested; attempt++)
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
+                if (!await db.AffiliatePrograms.AnyAsync(stoppingToken))
+                {
+                    db.AffiliatePrograms.AddRange(StarterPrograms.Missing([], time.GetUtcNow().UtcDateTime));
+                    await db.SaveChangesAsync(stoppingToken);
+                    logger.LogInformation("Affiliate programs: added {Count} test programs to start with", StarterPrograms.All.Count);
+                }
+                return;
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogDebug(ex, "Affiliate programs: the table isn't ready yet; trying again");
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+    }
 }

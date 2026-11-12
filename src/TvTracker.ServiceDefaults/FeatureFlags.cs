@@ -95,7 +95,7 @@ public static class FeatureFlags
     public static readonly IReadOnlySet<string> OnByDefault = new HashSet<string>
     {
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
-        Plans, Payments, FamilyPlan,
+        Plans, Payments, FamilyPlan, Affiliates,
     };
 
     /// <summary>
