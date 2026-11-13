@@ -18,11 +18,14 @@ namespace Identity.API.Services;
 /// <item><b>The web app's public address</b> (<c>Keycloak:WebPublicUrl</c>, set when the web app is reached through
 /// one forwarded address, such as a cloud preview): added to the web client's allowed redirects, which the realm file has
 /// only for localhost.</item>
+/// <item><b>Outside development</b> the realm is also set to require HTTPS from outside addresses and to lock an
+/// account for a while after repeated wrong passwords, which the realm file leaves off.</item>
 /// <item><b>Retried</b> as <see cref="KeycloakRetry"/> says; when it gives up, every service using a changed secret gets
 /// 401 from Keycloak until Identity restarts.</item>
 /// </list>
 /// </summary>
-public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, ILogger<RealmSecretsSeeder> logger) : BackgroundService
+public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, IHostEnvironment environment,
+    ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
     private const string WebClientId = "tvtracker-web";
 
@@ -63,6 +66,10 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
                         logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
                         break;
                 }
+            }
+            if (!environment.IsDevelopment() && await keycloak.HardenRealmAsync(token, stoppingToken))
+            {
+                logger.LogInformation("Set the Keycloak realm to require HTTPS and to lock accounts after repeated wrong passwords");
             }
             if (webPublicUrl is not null && await keycloak.AllowRedirectAsync(token, WebClientId, webPublicUrl, stoppingToken) == true)
             {

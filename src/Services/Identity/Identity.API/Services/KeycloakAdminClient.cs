@@ -125,6 +125,23 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// Adds <paramref name="pattern"/> to a client's allowed redirect and post-logout redirect addresses unless it's
     /// there. Null when the realm has no such client, else whether it changed.
     /// </summary>
+    /// <summary>
+    /// Makes the realm require HTTPS from outside addresses and lock an account for a while after repeated wrong
+    /// passwords; false when it already does. The realm file (made for development) has neither.
+    /// </summary>
+    public async Task<bool> HardenRealmAsync(string token, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        if (realm is null || (realm["sslRequired"]?.GetValue<string>() == "external" && realm["bruteForceProtected"]?.GetValue<bool>() == true))
+        {
+            return false;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject { ["sslRequired"] = "external", ["bruteForceProtected"] = true },
+            cancellationToken);
+        return true;
+    }
+
     public async Task<bool?> AllowRedirectAsync(string token, string clientId, string pattern, CancellationToken cancellationToken)
     {
         if (await FindClientAsync(token, clientId, cancellationToken) is not var (client, id))

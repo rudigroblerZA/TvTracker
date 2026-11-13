@@ -1759,15 +1759,74 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 
 ## Before production
 
-- Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
-  `identity-admin-client-secret`, `internal-client-secret`, `app-admin-password` and
-  `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
-  password into Keycloak's realm on start.
-- Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the
-  services accept the Android emulator's token issuer only in Development.
-- Set `Branding:Operator` and `Branding:ContactEmail`, and have the privacy policy and terms reviewed (Landing page,
-  privacy and terms).
-- Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
+The app has only run on a developer's machine. This is what stands between that and a public deployment: what the
+code already does for one, what a deployment has to be given, and what isn't built yet.
+
+**Already in place**
+
+- **Development-only parts stay there:** the test payment provider, the test affiliate network and its starter
+  programs, the `/ops` pages and OpenAPI exist only in Development. A publish carries no development secrets, always
+  uses Stripe, and Identity.API removes the realm's demo user on every start outside Development.
+- **Health checks** (`/health`, `/alive`) are served in every environment, for liveness and readiness probes. They
+  answer with the overall status only.
+- **Logs** are one JSON object a line outside Development. Traces and metrics go wherever
+  `OTEL_EXPORTER_OTLP_ENDPOINT` points; unset, they go nowhere.
+- **Database upgrades** run at start under a Postgres advisory lock, so two copies of a service starting together take
+  turns.
+- **The web app** keeps the keys behind its sign-in cookie in Redis (restarts and deploys don't sign people out, and
+  more than one copy can run), sends its cookie over HTTPS only, sends `nosniff` and a referrer policy, and refuses
+  framing by other sites. Keycloak's login pages keep their own anti-framing headers.
+- **Redis and RabbitMQ keep their data** in volumes: server-side sign-in tokens, queued events, retries and dead
+  letters survive a restart.
+- **Keycloak's realm** is set, outside Development, to require HTTPS from outside addresses and to lock an account
+  after repeated wrong passwords; client secrets and the admin password come from the secret parameters.
+- **Email that isn't configured isn't faked:** outside Development an alert's delivery shows as failed and weekly
+  digests are off, and no address or message is written to a log.
+- **Deleting an account** removes its data before its login, so a failure part-way leaves a login that can ask again.
+
+**A deployment must be given**
+
+- Every secret parameter (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
+  `identity-admin-client-secret`, `internal-client-secret`, `app-admin-password`, `keycloak-admin-password`, and
+  Stripe's (see [Plans](#plans)). Optional: `tvdb-api-key`, `tmdb-api-key`, `email-connection-string`.
+- `Branding:Operator` and `Branding:ContactEmail`: a publish refuses to start without them, since the privacy policy
+  and terms show them. Have both pages reviewed (Landing page, privacy and terms).
+- For email: `email-connection-string` (Azure Communication Services) and `Email:SenderAddress`. Links in the weekly
+  digest use `Digest:BaseUrl`, or `WebApp:PublicUrl` when that's set.
+- `Admin:Users` and `Moderation:Users`: create those accounts before opening registration, since admins are matched
+  by username.
+- Mobile: remove `usesCleartextTraffic` and `allowBackup` (Android) and `NSAllowsLocalNetworking` (iOS), and point
+  the app at real hosts (`MobileSettings`).
+
+**Not built yet** (each needs a decision first)
+
+- **A hosting target.** Nothing here deploys: no `azure.yaml`, Dockerfiles or compose file, and CI only builds and
+  tests. The two direct routes are Azure Container Apps through azd (`Aspire.Hosting.Azure.AppContainers`) or one
+  machine through the Aspire Docker Compose publisher. Most of the rest of this list follows from that choice.
+- **Keycloak for production.** It runs `start-dev` on an embedded H2 file over HTTP, with a realm made for
+  development (localhost redirects, no email server, `verifyEmail` off, so password reset doesn't work and addresses
+  aren't confirmed). A deployment needs `start` with Postgres, a public HTTPS address, an SMTP account, and a realm
+  file without the development users.
+- **Feature flags when deployed.** flagd reads the AppHost's `Flags` folder through a bind mount, and the flags page
+  writes its overrides there; in containers neither exists. The flag file has to ship in an image or volume, and
+  overrides need a store both flagd and Identity.API reach.
+- **Postgres as a service.** One container holds all nine databases. A deployment wants a managed server (with the
+  `vector`, `pg_trgm` and `unaccent` extensions allowed for the catalog) and its backups; `scripts/backup.sh` and
+  `restore.sh` work against the local containers only.
+- **One copy of each background service.** Notification delivery, digests, the sync worker and the analytics worker
+  don't claim their work, so two copies would do it twice. Run one of each until they do.
+- **Events at first start.** Locally the AppHost starts consumers before publishers. Deployed, everything starts at
+  once, and an event published before its queue exists is dropped by the broker.
+- **Payments beyond the happy path.** Stripe checkout collects no tax, and refunds, disputes and failed payments
+  aren't acted on (a refunded subscriber keeps their plan until the period ends). Deleting an account deletes its
+  receipts, which the law may want kept.
+- **Rate limits by address** should be tested behind the real ingress: they key on `X-Forwarded-For`, which the
+  platform's own forwarding may rewrite.
+- **The embedding model.** The default needs Docker Model Runner beside the services; without it search matches
+  titles only. A deployment should either run it somewhere with the model, or switch to the in-process model.
+- **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
+  network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
+  charging for the app, and TMDB's and TheTVDB's before turning those on.
 
 ## Package versions
 

@@ -161,7 +161,8 @@ public sealed class DigestOptions
 /// (so a late run or a changed day can't send two in one week). A week with nothing in it sends nothing, but counts as
 /// sent. Email logs instead of sending until <c>Email:ConnectionString</c> and <c>Email:SenderAddress</c> are set.
 /// </summary>
-public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration configuration, TimeProvider time, ILogger<DigestWorker> logger)
+public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration configuration, IHostEnvironment environment, TimeProvider time,
+    ILogger<DigestWorker> logger)
     : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(15);
@@ -172,6 +173,14 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // In development an unconfigured digest goes to the log. Deployed, addresses and what people watch don't
+        // belong there, so without an email account there are no digests, said once.
+        if (!_email.IsConfigured && !environment.IsDevelopment())
+        {
+            logger.LogWarning("Weekly digests are off: email isn't configured (Email:ConnectionString and Email:SenderAddress)");
+            return;
+        }
+
         using var timer = new PeriodicTimer(Interval, time);
         do
         {

@@ -44,9 +44,14 @@ var notificationsDb = postgres.AddDatabase("notificationsdb");
 var analyticsDb = postgres.AddDatabase("analyticsdb");
 var socialDb = postgres.AddDatabase("socialdb");
 
-var redis = builder.AddRedis("redis");
+// Redis holds the web app's server-side tokens and the keys that protect its sign-in cookie, so it keeps its data
+// across restarts: without the volume, restarting Redis signs everyone out.
+var redis = builder.AddRedis("redis").WithDataVolume();
 
+// The queues are durable (events waiting to be handled, retries, dead letters); the volume is what keeps them when
+// the broker's container is replaced.
 var eventBus = builder.AddRabbitMQ("eventbus")
+    .WithDataVolume()
     .WithManagementPlugin()
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -78,7 +83,7 @@ var keycloakUrl = keycloak.GetEndpoint("http");
 // later source. It isn't checked in, so it's created empty when missing.
 var flagsDirectory = Path.Combine(builder.AppHostDirectory, "Flags");
 var flagOverrides = Path.Combine(flagsDirectory, "overrides.json");
-if (!File.Exists(flagOverrides))
+if (!builder.ExecutionContext.IsPublishMode && !File.Exists(flagOverrides))
 {
     File.WriteAllText(flagOverrides, "{ \"flags\": {} }\n");
 }
@@ -190,7 +195,13 @@ var researchApi = builder.AddProject<Projects.Research_API>("research-api")
     .WithReference(catalogApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
-if (builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
+// TMDB's key, for research sources: plain configuration locally (Research:TmdbApiKey); in a deployment the secret
+// parameter tmdb-api-key, so it isn't written into the published manifest.
+if (builder.Configuration["Parameters:tmdb-api-key"] is { Length: > 0 })
+{
+    researchApi.WithEnvironment("Research__TmdbApiKey", builder.AddParameter("tmdb-api-key", secret: true));
+}
+else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
 {
     researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
 }
@@ -376,6 +387,29 @@ var webPublicUrl = builder.Configuration["WebApp:PublicUrl"];
 if (!string.IsNullOrEmpty(webPublicUrl))
 {
     identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
+}
+
+// Email (alerts and the weekly digest), through Azure Communication Services: the secret parameter
+// email-connection-string and Email:SenderAddress. Without them, development logs each message and a deployment
+// sends none (deliveries show as failed; digests are off). Links in the digest point at the web app's public address.
+if (builder.Configuration["Parameters:email-connection-string"] is { Length: > 0 } && builder.Configuration["Email:SenderAddress"] is { Length: > 0 } sender)
+{
+    notificationsApi
+        .WithEnvironment("Email__ConnectionString", builder.AddParameter("email-connection-string", secret: true))
+        .WithEnvironment("Email__SenderAddress", sender);
+}
+if ((builder.Configuration["Digest:BaseUrl"] ?? webPublicUrl) is { Length: > 0 } digestBaseUrl)
+{
+    notificationsApi.WithEnvironment("Digest__BaseUrl", digestBaseUrl);
+}
+
+// A deployment names who runs it: the privacy policy and terms show the operator and a contact address, and without
+// them they'd show the app's name and nothing to write to.
+if (builder.ExecutionContext.IsPublishMode
+    && (string.IsNullOrWhiteSpace(builder.Configuration["Branding:Operator"]) || string.IsNullOrWhiteSpace(builder.Configuration["Branding:ContactEmail"])))
+{
+    throw new InvalidOperationException(
+        "Set Branding:Operator (who runs the app) and Branding:ContactEmail before publishing: the privacy policy and terms show them.");
 }
 
 var webApp = builder.AddProject<Projects.WebApp>("webapp")

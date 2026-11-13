@@ -24,6 +24,18 @@ public static class Extensions
         builder.ConfigureOpenTelemetry();
         builder.AddDefaultHealthChecks();
 
+        // Deployed, the console is what a log collector reads: one JSON object a line, with scopes, rather than the
+        // coloured multi-line text that suits a terminal.
+        if (!builder.Environment.IsDevelopment())
+        {
+            builder.Logging.AddJsonConsole(options =>
+            {
+                options.IncludeScopes = true;
+                options.UseUtcTimestamp = true;
+                options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+            });
+        }
+
         builder.Services.AddServiceDiscovery();
         builder.Services.AddSingleton(new Branding(builder.Configuration[$"{Branding.Section}:AppName"]));
 
@@ -93,19 +105,18 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Health endpoints are only exposed in development. See https://aka.ms/dotnet/aspire/healthchecks
-        // before exposing them in other environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // All health checks must pass for the app to be ready to accept traffic
-            app.MapHealthChecks(HealthEndpointPath);
+        // Mapped in every environment: a deployment's liveness and readiness probes need them as much as the local
+        // orchestrator does. They answer with the overall status only ("Healthy"), never a check's detail, so being
+        // reachable through the web app or the mobile gateway tells a caller nothing more than that the service is up.
 
-            // Only "live" checks must pass for the app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
-        }
+        // All health checks must pass for the app to be ready to accept traffic
+        app.MapHealthChecks(HealthEndpointPath);
+
+        // Only "live" checks must pass for the app to be considered alive
+        app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        });
 
         return app;
     }

@@ -13,7 +13,8 @@ namespace TvTracker.Persistence;
 /// existing schema, until they move to migrations before the first production release.
 /// A context that moves to migrations names its first migration as the <c>baseline</c>: a database EnsureCreated made
 /// from the same model is then marked as having it, and migrated from there.
-/// Only one process per database should run this (for catalogdb that's Catalog.API).
+/// Only one service per database runs this (for catalogdb that's Catalog.API), and copies of that service starting
+/// together take turns: the whole of it runs under a Postgres advisory lock, held on the context's connection.
 /// </summary>
 public sealed class DatabaseInitializer<TContext>(
     IServiceScopeFactory scopeFactory,
@@ -34,19 +35,18 @@ public sealed class DatabaseInitializer<TContext>(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<TContext>();
 
-                if (db.Database.GetMigrations().Any())
+                // Session-level, so it needs the one connection kept open until it's released; a second copy of the
+                // service waits here and then finds nothing left to do.
+                await db.Database.OpenConnectionAsync(cancellationToken);
+                await db.Database.ExecuteSqlRawAsync(Lock, cancellationToken);
+                try
                 {
-                    await MigrateAsync(db, cancellationToken);
+                    await InitialiseAsync(db, scope.ServiceProvider, cancellationToken);
                 }
-                else
+                finally
                 {
-                    var created = await db.Database.EnsureCreatedAsync(cancellationToken);
-                    logger.LogInformation("Database for {Context} ready (schema created: {Created})", typeof(TContext).Name, created);
-                }
-
-                if (seed is not null)
-                {
-                    await seed(db, scope.ServiceProvider, cancellationToken);
+                    await db.Database.ExecuteSqlRawAsync(Unlock, CancellationToken.None);
+                    await db.Database.CloseConnectionAsync();
                 }
 
                 return;
@@ -56,6 +56,33 @@ public sealed class DatabaseInitializer<TContext>(
                 logger.LogWarning(ex, "Database initialisation failed (attempt {Attempt}); retrying", attempt);
                 await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
             }
+        }
+    }
+
+    /// <summary>
+    /// "TVTR" in ASCII, as a number. One key serves every service: advisory locks are per database, and each has its own.
+    /// </summary>
+    private const string AdvisoryLockKey = "1414943826";
+
+    private const string Lock = "SELECT pg_advisory_lock(" + AdvisoryLockKey + ")";
+
+    private const string Unlock = "SELECT pg_advisory_unlock(" + AdvisoryLockKey + ")";
+
+    private async Task InitialiseAsync(TContext db, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        if (db.Database.GetMigrations().Any())
+        {
+            await MigrateAsync(db, cancellationToken);
+        }
+        else
+        {
+            var created = await db.Database.EnsureCreatedAsync(cancellationToken);
+            logger.LogInformation("Database for {Context} ready (schema created: {Created})", typeof(TContext).Name, created);
+        }
+
+        if (seed is not null)
+        {
+            await seed(db, services, cancellationToken);
         }
     }
 

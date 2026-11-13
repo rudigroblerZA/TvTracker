@@ -20,9 +20,11 @@ builder.AddCatalogDbContext();
 builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, services, ct) =>
 {
     // A migration may have just created the pgvector extension; connections opened earlier didn't know its types.
-    var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-    await connection.OpenAsync(ct);
-    await connection.ReloadTypesAsync(ct);
+    // The initializer holds the context's connection open (its lock), so this asks the context for it rather than
+    // opening it a second time.
+    await db.Database.OpenConnectionAsync(ct);
+    await ((NpgsqlConnection)db.Database.GetDbConnection()).ReloadTypesAsync(ct);
+    await db.Database.CloseConnectionAsync();
 
     // In development with the test network running, an empty affiliate programs table starts with a test program per
     // main service. Only when empty: programs an admin removed don't come back while any other is left.

@@ -187,7 +187,7 @@ public sealed class EmailOptions
 /// <summary>
 /// Email through Azure Communication Services.
 /// </summary>
-public sealed class EmailSender(NotificationsContext db, IConfiguration configuration, ILogger<EmailSender> logger) : IChannelSender
+public sealed class EmailSender(NotificationsContext db, IConfiguration configuration, IHostEnvironment environment, ILogger<EmailSender> logger) : IChannelSender
 {
     private readonly EmailOptions _options = configuration.GetSection("Email").Get<EmailOptions>() ?? new EmailOptions();
 
@@ -204,6 +204,12 @@ public sealed class EmailSender(NotificationsContext db, IConfiguration configur
 
         if (!_options.IsConfigured)
         {
+            // In development the log stands in for the mailbox. Deployed, an address and a message don't belong in
+            // logs, and nothing was sent: say so, so the delivery shows as failed instead of quietly "sent".
+            if (!environment.IsDevelopment())
+            {
+                return new SendResult(false, "Email isn't configured (Email:ConnectionString and Email:SenderAddress).");
+            }
             logger.LogInformation("[email not configured] To {Email}: {Title} — {Body}", email, item.Title, item.Body);
             return SendResult.Ok;
         }
