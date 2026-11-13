@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,6 +35,15 @@ public sealed class DatabaseInitializer<TContext>(
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<TContext>();
+
+                // Running locally the AppHost creates each database; deployed, nothing has, and it's made here (as
+                // MigrateAsync would, were there a connection to lock on first).
+                var creator = db.GetService<IRelationalDatabaseCreator>();
+                if (!await creator.ExistsAsync(cancellationToken))
+                {
+                    await creator.CreateAsync(cancellationToken);
+                    logger.LogInformation("Created the database for {Context}", typeof(TContext).Name);
+                }
 
                 // Session-level, so it needs the one connection kept open until it's released; a second copy of the
                 // service waits here and then finds nothing left to do.

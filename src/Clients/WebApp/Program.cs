@@ -60,7 +60,7 @@ builder.Services
         options.ClientSecret = builder.Configuration["Identity:WebClientSecret"];
         options.ResponseType = "code";
         options.UsePkce = true;
-        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.RequireHttpsMetadata = IdentitySettings.RequireHttpsMetadata(builder.Configuration, builder.Environment);
         options.MapInboundClaims = false;
         options.GetClaimsFromUserInfoEndpoint = true;
         options.SaveTokens = false;
