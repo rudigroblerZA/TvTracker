@@ -537,6 +537,20 @@ if (publishing)
         .WithEnvironment("KC_HOSTNAME", publicUrl)
         .WithEnvironment("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "true")
         .WaitFor(postgres);
+    // Backups: a container with Postgres's own tools dumps every database once a day into a folder on the machine
+    // (Deploy/backup.sh; README, Deploying). The same image as the server, so pg_dump matches it.
+    builder.AddContainer("backup", "pgvector/pgvector", "0.8.7-pg18-trixie")
+        .WithBindMount("./Deploy/backup.sh", "/backup.sh", isReadOnly: true)
+        .WithBindMount("./Deploy/backups", "/backups")
+        .WithEntrypoint("/bin/bash")
+        .WithArgs("/backup.sh")
+        .WithEnvironment("PGHOST", postgres.Resource.Name)
+        .WithEnvironment("PGUSER", "postgres")
+        .WithEnvironment("PGPASSWORD", postgres.Resource.PasswordParameter)
+        .WithEnvironment("BACKUP_KEEP_DAYS", builder.AddParameter("backup-keep-days"))
+        .WithEnvironment("BACKUP_HOUR_UTC", builder.AddParameter("backup-hour-utc"))
+        .WaitFor(postgres);
+
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
     identityApi
         .WithEnvironment("Keycloak__WebPublicUrl", publicUrl)

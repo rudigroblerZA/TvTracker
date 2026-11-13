@@ -1790,13 +1790,34 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
   generated on the first run and kept; Identity.API puts them into Keycloak on start. The app's admin signs in as
   `admin` with `APP_ADMIN_PASSWORD` from that file.
 - **Data in Docker volumes:** Postgres (nine app databases and Keycloak's), Redis, RabbitMQ, the embedding model and
-  Caddy's certificates. Deploying again keeps them. Back the Postgres volume up: nothing here does yet.
+  Caddy's certificates. Deploying again keeps them.
+- **Daily backups** of every database, kept for two weeks on the machine (Backups, below).
 - **Feature flags** come from `Flags/flagd.json` in the checkout, copied on each deploy; what an admin changes on the
   flags page is kept in the deployment directory's `flags/overrides.json`, which both flagd and Identity.API mount.
 - **Services restart** after a crash or a reboot. They start in no particular order, so on the first start a few fail
   once and are started again; that settles within a minute or two.
 - **Logs, traces and metrics** go to the Aspire dashboard, on the machine's loopback address only:
   `ssh -L 18888:localhost:18888 <server>`, then `http://localhost:18888`.
+
+**Backups**
+
+A `backup` container dumps every database on the Postgres server (the nine the services own and Keycloak's, so
+accounts and their passwords too) with `pg_dump`, one file each, into the deployment directory's
+`backups/<UTC timestamp>`.
+
+- **When:** once a day at `BACKUP_HOUR_UTC` (3 by default), and straight away on a start that finds no backup from
+  the last day. Each dump is read back before the backup counts; one cut short is never left looking whole.
+- **How long:** `BACKUP_KEEP_DAYS` (14 by default); older ones are deleted after each new one. Both are in `.env`.
+- **One now:** `docker compose -p tvtracker exec backup bash /backup.sh once` (before a risky change, say).
+- **Putting one back:** `scripts/deploy-restore.sh latest` (or a backup's name; `--list` shows them). It stops
+  everything but Postgres, replaces each database in the backup with the backup's, and starts the stack again.
+  Whatever people did after that backup is lost.
+- **Off the machine is up to you.** These backups are on the same disk as the data: they undo a bad deploy or a
+  mistake, not a lost machine. Copy three things somewhere else on a schedule (`rclone`, `rsync`, your provider's
+  snapshots): `backups/`, `.env` (every secret; a restored database is no use without the passwords Keycloak and the
+  services were given) and `flags/overrides.json`.
+- **Not in it:** RabbitMQ's queued events and Redis (sign-in sessions; people sign in again), and the catalog's
+  embedding model, which is downloaded again.
 
 **Settings in `.env` you may want to fill in** (then run the script again)
 
@@ -1835,8 +1856,8 @@ Deploying works (above). This is what still stands between that and charging the
 
 **Still to do**
 
-- **Backups.** `scripts/backup.sh` and `restore.sh` work against the development containers only. A deployment needs
-  a scheduled dump of its Postgres volume kept somewhere else.
+- **Backups off the machine.** The daily backups (Deploying) sit on the same disk as the data; copying them, `.env`
+  and the flag overrides elsewhere is for whoever runs the machine to set up.
 - **Email from Keycloak.** The realm has no mail server, so password reset doesn't work and addresses aren't
   confirmed (`verifyEmail` is off). It needs an SMTP account.
 - **Payments beyond the happy path.** Stripe checkout collects no tax (a decision, for now), and refunds, disputes
