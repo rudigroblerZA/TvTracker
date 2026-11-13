@@ -1818,6 +1818,8 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
   services were given) and `flags/overrides.json`.
 - **Not in it:** RabbitMQ's queued events and Redis (sign-in sessions; people sign in again), and the catalog's
   embedding model, which is downloaded again.
+- **Tried** on a local deployment: a backup of all ten databases; then the profiles table emptied and the realm
+  disabled; then `deploy-restore.sh latest`, after which the profile was back and the admin could sign in again.
 
 **Settings in `.env` you may want to fill in** (then run the script again)
 

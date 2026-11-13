@@ -22,14 +22,27 @@ databases() {
   psql -d postgres -Atc "select datname from pg_database where not datistemplate and datname <> 'postgres' order by 1"
 }
 
+# The server may still be starting when this container does.
+wait_for_server() {
+  local tries=0
+  until pg_isready -q; do
+    (( ++tries < 60 )) || { echo "Postgres isn't answering at $PGHOST." >&2; return 1; }
+    sleep 2
+  done
+}
+
 backup() {
-  local name partial db
+  local name partial db dbs
+  wait_for_server
+  # Asked for first and on its own, so a failure to list them stops the backup rather than making an empty one.
+  dbs=$(databases)
+  [[ -n $dbs ]] || { echo "No databases to back up." >&2; return 1; }
   name=$(date -u +%Y%m%dT%H%M%SZ)
   # Written under another name and renamed when whole, so a backup that was cut short never looks like one.
   partial=$root/.partial-$name
   rm -rf "$root"/.partial-*
   mkdir -p "$partial"
-  for db in $(databases); do
+  for db in $dbs; do
     pg_dump -Fc -d "$db" -f "$partial/$db.dump"
     # A dump that can't be read back is no backup: listing its contents reads the whole archive's index.
     pg_restore --list "$partial/$db.dump" > /dev/null
@@ -49,6 +62,8 @@ restore() {
   local name=${1:?usage: backup.sh restore <name|latest>} dump db
   [[ $name != latest ]] || name=$(list | tail -1)
   [[ -n $name && -d $root/$name ]] || { echo "No backup named '$name' in $root." >&2; exit 1; }
+  compgen -G "$root/$name/*.dump" > /dev/null || { echo "The backup $name has no databases in it." >&2; exit 1; }
+  wait_for_server
   for dump in "$root/$name"/*.dump; do
     db=$(basename "$dump" .dump)
     # Replaced whole: a database half its old self and half the backup's is worse than either.
