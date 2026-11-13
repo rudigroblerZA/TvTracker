@@ -26,7 +26,7 @@ for tool in docker dotnet aspire jq openssl; do
 done
 docker compose version > /dev/null || { echo "Docker's compose plugin is missing." >&2; exit 1; }
 
-mkdir -p "$home/flags" "$home/keycloak"
+mkdir -p "$home/flags" "$home/keycloak" "$home/backups"
 env_file=$home/.env
 touch "$env_file" && chmod 600 "$env_file"
 
@@ -63,6 +63,11 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     CADDY_BINDMOUNT_0) value=$apphost/Deploy/Caddyfile ;;
     FLAGD_BINDMOUNT_0) value=$home/flags ;;
     KEYCLOAK_BINDMOUNT_0) value=$home/keycloak ;;
+    BACKUP_BINDMOUNT_0) value=$apphost/Deploy/backup.sh ;;
+    BACKUP_BINDMOUNT_1) value=$home/backups ;;
+    # Backups: how long they're kept, and the hour (UTC) the daily one is made.
+    BACKUP_KEEP_DAYS) value=$(current "$key"); value=${value:-14} ;;
+    BACKUP_HOUR_UTC) value=$(current "$key"); value=${value:-3} ;;
     PUBLIC_HOST | API_HOST | OPERATOR_NAME | CONTACT_EMAIL)
       value=$(current "$key")
       [[ -n $value ]] || missing+=("$key") ;;
@@ -118,4 +123,5 @@ docker compose --project-name tvtracker --project-directory "$home" up -d --remo
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
 echo "The admin signs in as 'admin' with APP_ADMIN_PASSWORD from $env_file."
+echo "Backups: daily, in $home/backups. Copy that folder, .env and flags/ off this machine."
 echo "Logs, traces and metrics: ssh -L 18888:localhost:18888 <this machine>, then http://localhost:18888"
