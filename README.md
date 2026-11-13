@@ -1808,9 +1808,11 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 Email (alerts and the weekly digest) needs an Azure Communication Services connection string
 (`Parameters:email-connection-string`) and `Email:SenderAddress` given to the publish; without them no email is sent.
 
-**Tried:** the script was run end to end on one machine with `PUBLIC_HOST=localhost` (Caddy then uses its own
-certificate authority instead of Let's Encrypt): the stack came up, and databases and the realm were created.
-Sign-in through the site is still being checked. It hasn't been run against a public host name.
+**Tried:** the script was run end to end, twice (a first deploy and a redeploy), on one machine with
+`PUBLIC_HOST=localhost`, where Caddy uses its own certificate authority instead of Let's Encrypt. All 21 containers
+came up, the ten databases and the realm were created, the secrets reached Keycloak, and an admin signed in through
+the site over HTTPS and opened the admin pages. Not tried: a public host name with a real certificate, and the
+catalog import from inside the containers (the test machine's network blocked their outbound HTTPS).
 
 ## Before production
 
