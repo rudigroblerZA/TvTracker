@@ -68,14 +68,18 @@ public static class SignInThroughWebApp
 
         options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
 
+        // Keycloak names the address the person signed in at as the token's issuer, which is the public one, while its
+        // metadata (read over the private address) names that one. Both are this realm.
+        options.TokenValidationParameters.ValidIssuers = [authority, publicAuthority];
+
         var signIn = options.Events.OnRedirectToIdentityProvider;
         options.Events.OnRedirectToIdentityProvider = async context =>
         {
             await signIn(context);
             context.ProtocolMessage.IssuerAddress = Public(context.ProtocolMessage.IssuerAddress);
             context.ProtocolMessage.RedirectUri = origin + options.CallbackPath;
-            // The token exchange sends the redirect address the challenge recorded, which must be this one.
-            context.Properties.Items[OpenIdConnectDefaults.RedirectUriForCodePropertiesKey] = context.ProtocolMessage.RedirectUri;
+            // The handler records this address after the event, for the token exchange to send again; setting it here
+            // as well makes it throw (the same key added twice).
         };
 
         var signOut = options.Events.OnRedirectToIdentityProviderForSignOut;

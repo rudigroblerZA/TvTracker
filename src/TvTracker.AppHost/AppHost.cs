@@ -530,10 +530,12 @@ if (publishing)
         .WithEnvironment("KC_DB_URL_DATABASE", "keycloakdb")
         .WithEnvironment("KC_DB_USERNAME", "postgres")
         .WithEnvironment("KC_DB_PASSWORD", postgres.Resource.PasswordParameter)
-        // Plain HTTP inside the machine's Docker network; the address in each link comes from what Caddy and the web
-        // app forward (KC_PROXY_HEADERS), so nothing fixes a host name here.
+        // Plain HTTP inside the machine's Docker network. Keycloak is told its public address, so every token names
+        // that as its issuer and every link it shows people leads there, while the services may still call it at its
+        // private address (the "backchannel"): without both, a token got at one address is refused at the other.
         .WithEnvironment("KC_HTTP_ENABLED", "true")
-        .WithEnvironment("KC_HOSTNAME_STRICT", "false")
+        .WithEnvironment("KC_HOSTNAME", publicUrl)
+        .WithEnvironment("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "true")
         .WaitFor(postgres);
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
     identityApi

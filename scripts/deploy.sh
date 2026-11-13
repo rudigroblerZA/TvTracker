@@ -45,6 +45,8 @@ cp "$work/docker-compose.yaml" "$home/docker-compose.yaml"
 
 # The tag: this checkout's commit, so a deploy of the same commit reuses its images.
 tag=$(git -C "$repo" rev-parse --short HEAD 2> /dev/null || date +%Y%m%d%H%M%S)
+# With changes not committed, the commit doesn't say what's being built: build afresh.
+[[ -z $(git -C "$repo" status --porcelain 2> /dev/null) ]] || tag=$tag-$(date +%H%M%S)
 
 # Every key the compose file wants is in the published .env; each gets a value here.
 new_env=$work/env
