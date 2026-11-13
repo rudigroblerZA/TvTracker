@@ -20,6 +20,11 @@ IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
     return builder.AddParameter(name, secret: true);
 }
 
+// Where a publish goes: one machine running Docker Compose. `aspire publish` writes a compose file and an .env of the
+// parameters it needs (README, Deploying). Running locally, this does nothing.
+var compose = builder.AddDockerComposeEnvironment("tvtracker");
+var publishing = builder.ExecutionContext.IsPublishMode;
+
 // ---------------------------------------------------------------------------
 // Infrastructure (containers; Docker or Podman must be running)
 // ---------------------------------------------------------------------------
@@ -44,9 +49,14 @@ var notificationsDb = postgres.AddDatabase("notificationsdb");
 var analyticsDb = postgres.AddDatabase("analyticsdb");
 var socialDb = postgres.AddDatabase("socialdb");
 
-var redis = builder.AddRedis("redis");
+// Redis holds the web app's server-side tokens and the keys that protect its sign-in cookie, so it keeps its data
+// across restarts: without the volume, restarting Redis signs everyone out.
+var redis = builder.AddRedis("redis").WithDataVolume();
 
+// The queues are durable (events waiting to be handled, retries, dead letters); the volume is what keeps them when
+// the broker's container is replaced.
 var eventBus = builder.AddRabbitMQ("eventbus")
+    .WithDataVolume()
     .WithManagementPlugin()
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -56,7 +66,8 @@ var eventBus = builder.AddRabbitMQ("eventbus")
 var keycloakAdminPassword = Secret("keycloak-admin-password", "admin");
 
 var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.4")
-    .WithArgs("start-dev", "--import-realm")
+    // Locally, development mode on its own file database. Published, production mode on Postgres (see Deployment below).
+    .WithArgs(publishing ? "start" : "start-dev", "--import-realm")
     .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
     .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", keycloakAdminPassword)
     .WithEnvironment("KC_HEALTH_ENABLED", "true")
@@ -78,7 +89,7 @@ var keycloakUrl = keycloak.GetEndpoint("http");
 // later source. It isn't checked in, so it's created empty when missing.
 var flagsDirectory = Path.Combine(builder.AppHostDirectory, "Flags");
 var flagOverrides = Path.Combine(flagsDirectory, "overrides.json");
-if (!File.Exists(flagOverrides))
+if (!builder.ExecutionContext.IsPublishMode && !File.Exists(flagOverrides))
 {
     File.WriteAllText(flagOverrides, "{ \"flags\": {} }\n");
 }
@@ -110,7 +121,9 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-identity-admin", identityAdminClientSecret)
     .WithEnvironment("Keycloak__ClientSecrets__tvtracker-internal", internalClientSecret)
     .WithEnvironment("Keycloak__ServiceClients__tvtracker-internal", "Internal service calls")
-    .WithEnvironment("Flags__Directory", flagsDirectory)
+    // Where the flags page writes its overrides: the AppHost's folder locally; published, the folder mounted into
+    // both this service and flagd (Deployment below).
+    .WithEnvironment("Flags__Directory", publishing ? "/flags" : flagsDirectory)
     .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
 
@@ -190,7 +203,13 @@ var researchApi = builder.AddProject<Projects.Research_API>("research-api")
     .WithReference(catalogApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
-if (builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
+// TMDB's key, for research sources: plain configuration locally (Research:TmdbApiKey); in a deployment the secret
+// parameter tmdb-api-key, so it isn't written into the published manifest.
+if (builder.Configuration["Parameters:tmdb-api-key"] is { Length: > 0 })
+{
+    researchApi.WithEnvironment("Research__TmdbApiKey", builder.AddParameter("tmdb-api-key", secret: true));
+}
+else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Research:TmdbApiKey"] is { Length: > 0 } tmdbKey)
 {
     researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
 }
@@ -356,8 +375,7 @@ socialApi.WithReference(catalogSync);
 // ---------------------------------------------------------------------------
 
 // The MAUI app talks to the services only through this gateway (http://localhost:5110, or 10.0.2.2:5110 from the Android emulator).
-builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
-    .WithExternalHttpEndpoints()
+var mobileBff = builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(flagd.GetEndpoint("ofrep"))
     .WithReference(identityApi)
     .WithReference(catalogApi)
@@ -378,13 +396,24 @@ if (!string.IsNullOrEmpty(webPublicUrl))
     identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
 }
 
+// Email (alerts and the weekly digest), through Azure Communication Services: the secret parameter
+// email-connection-string and Email:SenderAddress. Without them, development logs each message and a deployment
+// sends none (deliveries show as failed; digests are off). Links in the digest point at the web app's public address.
+if (builder.Configuration["Parameters:email-connection-string"] is { Length: > 0 } && builder.Configuration["Email:SenderAddress"] is { Length: > 0 } sender)
+{
+    notificationsApi
+        .WithEnvironment("Email__ConnectionString", builder.AddParameter("email-connection-string", secret: true))
+        .WithEnvironment("Email__SenderAddress", sender);
+}
+if ((builder.Configuration["Digest:BaseUrl"] ?? webPublicUrl) is { Length: > 0 } digestBaseUrl)
+{
+    notificationsApi.WithEnvironment("Digest__BaseUrl", digestBaseUrl);
+}
+
 var webApp = builder.AddProject<Projects.WebApp>("webapp")
     .WithEnvironment("Branding__AppName", appName)
     // Who runs the app and how to reach them, for the privacy policy and terms (README, Privacy and terms).
-    .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
-    .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "")
     .WithEnvironment("Catalog__Provider", catalogProvider ?? "")
-    .WithExternalHttpEndpoints()
     .WithReference(flagd)
     .WithReference(redis).WaitFor(redis)
     .WithEnvironment("Identity__Url", keycloakUrl)
@@ -435,9 +464,8 @@ if (builder.ExecutionContext.IsPublishMode || stripeLocally)
         .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true));
     if (builder.ExecutionContext.IsPublishMode)
     {
-        identityApi
-            .WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"))
-            .WithEnvironment("Payments__ReturnUrl", builder.AddParameter("payments-return-url"));
+        // The address Stripe sends the buyer back to is the plan page at the site's public address (Deployment below).
+        identityApi.WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"));
     }
     else
     {
@@ -466,6 +494,98 @@ else
         .WithEnvironment("Payments__ReturnUrl", "/settings/plan")
         .WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
     webApp.WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
+}
+
+// ---------------------------------------------------------------------------
+// Deployment: what a publish adds or changes (README, Deploying). One machine, Docker Compose, one public site.
+// ---------------------------------------------------------------------------
+
+if (publishing)
+{
+    // The site's host name (tv.example.com) and the mobile gateway's (api.tv.example.com); both must point at the machine.
+    var publicHost = builder.AddParameter("public-host");
+    var apiHost = builder.AddParameter("api-host");
+    var publicUrl = ReferenceExpression.Create($"https://{publicHost}");
+
+    // The front door: Caddy, the only container with ports on the machine. It gets and renews the certificates, and
+    // sends the site's host to the web app and the gateway's to the mobile gateway. Nothing else is reachable from outside.
+    builder.AddContainer("caddy", "docker.io/library/caddy", "2.10")
+        .WithBindMount("./Deploy/Caddyfile", "/etc/caddy/Caddyfile", isReadOnly: true)
+        .WithVolume("tvtracker-caddy-data", "/data")
+        .WithEnvironment("PUBLIC_HOST", publicHost)
+        .WithEnvironment("API_HOST", apiHost)
+        .WithEnvironment("WEBAPP_UPSTREAM", webApp.GetEndpoint("http").Property(EndpointProperty.HostAndPort))
+        .WithEnvironment("API_UPSTREAM", mobileBff.GetEndpoint("http").Property(EndpointProperty.HostAndPort))
+        .WithHttpEndpoint(port: 80, targetPort: 80, name: "http")
+        .WithHttpsEndpoint(port: 443, targetPort: 443, name: "https")
+        .WithExternalHttpEndpoints();
+
+    // Sign-in goes through the site: the web app passes Keycloak's login pages on at the public address, so Keycloak
+    // itself (and its admin console) has no address outside. Keycloak keeps its data in Postgres, in a database of its
+    // own, which the Postgres container creates the first time it starts.
+    postgres.WithEnvironment("POSTGRES_DB", "keycloakdb");
+    keycloak
+        .WithEnvironment("KC_DB", "postgres")
+        .WithEnvironment("KC_DB_URL_HOST", postgres.Resource.Name)
+        .WithEnvironment("KC_DB_URL_DATABASE", "keycloakdb")
+        .WithEnvironment("KC_DB_USERNAME", "postgres")
+        .WithEnvironment("KC_DB_PASSWORD", postgres.Resource.PasswordParameter)
+        // Plain HTTP inside the machine's Docker network. Keycloak is told its public address, so every token names
+        // that as its issuer and every link it shows people leads there, while the services may still call it at its
+        // private address (the "backchannel"): without both, a token got at one address is refused at the other.
+        .WithEnvironment("KC_HTTP_ENABLED", "true")
+        .WithEnvironment("KC_HOSTNAME", publicUrl)
+        .WithEnvironment("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "true")
+        .WaitFor(postgres);
+    webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
+    identityApi
+        .WithEnvironment("Keycloak__WebPublicUrl", publicUrl)
+        .WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"https://{publicHost}/settings/plan"))
+        // The flags folder flagd reads, so the flags page's overrides reach it.
+        .PublishAsDockerComposeService((_, service) => service.Volumes.Add(new()
+        {
+            Name = "flags", Type = "bind", Source = "${FLAGD_BINDMOUNT_0}", Target = "/flags", ReadOnly = false
+        }));
+    notificationsApi.WithEnvironment("Digest__BaseUrl", publicUrl);
+
+    // Who runs the site and how to reach them: the privacy policy and terms show both.
+    webApp
+        .WithEnvironment("Branding__Operator", builder.AddParameter("operator-name"))
+        .WithEnvironment("Branding__ContactEmail", builder.AddParameter("contact-email"));
+
+    // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
+    // site names the public address as its issuer.
+    foreach (var project in builder.Resources.OfType<ProjectResource>().ToList())
+    {
+        builder.CreateResourceBuilder(project)
+            .WithEnvironment("Identity__RequireHttpsMetadata", "false")
+            .WithEnvironment("Identity__PublicUrl", publicUrl);
+    }
+
+    compose.ConfigureComposeFile(file =>
+    {
+        foreach (var (name, service) in file.Services)
+        {
+            // Back up after a crash or a reboot; start order isn't guaranteed, so a service that starts before what it
+            // needs fails and is started again.
+            service.Restart = "unless-stopped";
+            // The Aspire dashboard (logs, traces, metrics) is for whoever runs the machine: on its loopback address
+            // only, to be reached through an SSH tunnel.
+            if (name.EndsWith("-dashboard", StringComparison.Ordinal))
+            {
+                service.Ports = ["127.0.0.1:18888:18888"];
+            }
+        }
+    });
+}
+else
+{
+    // Running locally, the web app and the gateway are opened directly.
+    webApp.WithExternalHttpEndpoints();
+    mobileBff.WithExternalHttpEndpoints();
+    webApp
+        .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
+        .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "");
 }
 
 builder.Build().Run();

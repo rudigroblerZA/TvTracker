@@ -1757,17 +1757,103 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 - **API:** `GET /api/v1/digest/preview` on Notifications.API (signed in), and the `weeklyDigest`, `digestDay` and
   `digestHour` preference fields.
 
+## Deploying
+
+A deployment is one machine running Docker Compose. `scripts/deploy.sh` does all of it: it publishes the AppHost to a
+compose file (`aspire publish`), builds each service's container image, fills in the settings, and starts everything.
+
+```bash
+# On the server, in a checkout of this repository. First run:
+PUBLIC_HOST=tv.example.com API_HOST=api.tv.example.com \
+OPERATOR_NAME="Example Ltd" CONTACT_EMAIL=hello@example.com \
+scripts/deploy.sh            # deploys into ~/tvtracker; pass another directory to use that
+
+# Later, to deploy a newer checkout: the settings are remembered.
+git pull && scripts/deploy.sh
+```
+
+**What the machine needs:** Docker with the compose plugin, the .NET SDK (`global.json`), the Aspire CLI
+(`dotnet tool install -g Aspire.Cli`), `jq` and `openssl`; ports 80 and 443 open; and both host names pointing at it
+in DNS before the first run, since the certificates are issued when it starts. About 8 GB of memory and 20 GB of disk
+is a sensible minimum: there are 21 containers, and the embedding model is about 640 MB.
+
+**What you get**
+
+- **One front door.** Caddy is the only container with ports on the machine. It gets and renews Let's Encrypt
+  certificates, redirects http to https, and sends `PUBLIC_HOST` to the web app and `API_HOST` to the mobile gateway
+  (which is also where Stripe and affiliate networks send their webhooks). Nothing else is reachable from outside.
+- **Sign-in through the site.** Keycloak runs in production mode on Postgres and has no address of its own: the web
+  app passes its login pages on under `https://PUBLIC_HOST/realms/…`, so its admin console isn't exposed. The realm is
+  the development one without its demo and admin users and client secrets, requiring HTTPS and locking accounts
+  after repeated wrong passwords.
+- **Secrets made once.** The deployment directory's `.env` holds every setting. Passwords and client secrets are
+  generated on the first run and kept; Identity.API puts them into Keycloak on start. The app's admin signs in as
+  `admin` with `APP_ADMIN_PASSWORD` from that file.
+- **Data in Docker volumes:** Postgres (nine app databases and Keycloak's), Redis, RabbitMQ, the embedding model and
+  Caddy's certificates. Deploying again keeps them. Back the Postgres volume up: nothing here does yet.
+- **Feature flags** come from `Flags/flagd.json` in the checkout, copied on each deploy; what an admin changes on the
+  flags page is kept in the deployment directory's `flags/overrides.json`, which both flagd and Identity.API mount.
+- **Services restart** after a crash or a reboot. They start in no particular order, so on the first start a few fail
+  once and are started again; that settles within a minute or two.
+- **Logs, traces and metrics** go to the Aspire dashboard, on the machine's loopback address only:
+  `ssh -L 18888:localhost:18888 <server>`, then `http://localhost:18888`.
+
+**Settings in `.env` you may want to fill in** (then run the script again)
+
+| Setting | For |
+| --- | --- |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
+
+Email (alerts and the weekly digest) needs an Azure Communication Services connection string
+(`Parameters:email-connection-string`) and `Email:SenderAddress` given to the publish; without them no email is sent.
+
+**Tried:** the script was run end to end, twice (a first deploy and a redeploy), on one machine with
+`PUBLIC_HOST=localhost`, where Caddy uses its own certificate authority instead of Let's Encrypt. All 21 containers
+came up, the ten databases and the realm were created, the secrets reached Keycloak, and an admin signed in through
+the site over HTTPS and opened the admin pages. Not tried: a public host name with a real certificate, and the
+catalog import from inside the containers (the test machine's network blocked their outbound HTTPS).
+
 ## Before production
 
-- Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
-  `identity-admin-client-secret`, `internal-client-secret`, `app-admin-password` and
-  `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
-  password into Keycloak's realm on start.
-- Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the
-  services accept the Android emulator's token issuer only in Development.
-- Set `Branding:Operator` and `Branding:ContactEmail`, and have the privacy policy and terms reviewed (Landing page,
-  privacy and terms).
-- Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
+Deploying works (above). This is what still stands between that and charging the public.
+
+**Already in place**
+
+- **Development-only parts stay there:** the test payment provider, the test affiliate network and its starter
+  programs, the `/ops` pages and OpenAPI exist only in Development. A publish carries no development secrets and
+  always uses Stripe.
+- **Health checks** (`/health`, `/alive`) are served in every environment. They answer with the overall status only.
+- **Logs** are one JSON object a line outside Development.
+- **Database upgrades** run at start under a Postgres advisory lock, so two copies of a service starting together take
+  turns; a database that doesn't exist yet is created.
+- **The web app** keeps the keys behind its sign-in cookie in Redis (restarts and deploys don't sign people out),
+  sends its cookie over HTTPS only, sends `nosniff` and a referrer policy, and refuses framing by other sites.
+- **Email that isn't configured isn't faked:** outside Development an alert's delivery shows as failed and weekly
+  digests are off, and no address or message is written to a log.
+- **Deleting an account** removes its data before its login, so a failure part-way leaves a login that can ask again.
+
+**Still to do**
+
+- **Backups.** `scripts/backup.sh` and `restore.sh` work against the development containers only. A deployment needs
+  a scheduled dump of its Postgres volume kept somewhere else.
+- **Email from Keycloak.** The realm has no mail server, so password reset doesn't work and addresses aren't
+  confirmed (`verifyEmail` is off). It needs an SMTP account.
+- **Payments beyond the happy path.** Stripe checkout collects no tax (a decision, for now), and refunds, disputes
+  and failed payments aren't acted on: a refunded subscriber keeps their plan until the period ends. Deleting an
+  account deletes its receipts, which the law may want kept.
+- **One copy of each service.** Notification delivery, digests, the sync worker and the analytics worker don't claim
+  their work, so two copies would do it twice. One machine runs one of each, so this matters only when scaling out.
+- **Events at first start.** Services start in no order, and an event published before its queue exists is dropped
+  by the broker. On a first start with nothing to publish yet that's harmless; after that the queues exist.
+- **Rate limits by address** should be checked behind Caddy: they key on `X-Forwarded-For`.
+- **Admins by username.** `Admin:Users` and `Moderation:Users` match usernames, and registration is open: create
+  those accounts before telling anyone the address.
+- **Mobile.** The app is built for local hosts: remove `usesCleartextTraffic` and `allowBackup` (Android) and
+  `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `API_HOST` and `PUBLIC_HOST`.
+- **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
+  network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
+  charging for the app, and TMDB's and TheTVDB's before turning those on. Have the privacy policy and terms reviewed.
 
 ## Package versions
 

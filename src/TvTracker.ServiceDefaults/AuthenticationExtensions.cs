@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -32,6 +33,22 @@ public static class IdentitySettings
             ?? throw new InvalidOperationException("Missing configuration value 'Identity:Url' (the Keycloak base URL).");
         return $"{url.TrimEnd('/')}/realms/{Realm}";
     }
+
+    /// <summary>
+    /// The realm as people's browsers and phones reach it (<c>Identity:PublicUrl</c>, the site's public address when
+    /// sign-in goes through it), or null. A token someone got there names it as its issuer, where one the web app got
+    /// for them over the private network names <see cref="GetAuthority"/>; both are this realm's.
+    /// </summary>
+    public static string? PublicAuthority(IConfiguration configuration) =>
+        configuration["Identity:PublicUrl"] is { Length: > 0 } url ? $"{url.TrimEnd('/')}/realms/{Realm}" : null;
+
+    /// <summary>
+    /// Whether Keycloak's metadata must come over HTTPS: yes outside development, unless
+    /// <c>Identity:RequireHttpsMetadata</c> says otherwise, for a deployment where the services reach Keycloak by plain
+    /// HTTP on a private network (one machine's Docker network) and only the front door has a certificate.
+    /// </summary>
+    public static bool RequireHttpsMetadata(IConfiguration configuration, IHostEnvironment environment) =>
+        configuration.GetValue<bool?>("Identity:RequireHttpsMetadata") ?? !environment.IsDevelopment();
 }
 
 public static class AuthenticationExtensions
@@ -58,11 +75,14 @@ public static class AuthenticationExtensions
             {
                 options.Authority = authority;
                 options.Audience = IdentitySettings.ApiAudience;
-                options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+                options.RequireHttpsMetadata = IdentitySettings.RequireHttpsMetadata(builder.Configuration, builder.Environment);
                 options.MapInboundClaims = false;
-                options.TokenValidationParameters.ValidIssuers = builder.Environment.IsDevelopment()
-                    ? [authority, IdentitySettings.AndroidEmulatorAuthority]
-                    : [authority];
+                options.TokenValidationParameters.ValidIssuers =
+                [
+                    authority,
+                    .. IdentitySettings.PublicAuthority(builder.Configuration) is { } publicAuthority ? [publicAuthority] : Array.Empty<string>(),
+                    .. builder.Environment.IsDevelopment() ? [IdentitySettings.AndroidEmulatorAuthority] : Array.Empty<string>()
+                ];
                 options.TokenValidationParameters.NameClaimType = "name";
             });
 

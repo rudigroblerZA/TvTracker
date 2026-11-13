@@ -1,0 +1,13 @@
+# The front door of a deployment (AppHost.cs, Deployment). Caddy gets and renews a certificate for each host name
+# from Let's Encrypt on its own, and redirects http to https. The values come from the container's environment.
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+	reverse_proxy {$WEBAPP_UPSTREAM}
+}
+
+# The mobile app's gateway, and where Stripe and affiliate networks send their webhooks.
+{$API_HOST} {
+	encode zstd gzip
+	reverse_proxy {$API_UPSTREAM}
+}
