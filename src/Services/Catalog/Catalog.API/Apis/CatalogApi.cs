@@ -117,9 +117,9 @@ public static class CatalogApi
         const int take = 8;
         var all = db.Shows.AsNoTracking();
         var shows = await TitleSearch.Ranked(TitleSearch.Matching(all, q), q).Take(take).ToListAsync(ct);
-        if (shows.Count < TitleSearch.FuzzyBelow)
+        if (shows.Count < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(q))
         {
-            shows.AddRange(await InOrderAsync(db, await TitleSearch.NearlySpelledAsync(TitleSearch.NotMatching(all, q), q, take - shows.Count, ct), ct));
+            shows.AddRange(await TitleSearch.NearlySpelled(TitleSearch.NotMatching(all, q), q).Take(take - shows.Count).ToListAsync(ct));
         }
         return shows.Select(s => s.ToSummary()).ToList();
     }
@@ -139,13 +139,13 @@ public static class CatalogApi
         // Cast members only, and decided on those: a creator's name containing the term mustn't stop a near-spelled
         // actor from being looked for.
         var cast = db.People.AsNoTracking().Where(p => db.Cast.Any(c => c.PersonId == p.Id));
-        var people = TitleSearch.Matching(cast, q);
-        if (q.Length >= TitleSearch.MinFuzzyLength && !await people.AnyAsync(ct))
+        var found = await BestKnownAsync(TitleSearch.Matching(cast, q));
+        if (found.Count == 0 && TitleSearch.AllowsNearSpelling(q))
         {
-            people = TitleSearch.NearlySpelled(cast, q);
+            found = await BestKnownAsync(TitleSearch.NearlySpelled(cast, q));
         }
 
-        var found = await people
+        Task<List<(Guid Id, string Name, string? PhotoUrl)>> BestKnownAsync(IQueryable<Person> people) => people
             .Select(p => new
             {
                 p.Id,
@@ -156,7 +156,9 @@ public static class CatalogApi
             .OrderByDescending(p => p.Top)
             .ThenBy(p => p.Name)
             .Take(6)
+            .Select(p => new ValueTuple<Guid, string, string?>(p.Id, p.Name, p.PhotoUrl))
             .ToListAsync(ct);
+
         var ids = found.Select(p => p.Id).ToList();
         var knownFor = (await db.Cast.AsNoTracking().Where(c => ids.Contains(c.PersonId))
                 .Join(db.Shows, c => c.ShowId, s => s.Id, (c, s) => new { c.PersonId, s.Title, s.Popularity })
@@ -218,9 +220,9 @@ public static class CatalogApi
         if (searching)
         {
             var others = TitleSearch.NotMatching(filtered, search!);
-            if (titleTotal < TitleSearch.FuzzyBelow)
+            if (titleTotal < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(search!))
             {
-                after = await TitleSearch.NearlySpelledAsync(others, search!, take: 12, ct);
+                after = await TitleSearch.NearlySpelled(others, search!).Select(s => s.Id).Take(12).ToListAsync(ct);
                 nearlySpelled = after.Count;
             }
             if (semantic is not null)

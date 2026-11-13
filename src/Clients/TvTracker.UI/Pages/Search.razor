@@ -111,28 +111,12 @@ else if (results is not null)
                 : results.TotalCount == byTitle ? Count(byTitle, "result")
                 : $"{Count(byTitle, "title match", "title matches")}, and {results.TotalCount - byTitle} similar in meaning")
         </p>
-        @if (titled.Count > 0)
+        @Cards(titled)
+        @if (similar.Count > 0 && byTitle > 0)
         {
-            <div class="card-grid">
-                @foreach (var show in titled)
-                {
-                    <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag" Subtitle="@Subtitle(show)" />
-                }
-            </div>
+            <h2>Similar in meaning</h2>
         }
-        @if (similar.Count > 0)
-        {
-            @if (byTitle > 0)
-            {
-                <h2>Similar in meaning</h2>
-            }
-            <div class="card-grid">
-                @foreach (var show in similar)
-                {
-                    <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag" Subtitle="@Subtitle(show)" />
-                }
-            </div>
-        }
+        @Cards(similar)
     }
 
     @if (results.TotalCount > results.Page * results.PageSize)
@@ -166,6 +150,18 @@ else if (results is not null)
     private List<ShowSummary>? suggestions;
     private CancellationTokenSource? pending;
 
+    private RenderFragment Cards(List<ShowSummary> shows) => @<text>
+        @if (shows.Count > 0)
+        {
+            <div class="card-grid">
+                @foreach (var show in shows)
+                {
+                    <ShowCard ShowId="show.Id" Title="@show.Title" PosterUrl="@show.PosterUrl" PreferredTag="@resultsTag" Subtitle="@Subtitle(show)" />
+                }
+            </div>
+        }
+    </text>;
+
     private static string Count(int count, string one, string? many = null) => count == 1 ? $"1 {one}" : $"{count} {many ?? one + "s"}";
 
     private static string Subtitle(ShowSummary show) =>
@@ -189,7 +185,7 @@ else if (results is not null)
         {
             // Superseded by a newer keystroke, or by the search itself.
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or System.Text.Json.JsonException)
+        catch (Exception ex) when (LookupFailed(ex))
         {
             suggestions = null;
         }
@@ -228,12 +224,12 @@ else if (results is not null)
     {
         error = null;
         searching = true;
-        Task<(string Term, List<PersonMatch> People)>? peopleTask = null;
+        var term = query?.Trim();
+        Task<List<PersonMatch>>? peopleTask = null;
         CancelPending();
         suggestions = null;
         try
         {
-            var term = query?.Trim();
             // People alongside the shows; a search without them is still a search.
             peopleTask = term?.Length >= 3 ? PeopleAsync(term) : null;
             results = await Catalog.SearchAsync(query, genre, tag: tag, nanogenre: nanogenre);
@@ -262,9 +258,9 @@ else if (results is not null)
         {
             StateHasChanged();
             var found = await peopleTask;
-            if (resultsQuery == found.Term)
+            if (resultsQuery == term)
             {
-                people = found.People;
+                people = found;
             }
         }
     }
@@ -272,17 +268,22 @@ else if (results is not null)
     /// <summary>
     /// People for the term; none if the lookup fails in any way, since the search doesn't depend on them.
     /// </summary>
-    private async Task<(string Term, List<PersonMatch> People)> PeopleAsync(string term)
+    private async Task<List<PersonMatch>> PeopleAsync(string term)
     {
         try
         {
-            return (term, await Catalog.SearchPeopleAsync(term) ?? []);
+            return await Catalog.SearchPeopleAsync(term) ?? [];
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or OperationCanceledException or System.Text.Json.JsonException)
+        catch (Exception ex) when (ex is OperationCanceledException || LookupFailed(ex))
         {
-            return (term, []);
+            return [];
         }
     }
+
+    /// <summary>
+    /// The ways an optional lookup (people, suggestions) can fail without it mattering to the search.
+    /// </summary>
+    private static bool LookupFailed(Exception ex) => ex is HttpRequestException or SignInRequiredException or System.Text.Json.JsonException;
 
     private async Task LoadMoreAsync()
     {
