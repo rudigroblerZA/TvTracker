@@ -4,6 +4,7 @@
        database or network. -->
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" VersionOverride="10.0.15" />
     <ProjectReference Include="..\..\src\Services\Identity\Identity.API\Identity.API.csproj" />
   </ItemGroup>
 
