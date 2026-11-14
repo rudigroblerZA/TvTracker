@@ -1960,7 +1960,7 @@ Deploying works (above). This is what still stands between that and charging the
 
 ## Package versions
 
-Versions live in `Directory.Packages.props` (the MAUI app pins its own in its project file). Aspire is on 13.6.4
+Versions live in `Directory.Packages.props` (the MAUI app pins its own in its project file). Aspire is on 13.6.5
 (`AspireVersion` there, plus the `Aspire.AppHost.Sdk` version in the AppHost's project file; keep the two equal).
 Run `aspire update` (or `dotnet list package --outdated`) to bring them up to date.
 
