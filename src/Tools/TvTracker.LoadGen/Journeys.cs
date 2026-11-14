@@ -12,13 +12,21 @@ public sealed record LoadOptions(string BffUrl, int Users, TimeSpan Duration, Ti
 /// One virtual user: signs in, then visits pages until the run ends, each page a burst of the requests the app makes
 /// for it, with a think time between pages. Pages are picked by weight, roughly how people use the app: shows most,
 /// then home, episodes and search. All through the Mobile BFF, so the gateway is under load too.
+/// <para>
+/// Only what's switched on is visited: pages and requests that belong to a feature flag are left out when the
+/// warm-up finds the feature off (<see cref="ShowPool.Has"/>), so a run measures the app as people have it.
+/// </para>
 /// </summary>
 public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats, ShowPool pool, LoadOptions options, string username)
 {
     private static readonly string[] SearchTerms =
     [
+        // Words in titles; then what people mean rather than a title; then typos and missing apostrophes, which fall
+        // back to near-spelling matches; then actors, for the people search beside it.
         "the", "love", "crime", "doctor", "house", "star", "dark", "office", "game", "space", "detective", "family", "war",
-        "comedy about friends", "slow burn mystery", "space opera", "cosy british crime"
+        "comedy about friends", "slow burn mystery", "space opera", "cosy british crime",
+        "breakng bad", "strangr things", "greys anatomy", "severence", "pokemon",
+        "pedro pascal", "bryan cranston", "olivia colman"
     ];
 
     private static readonly string[] DiscoverLists = ["hidden-gems", "most-consistent", "rollercoasters", "best-finales", "bingeable", "fan-favorites"];
@@ -27,13 +35,25 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
     public async Task RunAsync(CancellationToken ct)
     {
-        var pages = new (int Weight, Func<CancellationToken, Task> Visit)[]
+        var pages = new List<(int Weight, Func<CancellationToken, Task> Visit)>
         {
-            (4, ShowPageAsync), (3, HomeAsync), (2, EpisodePageAsync), (2, SearchAsync), (1, DiscoverAsync), (1, FeedAsync), (1, StatsAsync)
+            (4, ShowPageAsync), (3, HomeAsync), (2, EpisodePageAsync), (2, SearchAsync), (1, StatsAsync)
         };
+        // The pages of features that can be switched off, when they're on.
+        foreach (var (feature, weight, visit) in new (string, int, Func<CancellationToken, Task>)[]
+        {
+            (Features.Discover, 1, DiscoverAsync), (Features.Feed, 1, FeedAsync), (Features.Tonight, 1, TonightAsync),
+            (Features.WaitingRoom, 1, WaitingRoomAsync), (Features.Universes, 1, UniversesAsync)
+        })
+        {
+            if (pool.Has(feature))
+            {
+                pages.Add((weight, visit));
+            }
+        }
         if (options.Writes)
         {
-            pages = [.. pages, (2, TrackAsync)];
+            pages.Add((2, TrackAsync));
         }
         var totalWeight = pages.Sum(p => p.Weight);
 
@@ -55,6 +75,9 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
     }
 
     private Task HomeAsync(CancellationToken ct) => Task.WhenAll(
+        // Every page asks for the plan (it decides what the menu and the pages offer) and the app's name and colour.
+        GetAsync("identity", "/me/plan", "/identity/api/v1/me/plan", ct),
+        GetAsync("identity", "/branding", "/identity/api/v1/branding", ct),
         GetAsync("catalog", "/shows/trending", "/catalog/api/v1/shows/trending", ct),
         GetAsync("tracking", "/up-next", "/tracking/api/v1/up-next", ct),
         GetAsync("recommendations", "/for-you", "/recommendations/api/v1/for-you", ct),
@@ -63,14 +86,28 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
     private async Task ShowPageAsync(CancellationToken ct)
     {
         var show = pool.Show();
-        await Task.WhenAll(
+        var requests = new List<Task>
+        {
             GetAsync("catalog", "/shows/{id}", $"/catalog/api/v1/shows/{show}", ct),
             GetAsync("ratings", "/shows/{id}/ratings/summary", $"/ratings/api/v1/shows/{show}/ratings/summary", ct),
             GetAsync("tracking", "/follows/{id}", $"/tracking/api/v1/follows/{show}", ct),
             GetAsync("analytics", "/shows/{id}/insights", $"/analytics/api/v1/shows/{show}/insights", ct),
-            GetAsync("recommendations", "/shows/{id}/similar", $"/recommendations/api/v1/shows/{show}/similar", ct),
-            GetAsync("social", "/shows/{id}/friends", $"/social/api/v1/shows/{show}/friends", ct),
-            GetAsync("ratings", "/shows/{id}/community-insights", $"/ratings/api/v1/shows/{show}/community-insights", ct));
+            GetAsync("recommendations", "/shows/{id}/similar", $"/recommendations/api/v1/shows/{show}/similar", ct)
+        };
+        if (pool.Has(Features.FriendsOnShows))
+        {
+            requests.Add(GetAsync("social", "/shows/{id}/friends", $"/social/api/v1/shows/{show}/friends", ct));
+        }
+        if (pool.Has(Features.CommunityInsights))
+        {
+            requests.Add(GetAsync("ratings", "/shows/{id}/community-insights", $"/ratings/api/v1/shows/{show}/community-insights", ct));
+        }
+        if (pool.Has(Features.Universes))
+        {
+            // 404 for a show in no universe, which is most of them.
+            requests.Add(GetAsync("catalog", "/shows/{id}/universe", $"/catalog/api/v1/shows/{show}/universe", ct));
+        }
+        await Task.WhenAll(requests);
         if (Random.Shared.Next(3) == 0)
         {
             await GetAsync("catalog", "/shows/{id}/seasons/{n}", $"/catalog/api/v1/shows/{show}/seasons/1", ct);
@@ -92,22 +129,47 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
             GetAsync("catalog", "/shows/{id}", $"/catalog/api/v1/shows/{show}", ct));
     }
 
-    private Task SearchAsync(CancellationToken ct)
+    /// <summary>
+    /// A search as the search page makes it: suggestions while the term is typed, then the search itself (titles,
+    /// near-spelled titles, and by meaning) with the people search beside it.
+    /// </summary>
+    private async Task SearchAsync(CancellationToken ct)
     {
         var term = SearchTerms[Random.Shared.Next(SearchTerms.Length)];
-        return GetAsync("catalog", "/shows?q=", $"/catalog/api/v1/shows?q={Uri.EscapeDataString(term)}", ct);
+        foreach (var typed in new[] { term[..Math.Min(3, term.Length)], term[..Math.Min(7, term.Length)] }.Distinct())
+        {
+            await GetAsync("catalog", "/shows/suggest", $"/catalog/api/v1/shows/suggest?q={Uri.EscapeDataString(typed)}", ct);
+        }
+        await Task.WhenAll(
+            GetAsync("catalog", "/shows?search=", $"/catalog/api/v1/shows?search={Uri.EscapeDataString(term)}&pageSize=24", ct),
+            GetAsync("catalog", "/people/search", $"/catalog/api/v1/people/search?q={Uri.EscapeDataString(term)}", ct));
     }
 
     private Task DiscoverAsync(CancellationToken ct) => Task.WhenAll(
         GetAsync("analytics", "/insights/discover/{list}", $"/analytics/api/v1/insights/discover/{DiscoverLists[Random.Shared.Next(DiscoverLists.Length)]}", ct),
-        GetAsync("analytics", "/insights/premieres", "/analytics/api/v1/insights/premieres", ct));
+        pool.Has(Features.Premieres) ? GetAsync("analytics", "/insights/premieres", "/analytics/api/v1/insights/premieres", ct) : Task.CompletedTask);
 
     private Task FeedAsync(CancellationToken ct) => GetAsync("social", "/feed", "/social/api/v1/feed", ct);
 
-    private Task StatsAsync(CancellationToken ct) => Task.WhenAll(
-        GetAsync("tracking", "/stats", "/tracking/api/v1/stats", ct),
-        GetAsync("analytics", "/me/taste", "/analytics/api/v1/me/taste", ct),
-        GetAsync("tracking", "/calendar", "/tracking/api/v1/calendar", ct));
+    private Task TonightAsync(CancellationToken ct) => GetAsync("tracking", "/tonight/queue", "/tracking/api/v1/tonight/queue?perShow=2", ct);
+
+    private Task WaitingRoomAsync(CancellationToken ct) => GetAsync("analytics", "/me/waiting", "/analytics/api/v1/me/waiting", ct);
+
+    private Task UniversesAsync(CancellationToken ct) => GetAsync("catalog", "/universes", "/catalog/api/v1/universes", ct);
+
+    private Task StatsAsync(CancellationToken ct)
+    {
+        var requests = new List<Task>
+        {
+            GetAsync("tracking", "/stats", "/tracking/api/v1/stats", ct),
+            GetAsync("tracking", "/calendar", "/tracking/api/v1/calendar", ct)
+        };
+        if (pool.Has(Features.YourTaste))
+        {
+            requests.Add(GetAsync("analytics", "/me/taste", "/analytics/api/v1/me/taste", ct));
+        }
+        return Task.WhenAll(requests);
+    }
 
     /// <summary>
     /// Follows a show, marks its first episode watched and rates it; now and then unfollows one again, so a long run
@@ -161,19 +223,64 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 }
 
 /// <summary>
+/// The parts of the app behind a feature flag that a run can visit, each with the request that shows whether it's on:
+/// a flag that's off answers 404 from its endpoint.
+/// </summary>
+public static class Features
+{
+    public const string Discover = "Discover lists";
+    public const string Premieres = "premieres";
+    public const string YourTaste = "your taste";
+    public const string Feed = "the feed";
+    public const string Tonight = "tonight";
+    public const string WaitingRoom = "the waiting room";
+    public const string Universes = "universes";
+    public const string FriendsOnShows = "friends on show pages";
+    public const string CommunityInsights = "community insights";
+
+    /// <summary>
+    /// The probe for each; <c>{show}</c> is filled with a show from the pool.
+    /// </summary>
+    public static readonly (string Feature, string Probe)[] Probes =
+    [
+        (Discover, "/analytics/api/v1/insights/discover/hidden-gems"),
+        (Premieres, "/analytics/api/v1/insights/premieres"),
+        (YourTaste, "/analytics/api/v1/me/taste"),
+        (Feed, "/social/api/v1/feed"),
+        (Tonight, "/tracking/api/v1/tonight/queue?perShow=1"),
+        (WaitingRoom, "/analytics/api/v1/me/waiting"),
+        (Universes, "/catalog/api/v1/universes"),
+        (FriendsOnShows, "/social/api/v1/shows/{show}/friends"),
+        (CommunityInsights, "/ratings/api/v1/shows/{show}/community-insights")
+    ];
+}
+
+/// <summary>
 /// The shows (and their first season's episodes) users visit: the catalog's trending list and a few genres, fetched
-/// once at start, episodes as they're first needed.
+/// once at start, episodes as they're first needed. The warm-up also finds which flagged features are on.
 /// </summary>
 public sealed class ShowPool
 {
     private readonly List<Guid> shows = [];
+    private readonly HashSet<string> features = [];
+
+    /// <summary>
+    /// Whether the warm-up found the feature switched on.
+    /// </summary>
+    public bool Has(string feature) => features.Contains(feature);
+
+    /// <summary>
+    /// The features the warm-up found off, so the run can say what it leaves out.
+    /// </summary>
+    public IReadOnlyList<string> Off => Features.Probes.Select(p => p.Feature).Where(f => !features.Contains(f)).ToList();
+
     private readonly Dictionary<Guid, Task<List<Guid>>> episodes = [];
 
     public int Count => shows.Count;
 
     public async Task FillAsync(VirtualUser user, CancellationToken ct)
     {
-        foreach (var path in new[] { "/catalog/api/v1/shows/trending", "/catalog/api/v1/shows?q=the", "/catalog/api/v1/shows?genre=Drama", "/catalog/api/v1/shows?genre=Comedy" })
+        foreach (var path in new[] { "/catalog/api/v1/shows/trending", "/catalog/api/v1/shows?search=the", "/catalog/api/v1/shows?genre=Drama", "/catalog/api/v1/shows?genre=Comedy" })
         {
             using var response = await user.GetForPoolAsync("catalog", "(warm-up)", path, ct);
             if (response is { IsSuccessStatusCode: true })
@@ -187,6 +294,21 @@ public sealed class ShowPool
         var distinct = shows.Distinct().ToList();
         shows.Clear();
         shows.AddRange(distinct);
+        if (shows.Count == 0)
+        {
+            return;
+        }
+
+        // Which flagged features are on: one request each. Anything but 404 (and a failed connection) counts as on,
+        // so a feature that's on but broken is still visited, and shows up in the report as errors.
+        foreach (var (feature, probe) in Features.Probes)
+        {
+            using var response = await user.GetForPoolAsync("(warm-up)", "feature probes", probe.Replace("{show}", shows[0].ToString()), ct);
+            if (response is not null && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                features.Add(feature);
+            }
+        }
     }
 
     public Guid Show() => shows[Random.Shared.Next(shows.Count)];
