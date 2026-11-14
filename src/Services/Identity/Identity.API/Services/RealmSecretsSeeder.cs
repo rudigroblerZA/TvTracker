@@ -1,3 +1,6 @@
+using Identity.API.Data;
+using Microsoft.EntityFrameworkCore;
+
 namespace Identity.API.Services;
 
 /// <summary>
@@ -20,7 +23,10 @@ namespace Identity.API.Services;
 /// only for localhost.</item>
 /// <item><b>A mail account</b> (<c>Keycloak:Smtp:Host</c>, <c>Port</c>, <c>From</c>, <c>User</c>, <c>Password</c>):
 /// set on the realm, so the forgotten-password link can be sent, and with it new accounts must confirm their address
-/// (<c>Keycloak:Smtp:VerifyEmail=false</c> to leave that off). Without a host and a from address nothing is touched.</item>
+/// (<c>Keycloak:Smtp:VerifyEmail=false</c> to leave that off). Mail comes from the app's name, the one set in
+/// Settings when there is one. Without a host and a from address, a mail account this put there earlier is taken
+/// away again; one set by hand in Keycloak stays. It's a step of its own, retried apart from the rest, so a mail
+/// setting Keycloak refuses doesn't hold up the secrets or Google.</item>
 /// <item><b>Sign in with Google</b> (<c>Keycloak:Google:ClientId</c> and <c>:ClientSecret</c>): the realm's Google
 /// identity provider is created or brought up to date, so the sign-in page offers it. Without them nothing is touched,
 /// and one already in the realm stays as it is.</item>
@@ -31,7 +37,7 @@ namespace Identity.API.Services;
 /// </list>
 /// </summary>
 public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, IHostEnvironment environment,
-    ILogger<RealmSecretsSeeder> logger) : BackgroundService
+    IServiceScopeFactory scopes, ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
     private const string WebClientId = "tvtracker-web";
 
@@ -77,13 +83,6 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
             {
                 logger.LogInformation("Set the Keycloak realm to require HTTPS and to lock accounts after repeated wrong passwords");
             }
-            // A mail account for Keycloak, when the app has been given one (Keycloak:Smtp, from the AppHost's smtp-*
-            // parameters): password reset then works, and new accounts confirm their address unless told not to.
-            if (MailAccount.FromConfiguration(config, config["Branding:AppName"] is { Length: > 0 } appName ? appName : "TV Tracker") is { } mail
-                && await keycloak.SetMailAccountAsync(token, mail, config.GetValue("Keycloak:Smtp:VerifyEmail", true), stoppingToken))
-            {
-                logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {From}", mail.Host, mail.Port, mail.From);
-            }
             // Sign in with Google, when the app has been given its Google client (Keycloak:Google:ClientId and
             // :ClientSecret, from the AppHost's google-client-id and google-client-secret).
             if (config["Keycloak:Google:ClientId"] is { Length: > 0 } googleId && config["Keycloak:Google:ClientSecret"] is { Length: > 0 } googleSecret)
@@ -97,6 +96,30 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
             if (webPublicUrl is not null && await keycloak.AllowRedirectAsync(token, WebClientId, webPublicUrl, stoppingToken) == true)
             {
                 logger.LogInformation("Allowed {Address} as a redirect of the Keycloak client {ClientId}", webPublicUrl, WebClientId);
+            }
+        }, stoppingToken);
+
+        // A mail account for Keycloak, when the app has been given one (Keycloak:Smtp, from the AppHost's smtp-*
+        // parameters): password reset then works, and new accounts confirm their address unless told not to.
+        await KeycloakRetry.RunAsync(logger, "set the realm's mail account", async () =>
+        {
+            string? nameInSettings;
+            await using (var scope = scopes.CreateAsyncScope())
+            {
+                nameInSettings = await scope.ServiceProvider.GetRequiredService<IdentityContext>().SiteSettings.AsNoTracking()
+                    .Select(s => s.AppName).SingleOrDefaultAsync(stoppingToken);
+            }
+            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
+            if (MailAccount.FromConfiguration(config, MailAccount.AppName(config, nameInSettings)) is not { } mail)
+            {
+                if (await keycloak.ClearMailAccountAsync(token, stoppingToken))
+                {
+                    logger.LogInformation("Took the mail account off the Keycloak realm: the app no longer has one");
+                }
+            }
+            else if (await keycloak.SetMailAccountAsync(token, mail, MailAccount.VerifiesAddresses(config), stoppingToken))
+            {
+                logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {From}", mail.Host, mail.Port, mail.From);
             }
         }, stoppingToken);
     }

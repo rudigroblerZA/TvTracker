@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Identity.API.Data;
+using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,7 +38,7 @@ public static partial class BrandingApi
         TypedResults.Ok(ToDto(await db.SiteSettings.AsNoTracking().SingleOrDefaultAsync(ct)));
 
     private static async Task<Results<Ok<BrandingDto>, NotFound, ValidationProblem>> SaveAsync(BrandingDto request, ClaimsPrincipal user,
-        IConfiguration config, IdentityContext db, TimeProvider time, CancellationToken ct)
+        IConfiguration config, IdentityContext db, TimeProvider time, KeycloakAdminClient keycloak, ILoggerFactory loggers, CancellationToken ct)
     {
         if (!FlagsApi.IsAdmin(user, config))
         {
@@ -60,7 +61,32 @@ public static partial class BrandingApi
             settings.GoverningLaw, settings.UpdatedAtUtc) = (cleaned.AppName, cleaned.AccentColor, cleaned.Operator, cleaned.ContactEmail,
             cleaned.OperatorAddress, cleaned.CompanyNumber, cleaned.GoverningLaw, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
+        await RenameMailAsync(MailAccount.AppName(config, settings.AppName), config, keycloak, loggers.CreateLogger(typeof(BrandingApi)), ct);
         return TypedResults.Ok(ToDto(settings));
+    }
+
+    /// <summary>
+    /// Keycloak's own mail (password reset, confirming an address) comes from the app's name too, so a rename reaches
+    /// it. The settings are saved either way: if Keycloak can't be reached now, the next start sets the name.
+    /// </summary>
+    private static async Task RenameMailAsync(string name, IConfiguration config, KeycloakAdminClient keycloak, ILogger logger, CancellationToken ct)
+    {
+        if (config["Keycloak:AdminUsername"] is not { Length: > 0 } adminUser || config["Keycloak:AdminPassword"] is not { Length: > 0 } adminPassword)
+        {
+            return;
+        }
+        try
+        {
+            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, ct);
+            if (await keycloak.SetMailNameAsync(token, name, ct))
+            {
+                logger.LogInformation("Keycloak's mail now comes from {Name}", name);
+            }
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Couldn't rename Keycloak's mail; it's set on the next start");
+        }
     }
 
     /// <summary>
