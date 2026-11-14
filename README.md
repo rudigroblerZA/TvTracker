@@ -1930,10 +1930,44 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 - **Putting one back:** `scripts/deploy-restore.sh latest` (or a backup's name; `--list` shows them). It stops
   everything but Postgres, replaces each database in the backup with the backup's, and starts the stack again.
   Whatever people did after that backup is lost.
-- **Off the machine is up to you.** These backups are on the same disk as the data: they undo a bad deploy or a
-  mistake, not a lost machine. Copy three things somewhere else on a schedule (`rclone`, `rsync`, your provider's
-  snapshots): `backups/`, `.env` (every secret; a restored database is no use without the passwords Keycloak and the
-  services were given) and `flags/overrides.json`.
+- **Off the machine:** the backups above are on the same disk as the data, so they undo a bad deploy or a mistake,
+  not a lost machine. An `offsite` container copies them elsewhere once it has somewhere to copy to: any
+  S3-compatible storage (AWS S3, Backblaze B2, Cloudflare R2, Hetzner Object Storage). Make a private bucket and a
+  key that can read and write it, fill these in in `.env` and run `scripts/deploy.sh` again:
+
+  | Setting | |
+  | --- | --- |
+  | `OFFSITE_BUCKET` | The bucket, with a folder inside it if you like: `my-bucket/tvtracker` |
+  | `OFFSITE_ENDPOINT` | The storage's address, e.g. `https://s3.eu-central-003.backblazeb2.com`; empty for AWS |
+  | `OFFSITE_REGION` | Its region, where the provider asks for one |
+  | `OFFSITE_ACCESS_KEY`, `OFFSITE_SECRET_KEY` | The key |
+  | `OFFSITE_PASSPHRASE` | What everything is encrypted with before it leaves. Make up a long one |
+  | `OFFSITE_KEEP_DAYS` | How long a copy is kept there (30 by default) |
+
+  - **What goes:** each finished backup, within a minute of being made, and with it (and once an hour)
+    `flags/overrides.json` and `.env` (every secret; with it a replacement machine is the old one again). All of it is encrypted with the passphrase, so the storage provider
+    can read none of it; each backup's copy is read back and compared before it counts.
+  - **Keep the passphrase somewhere else** (a password manager). It's in `.env` on the machine, and the copy of
+    `.env` is encrypted with it: lose the machine without it and the copies can't be read.
+  - **Copies are only added.** Ones older than `OFFSITE_KEEP_DAYS` are deleted, but only once a backup from the
+    last two days has arrived, so a machine that stops making backups never empties the storage.
+  - **Is it working:** `docker compose -p tvtracker logs offsite` says "copied <backup> to <bucket>" for each new
+    backup, or what went wrong. `scripts/deploy-restore.sh --offsite-list` shows what's there.
+  - **Putting one back:** `scripts/deploy-restore.sh --offsite latest` (or a name) fetches it into `backups/` and
+    restores it.
+  - **A replacement machine:** get `.env` back first, then deploy and restore:
+
+    ```bash
+    docker run --rm --entrypoint sh -v "$PWD/src/TvTracker.AppHost/Deploy/offsite.sh:/offsite.sh:ro" \
+      -e OFFSITE_BUCKET=... -e OFFSITE_ENDPOINT=... -e OFFSITE_ACCESS_KEY=... -e OFFSITE_SECRET_KEY=... \
+      -e OFFSITE_PASSPHRASE=... rclone/rclone:1.71 /offsite.sh env > ~/tvtracker/.env   # after mkdir ~/tvtracker
+    scripts/deploy.sh && scripts/deploy-restore.sh --offsite latest
+    ```
+  - **Tried** against a local S3 server, with the Postgres, backup and offsite containers from the published
+    compose file: a backup was copied within a minute of being made and nothing in the storage was readable; with
+    the table emptied and the local backups deleted, the copy was fetched and restored and the row was back; a
+    wrong passphrase was refused; an old copy was deleted only after a new backup arrived. Not yet tried against a
+    real provider, or through `scripts/deploy.sh` and `deploy-restore.sh --offsite` on a whole deployment.
 - **Not in it:** RabbitMQ's queued events and Redis (sign-in sessions; people sign in again), and the catalog's
   embedding model, which is downloaded again.
 - **Tried** on a local deployment: a backup of all ten databases; then the profiles table emptied and the realm
@@ -1944,6 +1978,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `OFFSITE_BUCKET` and the other `OFFSITE_*` | Copies of the backups off the machine, encrypted (see Backups, above) |
 | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
@@ -1979,8 +2014,8 @@ Deploying works (above). This is what still stands between that and charging the
 
 **Still to do**
 
-- **Backups off the machine.** The daily backups (Deploying) sit on the same disk as the data; copying them, `.env`
-  and the flag overrides elsewhere is for whoever runs the machine to set up.
+- **Backups off the machine need an account.** The `offsite` container (Deploying, Backups) copies them once the
+  `OFFSITE_*` settings name a bucket; until then the daily backups sit on the same disk as the data.
 - **Payments beyond the happy path.** Stripe checkout collects no tax (a decision, for now), and refunds, disputes
   and failed payments aren't acted on: a refunded subscriber keeps their plan until the period ends. Deleting an
   account deletes its receipts, which the law may want kept.

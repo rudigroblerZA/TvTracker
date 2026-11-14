@@ -65,13 +65,19 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     KEYCLOAK_BINDMOUNT_0) value=$home/keycloak ;;
     BACKUP_BINDMOUNT_0) value=$apphost/Deploy/backup.sh ;;
     BACKUP_BINDMOUNT_1) value=$home/backups ;;
+    OFFSITE_BINDMOUNT_0) value=$apphost/Deploy/offsite.sh ;;
+    OFFSITE_BINDMOUNT_1) value=$home/backups ;;
+    OFFSITE_BINDMOUNT_2) value=$home/flags ;;
+    OFFSITE_BINDMOUNT_3) value=$env_file ;;
+    # How long a backup's copy off the machine is kept.
+    OFFSITE_KEEP_DAYS) value=$(current "$key"); value=${value:-30} ;;
     # Backups: how long they're kept, and the hour (UTC) the daily one is made.
     BACKUP_KEEP_DAYS) value=$(current "$key"); value=${value:-14} ;;
     BACKUP_HOUR_UTC) value=$(current "$key"); value=${value:-3} ;;
     PUBLIC_HOST | API_HOST | OPERATOR_NAME | CONTACT_EMAIL)
       value=$(current "$key")
       [[ -n $value ]] || missing+=("$key") ;;
-    STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | SMTP_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
+    STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | SMTP_* | OFFSITE_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
       # Optional: empty until there's an account. Without Stripe's, turn the `payments` flag off (README, Deploying).
       value=$(current "$key") ;;
     *)
@@ -135,5 +141,9 @@ echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
 echo "The admin signs in as 'admin' with APP_ADMIN_PASSWORD from $env_file."
 echo "To fill the catalog in bulk: scripts/deploy-import.sh top 500 (README, Deploying)."
-echo "Backups: daily, in $home/backups. Copy that folder, .env and flags/ off this machine."
+if [[ -n $(current OFFSITE_BUCKET) ]]; then
+  echo "Backups: daily, in $home/backups, and copied encrypted to $(current OFFSITE_BUCKET). Keep OFFSITE_PASSPHRASE somewhere else too."
+else
+  echo "Backups: daily, in $home/backups ONLY. Set OFFSITE_* in $env_file to copy them off this machine (README, Deploying)."
+fi
 echo "Logs, traces and metrics: ssh -L 18888:localhost:18888 <this machine>, then http://localhost:18888"
