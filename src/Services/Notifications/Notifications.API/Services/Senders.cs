@@ -176,16 +176,48 @@ public sealed class WebPushSender(NotificationsContext db, IConfiguration config
     }
 }
 
+/// <summary>
+/// Where the app's own email goes (<c>Email</c>): Azure Communication Services (<c>ConnectionString</c>), or a mail
+/// server (<c>Smtp:Host</c> and <c>Smtp:Port</c>), which is how development sends to its local mail catcher. Either
+/// needs <c>SenderAddress</c>.
+/// </summary>
 public sealed class EmailOptions
 {
     public string? ConnectionString { get; set; }
     public string? SenderAddress { get; set; }
+    public SmtpOptions Smtp { get; set; } = new();
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(ConnectionString) && !string.IsNullOrWhiteSpace(SenderAddress);
+    public bool IsConfigured =>
+        (!string.IsNullOrWhiteSpace(ConnectionString) || !string.IsNullOrWhiteSpace(Smtp.Host)) && !string.IsNullOrWhiteSpace(SenderAddress);
+
+    /// <summary>
+    /// Sends one message: through the mail server when there is one, else Azure Communication Services.
+    /// </summary>
+    public async Task SendAsync(string to, string subject, string html, string text, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(Smtp.Host))
+        {
+            using var message = new System.Net.Mail.MailMessage(SenderAddress!, to) { Subject = subject, Body = text };
+            message.AlternateViews.Add(System.Net.Mail.AlternateView.CreateAlternateViewFromString(html, null, "text/html"));
+            using var smtp = new System.Net.Mail.SmtpClient(Smtp.Host.Trim(), Smtp.Port);
+            await smtp.SendMailAsync(message, ct);
+            return;
+        }
+        await new EmailClient(ConnectionString).SendAsync(WaitUntil.Started, SenderAddress, to, subject, html, text, ct);
+    }
 }
 
 /// <summary>
-/// Email through Azure Communication Services.
+/// A mail server that asks for no sign-in: the local mail catcher.
+/// </summary>
+public sealed class SmtpOptions
+{
+    public string? Host { get; set; }
+    public int Port { get; set; } = 1025;
+}
+
+/// <summary>
+/// Email, as <see cref="EmailOptions"/> says where.
 /// </summary>
 public sealed class EmailSender(NotificationsContext db, IConfiguration configuration, IHostEnvironment environment, ILogger<EmailSender> logger) : IChannelSender
 {
@@ -214,9 +246,8 @@ public sealed class EmailSender(NotificationsContext db, IConfiguration configur
             return SendResult.Ok;
         }
 
-        var client = new EmailClient(_options.ConnectionString);
         var html = $"<p><strong>{WebUtility.HtmlEncode(item.Title)}</strong></p><p>{WebUtility.HtmlEncode(item.Body)}</p>";
-        await client.SendAsync(WaitUntil.Started, _options.SenderAddress, email, item.Title, html, item.Body, ct);
+        await _options.SendAsync(email, item.Title, html, item.Body, ct);
         return SendResult.Ok;
     }
 }

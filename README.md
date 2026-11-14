@@ -1136,8 +1136,11 @@ Postmark, Brevo, a mailbox at your domain's host).
     | `SMTP_ENCRYPTION` | `starttls`, `ssl` or `none`, when the port doesn't say it |
 
   - locally: `dotnet user-secrets set "Parameters:smtp-host" "<host>"` and likewise `smtp-from`, `smtp-user`,
-    `smtp-password`, `smtp-port` and `smtp-encryption`, in `src/TvTracker.AppHost`. A local catcher such as Mailpit on port 1025 needs
-    only the host, the port and a from address.
+    `smtp-password`, `smtp-port` and `smtp-encryption`, in `src/TvTracker.AppHost`.
+- **Locally there's a mail catcher:** with no mail account set, the AppHost runs [Mailpit](https://mailpit.axllent.org)
+  and points Keycloak and the app's own email at it. Open the `mailpit` resource's link in the Aspire dashboard to
+  read what was sent: password reset, the link confirming a new account's address, alerts and the weekly digest.
+  Nothing leaves the machine. Setting `smtp-host` and `smtp-from` replaces it with a real account for Keycloak.
 - **What happens:** Identity.API puts the account on Keycloak's realm on start (`RealmSecretsSeeder`), as a step of
   its own: a mail setting Keycloak refuses doesn't hold up the client secrets or Google sign-in.
   - **Mail comes from the app's name:** the one set in Settings when there is one, and a rename there reaches
@@ -1155,8 +1158,8 @@ Postmark, Brevo, a mailbox at your domain's host).
 - **Tried** against a local mail catcher: "Forgot Password?" on the sign-in page sent a reset email from the app's
   name with a working link; a new registration was held at "Email verification" and its confirmation email arrived;
   the existing `demo` and `admin` accounts still signed in.
-- This is Keycloak's mail only. The app's own emails (alerts, the weekly digest) still go through Azure
-  Communication Services (`email-connection-string`).
+- A deployment's mail account is Keycloak's only. The app's own emails (alerts, the weekly digest) go through Azure
+  Communication Services there (`email-connection-string`); locally they go to Mailpit unless that is set.
 
 ### Sign in with Google
 

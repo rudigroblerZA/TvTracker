@@ -1,8 +1,6 @@
 ﻿using System.Globalization;
 using System.Net;
 using System.Text;
-using Azure;
-using Azure.Communication.Email;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
 using TvTracker;
@@ -159,7 +157,7 @@ public sealed class DigestOptions
 /// <summary>
 /// Sends each user's digest when it's due: on their day, from their hour, in their time zone, at most once in six days
 /// (so a late run or a changed day can't send two in one week). A week with nothing in it sends nothing, but counts as
-/// sent. Email logs instead of sending until <c>Email:ConnectionString</c> and <c>Email:SenderAddress</c> are set.
+/// sent. Email logs instead of sending until it's configured (<see cref="EmailOptions"/>).
 /// </summary>
 public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration configuration, IHostEnvironment environment, TimeProvider time,
     ILogger<DigestWorker> logger)
@@ -257,7 +255,6 @@ public sealed class DigestWorker(IServiceScopeFactory scopes, IConfiguration con
             logger.LogInformation("[email not configured] Digest to {Email}: {Subject}\n{Text}", email, digest.Subject, digest.Text());
             return;
         }
-        var client = new EmailClient(_email.ConnectionString);
-        await client.SendAsync(WaitUntil.Started, _email.SenderAddress, email, digest.Subject, digest.Html(_options.BaseUrl), digest.Text(), ct);
+        await _email.SendAsync(email, digest.Subject, digest.Html(_options.BaseUrl), digest.Text(), ct);
     }
 }

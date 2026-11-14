@@ -431,6 +431,31 @@ else if (builder.Configuration["Parameters:smtp-host"] is { Length: > 0 } && bui
         identityApi.WithEnvironment("Keycloak__Smtp__Password", builder.AddParameter("smtp-password", secret: true));
     }
 }
+else
+{
+    // Locally, with no mail account: Mailpit, a mail catcher. Everything the app and Keycloak send lands in its
+    // inbox (the "mailpit" resource's link in the dashboard) and goes no further, so password reset, confirming
+    // a new account's address, alerts and the weekly digest can all be tried (README, Mail for password reset).
+    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.27")
+        .WithHttpEndpoint(targetPort: 8025, name: "http")
+        .WithEndpoint(targetPort: 1025, name: "smtp", scheme: "tcp")
+        .WithLifetime(ContainerLifetime.Persistent);
+    var mailFrom = "no-reply@tvtracker.localhost";
+    // Keycloak is a container beside it, so it reaches Mailpit by name on the container network.
+    identityApi
+        .WithEnvironment("Keycloak__Smtp__Host", "mailpit")
+        .WithEnvironment("Keycloak__Smtp__Port", "1025")
+        .WithEnvironment("Keycloak__Smtp__From", mailFrom);
+    // The app's own email, unless it has an Azure Communication Services account (below).
+    if (builder.Configuration["Parameters:email-connection-string"] is not { Length: > 0 })
+    {
+        var smtp = mailpit.GetEndpoint("smtp");
+        notificationsApi
+            .WithEnvironment("Email__Smtp__Host", smtp.Property(EndpointProperty.Host))
+            .WithEnvironment("Email__Smtp__Port", smtp.Property(EndpointProperty.Port))
+            .WithEnvironment("Email__SenderAddress", mailFrom);
+    }
+}
 
 // Sign in with Google: the Google client's id and secret (Google Cloud console, an "OAuth client ID" of type "Web
 // application"), which Identity.API gives to Keycloak (RealmSecretsSeeder). Locally they come from user secrets
@@ -451,7 +476,7 @@ else if (builder.Configuration["Parameters:google-client-id"] is { Length: > 0 }
 }
 
 // Email (alerts and the weekly digest), through Azure Communication Services: the secret parameter
-// email-connection-string and Email:SenderAddress. Without them, development logs each message and a deployment
+// email-connection-string and Email:SenderAddress. Without them, development sends to Mailpit (above) and a deployment
 // sends none (deliveries show as failed; digests are off). Links in the digest point at the web app's public address.
 if (builder.Configuration["Parameters:email-connection-string"] is { Length: > 0 } && builder.Configuration["Email:SenderAddress"] is { Length: > 0 } sender)
 {
