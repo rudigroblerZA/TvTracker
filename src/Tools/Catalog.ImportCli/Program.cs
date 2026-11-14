@@ -2,7 +2,9 @@ using System.CommandLine;
 using Catalog.ImportCli;
 
 // tvtracker-import: bulk imports shows into the catalog, and (wikidata) runs the jobs that add Wikidata's data to it. The sync worker does the work (one job at a time, under
-// TVmaze's rate limit, about two shows a second); this tool starts the job and shows its progress.
+// its provider's rate limit, about two shows a second for TVmaze); this tool starts the job and shows its progress. The shows come from whichever
+// provider the catalog was set up with (Catalog:Provider: TVmaze unless said otherwise, or Wikidata or TheTVDB), so ids are that provider's.
+// Against a deployment, scripts/deploy-import.sh runs it inside the stack's network, where the sync worker is.
 // Stopping the tool (Ctrl+C) doesn't stop the import: use `cancel` for that.
 
 var urlOption = new Option<string>("--url")
@@ -19,8 +21,8 @@ var keycloakOption = new Option<string>("--keycloak")
 };
 var secretOption = new Option<string>("--client-secret")
 {
-    Description = "The internal client's secret, the AppHost's internal-client-secret (or set TVTRACKER_INTERNAL_SECRET; " +
-        "the development value by default)",
+    Description = "The internal client's secret: the AppHost's internal-client-secret, INTERNAL_CLIENT_SECRET in a deployment's .env " +
+        "(or set TVTRACKER_INTERNAL_SECRET; the development value by default)",
     DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_INTERNAL_SECRET") ?? "tvtracker-internal-dev-secret",
     Recursive = true
 };
@@ -31,12 +33,12 @@ var detachOption = new Option<bool>("--detach")
 };
 
 var fileArgument = new Argument<string>("file") { Description = "A file with one show title per line (blank lines and lines starting with # are skipped), or - for standard input" };
-var titles = new Command("titles", "Import the best TVmaze match for each title") { fileArgument };
+var titles = new Command("titles", "Import the catalog provider's best match for each title") { fileArgument };
 titles.SetAction((parse, ct) => StartAsync(parse, new BulkImportRequest(Titles: ReadLines(parse.GetValue(fileArgument)!)), ct));
 
-var idsArgument = new Argument<string[]>("id") { Description = "TVmaze show ids", Arity = ArgumentArity.ZeroOrMore };
-var idsFileOption = new Option<string>("--file") { Description = "A file with one TVmaze id per line, or - for standard input" };
-var ids = new Command("ids", "Import shows by TVmaze id") { idsArgument, idsFileOption };
+var idsArgument = new Argument<string[]>("id") { Description = "Show ids at the catalog's provider (TVmaze's unless the catalog uses another)", Arity = ArgumentArity.ZeroOrMore };
+var idsFileOption = new Option<string>("--file") { Description = "A file with one id per line, or - for standard input" };
+var ids = new Command("ids", "Import shows by their id at the catalog's provider") { idsArgument, idsFileOption };
 ids.SetAction((parse, ct) =>
 {
     var given = parse.GetValue(idsArgument) ?? [];
@@ -45,7 +47,7 @@ ids.SetAction((parse, ct) =>
 });
 
 var countArgument = new Argument<int>("count") { Description = "How many shows (at most 5000)" };
-var top = new Command("top", "Import TVmaze's most popular shows (reads TVmaze's whole index first, a few minutes)") { countArgument };
+var top = new Command("top", "Import the provider's most popular shows (with TVmaze, its whole index is read first: a few minutes)") { countArgument };
 top.SetAction((parse, ct) => StartAsync(parse, new BulkImportRequest(Top: parse.GetValue(countArgument)), ct));
 
 var status = new Command("status", "Show the running or most recent import (follows a running one unless --detach)");
@@ -107,7 +109,7 @@ var wikidata = new Command("wikidata", "Run the jobs that add Wikidata's data to
     wikidataRun, wikidataStatus, researchUrlOption
 };
 
-var root = new RootCommand("Bulk import shows from TVmaze into the TV Tracker catalog, through the sync worker")
+var root = new RootCommand("Bulk import shows into the catalog from its provider (TVmaze, Wikidata or TheTVDB), through the sync worker")
 {
     titles, ids, top, status, cancel, wikidata, urlOption, keycloakOption, secretOption, detachOption
 };

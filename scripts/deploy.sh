@@ -85,6 +85,8 @@ if (( ${#missing[@]} )); then
   echo "Set these and run again: ${missing[*]}" >&2
   exit 1
 fi
+# The import tool's image, for scripts/deploy-import.sh; not part of the compose file.
+echo "IMPORT_CLI_IMAGE=tvtracker/import-cli:$tag" >> "$new_env"
 # Keys from an earlier deploy that this publish no longer asks for are kept, in case a later one does again.
 grep -v -f <(sed 's/=.*/=/; s/^/^/' "$new_env") "$env_file" >> "$new_env" || true
 cp "$new_env" "$env_file"
@@ -108,9 +110,13 @@ grep -o '^[A-Z0-9_]*_IMAGE=.*' "$env_file" | while IFS== read -r key image; do
     echo "  $resource: already built"
     continue
   fi
+  if [[ $resource == import-cli ]]; then
+    csproj=$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj
+  else
   # The project the AppHost runs as this resource: AddProject<Projects.Catalog_API>("catalog-api").
   project=$(grep -o "AddProject<Projects\.[A-Za-z_]*>(\"$resource\")" "$apphost/AppHost.cs" | sed 's/.*Projects\.\([A-Za-z_]*\)>.*/\1/' | tr _ .)
   csproj=$(find "$repo/src" -name "$project.csproj" | head -1)
+  fi
   [[ -n $csproj ]] || { echo "No project for $resource." >&2; exit 1; }
   echo "  $resource"
   dotnet publish "$csproj" -c Release -t:PublishContainer -p:ContainerRepository="${image%%:*}" -p:ContainerImageTag="$tag" \
@@ -123,5 +129,6 @@ docker compose --project-name tvtracker --project-directory "$home" up -d --remo
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
 echo "The admin signs in as 'admin' with APP_ADMIN_PASSWORD from $env_file."
+echo "To fill the catalog in bulk: scripts/deploy-import.sh top 500 (README, Deploying)."
 echo "Backups: daily, in $home/backups. Copy that folder, .env and flags/ off this machine."
 echo "Logs, traces and metrics: ssh -L 18888:localhost:18888 <this machine>, then http://localhost:18888"

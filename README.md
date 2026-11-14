@@ -676,13 +676,15 @@ users to `backups/<UTC timestamp>` (git-ignored); `scripts/restore.sh <dir>` put
 
 `tvtracker-import` (`src/Tools/Catalog.ImportCli`) fills the catalog in bulk while the AppHost is running. It starts a job
 on the sync worker (`/api/v1/imports/bulk`, internal only), which imports the shows through the same synchronizer
-and TVmaze rate limit as everything else, about two shows a second, and the tool shows the job's progress:
+and rate limit as everything else (about two shows a second with TVmaze), and the tool shows the job's progress. The
+shows come from whichever provider the catalog was set up with (`Catalog:Provider`: TVmaze unless said otherwise, or
+Wikidata or TheTVDB), so titles are matched there and ids are that provider's:
 
 ```bash
 cd src/Tools/Catalog.ImportCli
-dotnet run -- titles shows.txt     # the best TVmaze match for each line (# comments and blank lines skipped; - for stdin)
-dotnet run -- ids 82 431 169       # TVmaze show ids (or --file ids.txt)
-dotnet run -- top 500              # TVmaze's most popular shows; reads TVmaze's whole index first (about 4 minutes)
+dotnet run -- titles shows.txt     # the provider's best match for each line (# comments and blank lines skipped; - for stdin)
+dotnet run -- ids 82 431 169       # show ids at the provider, here TVmaze's (or --file ids.txt)
+dotnet run -- top 500              # the provider's most popular shows; with TVmaze its whole index is read first (about 4 minutes)
 dotnet run -- status               # follow the running import, or show the last one
 dotnet run -- cancel               # stop after the current show
 ```
@@ -696,6 +698,17 @@ the sync worker's APIs answer nothing else: in development its default secret wo
 2 done with some shows failing, 1 cancelled, failed or unreachable. Job state lives in the worker's memory, so a
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
+
+**Against a deployment** the sync worker has no address outside the stack, so the tool runs as a container on the
+stack's network: `scripts/deploy.sh` builds its image, and `scripts/deploy-import.sh` runs it with the deployment's
+addresses and the internal client's secret from `.env`, passing its arguments through:
+
+```bash
+scripts/deploy-import.sh top 500                 # in ~/tvtracker; give another directory first to use that
+scripts/deploy-import.sh titles - < shows.txt    # a file goes in on standard input
+scripts/deploy-import.sh status
+scripts/deploy-import.sh wikidata run
+```
 
 ### Wikidata jobs
 
@@ -749,9 +762,16 @@ dotnet run -- cleanup                          # delete the users and everything
 ```
 
 - **What users do:** each signs in, then visits pages until the run ends, each page a burst of the requests the app
-  makes for it: a show page (seven services), home, an episode, a search, Discover, the feed, stats. Shows come from
-  the catalog's trending list and a few genres. `--writes` adds following, marking watched and rating, and now and then
-  unfollowing so long runs stay bounded.
+  makes for it: a show page (six services), home (with the plan and the app's name, which every page asks for), an
+  episode, a search, stats and the calendar. Shows come from the catalog's trending list and a few genres. `--writes`
+  adds following, marking watched and rating, and now and then unfollowing so long runs stay bounded.
+- **A search is the search page's:** suggestions as the term is typed, then the search itself with the people search
+  beside it. The terms are words in titles, descriptions ("slow burn mystery"), typos and missing apostrophes
+  ("breakng bad", "greys anatomy"), which reach the near-spelling matches, and actors' names.
+- **Only what's switched on:** Discover, the feed, tonight, the waiting room, universes, your taste, and the friends
+  and community-insights parts of a show page belong to feature flags. The warm-up asks for each once; one that
+  answers 404 (the flag is off, or it isn't in a free user's plan) is left out and named at the start of the run, so
+  the report isn't full of 404s for features nobody can reach.
 - **Pacing:** `--ramp-up` (default 10s) starts users evenly; `--think` (default 1s, ±50%) is the pause between pages;
   `--think 0` runs flat out.
 - **Output:** a progress line every 5 seconds (req/s, p95, errors), then a table per endpoint: count, req/s, errors,
@@ -1840,6 +1860,8 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 - **Data in Docker volumes:** Postgres (nine app databases and Keycloak's), Redis, RabbitMQ, the embedding model and
   Caddy's certificates. Deploying again keeps them.
 - **Daily backups** of every database, kept for two weeks on the machine (Backups, below).
+- **Filling the catalog:** the sync worker imports on its own schedule; `scripts/deploy-import.sh top 500` imports in
+  bulk straight away (Bulk import, above).
 - **Feature flags** come from `Flags/flagd.json` in the checkout, copied on each deploy; what an admin changes on the
   flags page is kept in the deployment directory's `flags/overrides.json`, which both flagd and Identity.API mount.
 - **Container logs are capped** at five files of 20 MB each per service, so they neither fill the disk nor keep

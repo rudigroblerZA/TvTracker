@@ -138,7 +138,7 @@ public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSec
         }
         catch (HttpRequestException ex)
         {
-            throw new CliException($"Couldn't reach {service} at {_http.BaseAddress} ({ex.Message}). Is the AppHost running?");
+            throw new CliException($"Couldn't reach {service} at {_http.BaseAddress} ({ex.Message}). Is the app running? Against a deployment, use scripts/deploy-import.sh.");
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
@@ -163,7 +163,7 @@ public sealed class SyncWorkerClient(Uri baseUrl, Uri keycloak, string clientSec
         }
         catch (HttpRequestException ex)
         {
-            throw new CliException($"Couldn't reach Keycloak at {keycloak} ({ex.Message}). Is the AppHost running?");
+            throw new CliException($"Couldn't reach Keycloak at {keycloak} ({ex.Message}). Is the app running? Against a deployment, use scripts/deploy-import.sh.");
         }
         using (response)
         {

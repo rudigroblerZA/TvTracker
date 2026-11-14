@@ -3,12 +3,16 @@
   <!--
     tvtracker-import: bulk imports shows into the catalog through the sync worker's internal import endpoints,
     so provider calls, rate limiting, writes and catalog events stay in the worker. Run it while the AppHost is running.
+    A deployment builds it as a container image (scripts/deploy.sh) and runs it inside the stack's network, where the
+    sync worker is (scripts/deploy-import.sh).
   -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>tvtracker-import</AssemblyName>
     <RootNamespace>Catalog.ImportCli</RootNamespace>
+    <!-- A console app isn't containerised by the SDK unless asked. -->
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
   </PropertyGroup>
 
   <ItemGroup>
