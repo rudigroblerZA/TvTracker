@@ -1,11 +1,13 @@
 using TvTracker.UI.Components;
+using TvTracker.UI.Models;
 
 namespace TvTracker.UI.Services;
 
 /// <summary>
 /// The app's name, for white-labelling: the web app passes <c>Branding:AppName</c> from its configuration to
 /// <see cref="UiServiceCollectionExtensions.AddTvTrackerUi"/>, and the phone <c>MobileSettings.AppName</c>, since a MAUI
-/// app has no configuration file. Pages inject it as <c>Brand</c>.
+/// app has no configuration file. Pages inject it as <c>Brand</c>. An admin can set all of it in Settings instead
+/// (<see cref="Apply"/>): what's set there wins, and what's left empty there keeps the configured value.
 /// <para>
 /// The privacy policy and terms also name who runs the app and how to reach them (<c>Branding:Operator</c>,
 /// <c>Branding:ContactEmail</c>, and <c>Branding:OperatorAddress</c>, <c>CompanyNumber</c> and <c>GoverningLaw</c>),
@@ -16,6 +18,17 @@ namespace TvTracker.UI.Services;
 public sealed class Branding(string? appName = null, string? operatorName = null, string? contactEmail = null, string? catalogSource = null,
     string? operatorAddress = null, string? companyNumber = null, string? governingLaw = null)
 {
+    private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    // What the app was started with; Settings' values, when there are any, go on top.
+    private readonly string _appName = Text(appName) ?? DefaultAppName;
+    private readonly string? _operator = Text(operatorName);
+    private readonly string? _contactEmail = Text(contactEmail);
+    private readonly string? _operatorAddress = Text(operatorAddress);
+    private readonly string? _companyNumber = Text(companyNumber);
+    private readonly string? _governingLaw = Text(governingLaw);
+    private volatile BrandingSettings _settings = BrandingSettings.None;
+
     /// <summary>
     /// Where the catalog's data comes from (<c>Catalog:Provider</c>: "tvmaze", "wikidata", "tvdb" or "mock"), for the
     /// credit in the footer that TVmaze's and TheTVDB's licences require. TVmaze when not said.
@@ -30,37 +43,91 @@ public sealed class Branding(string? appName = null, string? operatorName = null
 
     public const string DefaultAppName = "TV Tracker";
 
-    public string AppName { get; } = string.IsNullOrWhiteSpace(appName) ? DefaultAppName : appName.Trim();
+    public string AppName => Text(_settings.AppName) ?? _appName;
+
+    /// <summary>
+    /// The colour of links, buttons and the logo tile, as #rrggbb, when an admin set one; else the stylesheet's own.
+    /// </summary>
+    public string? AccentColor => Text(_settings.AccentColor);
 
     /// <summary>
     /// Who runs the app (a company's legal name), else the app's own name.
     /// </summary>
-    public string Operator { get; } = string.IsNullOrWhiteSpace(operatorName)
-        ? (string.IsNullOrWhiteSpace(appName) ? DefaultAppName : appName.Trim())
-        : operatorName.Trim();
+    public string Operator => Text(_settings.Operator) ?? _operator ?? AppName;
 
     /// <summary>
-    /// Where to write about privacy and the terms; null when not configured.
+    /// Where to write about privacy and the terms; null when not set.
     /// </summary>
-    public string? ContactEmail { get; } = string.IsNullOrWhiteSpace(contactEmail) ? null : contactEmail.Trim();
+    public string? ContactEmail => Text(_settings.ContactEmail) ?? _contactEmail;
 
     /// <summary>
-    /// The operator's postal address (<c>Branding:OperatorAddress</c>), which the law in most places wants a seller
-    /// and a keeper of personal data to state; null when not configured.
+    /// The operator's postal address, which the law in most places wants a seller and a keeper of personal data to
+    /// state; null when not set.
     /// </summary>
-    public string? OperatorAddress { get; } = string.IsNullOrWhiteSpace(operatorAddress) ? null : operatorAddress.Trim();
+    public string? OperatorAddress => Text(_settings.OperatorAddress) ?? _operatorAddress;
 
     /// <summary>
-    /// The operator's company registration number and where it's registered, as one phrase
-    /// (<c>Branding:CompanyNumber</c>, e.g. "registered in South Africa, no. 2026/123456/07"); null when not configured.
+    /// The operator's company registration number and where it's registered, as one phrase (e.g. "registered in
+    /// South Africa, no. 2026/123456/07"); null when not set.
     /// </summary>
-    public string? CompanyNumber { get; } = string.IsNullOrWhiteSpace(companyNumber) ? null : companyNumber.Trim();
+    public string? CompanyNumber => Text(_settings.CompanyNumber) ?? _companyNumber;
 
     /// <summary>
-    /// Whose law the terms are under (<c>Branding:GoverningLaw</c>, e.g. "South Africa" or "England and Wales");
-    /// null when not configured, and the terms then say the place the operator is established.
+    /// Whose law the terms are under (e.g. "South Africa" or "England and Wales"); null when not set, and the terms
+    /// then say the place the operator is established.
     /// </summary>
-    public string? GoverningLaw { get; } = string.IsNullOrWhiteSpace(governingLaw) ? null : governingLaw.Trim();
+    public string? GoverningLaw => Text(_settings.GoverningLaw) ?? _governingLaw;
+
+    /// <summary>
+    /// When Settings' values were last read, for <see cref="BrandingLoader"/> to know when to ask again.
+    /// </summary>
+    public DateTimeOffset? LoadedAt { get; private set; }
+
+    /// <summary>
+    /// Raised when Settings' values change what the pages show.
+    /// </summary>
+    public event Action? Changed;
+
+    /// <summary>
+    /// Takes what an admin set in Settings; a field left empty there keeps the value the app was started with.
+    /// </summary>
+    public void Apply(BrandingSettings? settings, DateTimeOffset now)
+    {
+        var changed = (settings ?? BrandingSettings.None) != _settings;
+        _settings = settings ?? BrandingSettings.None;
+        LoadedAt = now;
+        if (changed)
+        {
+            Changed?.Invoke();
+        }
+    }
+}
+
+/// <summary>
+/// Reads the name, colour and company details an admin set in Settings (Identity.API keeps them) into
+/// <see cref="Branding"/>: when the first page opens and then at most once a minute, so a change made by one admin
+/// reaches everyone without a restart. A failure leaves what was there.
+/// </summary>
+public sealed class BrandingLoader(IdentityClient identity, Branding brand, TimeProvider time)
+{
+    private static readonly TimeSpan Every = TimeSpan.FromMinutes(1);
+
+    public async Task EnsureFreshAsync()
+    {
+        var now = time.GetUtcNow();
+        if (brand.LoadedAt is { } loaded && now - loaded < Every)
+        {
+            return;
+        }
+        try
+        {
+            brand.Apply(await identity.GetBrandingAsync(), now);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or OperationCanceledException or System.Text.Json.JsonException)
+        {
+            // Identity.API is away: the name and details the app has stand.
+        }
+    }
 }
 
 /// <summary>

@@ -27,6 +27,8 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<ConnectionState>();
         services.TryAddScoped<ClientInfo>();
         services.AddScoped<UserSession>();
+        services.AddScoped<BrandingLoader>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ShowTagStore>();
         services.AddScoped<FeatureFlagStore>();
         services.AddScoped<SpoilerShield>();

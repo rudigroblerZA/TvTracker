@@ -1124,6 +1124,18 @@ read-only, without signing in or having an account.
 
 ### White label and theme
 
+- **In Settings, for admins:** Settings → Admin → **Name and company** (`/settings/branding`) sets the app's name, an
+  accent colour, and the company behind it (legal name, contact email, postal address, registration, governing law),
+  which the privacy policy and terms show. No restart:
+  - **Who sees it when:** the admin's own copy of the web app at once; everyone else's pages, the phone app, and the
+    services that put the name in what they write (the weekly digest's subject, push titles, default list names)
+    within a minute.
+  - **What's left empty keeps the configured value** (`Branding:*` below, or `.env` in a deployment), so configuration
+    still sets the defaults and Settings overrides them field by field.
+  - **The accent colour** is six hex digits; it's used as given on a light background and lightened automatically on
+    a dark one, and the gradients' second colour follows it.
+  - **Stored** in Identity's database (`site_settings`, one row). `GET /api/v1/branding` needs no sign-in, since the
+    signed-out pages show it; `PUT /api/v1/admin/branding` is for `Admin:Users`.
 - **App name:** `Branding:AppName` in the AppHost's `appsettings.json` (default "TV Tracker"), or the
   `Branding__AppName` environment variable when starting the AppHost. It names the header, page and browser titles,
   "… users" in insights and Discover, the ops page, and the title of a push notification without one. The AppHost

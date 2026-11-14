@@ -108,6 +108,18 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
         GetAsync<List<PlanUser>>(ApiClients.Identity, $"api/v1/admin/plans/users?q={Uri.EscapeDataString(term ?? "")}", ct);
 
     /// <summary>
+    /// The app's name, accent colour and company details as set in Settings; readable signed out.
+    /// </summary>
+    public Task<BrandingSettings?> GetBrandingAsync(CancellationToken ct = default) =>
+        GetAsync<BrandingSettings>(ApiClients.Identity, "api/v1/branding", ct);
+
+    /// <summary>
+    /// Saves them, for admins; null when it didn't happen (not an admin).
+    /// </summary>
+    public Task<BrandingSettings?> SaveBrandingAsync(BrandingSettings settings, CancellationToken ct = default) =>
+        SendAsync<BrandingSettings>(ApiClients.Identity, HttpMethod.Put, "api/v1/admin/branding", settings, ct);
+
+    /// <summary>
     /// What subscriptions bring in over the last <paramref name="days"/> days; null for anyone but an admin.
     /// </summary>
     public Task<RevenueReport?> GetRevenueReportAsync(int days, CancellationToken ct = default) =>

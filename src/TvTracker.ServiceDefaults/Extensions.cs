@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -38,6 +39,12 @@ public static class Extensions
 
         builder.Services.AddServiceDiscovery();
         builder.Services.AddSingleton(new Branding(builder.Configuration[$"{Branding.Section}:AppName"]));
+        // A service that can reach Identity.API follows the name an admin sets in Settings (BrandingRefresher).
+        if (builder.Configuration.GetSection("services:identity-api").Exists())
+        {
+            builder.Services.AddHttpClient(BrandingRefresher.ClientName, client => client.BaseAddress = new Uri("https+http://identity-api/"));
+            builder.Services.AddHostedService<BrandingRefresher>();
+        }
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {

@@ -74,6 +74,7 @@ app.MapProfileApi();
 app.MapFlagsApi();
 app.MapPlansApi();
 app.MapRevenueApi();
+app.MapBrandingApi();
 app.MapFamilyApi();
 app.MapPaymentsApi();
 

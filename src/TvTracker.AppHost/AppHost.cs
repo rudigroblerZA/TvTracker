@@ -161,6 +161,8 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
     .WithHttpHealthCheck("/health");
 
 var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(notificationsDb).WaitFor(notificationsDb)
     .WithReference(catalogApi)
@@ -177,6 +179,8 @@ var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
     .WithHttpHealthCheck("/health");
 
 var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-worker")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(analyticsDb)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -186,6 +190,8 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
 
 // Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
 var socialApi = builder.AddProject<Projects.Social_API>("social-api")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(socialDb).WaitFor(socialDb)
     .WithReference(eventBus).WaitFor(eventBus)
