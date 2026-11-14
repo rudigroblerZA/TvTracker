@@ -629,6 +629,23 @@ if (publishing)
         .WithEnvironment("BACKUP_KEEP_DAYS", builder.AddParameter("backup-keep-days"))
         .WithEnvironment("BACKUP_HOUR_UTC", builder.AddParameter("backup-hour-utc"))
         .WaitFor(postgres);
+    // And off the machine: a container with rclone copies each backup, the flag overrides and .env, encrypted, to
+    // S3-compatible storage every hour (Deploy/offsite.sh; README, Deploying). It waits, doing nothing, until the
+    // offsite-* settings are filled in.
+    builder.AddContainer("offsite", "rclone/rclone", "1.71")
+        .WithBindMount("./Deploy/offsite.sh", "/offsite.sh", isReadOnly: true)
+        .WithBindMount("./Deploy/backups", "/backups")
+        .WithBindMount("./Flags", "/flags", isReadOnly: true)
+        .WithBindMount("./Deploy/env", "/deploy.env", isReadOnly: true)
+        .WithEntrypoint("/bin/sh")
+        .WithArgs("/offsite.sh")
+        .WithEnvironment("OFFSITE_BUCKET", builder.AddParameter("offsite-bucket", ""))
+        .WithEnvironment("OFFSITE_ENDPOINT", builder.AddParameter("offsite-endpoint", ""))
+        .WithEnvironment("OFFSITE_REGION", builder.AddParameter("offsite-region", ""))
+        .WithEnvironment("OFFSITE_ACCESS_KEY", builder.AddParameter("offsite-access-key", ""))
+        .WithEnvironment("OFFSITE_SECRET_KEY", builder.AddParameter("offsite-secret-key", "", secret: true))
+        .WithEnvironment("OFFSITE_PASSPHRASE", builder.AddParameter("offsite-passphrase", "", secret: true))
+        .WithEnvironment("OFFSITE_KEEP_DAYS", builder.AddParameter("offsite-keep-days"));
 
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
     identityApi
