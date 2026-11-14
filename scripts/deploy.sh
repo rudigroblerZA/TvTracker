@@ -64,13 +64,12 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     FLAGD_BINDMOUNT_0) value=$home/flags ;;
     KEYCLOAK_BINDMOUNT_0) value=$home/keycloak ;;
     BACKUP_BINDMOUNT_0) value=$apphost/Deploy/backup.sh ;;
-    BACKUP_BINDMOUNT_1) value=$home/backups ;;
+    BACKUP_BINDMOUNT_1 | OFFSITE_BINDMOUNT_1) value=$home/backups ;;
     OFFSITE_BINDMOUNT_0) value=$apphost/Deploy/offsite.sh ;;
-    OFFSITE_BINDMOUNT_1) value=$home/backups ;;
     OFFSITE_BINDMOUNT_2) value=$home/flags ;;
     OFFSITE_BINDMOUNT_3) value=$env_file ;;
-    # How long a backup's copy off the machine is kept.
-    OFFSITE_KEEP_DAYS) value=$(current "$key"); value=${value:-30} ;;
+    # A mount this script doesn't know is a mistake here, not a setting to leave empty.
+    *_BINDMOUNT_*) echo "The compose file has a mount this script doesn't know: $key." >&2; exit 1 ;;
     # Backups: how long they're kept, and the hour (UTC) the daily one is made.
     BACKUP_KEEP_DAYS) value=$(current "$key"); value=${value:-14} ;;
     BACKUP_HOUR_UTC) value=$(current "$key"); value=${value:-3} ;;

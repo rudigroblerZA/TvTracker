@@ -109,17 +109,9 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
                 nameInSettings = await scope.ServiceProvider.GetRequiredService<IdentityContext>().SiteSettings.AsNoTracking()
                     .Select(s => s.AppName).SingleOrDefaultAsync(stoppingToken);
             }
-            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
-            if (MailAccount.FromConfiguration(config, MailAccount.AppName(config, nameInSettings)) is not { } mail)
+            if (await keycloak.ApplyMailAccountAsync(nameInSettings, stoppingToken) is { } done)
             {
-                if (await keycloak.ClearMailAccountAsync(token, stoppingToken))
-                {
-                    logger.LogInformation("Took the mail account off the Keycloak realm: the app no longer has one");
-                }
-            }
-            else if (await keycloak.SetMailAccountAsync(token, mail, MailAccount.VerifiesAddresses(config), stoppingToken))
-            {
-                logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {From}", mail.Host, mail.Port, mail.From);
+                logger.LogInformation("{Outcome}", done);
             }
         }, stoppingToken);
     }

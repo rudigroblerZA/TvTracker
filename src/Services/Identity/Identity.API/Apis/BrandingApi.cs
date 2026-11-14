@@ -57,11 +57,15 @@ public static partial class BrandingApi
             settings = new SiteSettings { Id = SiteSettings.OnlyId };
             db.SiteSettings.Add(settings);
         }
+        var nameBefore = settings.AppName;
         (settings.AppName, settings.AccentColor, settings.Operator, settings.ContactEmail, settings.OperatorAddress, settings.CompanyNumber,
             settings.GoverningLaw, settings.UpdatedAtUtc) = (cleaned.AppName, cleaned.AccentColor, cleaned.Operator, cleaned.ContactEmail,
             cleaned.OperatorAddress, cleaned.CompanyNumber, cleaned.GoverningLaw, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
-        await RenameMailAsync(MailAccount.AppName(config, settings.AppName), config, keycloak, loggers.CreateLogger(typeof(BrandingApi)), ct);
+        if (settings.AppName != nameBefore)
+        {
+            await RenameMailAsync(settings.AppName, keycloak, loggers.CreateLogger(typeof(BrandingApi)), ct);
+        }
         return TypedResults.Ok(ToDto(settings));
     }
 
@@ -69,18 +73,13 @@ public static partial class BrandingApi
     /// Keycloak's own mail (password reset, confirming an address) comes from the app's name too, so a rename reaches
     /// it. The settings are saved either way: if Keycloak can't be reached now, the next start sets the name.
     /// </summary>
-    private static async Task RenameMailAsync(string name, IConfiguration config, KeycloakAdminClient keycloak, ILogger logger, CancellationToken ct)
+    private static async Task RenameMailAsync(string? name, KeycloakAdminClient keycloak, ILogger logger, CancellationToken ct)
     {
-        if (config["Keycloak:AdminUsername"] is not { Length: > 0 } adminUser || config["Keycloak:AdminPassword"] is not { Length: > 0 } adminPassword)
-        {
-            return;
-        }
         try
         {
-            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, ct);
-            if (await keycloak.SetMailNameAsync(token, name, ct))
+            if (await keycloak.ApplyMailAccountAsync(name, ct) is { } done)
             {
-                logger.LogInformation("Keycloak's mail now comes from {Name}", name);
+                logger.LogInformation("{Outcome}", done);
             }
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)

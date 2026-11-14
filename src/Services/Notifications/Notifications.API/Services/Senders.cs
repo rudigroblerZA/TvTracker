@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Mail;
 using System.Text.Json;
 using Azure;
 using Azure.Communication.Email;
@@ -187,19 +188,20 @@ public sealed class EmailOptions
     public string? SenderAddress { get; set; }
     public SmtpOptions Smtp { get; set; } = new();
 
-    public bool IsConfigured =>
-        (!string.IsNullOrWhiteSpace(ConnectionString) || !string.IsNullOrWhiteSpace(Smtp.Host)) && !string.IsNullOrWhiteSpace(SenderAddress);
+    private bool UsesSmtp => !string.IsNullOrWhiteSpace(Smtp.Host);
+
+    public bool IsConfigured => (UsesSmtp || !string.IsNullOrWhiteSpace(ConnectionString)) && !string.IsNullOrWhiteSpace(SenderAddress);
 
     /// <summary>
     /// Sends one message: through the mail server when there is one, else Azure Communication Services.
     /// </summary>
     public async Task SendAsync(string to, string subject, string html, string text, CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(Smtp.Host))
+        if (UsesSmtp)
         {
-            using var message = new System.Net.Mail.MailMessage(SenderAddress!, to) { Subject = subject, Body = text };
-            message.AlternateViews.Add(System.Net.Mail.AlternateView.CreateAlternateViewFromString(html, null, "text/html"));
-            using var smtp = new System.Net.Mail.SmtpClient(Smtp.Host.Trim(), Smtp.Port);
+            using var message = new MailMessage(SenderAddress!, to) { Subject = subject, Body = text };
+            message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(html, null, "text/html"));
+            using var smtp = new SmtpClient(Smtp.Host!.Trim(), Smtp.Port);
             await smtp.SendMailAsync(message, ct);
             return;
         }
@@ -240,7 +242,7 @@ public sealed class EmailSender(NotificationsContext db, IConfiguration configur
             // logs, and nothing was sent: say so, so the delivery shows as failed instead of quietly "sent".
             if (!environment.IsDevelopment())
             {
-                return new SendResult(false, "Email isn't configured (Email:ConnectionString and Email:SenderAddress).");
+                return new SendResult(false, "Email isn't configured (Email:ConnectionString or Email:Smtp:Host, and Email:SenderAddress).");
             }
             logger.LogInformation("[email not configured] To {Email}: {Title} — {Body}", email, item.Title, item.Body);
             return SendResult.Ok;
