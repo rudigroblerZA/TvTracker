@@ -31,9 +31,9 @@ tty=()
 
 # The stack's network, asked of the running sync worker rather than assumed: its name is the compose project's plus
 # whatever the publisher called the network.
-worker=$(docker compose --project-name tvtracker --project-directory "$home" ps -q catalog-sync 2> /dev/null | head -1)
+worker=$(docker compose --project-name tvtracker --project-directory "$home" ps -q catalog-sync 2> /dev/null | head -1 || true)
 [[ -n $worker ]] || { echo "The sync worker isn't running in $home: start the stack with scripts/deploy.sh." >&2; exit 1; }
-network=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$worker" | head -1)
+network=$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$worker" 2> /dev/null | head -1 || true)
 [[ -n $network ]] || { echo "Couldn't find the stack's network." >&2; exit 1; }
 
 # The secret goes to docker through this script's environment, named but not spelled out, so it isn't in the

@@ -405,7 +405,7 @@ if (!string.IsNullOrEmpty(webPublicUrl))
 // A mail account for Keycloak (any SMTP service): with it people can reset a forgotten password and new accounts
 // confirm their address; without it Keycloak can send nothing. Identity.API puts it on the realm (RealmSecretsSeeder).
 // Locally it comes from user secrets (Parameters:smtp-host, smtp-from and, where the server asks for them, smtp-user
-// and smtp-password; smtp-port when it isn't 587); a deployment has them in .env, empty until there's an account
+// and smtp-password; smtp-port when it isn't 587, smtp-encryption when the port doesn't say it); a deployment has them in .env, empty until there's an account
 // (README, Mail for password reset).
 identityApi.WithEnvironment("Branding__AppName", appName);
 if (builder.ExecutionContext.IsPublishMode)
@@ -413,6 +413,7 @@ if (builder.ExecutionContext.IsPublishMode)
     identityApi
         .WithEnvironment("Keycloak__Smtp__Host", builder.AddParameter("smtp-host", ""))
         .WithEnvironment("Keycloak__Smtp__Port", builder.AddParameter("smtp-port", ""))
+        .WithEnvironment("Keycloak__Smtp__Encryption", builder.AddParameter("smtp-encryption", ""))
         .WithEnvironment("Keycloak__Smtp__From", builder.AddParameter("smtp-from", ""))
         .WithEnvironment("Keycloak__Smtp__User", builder.AddParameter("smtp-user", ""))
         .WithEnvironment("Keycloak__Smtp__Password", builder.AddParameter("smtp-password", "", secret: true));
@@ -423,6 +424,7 @@ else if (builder.Configuration["Parameters:smtp-host"] is { Length: > 0 } && bui
         .WithEnvironment("Keycloak__Smtp__Host", builder.AddParameter("smtp-host"))
         .WithEnvironment("Keycloak__Smtp__From", builder.AddParameter("smtp-from"))
         .WithEnvironment("Keycloak__Smtp__Port", builder.Configuration["Parameters:smtp-port"] ?? "")
+        .WithEnvironment("Keycloak__Smtp__Encryption", builder.Configuration["Parameters:smtp-encryption"] ?? "")
         .WithEnvironment("Keycloak__Smtp__User", builder.Configuration["Parameters:smtp-user"] ?? "");
     if (builder.Configuration["Parameters:smtp-password"] is { Length: > 0 })
     {

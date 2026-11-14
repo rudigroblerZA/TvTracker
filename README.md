@@ -1132,17 +1132,26 @@ Postmark, Brevo, a mailbox at your domain's host).
     | `SMTP_HOST` | The mail server, e.g. `email-smtp.eu-west-1.amazonaws.com` |
     | `SMTP_FROM` | The address mail comes from, e.g. `no-reply@tv.example.com`; the service must allow it |
     | `SMTP_USER`, `SMTP_PASSWORD` | The account's sign-in; empty for a server that asks for none |
-    | `SMTP_PORT` | 587 when empty. 587 uses STARTTLS and 465 SSL |
+    | `SMTP_PORT` | 587 when empty. 465 uses SSL; every other port STARTTLS, except 25 and 1025 with no sign-in, which use none |
+    | `SMTP_ENCRYPTION` | `starttls`, `ssl` or `none`, when the port doesn't say it |
 
   - locally: `dotnet user-secrets set "Parameters:smtp-host" "<host>"` and likewise `smtp-from`, `smtp-user`,
-    `smtp-password` and `smtp-port`, in `src/TvTracker.AppHost`. A local catcher such as Mailpit on port 1025 needs
+    `smtp-password`, `smtp-port` and `smtp-encryption`, in `src/TvTracker.AppHost`. A local catcher such as Mailpit on port 1025 needs
     only the host, the port and a from address.
-- **What happens:** Identity.API puts the account on Keycloak's realm on start (`RealmSecretsSeeder`). Mail comes from
-  the app's name. With no host or no from address nothing is touched.
+- **What happens:** Identity.API puts the account on Keycloak's realm on start (`RealmSecretsSeeder`), as a step of
+  its own: a mail setting Keycloak refuses doesn't hold up the client secrets or Google sign-in.
+  - **Mail comes from the app's name:** the one set in Settings when there is one, and a rename there reaches
+    Keycloak at once.
+  - **Taking it away:** empty `SMTP_HOST` (or `SMTP_FROM`) and deploy again. The realm's mail account is removed and
+    new accounts stop being asked to confirm their address. A mail account set by hand in Keycloak's console isn't
+    the app's and is left alone.
 - **New accounts confirm their address:** with a mail account, registering sends a confirmation link and the account
   can't be used until it's followed. That keeps the app's own emails going only to addresses that are someone's.
   `Keycloak:Smtp:VerifyEmail=false` on Identity.API leaves it off. Accounts made by the app (the admin, load-test
   users, personas) count as confirmed, as do ones that sign in with Google.
+- **Accounts that are already there** are marked as confirmed when confirming is first switched on, so nobody who
+  registered before the mail account is held at "verify your email" (someone with a mistyped address could never
+  get past it). Their addresses have not been checked.
 - **Tried** against a local mail catcher: "Forgot Password?" on the sign-in page sent a reset email from the app's
   name with a working link; a new registration was held at "Email verification" and its confirmation email arrived;
   the existing `demo` and `admin` accounts still signed in.
@@ -1932,7 +1941,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
-| `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
+| `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
 | `OPERATOR_ADDRESS`, `COMPANY_NUMBER`, `GOVERNING_LAW` | The operator's postal address, its registration ("registered in …, no. …") and whose law the terms are under: shown in the privacy policy and terms, and wanted by law from anyone selling to the public |

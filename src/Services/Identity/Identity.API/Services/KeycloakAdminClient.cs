@@ -145,6 +145,11 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// <item><b>Confirming addresses</b> (<paramref name="verifyEmail"/>) is switched on with it, since it's the
     /// mail account that makes it possible: a new account then can't be used until its address is confirmed, and
     /// the app's own emails go only to addresses that are someone's.</item>
+    /// <item><b>Accounts that are already there</b> count as confirmed when confirming is first switched on: their
+    /// owners have been using them, and one registered with a mistyped address could otherwise never sign in
+    /// again.</item>
+    /// <item><b>Marked as the app's</b> (a realm attribute), so <see cref="ClearMailAccountAsync"/> can tell it from
+    /// one somebody set in Keycloak's console.</item>
     /// <item><b>The password is always sent:</b> Keycloak never gives a stored one back, so there's nothing to
     /// compare it with; "changed" is judged on everything else.</item>
     /// </list>
@@ -166,14 +171,105 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         };
         var current = realm?["smtpServer"] as JsonObject;
         var same = current is not null && wanted.All(w => current[w.Key]?.GetValue<string>() == w.Value!.GetValue<string>())
-            && realm?["verifyEmail"]?.GetValue<bool>() == verifyEmail && realm["resetPasswordAllowed"]?.GetValue<bool>() == true;
+            && realm?["verifyEmail"]?.GetValue<bool>() == verifyEmail && realm["resetPasswordAllowed"]?.GetValue<bool>() == true
+            && MailIsTheApps(realm);
         if (mail.Password is not null)
         {
             wanted["password"] = mail.Password;
         }
-        await SendAsync<JsonNode>(HttpMethod.Put, url, token,
-            new JsonObject { ["smtpServer"] = wanted, ["verifyEmail"] = verifyEmail, ["resetPasswordAllowed"] = true }, cancellationToken);
+        // Before the switch, so a failure part-way is retried rather than leaving people held at the door.
+        if (verifyEmail && realm?["verifyEmail"]?.GetValue<bool>() != true)
+        {
+            await ConfirmExistingAddressesAsync(token, cancellationToken);
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject
+        {
+            ["smtpServer"] = wanted,
+            ["verifyEmail"] = verifyEmail,
+            ["resetPasswordAllowed"] = true,
+            ["attributes"] = WithMailMark(realm, "true")
+        }, cancellationToken);
         return !same;
+    }
+
+    /// <summary>
+    /// Takes away the mail account <see cref="SetMailAccountAsync"/> put on the realm, when the app no longer has
+    /// one, and stops asking new accounts to confirm their address (the mail couldn't be sent). Returns whether
+    /// there was one to take away; a mail account set by hand in Keycloak's console isn't the app's and stays.
+    /// </summary>
+    public async Task<bool> ClearMailAccountAsync(string token, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        if (!MailIsTheApps(realm))
+        {
+            return false;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token,
+            new JsonObject { ["smtpServer"] = new JsonObject(), ["verifyEmail"] = false, ["attributes"] = WithMailMark(realm, "false") },
+            cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// The name Keycloak's mail comes from, kept in step with the app's when an admin renames it. Only on a mail
+    /// account the app set; returns whether it changed.
+    /// </summary>
+    public async Task<bool> SetMailNameAsync(string token, string name, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        if (!MailIsTheApps(realm) || realm?["smtpServer"] is not JsonObject current || current["fromDisplayName"]?.GetValue<string>() == name)
+        {
+            return false;
+        }
+        // The rest goes back as it came, password included: Keycloak gives that as a mask and keeps the stored one for it.
+        var renamed = (JsonObject)current.DeepClone();
+        renamed["fromDisplayName"] = name;
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject { ["smtpServer"] = renamed }, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// The realm attribute saying the mail account is the one the app set.
+    /// </summary>
+    private const string MailMark = "tvtracker.mailAccount";
+
+    private static bool MailIsTheApps(JsonObject? realm) => realm?["attributes"]?[MailMark]?.GetValue<string>() == "true";
+
+    /// <summary>
+    /// The realm's attributes with the mark set. All of them go back: Keycloak drops the ones a save leaves out.
+    /// </summary>
+    private static JsonObject WithMailMark(JsonObject? realm, string value)
+    {
+        var attributes = realm?["attributes"] is JsonObject existing ? (JsonObject)existing.DeepClone() : new JsonObject();
+        attributes[MailMark] = value;
+        return attributes;
+    }
+
+    /// <summary>
+    /// Marks the address of every account that has one as confirmed.
+    /// </summary>
+    private async Task ConfirmExistingAddressesAsync(string token, CancellationToken cancellationToken)
+    {
+        const int Page = 200;
+        var ids = new List<string>();
+        for (var first = 0; ; first += Page)
+        {
+            var (_, users) = await SendAsync<JsonArray>(HttpMethod.Get, $"{Users}?emailVerified=false&briefRepresentation=true&first={first}&max={Page}",
+                token, null, cancellationToken);
+            ids.AddRange((users ?? []).OfType<JsonObject>()
+                .Where(u => u["email"]?.GetValue<string>() is { Length: > 0 } && u["id"] is not null)
+                .Select(u => u["id"]!.GetValue<string>()));
+            if (users is null || users.Count < Page)
+            {
+                break;
+            }
+        }
+        foreach (var id in ids)
+        {
+            await SendAsync<JsonNode>(HttpMethod.Put, $"{Users}/{id}", token, new JsonObject { ["emailVerified"] = true }, cancellationToken);
+        }
     }
 
     /// <summary>
@@ -350,7 +446,8 @@ public sealed record MailAccount(string Host, int Port, string From, string From
     /// <list type="bullet">
     /// <item><b>Port:</b> 587 when not given.</item>
     /// <item><b>Encryption:</b> <c>Keycloak:Smtp:Encryption</c> (starttls, ssl or none) when given; else SSL on
-    /// port 465, none on 25 and 1025 (a local test server), and STARTTLS on anything else.</item>
+    /// port 465, none on 25 and 1025 for a server that asks for no sign-in (a local test server), and STARTTLS on
+    /// anything else, so a user name and password are never sent in the clear unless that was asked for.</item>
     /// </list>
     /// </summary>
     public static MailAccount? FromConfiguration(IConfiguration configuration, string appName)
@@ -361,15 +458,29 @@ public sealed record MailAccount(string Host, int Port, string From, string From
             return null;
         }
         var port = int.TryParse(section["Port"], out var given) && given is > 0 and < 65536 ? given : 587;
+        var user = Text(section["User"]);
         var encryption = Text(section["Encryption"])?.ToLowerInvariant() switch
         {
             "ssl" or "tls" => MailEncryption.Ssl,
             "starttls" => MailEncryption.StartTls,
             "none" => MailEncryption.None,
-            _ => port switch { 465 => MailEncryption.Ssl, 25 or 1025 => MailEncryption.None, _ => MailEncryption.StartTls }
+            _ => port switch { 465 => MailEncryption.Ssl, 25 or 1025 when user is null => MailEncryption.None, _ => MailEncryption.StartTls }
         };
-        return new MailAccount(host, port, from, Text(section["FromName"]) ?? appName, Text(section["User"]), Text(section["Password"]), encryption);
+        return new MailAccount(host, port, from, Text(section["FromName"]) ?? appName, user, Text(section["Password"]), encryption);
     }
+
+    /// <summary>
+    /// Whether new accounts confirm their address (<c>Keycloak:Smtp:VerifyEmail</c>): yes unless it says false, no,
+    /// off or 0. Anything else, a typo included, leaves it on.
+    /// </summary>
+    public static bool VerifiesAddresses(IConfiguration configuration) =>
+        Text(configuration["Keycloak:Smtp:VerifyEmail"])?.ToLowerInvariant() is not ("false" or "no" or "off" or "0");
+
+    /// <summary>
+    /// The name mail comes from: the one an admin set in Settings, else the one the app was started with.
+    /// </summary>
+    public static string AppName(IConfiguration configuration, string? fromSettings) =>
+        Text(fromSettings) ?? Text(configuration["Branding:AppName"]) ?? "TV Tracker";
 
     private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

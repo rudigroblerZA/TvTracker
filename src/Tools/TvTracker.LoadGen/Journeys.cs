@@ -94,6 +94,11 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
             GetAsync("analytics", "/shows/{id}/insights", $"/analytics/api/v1/shows/{show}/insights", ct),
             GetAsync("recommendations", "/shows/{id}/similar", $"/recommendations/api/v1/shows/{show}/similar", ct)
         };
+        if (pool.Has(Features.Universes))
+        {
+            // As the show page does. 404 for a show in no universe, which is most of them: the report's 404 column.
+            requests.Add(GetAsync("catalog", "/shows/{id}/universe", $"/catalog/api/v1/shows/{show}/universe", ct));
+        }
         if (pool.Has(Features.FriendsOnShows))
         {
             requests.Add(GetAsync("social", "/shows/{id}/friends", $"/social/api/v1/shows/{show}/friends", ct));
@@ -191,9 +196,9 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
     /// </summary>
     public async Task<System.Net.HttpStatusCode?> ProbeAsync(string path, CancellationToken ct)
     {
-        using var request = await session.RequestAsync(HttpMethod.Get, path, null, ct);
         try
         {
+            using var request = await session.RequestAsync(HttpMethod.Get, path, null, ct);
             using var response = await http.SendAsync(request, ct);
             return response.StatusCode;
         }
@@ -303,15 +308,21 @@ public sealed class ShowPool
             return;
         }
 
-        // Which flagged features are on. Only a 404 says "off": a service that's slow to wake is asked again, and one
-        // that can't be reached at all counts as on, so its feature is visited and shows in the report as errors
-        // rather than being quietly left out.
+        // Which flagged features are on. Only a 404 says "off": a service that's slow to wake (no answer, or the
+        // gateway's 502, 503 or 504 for it) is asked again after a pause, and one that still can't be reached counts
+        // as on, so its feature is visited and shows in the report as errors rather than being quietly left out.
         foreach (var (feature, probe) in Features.Probes)
         {
             System.Net.HttpStatusCode? status = null;
-            for (var attempt = 0; attempt < 3 && status is null; attempt++)
+            for (var attempt = 0; attempt < 3; attempt++)
             {
                 status = await user.ProbeAsync(probe.Replace("{show}", shows[0].ToString()), ct);
+                if (status is not (null or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable
+                    or System.Net.HttpStatusCode.GatewayTimeout) || attempt == 2)
+                {
+                    break;
+                }
+                await Task.Delay(TimeSpan.FromSeconds(2), ct);
             }
             if (status != System.Net.HttpStatusCode.NotFound)
             {

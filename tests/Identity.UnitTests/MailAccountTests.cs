@@ -39,6 +39,40 @@ public class MailAccountTests
     public void Encryption_follows_the_port_unless_said(string port, string? encryption, MailEncryption expected) =>
         Assert.Equal(expected, Read(("Host", "smtp.example.org"), ("From", "hello@example.org"), ("Port", port), ("Encryption", encryption))!.Encryption);
 
+    [Theory]
+    [InlineData("25")]
+    [InlineData("1025")]
+    public void A_sign_in_is_never_sent_in_the_clear_unless_asked_for(string port)
+    {
+        Assert.Equal(MailEncryption.StartTls, Read(("Host", "smtp.example.org"), ("From", "a@example.org"), ("Port", port), ("User", "apikey"))!.Encryption);
+        Assert.Equal(MailEncryption.None, Read(("Host", "smtp.example.org"), ("From", "a@example.org"), ("Port", port))!.Encryption);
+        Assert.Equal(MailEncryption.None,
+            Read(("Host", "smtp.example.org"), ("From", "a@example.org"), ("Port", port), ("User", "apikey"), ("Encryption", "none"))!.Encryption);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("true", true)]
+    [InlineData("flase", true)]
+    [InlineData("false", false)]
+    [InlineData(" No ", false)]
+    [InlineData("off", false)]
+    [InlineData("0", false)]
+    public void New_accounts_confirm_their_address_unless_told_not_to(string? setting, bool expected) =>
+        Assert.Equal(expected, MailAccount.VerifiesAddresses(new ConfigurationBuilder()
+            .AddInMemoryCollection([new("Keycloak:Smtp:VerifyEmail", setting)]).Build()));
+
+    [Fact]
+    public void Mail_comes_from_the_name_in_settings_then_the_configured_one()
+    {
+        var configured = new ConfigurationBuilder().AddInMemoryCollection([new("Branding:AppName", "Couch Club")]).Build();
+
+        Assert.Equal("Sofa Society", MailAccount.AppName(configured, " Sofa Society "));
+        Assert.Equal("Couch Club", MailAccount.AppName(configured, null));
+        Assert.Equal("TV Tracker", MailAccount.AppName(new ConfigurationBuilder().Build(), " "));
+    }
+
     [Fact]
     public void A_server_that_asks_for_no_sign_in_has_no_user()
     {
