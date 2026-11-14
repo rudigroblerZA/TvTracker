@@ -3,6 +3,19 @@
 @inject ConnectionState Connection
 @inject UserSession Session
 @inject ThemeStore Theme
+@inject BrandingLoader BrandLoader
+
+@* An accent colour set in Settings replaces the stylesheet's: as given on a light background, lightened on a dark one
+   so it stays readable, and the second colour of the gradients follows it. *@
+@if (Brand.AccentColor is { } accent)
+{
+    <style>
+        :root {
+            --accent: light-dark(@accent, color-mix(in oklab, @accent 62%, white));
+            --accent-2: light-dark(color-mix(in oklab, @accent 78%, #7c3aed), color-mix(in oklab, @accent 50%, #c4b5fd));
+        }
+    </style>
+}
 
 <div class="app">
     <header class="app-header">
@@ -48,6 +61,8 @@
     {
         Connection.Changed += OnChanged;
         Session.Changed += OnChanged;
+        Brand.Changed += OnChanged;
+        await BrandLoader.EnsureFreshAsync();
         await Session.EnsureLoadedAsync();
     }
 
@@ -65,5 +80,6 @@
     {
         Connection.Changed -= OnChanged;
         Session.Changed -= OnChanged;
+        Brand.Changed -= OnChanged;
     }
 }

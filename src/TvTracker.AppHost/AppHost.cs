@@ -161,6 +161,8 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
     .WithHttpHealthCheck("/health");
 
 var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(notificationsDb).WaitFor(notificationsDb)
     .WithReference(catalogApi)
@@ -177,6 +179,8 @@ var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
     .WithHttpHealthCheck("/health");
 
 var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-worker")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(analyticsDb)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -186,6 +190,8 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
 
 // Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
 var socialApi = builder.AddProject<Projects.Social_API>("social-api")
+    // For the app's name as an admin set it in Settings (BrandingRefresher).
+    .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(socialDb).WaitFor(socialDb)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -396,6 +402,24 @@ if (!string.IsNullOrEmpty(webPublicUrl))
     identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
 }
 
+// Sign in with Google: the Google client's id and secret (Google Cloud console, an "OAuth client ID" of type "Web
+// application"), which Identity.API gives to Keycloak (RealmSecretsSeeder). Locally they come from user secrets
+// (Parameters:google-client-id and google-client-secret) and nothing happens without both; a deployment has them in
+// .env, empty until there's a Google client. The address to allow in Google's console is
+// <where people reach Keycloak>/realms/tvtracker/broker/google/endpoint (README, Sign in with Google).
+if (builder.ExecutionContext.IsPublishMode)
+{
+    identityApi
+        .WithEnvironment("Keycloak__Google__ClientId", builder.AddParameter("google-client-id", ""))
+        .WithEnvironment("Keycloak__Google__ClientSecret", builder.AddParameter("google-client-secret", "", secret: true));
+}
+else if (builder.Configuration["Parameters:google-client-id"] is { Length: > 0 } && builder.Configuration["Parameters:google-client-secret"] is { Length: > 0 })
+{
+    identityApi
+        .WithEnvironment("Keycloak__Google__ClientId", builder.AddParameter("google-client-id"))
+        .WithEnvironment("Keycloak__Google__ClientSecret", builder.AddParameter("google-client-secret", secret: true));
+}
+
 // Email (alerts and the weekly digest), through Azure Communication Services: the secret parameter
 // email-connection-string and Email:SenderAddress. Without them, development logs each message and a deployment
 // sends none (deliveries show as failed; digests are off). Links in the digest point at the web app's public address.
@@ -537,6 +561,20 @@ if (publishing)
         .WithEnvironment("KC_HOSTNAME", publicUrl)
         .WithEnvironment("KC_HOSTNAME_BACKCHANNEL_DYNAMIC", "true")
         .WaitFor(postgres);
+    // Backups: a container with Postgres's own tools dumps every database once a day into a folder on the machine
+    // (Deploy/backup.sh; README, Deploying). The same image as the server, so pg_dump matches it.
+    builder.AddContainer("backup", "pgvector/pgvector", "0.8.7-pg18-trixie")
+        .WithBindMount("./Deploy/backup.sh", "/backup.sh", isReadOnly: true)
+        .WithBindMount("./Deploy/backups", "/backups")
+        .WithEntrypoint("/bin/bash")
+        .WithArgs("/backup.sh")
+        .WithEnvironment("PGHOST", postgres.Resource.Name)
+        .WithEnvironment("PGUSER", "postgres")
+        .WithEnvironment("PGPASSWORD", postgres.Resource.PasswordParameter)
+        .WithEnvironment("BACKUP_KEEP_DAYS", builder.AddParameter("backup-keep-days"))
+        .WithEnvironment("BACKUP_HOUR_UTC", builder.AddParameter("backup-hour-utc"))
+        .WaitFor(postgres);
+
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
     identityApi
         .WithEnvironment("Keycloak__WebPublicUrl", publicUrl)
@@ -551,7 +589,12 @@ if (publishing)
     // Who runs the site and how to reach them: the privacy policy and terms show both.
     webApp
         .WithEnvironment("Branding__Operator", builder.AddParameter("operator-name"))
-        .WithEnvironment("Branding__ContactEmail", builder.AddParameter("contact-email"));
+        .WithEnvironment("Branding__ContactEmail", builder.AddParameter("contact-email"))
+        // Optional, and wanted before selling to the public: the operator's postal address, its company number and
+        // where it's registered, and whose law the terms are under (docs/legal-review.md).
+        .WithEnvironment("Branding__OperatorAddress", builder.AddParameter("operator-address", ""))
+        .WithEnvironment("Branding__CompanyNumber", builder.AddParameter("company-number", ""))
+        .WithEnvironment("Branding__GoverningLaw", builder.AddParameter("governing-law", ""));
 
     // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
     // site names the public address as its issuer.
@@ -569,6 +612,10 @@ if (publishing)
             // Back up after a crash or a reboot; start order isn't guaranteed, so a service that starts before what it
             // needs fails and is started again.
             service.Restart = "unless-stopped";
+            // Docker keeps each container's output for ever unless told otherwise. Capped here (five files of 20 MB
+            // each), so the disk doesn't fill and logs, which can hold network addresses, don't outlive their use:
+            // the privacy policy says they're kept for a limited time.
+            service.Logging = new() { Driver = "json-file", Options = new() { ["max-size"] = "20m", ["max-file"] = "5" } };
             // The Aspire dashboard (logs, traces, metrics) is for whoever runs the machine: on its loopback address
             // only, to be reached through an SSH tunnel.
             if (name.EndsWith("-dashboard", StringComparison.Ordinal))
@@ -585,7 +632,10 @@ else
     mobileBff.WithExternalHttpEndpoints();
     webApp
         .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
-        .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "");
+        .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "")
+        .WithEnvironment("Branding__OperatorAddress", builder.Configuration["Branding:OperatorAddress"] ?? "")
+        .WithEnvironment("Branding__CompanyNumber", builder.Configuration["Branding:CompanyNumber"] ?? "")
+        .WithEnvironment("Branding__GoverningLaw", builder.Configuration["Branding:GoverningLaw"] ?? "");
 }
 
 builder.Build().Run();

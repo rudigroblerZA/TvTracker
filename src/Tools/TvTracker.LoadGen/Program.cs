@@ -15,8 +15,8 @@ var bffOption = new Option<string>("--url")
 };
 var keycloakOption = new Option<string>("--keycloak")
 {
-    Description = "Keycloak's address",
-    DefaultValueFactory = _ => "http://localhost:8080",
+    Description = "Keycloak's address (or set TVTRACKER_KEYCLOAK_URL)",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_KEYCLOAK_URL") ?? "http://localhost:8080",
     Recursive = true
 };
 var usersOption = new Option<int>("--users", "-u") { Description = "How many load-test users", DefaultValueFactory = _ => 10, Recursive = true };
@@ -76,6 +76,10 @@ run.SetAction(async (parse, ct) =>
     }
     Console.WriteLine($"{options.Users} users for {options.Duration}, ramping up over {options.RampUp}, {options.Think} between pages" +
         $"{(options.Writes ? ", with writes" : ", reads only")}, {pool.Count} shows. Ctrl+C stops early.");
+    if (pool.Off is { Count: > 0 } off)
+    {
+        Console.WriteLine($"Switched off (or not in these users' plan), so not visited: {string.Join(", ", off)}.");
+    }
 
     using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
     stop.CancelAfter(options.Duration);

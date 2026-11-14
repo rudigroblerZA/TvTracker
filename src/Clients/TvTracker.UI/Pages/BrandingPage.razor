@@ -1,0 +1,160 @@
+@page "/settings/branding"
+@inject IdentityClient Identity
+@inject TimeProvider Time
+
+<PageTitle>Name and company · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Name and company</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            What the app is called and looks like, and who runs it. Whatever you set here shows for everyone within a
+            minute, with no restart. A field left empty keeps the value the app was installed with, shown beside it.
+        </p>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (form is not null)
+        {
+            <EditForm Model="form" OnSubmit="SaveAsync" class="stack" aria-label="Name and company" Context="editing">
+                <section class="panel stack">
+                    <h2>The app</h2>
+                    <label>
+                        Name
+                        <input @bind="form.AppName" maxlength="40" placeholder="@Brand.AppName" />
+                        <span class="muted small">In the header, page titles, emails and notifications.</span>
+                    </label>
+                    <label>
+                        Accent colour
+                        <span class="inline">
+                            <input type="color" value="@(form.AccentColor ?? DefaultAccent)" @onchange="e => form.AccentColor = e.Value?.ToString()"
+                                   aria-label="Accent colour" />
+                            <input @bind="form.AccentColor" maxlength="7" size="8" placeholder="@DefaultAccent" aria-label="Accent colour as hex" />
+                            @if (!string.IsNullOrWhiteSpace(form.AccentColor))
+                            {
+                                <button class="btn btn-quiet small" type="button" @onclick="() => form.AccentColor = null">Use the default</button>
+                            }
+                        </span>
+                        <span class="muted small">Links, buttons and the logo tile. It's lightened automatically in the dark theme.</span>
+                    </label>
+                </section>
+
+                <section class="panel stack">
+                    <h2>The company</h2>
+                    <p class="muted small">
+                        Shown in the <a href="privacy">privacy policy</a> and the <a href="terms">terms</a>. Anyone
+                        selling to the public is expected to say who they are and where.
+                    </p>
+                    <label>
+                        Legal name
+                        <input @bind="form.Operator" maxlength="120" placeholder="@Brand.Operator" />
+                    </label>
+                    <label>
+                        Contact email
+                        <input type="email" @bind="form.ContactEmail" maxlength="256" placeholder="@(Brand.ContactEmail ?? "privacy@example.com")" />
+                        <span class="muted small">Where people write about their data and the terms.</span>
+                    </label>
+                    <label>
+                        Postal address
+                        <input @bind="form.OperatorAddress" maxlength="300" placeholder="@(Brand.OperatorAddress ?? "1 Long Street, Cape Town, 8001, South Africa")" />
+                    </label>
+                    <label>
+                        Company registration
+                        <input @bind="form.CompanyNumber" maxlength="160" placeholder="@(Brand.CompanyNumber ?? "registered in South Africa, no. 2026/123456/07")" />
+                        <span class="muted small">Written as it should read after the name: "registered in …, no. …".</span>
+                    </label>
+                    <label>
+                        Governing law
+                        <input @bind="form.GoverningLaw" maxlength="80" placeholder="@(Brand.GoverningLaw ?? "South Africa")" />
+                        <span class="muted small">Whose law the terms are under. Empty, the terms say the place the company is established.</span>
+                    </label>
+                </section>
+
+                <div class="actions">
+                    <button class="btn" type="submit" disabled="@busy">Save</button>
+                    @if (notice is not null)
+                    {
+                        <span class="muted small" role="status">@notice</span>
+                    }
+                </div>
+            </EditForm>
+        }
+        else if (error is null)
+        {
+            <p class="muted">Loading…</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p class="muted">Sign in as an admin to change these.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    /// <summary>
+    /// The stylesheet's own accent in the light theme, for the colour picker when none is set.
+    /// </summary>
+    private const string DefaultAccent = "#2563eb";
+
+    private Form? form;
+    private bool busy;
+    private string? error;
+    private string? notice;
+
+    private sealed class Form
+    {
+        public string? AppName { get; set; }
+        public string? AccentColor { get; set; }
+        public string? Operator { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? OperatorAddress { get; set; }
+        public string? CompanyNumber { get; set; }
+        public string? GoverningLaw { get; set; }
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            var saved = await Identity.GetBrandingAsync() ?? BrandingSettings.None;
+            form = new Form
+            {
+                AppName = saved.AppName, AccentColor = saved.AccentColor, Operator = saved.Operator, ContactEmail = saved.ContactEmail,
+                OperatorAddress = saved.OperatorAddress, CompanyNumber = saved.CompanyNumber, GoverningLaw = saved.GoverningLaw
+            };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        (busy, error, notice) = (true, null, null);
+        try
+        {
+            var saved = await Identity.SaveBrandingAsync(new BrandingSettings(form!.AppName, form.AccentColor, form.Operator, form.ContactEmail,
+                form.OperatorAddress, form.CompanyNumber, form.GoverningLaw));
+            if (saved is null)
+            {
+                error = "That didn't go through: only admins can change these.";
+                return;
+            }
+            // This copy of the app shows it at once; the others pick it up within a minute.
+            Brand.Apply(saved, Time.GetUtcNow());
+            notice = "Saved.";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}
