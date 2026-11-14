@@ -565,7 +565,12 @@ if (publishing)
     // Who runs the site and how to reach them: the privacy policy and terms show both.
     webApp
         .WithEnvironment("Branding__Operator", builder.AddParameter("operator-name"))
-        .WithEnvironment("Branding__ContactEmail", builder.AddParameter("contact-email"));
+        .WithEnvironment("Branding__ContactEmail", builder.AddParameter("contact-email"))
+        // Optional, and wanted before selling to the public: the operator's postal address, its company number and
+        // where it's registered, and whose law the terms are under (docs/legal-review.md).
+        .WithEnvironment("Branding__OperatorAddress", builder.AddParameter("operator-address", ""))
+        .WithEnvironment("Branding__CompanyNumber", builder.AddParameter("company-number", ""))
+        .WithEnvironment("Branding__GoverningLaw", builder.AddParameter("governing-law", ""));
 
     // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
     // site names the public address as its issuer.
@@ -583,6 +588,10 @@ if (publishing)
             // Back up after a crash or a reboot; start order isn't guaranteed, so a service that starts before what it
             // needs fails and is started again.
             service.Restart = "unless-stopped";
+            // Docker keeps each container's output for ever unless told otherwise. Capped here (five files of 20 MB
+            // each), so the disk doesn't fill and logs, which can hold network addresses, don't outlive their use:
+            // the privacy policy says they're kept for a limited time.
+            service.Logging = new() { Driver = "json-file", Options = new() { ["max-size"] = "20m", ["max-file"] = "5" } };
             // The Aspire dashboard (logs, traces, metrics) is for whoever runs the machine: on its loopback address
             // only, to be reached through an SSH tunnel.
             if (name.EndsWith("-dashboard", StringComparison.Ordinal))
@@ -599,7 +608,10 @@ else
     mobileBff.WithExternalHttpEndpoints();
     webApp
         .WithEnvironment("Branding__Operator", builder.Configuration["Branding:Operator"] ?? "")
-        .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "");
+        .WithEnvironment("Branding__ContactEmail", builder.Configuration["Branding:ContactEmail"] ?? "")
+        .WithEnvironment("Branding__OperatorAddress", builder.Configuration["Branding:OperatorAddress"] ?? "")
+        .WithEnvironment("Branding__CompanyNumber", builder.Configuration["Branding:CompanyNumber"] ?? "")
+        .WithEnvironment("Branding__GoverningLaw", builder.Configuration["Branding:GoverningLaw"] ?? "");
 }
 
 builder.Build().Run();

@@ -14,7 +14,8 @@ public static class UiServiceCollectionExtensions
     /// (<see cref="Branding"/>); <paramref name="catalogSource"/> is the catalog's provider, for the footer's credit.
     /// </summary>
     public static IServiceCollection AddTvTrackerUi(this IServiceCollection services, Func<string, Uri> baseAddressFor, string? appName = null,
-        string? operatorName = null, string? contactEmail = null, string? catalogSource = null)
+        string? operatorName = null, string? contactEmail = null, string? catalogSource = null, string? operatorAddress = null,
+        string? companyNumber = null, string? governingLaw = null)
     {
         foreach (var name in ApiClients.All)
         {
@@ -30,7 +31,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<FeatureFlagStore>();
         services.AddScoped<SpoilerShield>();
         services.AddScoped<ThemeStore>();
-        services.AddSingleton(new Branding(appName, operatorName, contactEmail, catalogSource));
+        services.AddSingleton(new Branding(appName, operatorName, contactEmail, catalogSource, operatorAddress, companyNumber, governingLaw));
 
         services.AddScoped<IdentityClient>();
         services.AddScoped<CatalogClient>();

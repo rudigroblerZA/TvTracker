@@ -1101,14 +1101,26 @@ read-only, without signing in or having an account.
   where Register creates the account), the four things that set it apart, and what Free, Pro and Family include, with
   Trending below. Signed in, Home is unchanged.
 - **Privacy** (`/privacy`) and **Terms** (`/terms`), linked from every page's footer and readable signed out. They
-  describe what the app actually does: what's stored and why, what stays on the device, what others see (activity,
-  posts, shared lists), who else gets data (Stripe, streaming links, TVmaze's pictures), cookies, how long things are
-  kept, export and deletion in Settings, moderation, the paid plans' renewal, cancellation and refunds. Keep them in step
-  when a feature stores something new, and change `PrivacyPage.LastUpdated` with the text.
-- **Who runs it:** `Branding:Operator` (the legal name; default the app's name) and `Branding:ContactEmail` (shown for
-  privacy questions when set) in the AppHost's configuration; the AppHost passes them to the web app.
-- **A starting text, not legal advice:** have both pages reviewed for the country the operator is established in, and
-  the places it sells to, before launch.
+  describe what the app actually does:
+  - **Privacy:** who runs it; what's stored (network addresses in rate limits and logs included); what stays on the
+    device; what each use rests on (the agreement, a legal duty, a legitimate interest, the user's choice); what
+    others see; who else gets data (hosting, Stripe, email delivery, push services, streaming links, the pictures'
+    host); data kept abroad; cookies; how long things are kept (backups and logs included); security; rights, export
+    and deletion in Settings; and where to complain (EU authorities, the UK's ICO, South Africa's Information
+    Regulator).
+  - **Terms:** personal use; accounts and age; posts, moderation and reporting; where the show data comes from and
+    that where-to-watch is inferred; plans, automatic renewal, cancelling, a 14-day refund on a first purchase,
+    failed payments and price changes; ending and closing; what the operator is responsible for; whose law applies.
+  - Keep them in step when a feature stores something new or sends data somewhere new, and change
+    `PrivacyPage.LastUpdated` with the text.
+- **Who runs it:** `Branding:Operator` (the legal name; default the app's name) and `Branding:ContactEmail`, and for
+  a seller the law also wants `Branding:OperatorAddress`, `Branding:CompanyNumber` (a phrase, such as "registered in
+  South Africa, no. 2026/123456/07") and `Branding:GoverningLaw` (whose law the terms are under). The AppHost passes
+  them to the web app; in a deployment they're `OPERATOR_NAME`, `CONTACT_EMAIL`, `OPERATOR_ADDRESS`, `COMPANY_NUMBER`
+  and `GOVERNING_LAW` in `.env`.
+- **Reviewed, not legal advice:** `docs/legal-review.md` records what the pages were checked against, the promises
+  they make (the 14-day refund, 30 days' notice of changes), what in the code they rely on, and twelve things for a
+  lawyer to confirm for the country the operator is established in.
 
 ### White label and theme
 
@@ -1794,6 +1806,8 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 - **Daily backups** of every database, kept for two weeks on the machine (Backups, below).
 - **Feature flags** come from `Flags/flagd.json` in the checkout, copied on each deploy; what an admin changes on the
   flags page is kept in the deployment directory's `flags/overrides.json`, which both flagd and Identity.API mount.
+- **Container logs are capped** at five files of 20 MB each per service, so they neither fill the disk nor keep
+  network addresses for longer than they're useful.
 - **Services restart** after a crash or a reboot. They start in no particular order, so on the first start a few fail
   once and are started again; that settles within a minute or two.
 - **Logs, traces and metrics** go to the Aspire dashboard, on the machine's loopback address only:
@@ -1827,6 +1841,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
+| `OPERATOR_ADDRESS`, `COMPANY_NUMBER`, `GOVERNING_LAW` | The operator's postal address, its registration ("registered in …, no. …") and whose law the terms are under: shown in the privacy policy and terms, and wanted by law from anyone selling to the public |
 
 Email (alerts and the weekly digest) needs an Azure Communication Services connection string
 (`Parameters:email-connection-string`) and `Email:SenderAddress` given to the publish; without them no email is sent.
@@ -1876,7 +1891,10 @@ Deploying works (above). This is what still stands between that and charging the
   `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `API_HOST` and `PUBLIC_HOST`.
 - **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
   network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
-  charging for the app, and TMDB's and TheTVDB's before turning those on. Have the privacy policy and terms reviewed.
+  charging for the app, and TMDB's and TheTVDB's before turning those on.
+- **A lawyer's reading.** The privacy policy and terms were reviewed against the code and rewritten
+  (`docs/legal-review.md`), which leaves twelve things for someone qualified, starting with where the operator is
+  established.
 
 ## Package versions
 
