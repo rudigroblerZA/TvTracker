@@ -104,24 +104,29 @@ jq '.users |= map(select(.serviceAccountClientId)) | (.clients[] |= del(.secret)
 chmod -R a+rX "$home/keycloak"
 
 echo "Building images ($tag)..."
-grep -o '^[A-Z0-9_]*_IMAGE=.*' "$env_file" | while IFS== read -r key image; do
-  resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
+# Builds a project as the image named, unless this commit's is there already.
+build_image() {
+  local name=$1 csproj=$2 image=$3
   if docker image inspect "$image" > /dev/null 2>&1; then
-    echo "  $resource: already built"
-    continue
+    echo "  $name: already built"
+    return
   fi
-  if [[ $resource == import-cli ]]; then
-    csproj=$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj
-  else
+  echo "  $name"
+  dotnet publish "$csproj" -c Release -t:PublishContainer -p:ContainerRepository="${image%%:*}" -p:ContainerImageTag="${image##*:}" \
+    --nologo -v quiet > "$work/build-$name.log" 2>&1 || { tail -30 "$work/build-$name.log" >&2; exit 1; }
+}
+
+# One image per service in the compose file: each *_IMAGE key the publish asked for is an AppHost project.
+grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d = | while read -r key; do
+  resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
   # The project the AppHost runs as this resource: AddProject<Projects.Catalog_API>("catalog-api").
   project=$(grep -o "AddProject<Projects\.[A-Za-z_]*>(\"$resource\")" "$apphost/AppHost.cs" | sed 's/.*Projects\.\([A-Za-z_]*\)>.*/\1/' | tr _ .)
   csproj=$(find "$repo/src" -name "$project.csproj" | head -1)
-  fi
   [[ -n $csproj ]] || { echo "No project for $resource." >&2; exit 1; }
-  echo "  $resource"
-  dotnet publish "$csproj" -c Release -t:PublishContainer -p:ContainerRepository="${image%%:*}" -p:ContainerImageTag="$tag" \
-    --nologo -v quiet > "$work/build-$resource.log" 2>&1 || { tail -30 "$work/build-$resource.log" >&2; exit 1; }
+  build_image "$resource" "$csproj" "$(current "$key")"
 done
+# And the import tool's, which isn't a service: scripts/deploy-import.sh runs it on demand.
+build_image import-cli "$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" "$(current IMPORT_CLI_IMAGE)"
 
 echo "Starting..."
 docker compose --project-name tvtracker --project-directory "$home" up -d --remove-orphans

@@ -37,13 +37,13 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
     {
         var pages = new List<(int Weight, Func<CancellationToken, Task> Visit)>
         {
-            (4, ShowPageAsync), (3, HomeAsync), (2, EpisodePageAsync), (2, SearchAsync), (1, StatsAsync)
+            (4, ShowPageAsync), (3, HomeAsync), (2, EpisodePageAsync), (2, SearchAsync), (1, DiscoverAsync), (1, StatsAsync)
         };
         // The pages of features that can be switched off, when they're on.
         foreach (var (feature, weight, visit) in new (string, int, Func<CancellationToken, Task>)[]
         {
-            (Features.Discover, 1, DiscoverAsync), (Features.Feed, 1, FeedAsync), (Features.Tonight, 1, TonightAsync),
-            (Features.WaitingRoom, 1, WaitingRoomAsync), (Features.Universes, 1, UniversesAsync)
+            (Features.Feed, 1, FeedAsync), (Features.Tonight, 1, TonightAsync), (Features.WaitingRoom, 1, WaitingRoomAsync),
+            (Features.Universes, 1, UniversesAsync)
         })
         {
             if (pool.Has(feature))
@@ -102,11 +102,6 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
         {
             requests.Add(GetAsync("ratings", "/shows/{id}/community-insights", $"/ratings/api/v1/shows/{show}/community-insights", ct));
         }
-        if (pool.Has(Features.Universes))
-        {
-            // 404 for a show in no universe, which is most of them.
-            requests.Add(GetAsync("catalog", "/shows/{id}/universe", $"/catalog/api/v1/shows/{show}/universe", ct));
-        }
         await Task.WhenAll(requests);
         if (Random.Shared.Next(3) == 0)
         {
@@ -140,14 +135,18 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
         {
             await GetAsync("catalog", "/shows/suggest", $"/catalog/api/v1/shows/suggest?q={Uri.EscapeDataString(typed)}", ct);
         }
+        // The first search for a term makes the catalog ask its provider for matches it doesn't have (at most once
+        // in six hours a term, and it can wait ten seconds on the provider), so that one is timed apart: it measures
+        // the provider, where the rest measure the catalog.
+        var search = pool.FirstSearch(term) ? "/shows?search= (a term's first: may import)" : "/shows?search=";
         await Task.WhenAll(
-            GetAsync("catalog", "/shows?search=", $"/catalog/api/v1/shows?search={Uri.EscapeDataString(term)}&pageSize=24", ct),
+            GetAsync("catalog", search, $"/catalog/api/v1/shows?search={Uri.EscapeDataString(term)}&pageSize=24", ct),
             GetAsync("catalog", "/people/search", $"/catalog/api/v1/people/search?q={Uri.EscapeDataString(term)}", ct));
     }
 
     private Task DiscoverAsync(CancellationToken ct) => Task.WhenAll(
         GetAsync("analytics", "/insights/discover/{list}", $"/analytics/api/v1/insights/discover/{DiscoverLists[Random.Shared.Next(DiscoverLists.Length)]}", ct),
-        pool.Has(Features.Premieres) ? GetAsync("analytics", "/insights/premieres", "/analytics/api/v1/insights/premieres", ct) : Task.CompletedTask);
+        GetAsync("analytics", "/insights/premieres", "/analytics/api/v1/insights/premieres", ct));
 
     private Task FeedAsync(CancellationToken ct) => GetAsync("social", "/feed", "/social/api/v1/feed", ct);
 
@@ -157,19 +156,10 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
     private Task UniversesAsync(CancellationToken ct) => GetAsync("catalog", "/universes", "/catalog/api/v1/universes", ct);
 
-    private Task StatsAsync(CancellationToken ct)
-    {
-        var requests = new List<Task>
-        {
-            GetAsync("tracking", "/stats", "/tracking/api/v1/stats", ct),
-            GetAsync("tracking", "/calendar", "/tracking/api/v1/calendar", ct)
-        };
-        if (pool.Has(Features.YourTaste))
-        {
-            requests.Add(GetAsync("analytics", "/me/taste", "/analytics/api/v1/me/taste", ct));
-        }
-        return Task.WhenAll(requests);
-    }
+    private Task StatsAsync(CancellationToken ct) => Task.WhenAll(
+        GetAsync("tracking", "/stats", "/tracking/api/v1/stats", ct),
+        GetAsync("analytics", "/me/taste", "/analytics/api/v1/me/taste", ct),
+        GetAsync("tracking", "/calendar", "/tracking/api/v1/calendar", ct));
 
     /// <summary>
     /// Follows a show, marks its first episode watched and rates it; now and then unfollows one again, so a long run
@@ -194,6 +184,24 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
     public Task<HttpResponseMessage?> GetForPoolAsync(string service, string name, string path, CancellationToken ct) =>
         SendRawAsync(HttpMethod.Get, service, name, path, null, ct);
+
+    /// <summary>
+    /// The status a GET answers, or null when it couldn't be reached. Not timed or counted: it's the tool asking a
+    /// question of its own, not something a user does.
+    /// </summary>
+    public async Task<System.Net.HttpStatusCode?> ProbeAsync(string path, CancellationToken ct)
+    {
+        using var request = await session.RequestAsync(HttpMethod.Get, path, null, ct);
+        try
+        {
+            using var response = await http.SendAsync(request, ct);
+            return response.StatusCode;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
 
     private async Task GetAsync(string service, string name, string path, CancellationToken ct) =>
         (await SendRawAsync(HttpMethod.Get, service, name, path, null, ct))?.Dispose();
@@ -224,13 +232,11 @@ public sealed class VirtualUser(HttpClient http, Keycloak keycloak, Stats stats,
 
 /// <summary>
 /// The parts of the app behind a feature flag that a run can visit, each with the request that shows whether it's on:
-/// a flag that's off answers 404 from its endpoint.
+/// a flag that's off answers 404 from its endpoint. Only features whose endpoints the services gate are here;
+/// Discover, premieres and your taste have no flag, and are always visited.
 /// </summary>
 public static class Features
 {
-    public const string Discover = "Discover lists";
-    public const string Premieres = "premieres";
-    public const string YourTaste = "your taste";
     public const string Feed = "the feed";
     public const string Tonight = "tonight";
     public const string WaitingRoom = "the waiting room";
@@ -243,9 +249,6 @@ public static class Features
     /// </summary>
     public static readonly (string Feature, string Probe)[] Probes =
     [
-        (Discover, "/analytics/api/v1/insights/discover/hidden-gems"),
-        (Premieres, "/analytics/api/v1/insights/premieres"),
-        (YourTaste, "/analytics/api/v1/me/taste"),
         (Feed, "/social/api/v1/feed"),
         (Tonight, "/tracking/api/v1/tonight/queue?perShow=1"),
         (WaitingRoom, "/analytics/api/v1/me/waiting"),
@@ -280,7 +283,8 @@ public sealed class ShowPool
 
     public async Task FillAsync(VirtualUser user, CancellationToken ct)
     {
-        foreach (var path in new[] { "/catalog/api/v1/shows/trending", "/catalog/api/v1/shows?search=the", "/catalog/api/v1/shows?genre=Drama", "/catalog/api/v1/shows?genre=Comedy" })
+        // Lists only: a search here would have the catalog ask its provider for new shows before the run starts.
+        foreach (var path in new[] { "/catalog/api/v1/shows/trending", "/catalog/api/v1/shows?genre=Drama", "/catalog/api/v1/shows?genre=Comedy", "/catalog/api/v1/shows?genre=Crime" })
         {
             using var response = await user.GetForPoolAsync("catalog", "(warm-up)", path, ct);
             if (response is { IsSuccessStatusCode: true })
@@ -299,15 +303,33 @@ public sealed class ShowPool
             return;
         }
 
-        // Which flagged features are on: one request each. Anything but 404 (and a failed connection) counts as on,
-        // so a feature that's on but broken is still visited, and shows up in the report as errors.
+        // Which flagged features are on. Only a 404 says "off": a service that's slow to wake is asked again, and one
+        // that can't be reached at all counts as on, so its feature is visited and shows in the report as errors
+        // rather than being quietly left out.
         foreach (var (feature, probe) in Features.Probes)
         {
-            using var response = await user.GetForPoolAsync("(warm-up)", "feature probes", probe.Replace("{show}", shows[0].ToString()), ct);
-            if (response is not null && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            System.Net.HttpStatusCode? status = null;
+            for (var attempt = 0; attempt < 3 && status is null; attempt++)
+            {
+                status = await user.ProbeAsync(probe.Replace("{show}", shows[0].ToString()), ct);
+            }
+            if (status != System.Net.HttpStatusCode.NotFound)
             {
                 features.Add(feature);
             }
+        }
+    }
+
+    private readonly HashSet<string> searched = [];
+
+    /// <summary>
+    /// Whether this is the run's first search for the term (the one that may wait on the catalog's provider).
+    /// </summary>
+    public bool FirstSearch(string term)
+    {
+        lock (searched)
+        {
+            return searched.Add(term);
         }
     }
 
