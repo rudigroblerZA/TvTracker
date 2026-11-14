@@ -1095,6 +1095,30 @@ read-only, without signing in or having an account.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
 - **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
+### Sign in with Google
+
+People can sign up and sign in with a Google account once the app has been given a Google client. Keycloak does the
+work: its sign-in and registration pages show a Google button, and a first sign-in creates the account with the name
+and (already confirmed) email address Google gives.
+
+- **Get a client:** in the Google Cloud console, create an "OAuth client ID" of type "Web application", and add this
+  as an authorised redirect URI:
+  - deployed: `https://<PUBLIC_HOST>/realms/tvtracker/broker/google/endpoint`
+  - locally: `http://localhost:8080/realms/tvtracker/broker/google/endpoint`
+- **Give it to the app:** the client's id and secret.
+  - deployed: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the deployment's `.env`, then run `scripts/deploy.sh`
+    again.
+  - locally: `dotnet user-secrets set "Parameters:google-client-id" "<id>"` and `"Parameters:google-client-secret"`,
+    in `src/TvTracker.AppHost`.
+- **What happens:** Identity.API creates Keycloak's Google identity provider on start, or brings it up to date
+  (`RealmSecretsSeeder`). With neither value set nothing is touched; taking them away again doesn't remove a provider
+  already there (do that in Keycloak's admin console).
+- **An address already registered** with a password isn't taken over: Keycloak asks the person to prove the existing
+  account is theirs before linking the two.
+- **Tried** with placeholder credentials: the provider was created, the sign-in page offered Google, and the button
+  sent the browser to Google with the client id and that redirect address. Signing in for real needs a real client.
+- The privacy policy says what Google learns and tells the app.
+
 ### Landing page, privacy and terms
 
 - **Landing page:** signed out, Home (`/`) opens with what the app does, "Get started free" (Keycloak's sign-in page,
@@ -1852,6 +1876,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
 | `OPERATOR_ADDRESS`, `COMPANY_NUMBER`, `GOVERNING_LAW` | The operator's postal address, its registration ("registered in …, no. …") and whose law the terms are under: shown in the privacy policy and terms, and wanted by law from anyone selling to the public |
 

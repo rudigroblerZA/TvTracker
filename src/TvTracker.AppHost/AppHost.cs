@@ -402,6 +402,24 @@ if (!string.IsNullOrEmpty(webPublicUrl))
     identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
 }
 
+// Sign in with Google: the Google client's id and secret (Google Cloud console, an "OAuth client ID" of type "Web
+// application"), which Identity.API gives to Keycloak (RealmSecretsSeeder). Locally they come from user secrets
+// (Parameters:google-client-id and google-client-secret) and nothing happens without both; a deployment has them in
+// .env, empty until there's a Google client. The address to allow in Google's console is
+// <where people reach Keycloak>/realms/tvtracker/broker/google/endpoint (README, Sign in with Google).
+if (builder.ExecutionContext.IsPublishMode)
+{
+    identityApi
+        .WithEnvironment("Keycloak__Google__ClientId", builder.AddParameter("google-client-id", ""))
+        .WithEnvironment("Keycloak__Google__ClientSecret", builder.AddParameter("google-client-secret", "", secret: true));
+}
+else if (builder.Configuration["Parameters:google-client-id"] is { Length: > 0 } && builder.Configuration["Parameters:google-client-secret"] is { Length: > 0 })
+{
+    identityApi
+        .WithEnvironment("Keycloak__Google__ClientId", builder.AddParameter("google-client-id"))
+        .WithEnvironment("Keycloak__Google__ClientSecret", builder.AddParameter("google-client-secret", secret: true));
+}
+
 // Email (alerts and the weekly digest), through Azure Communication Services: the secret parameter
 // email-connection-string and Email:SenderAddress. Without them, development logs each message and a deployment
 // sends none (deliveries show as failed; digests are off). Links in the digest point at the web app's public address.
