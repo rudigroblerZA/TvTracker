@@ -7,7 +7,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <AspireVersion>13.6.4</AspireVersion>
-    <AspNetCoreVersion>10.0.14</AspNetCoreVersion>
+    <AspNetCoreVersion>10.0.15</AspNetCoreVersion>
     <!-- dotnet/runtime packages (Microsoft.Extensions.*), which service on their own numbers; MobileApp uses it too. -->
     <RuntimeVersion>10.0.14</RuntimeVersion>
     <EfCoreVersion>10.0.14</EfCoreVersion>
