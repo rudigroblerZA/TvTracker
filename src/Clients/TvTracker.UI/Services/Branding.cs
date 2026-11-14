@@ -8,11 +8,13 @@ namespace TvTracker.UI.Services;
 /// app has no configuration file. Pages inject it as <c>Brand</c>.
 /// <para>
 /// The privacy policy and terms also name who runs the app and how to reach them (<c>Branding:Operator</c>,
-/// <c>Branding:ContactEmail</c>), since each white-labelled deployment has its own; without them the pages speak of the
-/// app by name and point to Settings for the rights it serves there.
+/// <c>Branding:ContactEmail</c>, and <c>Branding:OperatorAddress</c>, <c>CompanyNumber</c> and <c>GoverningLaw</c>),
+/// since each white-labelled deployment has its own; without them the pages speak of the app by name and point to
+/// Settings for the rights it serves there.
 /// </para>
 /// </summary>
-public sealed class Branding(string? appName = null, string? operatorName = null, string? contactEmail = null, string? catalogSource = null)
+public sealed class Branding(string? appName = null, string? operatorName = null, string? contactEmail = null, string? catalogSource = null,
+    string? operatorAddress = null, string? companyNumber = null, string? governingLaw = null)
 {
     /// <summary>
     /// Where the catalog's data comes from (<c>Catalog:Provider</c>: "tvmaze", "wikidata", "tvdb" or "mock"), for the
@@ -41,6 +43,24 @@ public sealed class Branding(string? appName = null, string? operatorName = null
     /// Where to write about privacy and the terms; null when not configured.
     /// </summary>
     public string? ContactEmail { get; } = string.IsNullOrWhiteSpace(contactEmail) ? null : contactEmail.Trim();
+
+    /// <summary>
+    /// The operator's postal address (<c>Branding:OperatorAddress</c>), which the law in most places wants a seller
+    /// and a keeper of personal data to state; null when not configured.
+    /// </summary>
+    public string? OperatorAddress { get; } = string.IsNullOrWhiteSpace(operatorAddress) ? null : operatorAddress.Trim();
+
+    /// <summary>
+    /// The operator's company registration number and where it's registered, as one phrase
+    /// (<c>Branding:CompanyNumber</c>, e.g. "registered in South Africa, no. 2026/123456/07"); null when not configured.
+    /// </summary>
+    public string? CompanyNumber { get; } = string.IsNullOrWhiteSpace(companyNumber) ? null : companyNumber.Trim();
+
+    /// <summary>
+    /// Whose law the terms are under (<c>Branding:GoverningLaw</c>, e.g. "South Africa" or "England and Wales");
+    /// null when not configured, and the terms then say the place the operator is established.
+    /// </summary>
+    public string? GoverningLaw { get; } = string.IsNullOrWhiteSpace(governingLaw) ? null : governingLaw.Trim();
 }
 
 /// <summary>

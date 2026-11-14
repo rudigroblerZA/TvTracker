@@ -1,7 +1,8 @@
 @page "/privacy"
 
-@* What the app stores and why, as the code does it. Keep this page in step
-   when a feature starts storing something new or sending data somewhere new. *@
+@* What the app stores and why, as the code does it. Keep this page in step when a feature starts storing something
+   new or sending data somewhere new, and update LastUpdated. What it was checked against, and what a lawyer still has
+   to confirm for the place the operator is established, is in docs/legal-review.md. *@
 
 <PageTitle>Privacy · @Brand.AppName</PageTitle>
 
@@ -10,22 +11,38 @@
     <p class="muted">Last updated @LastUpdated</p>
 
     <p>
-        This policy explains what @Brand.AppName keeps about you, why, who else sees any of it, and how you can get a copy
-        or have it deleted.
+        This policy explains what @Brand.AppName keeps about you, why, who else sees any of it, how long we keep it, and
+        how you can get a copy or have it deleted.
+    </p>
+
+    <h2>Who we are</h2>
+    <p>
         @if (Brand.Operator != Brand.AppName)
         {
-            <span> @Brand.AppName is run by @Brand.Operator ("we").</span>
+            <span>@Brand.AppName is run by @Brand.Operator ("we")</span>
+            @if (Brand.CompanyNumber is { } number)
+            {
+                <span>, @number</span>
+            }
+            @if (Brand.OperatorAddress is { } address)
+            {
+                <span>, of @address</span>
+            }
+            <span>. </span>
         }
+        We decide what your data is used for, which makes us the "controller" under European law and the "responsible
+        party" under South Africa's.
         @if (Brand.ContactEmail is { } email)
         {
-            <span> Questions go to <a href="mailto:@email">@email</a>.</span>
+            <span> Anything about your data, including the rights below, goes to <a href="mailto:@email">@email</a>,
+                which reaches the person responsible for data protection here.</span>
         }
     </p>
 
     <h2>The short version</h2>
     <ul>
         <li>We keep what you tell the app (your shows, the episodes you've watched, your ratings and posts) so it can work
-            for you. We don't sell it, and there are no advertising trackers.</li>
+            for you. We don't sell it, and there are no advertising or analytics trackers.</li>
         <li>Figures about our users that others can see, such as how many people finished a season, need at least five
             people behind them, so they can't point to you.</li>
         <li>You can download everything we hold about you, and delete your account, in Settings at any time.</li>
@@ -50,7 +67,14 @@
         <li><strong>History you import:</strong> the file is read on your device; only the shows, episodes and dates it
             contains are sent to us, and account files in an export archive are never opened.</li>
         <li><strong>Streaming services</strong> you tell us you pay for, to show what they cost you per hour watched.</li>
+        <li><strong>Technical records:</strong> when you use the app our servers see your device's network (IP) address
+            and what was asked for. We use the address to limit how fast any one visitor can make requests, and it can
+            appear in the server logs we use to find faults. We don't build a profile from it.</li>
     </ul>
+    <p>
+        We don't ask for, and the app has no place for, sensitive information such as your health, beliefs or
+        government identity numbers. Please don't put any in a comment or a profile.
+    </p>
 
     <h2>What stays on your device</h2>
     <p>
@@ -59,17 +83,42 @@
         storage, the phone app in its own preferences.
     </p>
 
-    <h2>Why we use it</h2>
-    <ul>
-        <li>To run the service you signed up for: tracking, calendars, recommendations, insights and the social
-            features. This is the basis for nearly everything we keep.</li>
-        <li>To take payments and keep the records the law requires.</li>
-        <li>To keep the service safe: rate limits, moderation of posts, and logs we use to find faults.</li>
-        <li>To send the notifications and the weekly digest you've turned on. You can turn each one off in Settings.</li>
-    </ul>
+    <h2>Why we use it, and what allows us to</h2>
+    <div class="table-scroll">
+        <table class="table">
+            <thead><tr><th>What for</th><th>What allows it</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>Running the service you signed up for: your account, tracking, calendars, recommendations,
+                        insights, the social features, and a paid plan if you buy one</td>
+                    <td>Our agreement with you (the <a href="terms">terms</a>)</td>
+                </tr>
+                <tr>
+                    <td>Taking payments and keeping the records tax and accounting law requires</td>
+                    <td>Our agreement with you, and legal duties we have</td>
+                </tr>
+                <tr>
+                    <td>Keeping the service safe and working: rate limits, moderation of posts, logs for finding faults,
+                        and backups</td>
+                    <td>Our legitimate interest in a service that is secure and reliable, which doesn't override yours</td>
+                </tr>
+                <tr>
+                    <td>Figures about many users together, and counts of clicks on streaming links</td>
+                    <td>Our legitimate interest in understanding and funding the service; neither identifies you</td>
+                </tr>
+                <tr>
+                    <td>Push notifications, emails about your shows and the weekly digest</td>
+                    <td>Your choice: push needs the permission your device asks you for, emails and the digest are off
+                        until you turn them on, and you can turn any of them off again in Settings</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     <p>
-        Our insights are computed from the episodes and ratings of shows, and from your own viewing for the ones about
-        you. Where an insight is about other users, we show it only with five or more people or ratings behind it.
+        Recommendations, forecasts and insights are worked out by software from the episodes and ratings of shows, and
+        from your own viewing for the ones about you. They decide nothing about you that has a legal or similarly
+        serious effect. Where an insight is about other users, we show it only with five or more people or ratings
+        behind it.
     </p>
 
     <h2>What others can see</h2>
@@ -84,10 +133,18 @@
     </ul>
 
     <h2>Who else receives data</h2>
+    <p>We don't sell your data or give it to advertisers. These are the only others involved:</p>
     <ul>
-        <li><strong>Your payment provider</strong> (Stripe) handles checkout and billing, including your card and billing
+        <li><strong>Our hosting provider</strong> runs the servers the app and its databases are on, and any storage
+            our backups are copied to. It handles data only on our instructions.</li>
+        <li><strong>Our payment provider</strong> (Stripe) handles checkout and billing, including your card and billing
             details, under its own privacy policy. We tell it which plan you're buying; it tells us when a payment
             succeeds.</li>
+        <li><strong>Our email delivery provider</strong> receives your email address and the message when we send you
+            one, to deliver it.</li>
+        <li><strong>Push services:</strong> a push notification travels through the service your browser or phone uses
+            for them (run by Apple, Google or Mozilla, for example), which receives the notification and an address for
+            your device.</li>
         <li><strong>Streaming services</strong> you open from a show page: the link goes through us so we can count clicks
             per service, without recording who clicked. Some links carry an affiliate code, so the service may pay us a
             commission on a sign-up.</li>
@@ -96,45 +153,74 @@
         <li>Our show data comes from @(Brand.Catalog.DataFrom). We fetch it ourselves, and send them nothing about
             you; when you import a history, the titles of shows we don't yet have are looked up there, without your
             name.</li>
-        <li>We use hosting and infrastructure providers to run the service, who process data only on our behalf.</li>
-        <li>We may disclose data where the law requires it.</li>
+        <li>We may disclose data where the law requires it, or to someone who takes over the service, who would be bound
+            by this policy.</li>
     </ul>
+
+    <h2>Where your data is kept</h2>
+    <p>
+        Your data is kept on servers our hosting provider runs, and some of the providers above are in other countries,
+        so it may be handled outside the country you live in. Where the law asks for it, we rely on a safeguard it
+        recognises for that, such as an agreement with the provider on standard terms approved for the purpose, or a
+        decision that the other country protects data adequately.
+    </p>
 
     <h2>Cookies</h2>
     <p>
-        The web app uses one cookie to keep you signed in, and the sign-in service sets its own while you sign in. There
-        are no advertising or analytics cookies.
+        The web app sets a cookie to keep you signed in and one that protects the forms you send, and the sign-in service
+        sets its own while you sign in. All are needed for the app to work, so there is no cookie banner to answer.
+        There are no advertising or analytics cookies.
     </p>
 
     <h2>How long we keep it</h2>
     <ul>
         <li>Your account and what you've added stay until you delete them or your account.</li>
         <li>Notifications are removed 90 days after you've read them, and after a year at the latest.</li>
+        <li>You stay signed in on a device for up to seven days after you last used it there.</li>
         <li>Payment receipts are kept while your account exists; the payment provider keeps its own records for as long
             as the law requires.</li>
+        <li>Backups of our databases are kept for about two weeks. Something you delete, or your whole account, is gone
+            from the app at once and from the last backup that held it once that backup expires.</li>
+        <li>Server logs are kept for a limited time, until newer ones replace them.</li>
         <li>Counts of clicks on streaming links carry no information about who clicked.</li>
     </ul>
+
+    <h2>How we protect it</h2>
+    <p>
+        Everything between your device and us travels encrypted (HTTPS). Passwords are stored only as hashes, by a
+        separate sign-in service. The databases can't be reached from the internet, and only the people who run the
+        service can reach the servers. No system is perfectly safe: if a breach puts your data at risk, we'll tell you
+        and the data protection authority, as the law requires.
+    </p>
 
     <h2>Your rights</h2>
     <ul>
         <li><strong>A copy of your data:</strong> Settings → Export my data gives you everything every part of the app
-            holds about you, as a file.</li>
+            holds about you, as a file you can take elsewhere.</li>
         <li><strong>Deleting your account:</strong> Settings → Delete account removes your account and everything you've
             added, from every part of the app, and stops any subscription at once. Posts you wrote go with it.</li>
         <li><strong>Correcting it:</strong> you can change your profile, ratings, lists and posts at any time.</li>
-        <li>Depending on where you live (for example under the GDPR or POPIA), you may also have the right to object to or
-            restrict how we use your data, and to complain to your data protection authority.
-            @if (Brand.ContactEmail is { } address)
+        <li><strong>Saying no:</strong> you can turn off notifications, emails and activity sharing in Settings, and
+            object to, or ask us to limit, anything we do on the strength of a legitimate interest.</li>
+        <li>
+            These rights come from laws such as the GDPR in Europe and the UK, and POPIA in South Africa; which apply
+            depends on where you live.
+            @if (Brand.ContactEmail is { } rights)
             {
-                <span> Write to <a href="mailto:@address">@address</a> for anything Settings doesn't cover.</span>
+                <span> Write to <a href="mailto:@rights">@rights</a> for anything Settings doesn't cover; we answer
+                    within a month.</span>
             }
         </li>
+        <li><strong>Complaining:</strong> if you think we've handled your data wrongly, please tell us first. You may also
+            complain to the data protection authority where you live: in the EU, your national authority; in the UK,
+            the Information Commissioner's Office; in South Africa, the Information Regulator.</li>
     </ul>
 
     <h2>Children</h2>
     <p>
         @Brand.AppName isn't meant for children under 13, or under the age at which you can agree to this yourself where
-        you live (16 in parts of Europe). We don't knowingly keep their data, and delete it when we learn of it.
+        you live (16 in parts of Europe, 18 in South Africa without a parent's or guardian's consent). We don't knowingly
+        keep their data, and delete it when we learn of it.
     </p>
 
     <h2>Changes</h2>
@@ -143,12 +229,12 @@
         what we do with data you've already given us.
     </p>
 
-    <p class="muted"><a href="terms">Terms of use</a></p>
+    <p class="muted"><a href="terms">Terms of service</a></p>
 </article>
 
 @code {
     /// <summary>
-    /// When the policy last changed; update it with any change to the text.
+    /// When the policy and the terms last changed; update it with any change to either text.
     /// </summary>
-    internal const string LastUpdated = "9 November 2026";
+    internal const string LastUpdated = "14 November 2026";
 }
