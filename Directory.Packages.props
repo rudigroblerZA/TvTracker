@@ -15,26 +15,26 @@
     <OpenTelemetryInstrumentationVersion>1.20.1</OpenTelemetryInstrumentationVersion>
   </PropertyGroup>
   <ItemGroup Label="Aspire hosting (AppHost)">
-    <PackageVersion Include="Aspire.Hosting.Docker" Version="$(AspireVersion)" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
-    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Docker" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.5" />
     <!-- Community Toolkit: flagd, the OpenFeature flag server. -->
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="13.6.1" />
   </ItemGroup>
   <ItemGroup Label="Aspire client integrations (services)">
-    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="$(AspireVersion)" />
-    <PackageVersion Include="Aspire.StackExchange.Redis.DistributedCaching" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.5" />
+    <PackageVersion Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.6.5" />
   </ItemGroup>
   <ItemGroup Label="Service defaults">
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.11.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="$(OpenTelemetryVersion)" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="$(OpenTelemetryVersion)" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="$(OpenTelemetryInstrumentationVersion)" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="$(OpenTelemetryInstrumentationVersion)" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="$(OpenTelemetryInstrumentationVersion)" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.21.0" />
   </ItemGroup>
   <ItemGroup Label="ASP.NET Core and EF Core">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="$(AspNetCoreVersion)" />
@@ -51,8 +51,8 @@
   </ItemGroup>
   <ItemGroup Label="Search (vectors)">
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
-    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="3.0.0" />
     <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
   </ItemGroup>
   <ItemGroup Label="Feature flags (OpenFeature)">
@@ -65,7 +65,7 @@
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
   </ItemGroup>
   <ItemGroup Label="Tools">
-    <PackageVersion Include="System.CommandLine" Version="2.0.14" />
+    <PackageVersion Include="System.CommandLine" Version="3.0.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging and delivery">
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
