@@ -139,6 +139,44 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Gives the realm a mail account, so Keycloak can send what it has to: the link to reset a forgotten password,
+    /// and the one that confirms a new account's address. Returns whether anything changed.
+    /// <list type="bullet">
+    /// <item><b>Confirming addresses</b> (<paramref name="verifyEmail"/>) is switched on with it, since it's the
+    /// mail account that makes it possible: a new account then can't be used until its address is confirmed, and
+    /// the app's own emails go only to addresses that are someone's.</item>
+    /// <item><b>The password is always sent:</b> Keycloak never gives a stored one back, so there's nothing to
+    /// compare it with; "changed" is judged on everything else.</item>
+    /// </list>
+    /// </summary>
+    public async Task<bool> SetMailAccountAsync(string token, MailAccount mail, bool verifyEmail, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        var wanted = new JsonObject
+        {
+            ["host"] = mail.Host,
+            ["port"] = mail.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["from"] = mail.From,
+            ["fromDisplayName"] = mail.FromName,
+            ["auth"] = mail.User is null ? "false" : "true",
+            ["user"] = mail.User ?? "",
+            ["starttls"] = mail.Encryption == MailEncryption.StartTls ? "true" : "false",
+            ["ssl"] = mail.Encryption == MailEncryption.Ssl ? "true" : "false"
+        };
+        var current = realm?["smtpServer"] as JsonObject;
+        var same = current is not null && wanted.All(w => current[w.Key]?.GetValue<string>() == w.Value!.GetValue<string>())
+            && realm?["verifyEmail"]?.GetValue<bool>() == verifyEmail && realm["resetPasswordAllowed"]?.GetValue<bool>() == true;
+        if (mail.Password is not null)
+        {
+            wanted["password"] = mail.Password;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token,
+            new JsonObject { ["smtpServer"] = wanted, ["verifyEmail"] = verifyEmail, ["resetPasswordAllowed"] = true }, cancellationToken);
+        return !same;
+    }
+
+    /// <summary>
     /// Lets people sign up and sign in with an outside account (<paramref name="alias"/> is Keycloak's name for the
     /// provider, such as "google"): creates the realm's identity provider with the app's client id and secret there,
     /// or brings an existing one up to date. Returns what it did, for the log.
@@ -275,4 +313,63 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);
+}
+
+/// <summary>
+/// How a connection to the mail server is protected.
+/// </summary>
+public enum MailEncryption
+{
+    /// <summary>
+    /// Starts plain and upgrades (STARTTLS): what port 587 expects.
+    /// </summary>
+    StartTls,
+
+    /// <summary>
+    /// Encrypted from the first byte: what port 465 expects.
+    /// </summary>
+    Ssl,
+
+    /// <summary>
+    /// None: a test server on the same machine only.
+    /// </summary>
+    None
+}
+
+/// <summary>
+/// The mail (SMTP) account Keycloak sends through (<c>Keycloak:Smtp</c>).
+/// </summary>
+/// <param name="From">The address its mail comes from.</param>
+/// <param name="FromName">The name shown beside it: the app's.</param>
+/// <param name="User">The account's user name; null for a server that asks for none.</param>
+public sealed record MailAccount(string Host, int Port, string From, string FromName, string? User, string? Password, MailEncryption Encryption)
+{
+    /// <summary>
+    /// The account in configuration, or null when there's none (no host or no from address): nothing is then set
+    /// in the realm, and one put there by hand stays.
+    /// <list type="bullet">
+    /// <item><b>Port:</b> 587 when not given.</item>
+    /// <item><b>Encryption:</b> <c>Keycloak:Smtp:Encryption</c> (starttls, ssl or none) when given; else SSL on
+    /// port 465, none on 25 and 1025 (a local test server), and STARTTLS on anything else.</item>
+    /// </list>
+    /// </summary>
+    public static MailAccount? FromConfiguration(IConfiguration configuration, string appName)
+    {
+        var section = configuration.GetSection("Keycloak:Smtp");
+        if (Text(section["Host"]) is not { } host || Text(section["From"]) is not { } from)
+        {
+            return null;
+        }
+        var port = int.TryParse(section["Port"], out var given) && given is > 0 and < 65536 ? given : 587;
+        var encryption = Text(section["Encryption"])?.ToLowerInvariant() switch
+        {
+            "ssl" or "tls" => MailEncryption.Ssl,
+            "starttls" => MailEncryption.StartTls,
+            "none" => MailEncryption.None,
+            _ => port switch { 465 => MailEncryption.Ssl, 25 or 1025 => MailEncryption.None, _ => MailEncryption.StartTls }
+        };
+        return new MailAccount(host, port, from, Text(section["FromName"]) ?? appName, Text(section["User"]), Text(section["Password"]), encryption);
+    }
+
+    private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

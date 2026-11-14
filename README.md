@@ -1118,6 +1118,37 @@ read-only, without signing in or having an account.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
 - **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
+### Mail for password reset
+
+Keycloak sends two emails of its own: the link to reset a forgotten password, and the one that confirms a new
+account's address. It can send neither until it has a mail account, and any SMTP service will do (Amazon SES,
+Postmark, Brevo, a mailbox at your domain's host).
+
+- **Give it to the app:** the server, the address mail comes from, and the sign-in the server asks for.
+  - deployed: in the deployment's `.env`, then run `scripts/deploy.sh` again:
+
+    | Setting | |
+    | --- | --- |
+    | `SMTP_HOST` | The mail server, e.g. `email-smtp.eu-west-1.amazonaws.com` |
+    | `SMTP_FROM` | The address mail comes from, e.g. `no-reply@tv.example.com`; the service must allow it |
+    | `SMTP_USER`, `SMTP_PASSWORD` | The account's sign-in; empty for a server that asks for none |
+    | `SMTP_PORT` | 587 when empty. 587 uses STARTTLS and 465 SSL |
+
+  - locally: `dotnet user-secrets set "Parameters:smtp-host" "<host>"` and likewise `smtp-from`, `smtp-user`,
+    `smtp-password` and `smtp-port`, in `src/TvTracker.AppHost`. A local catcher such as Mailpit on port 1025 needs
+    only the host, the port and a from address.
+- **What happens:** Identity.API puts the account on Keycloak's realm on start (`RealmSecretsSeeder`). Mail comes from
+  the app's name. With no host or no from address nothing is touched.
+- **New accounts confirm their address:** with a mail account, registering sends a confirmation link and the account
+  can't be used until it's followed. That keeps the app's own emails going only to addresses that are someone's.
+  `Keycloak:Smtp:VerifyEmail=false` on Identity.API leaves it off. Accounts made by the app (the admin, load-test
+  users, personas) count as confirmed, as do ones that sign in with Google.
+- **Tried** against a local mail catcher: "Forgot Password?" on the sign-in page sent a reset email from the app's
+  name with a working link; a new registration was held at "Email verification" and its confirmation email arrived;
+  the existing `demo` and `admin` accounts still signed in.
+- This is Keycloak's mail only. The app's own emails (alerts, the weekly digest) still go through Azure
+  Communication Services (`email-connection-string`).
+
 ### Sign in with Google
 
 People can sign up and sign in with a Google account once the app has been given a Google client. Keycloak does the
@@ -1901,6 +1932,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
 | `OPERATOR_ADDRESS`, `COMPANY_NUMBER`, `GOVERNING_LAW` | The operator's postal address, its registration ("registered in …, no. …") and whose law the terms are under: shown in the privacy policy and terms, and wanted by law from anyone selling to the public |
@@ -1937,8 +1969,6 @@ Deploying works (above). This is what still stands between that and charging the
 
 - **Backups off the machine.** The daily backups (Deploying) sit on the same disk as the data; copying them, `.env`
   and the flag overrides elsewhere is for whoever runs the machine to set up.
-- **Email from Keycloak.** The realm has no mail server, so password reset doesn't work and addresses aren't
-  confirmed (`verifyEmail` is off). It needs an SMTP account.
 - **Payments beyond the happy path.** Stripe checkout collects no tax (a decision, for now), and refunds, disputes
   and failed payments aren't acted on: a refunded subscriber keeps their plan until the period ends. Deleting an
   account deletes its receipts, which the law may want kept.

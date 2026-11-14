@@ -18,6 +18,9 @@ namespace Identity.API.Services;
 /// <item><b>The web app's public address</b> (<c>Keycloak:WebPublicUrl</c>, set when the web app is reached through
 /// one forwarded address, such as a cloud preview): added to the web client's allowed redirects, which the realm file has
 /// only for localhost.</item>
+/// <item><b>A mail account</b> (<c>Keycloak:Smtp:Host</c>, <c>Port</c>, <c>From</c>, <c>User</c>, <c>Password</c>):
+/// set on the realm, so the forgotten-password link can be sent, and with it new accounts must confirm their address
+/// (<c>Keycloak:Smtp:VerifyEmail=false</c> to leave that off). Without a host and a from address nothing is touched.</item>
 /// <item><b>Sign in with Google</b> (<c>Keycloak:Google:ClientId</c> and <c>:ClientSecret</c>): the realm's Google
 /// identity provider is created or brought up to date, so the sign-in page offers it. Without them nothing is touched,
 /// and one already in the realm stays as it is.</item>
@@ -73,6 +76,13 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
             if (!environment.IsDevelopment() && await keycloak.HardenRealmAsync(token, stoppingToken))
             {
                 logger.LogInformation("Set the Keycloak realm to require HTTPS and to lock accounts after repeated wrong passwords");
+            }
+            // A mail account for Keycloak, when the app has been given one (Keycloak:Smtp, from the AppHost's smtp-*
+            // parameters): password reset then works, and new accounts confirm their address unless told not to.
+            if (MailAccount.FromConfiguration(config, config["Branding:AppName"] is { Length: > 0 } appName ? appName : "TV Tracker") is { } mail
+                && await keycloak.SetMailAccountAsync(token, mail, config.GetValue("Keycloak:Smtp:VerifyEmail", true), stoppingToken))
+            {
+                logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {From}", mail.Host, mail.Port, mail.From);
             }
             // Sign in with Google, when the app has been given its Google client (Keycloak:Google:ClientId and
             // :ClientSecret, from the AppHost's google-client-id and google-client-secret).

@@ -402,6 +402,34 @@ if (!string.IsNullOrEmpty(webPublicUrl))
     identityApi.WithEnvironment("Keycloak__WebPublicUrl", webPublicUrl);
 }
 
+// A mail account for Keycloak (any SMTP service): with it people can reset a forgotten password and new accounts
+// confirm their address; without it Keycloak can send nothing. Identity.API puts it on the realm (RealmSecretsSeeder).
+// Locally it comes from user secrets (Parameters:smtp-host, smtp-from and, where the server asks for them, smtp-user
+// and smtp-password; smtp-port when it isn't 587); a deployment has them in .env, empty until there's an account
+// (README, Mail for password reset).
+identityApi.WithEnvironment("Branding__AppName", appName);
+if (builder.ExecutionContext.IsPublishMode)
+{
+    identityApi
+        .WithEnvironment("Keycloak__Smtp__Host", builder.AddParameter("smtp-host", ""))
+        .WithEnvironment("Keycloak__Smtp__Port", builder.AddParameter("smtp-port", ""))
+        .WithEnvironment("Keycloak__Smtp__From", builder.AddParameter("smtp-from", ""))
+        .WithEnvironment("Keycloak__Smtp__User", builder.AddParameter("smtp-user", ""))
+        .WithEnvironment("Keycloak__Smtp__Password", builder.AddParameter("smtp-password", "", secret: true));
+}
+else if (builder.Configuration["Parameters:smtp-host"] is { Length: > 0 } && builder.Configuration["Parameters:smtp-from"] is { Length: > 0 })
+{
+    identityApi
+        .WithEnvironment("Keycloak__Smtp__Host", builder.AddParameter("smtp-host"))
+        .WithEnvironment("Keycloak__Smtp__From", builder.AddParameter("smtp-from"))
+        .WithEnvironment("Keycloak__Smtp__Port", builder.Configuration["Parameters:smtp-port"] ?? "")
+        .WithEnvironment("Keycloak__Smtp__User", builder.Configuration["Parameters:smtp-user"] ?? "");
+    if (builder.Configuration["Parameters:smtp-password"] is { Length: > 0 })
+    {
+        identityApi.WithEnvironment("Keycloak__Smtp__Password", builder.AddParameter("smtp-password", secret: true));
+    }
+}
+
 // Sign in with Google: the Google client's id and secret (Google Cloud console, an "OAuth client ID" of type "Web
 // application"), which Identity.API gives to Keycloak (RealmSecretsSeeder). Locally they come from user secrets
 // (Parameters:google-client-id and google-client-secret) and nothing happens without both; a deployment has them in
