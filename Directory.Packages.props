@@ -10,7 +10,7 @@
     <AspNetCoreVersion>10.0.15</AspNetCoreVersion>
     <!-- dotnet/runtime packages (Microsoft.Extensions.*), which service on their own numbers; MobileApp uses it too. -->
     <RuntimeVersion>10.0.14</RuntimeVersion>
-    <EfCoreVersion>10.0.14</EfCoreVersion>
+    <EfCoreVersion>10.0.15</EfCoreVersion>
     <OpenTelemetryVersion>1.21.0</OpenTelemetryVersion>
     <OpenTelemetryInstrumentationVersion>1.21.0</OpenTelemetryInstrumentationVersion>
   </PropertyGroup>
