@@ -11,6 +11,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 15
+    ignore:
+      # The MAUI app's two MAUI packages take their version from the installed MAUI workload ($(MauiVersion) in
+      # MobileApp.csproj), so the pair always matches each other and the workload; a literal version there breaks that.
+      - dependency-name: "Microsoft.Maui.*"
+      - dependency-name: "Microsoft.AspNetCore.Components.WebView.Maui"
+      # Everything targets .NET 10: the runtime, ASP.NET Core and EF Core packages stay on 10.x until the projects
+      # move to .NET 11 together.
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore.*"
+        update-types: ["version-update:semver-major"]
     groups:
       Aspire:
         patterns:
