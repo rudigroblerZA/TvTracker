@@ -1,3 +1,4 @@
+@using static TvTracker.UI.Services.ReportFormat
 @page "/settings/affiliates"
 @attribute [RequiresFeature(FeatureFlags.Affiliates)]
 @inject CatalogClient Catalog
@@ -45,7 +46,7 @@
                     <div class="muted">@($"sales reported, {Share(report.Conversions, report.AffiliatedClicks)} of program clicks")</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">@(report.Revenue.Count == 0 ? "–" : string.Join(" + ", report.Revenue.Select(m => Amount(m.Amount, m.Currency))))</div>
+                    <div class="stat-value">@Sum(report.Revenue)</div>
                     <div class="muted">commission</div>
                 </div>
             </div>
@@ -139,38 +140,7 @@
                 </section>
             }
 
-            <section>
-                <h2>Programs</h2>
-                @if (report.Programs.Count == 0)
-                {
-                    <p class="muted">
-                        None yet: every click goes to the service's own link and is still counted, so the table above is what each
-                        service's traffic is worth to a deal.
-                    </p>
-                }
-                else
-                {
-                    <ul class="plain-list">
-                        @foreach (var program in report.Programs)
-                        {
-                            <li>
-                                <strong>@program.Name</strong>
-                                <span class="muted">@($" · {string.Join(", ", program.Services)} · {(program.Regions.Count == 0 ? "every region" : string.Join(", ", program.Regions))} · paid in {program.Currency}")</span>
-                                @if (!program.Valid)
-                                {
-                                    <span class="tag tone-bad">@("not used: check its name, services, currency and https template")</span>
-                                }
-                            </li>
-                        }
-                    </ul>
-                }
-                <p class="muted small">
-                    Programs are set in Catalog.API's <code>Affiliates:Programs</code> (name, services, regions, an https template with
-                    <code>{url}</code> and <code>{click}</code>, a postback key and currency). Networks report sales to
-                    <code>/catalog/api/v1/affiliates/postback/{name}?click=…&amp;transaction=…&amp;amount=…&amp;key=…</code> on the mobile
-                    gateway's public address.
-                </p>
-            </section>
+            <AffiliateProgramsEditor OnChanged="LoadAsync" />
         }
     </Authorized>
     <NotAuthorized>
@@ -179,8 +149,6 @@
 </AuthorizeView>
 
 @code {
-    private static readonly int[] Windows = [7, 30, 90];
-
     private AffiliateReport? report;
     private int days = 30;
     private bool loaded;
@@ -218,13 +186,6 @@
             loaded = true;
         }
     }
-
-    private static int Width(int value, int max) => max == 0 ? 0 : Math.Max(2, (int)Math.Round(100.0 * value / max));
-
-    private static string Share(int part, int whole) => whole == 0 ? "–" : ((double)part / whole).ToString("P0");
-
-    private static string Amount(decimal amount, string? currency, int decimals = 2) =>
-        $"{amount.ToString($"N{decimals}")} {currency}".Trim();
 
     private static string SurfaceName(string key) => key switch
     {

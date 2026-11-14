@@ -181,7 +181,7 @@
     "affiliates": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Affiliate links: where-to-watch clicks go through a counted redirect (wrapped in a program's link when one covers the service), and admins see the clicks, conversions and revenue." }
     },
     "history-import": {

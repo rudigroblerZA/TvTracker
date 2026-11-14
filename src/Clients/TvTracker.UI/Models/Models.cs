@@ -23,7 +23,25 @@ public record UpdateProfile(string DisplayName, string? AvatarUrl, string TimeZo
 
 // Catalog
 
-public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+/// <param name="TitleCount">For a search by term: how many of the results match by title (they come first); the rest
+/// are similar in meaning. Null when there's no such split.</param>
+public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int? TitleCount = null);
+
+/// <summary>
+/// The app's name, accent colour and the company behind it, as an admin set them in Settings; a field left null
+/// keeps what the app was configured with.
+/// </summary>
+/// <param name="CompanyNumber">A phrase, such as "registered in South Africa, no. 2026/123456/07".</param>
+public record BrandingSettings(string? AppName = null, string? AccentColor = null, string? Operator = null, string? ContactEmail = null,
+    string? OperatorAddress = null, string? CompanyNumber = null, string? GoverningLaw = null)
+{
+    public static readonly BrandingSettings None = new();
+}
+
+/// <summary>
+/// A person found by name, with the shows they're best known for.
+/// </summary>
+public record PersonMatch(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
 
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
@@ -1300,7 +1318,46 @@ public record AffiliateDay(DateOnly Day, int Clicks, int Conversions);
 
 public record AffiliateShowRow(Guid ShowId, string Title, int Clicks, int Conversions);
 
-public record AffiliateProgramInfo(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid);
+/// <param name="Source">"settings", "configuration" or "test-network".</param>
+/// <param name="Test">A stand-in that goes through the test network.</param>
+public record AffiliateProgramInfo(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Currency, bool Valid,
+    string Source = "configuration", bool Test = false);
+
+/// <summary>
+/// An affiliate program as an admin edits it in Settings. The postback key is never sent back.
+/// </summary>
+/// <param name="Usable">In force: switched on and valid (a test program only where the test network runs).</param>
+public record AffiliateProgramSettings(string Name, IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string Template, bool HasPostbackKey,
+    string Currency, bool Test, bool Enabled, bool Usable);
+
+/// <param name="Others">Programs from configuration and the test network's catch-all, which Settings can't change.</param>
+/// <param name="TestNetwork">Whether the test network runs here, so test programs work.</param>
+/// <param name="PostbackUrl">What a network calls to report a sale, with {name} for the program's.</param>
+public record AffiliatePrograms(IReadOnlyList<AffiliateProgramSettings> Programs, IReadOnlyList<AffiliateProgramInfo> Others, bool TestNetwork,
+    string PostbackUrl);
+
+/// <summary>
+/// A program to save; a null postback key keeps the one it has. <paramref name="New"/> refuses a name already taken.
+/// </summary>
+public record SaveAffiliateProgram(IReadOnlyList<string> Services, IReadOnlyList<string> Regions, string? Template, string? PostbackKey, string Currency,
+    bool Test, bool Enabled, bool New = false);
+
+/// <param name="Cancelling">Of <paramref name="Active"/>, those set to end with the period they've paid for.</param>
+public record RevenuePlanRow(string Plan, string Name, string Interval, int Active, int Cancelling);
+
+public record RevenueDay(DateOnly Day, int NewAccounts, int Payments, int NewSubscriptions);
+
+/// <summary>
+/// What subscriptions bring in, for admins (Identity.API's report).
+/// </summary>
+/// <param name="PayingAccounts">Accounts with a running subscription of their own.</param>
+/// <param name="OnPaidPlan">Accounts on a paid plan however they came by it (their own, a family's, an admin's).</param>
+/// <param name="PaidShare">Paying accounts of all accounts, 0 to 1.</param>
+/// <param name="MonthlyRecurring">What running subscriptions come to a month, per currency.</param>
+/// <param name="Received">Payments received in the window, per currency.</param>
+public record RevenueReport(DateOnly From, DateOnly To, int Accounts, int NewAccounts, int PayingAccounts, int OnPaidPlan, double PaidShare,
+    IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> Received, int CheckoutsStarted, int CheckoutsCompleted, int NewSubscriptions,
+    int Ended, IReadOnlyList<RevenuePlanRow> Plans, IReadOnlyList<RevenueDay> Days);
 
 /// <summary>
 /// From the makers: a show someone created or developed (in the catalog or not).

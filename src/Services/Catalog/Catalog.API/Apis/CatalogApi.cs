@@ -53,6 +53,9 @@ public static class CatalogApi
         api.MapGet("/shows/{id:guid}", GetShowAsync);
         api.MapGet("/shows/{id:guid}/seasons/{number:int}", GetSeasonAsync);
         api.MapGet("/episodes/{id:guid}", GetEpisodeAsync);
+        // Not rate limited, like suggestions: the search page asks for people with every search, which would halve
+        // what the search limit allows, and it reads the catalog only.
+        api.MapGet("/people/search", SearchPeopleAsync);
         api.MapGet("/people/{id:guid}", GetPersonAsync);
         api.MapGet("/schedule", GetScheduleAsync);
         api.MapGet("/genres", GetGenresAsync);
@@ -63,8 +66,9 @@ public static class CatalogApi
     }
 
     /// <summary>
-    /// Shows whose title contains the search term (most popular first), followed by shows similar in meaning
-    /// (closest first; see <see cref="SemanticSearch"/>). Genre, status, nanogenre and tags filter both.
+    /// Shows whose title contains the search term (best match first; see <see cref="TitleSearch"/>), then, when few
+    /// do, titles spelled nearly like it, followed by shows similar in meaning (closest first; see
+    /// <see cref="SemanticSearch"/>). Genre, status, nanogenre and tags filter all three.
     /// </summary>
     /// <param name="nanogenre">
     /// A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search. Ignored while the nanogenres
@@ -99,8 +103,9 @@ public static class CatalogApi
     }
 
     /// <summary>
-    /// Up to 8 catalog shows whose title contains the term, most popular first, for pickers that suggest as you type.
-    /// Unlike search it doesn't import from the provider or match by meaning, so it's cheap enough for every keystroke.
+    /// Up to 8 catalog shows whose title contains the term, best match first, for suggesting as you type; when hardly
+    /// any do, titles spelled nearly like it. Unlike search it doesn't import from the provider or match by meaning, so
+    /// it's cheap enough for every keystroke.
     /// </summary>
     private static async Task<List<ShowSummaryDto>> SuggestShowsAsync(CatalogContext db, string? q, CancellationToken ct)
     {
@@ -109,14 +114,73 @@ public static class CatalogApi
             return [];
         }
 
-        var pattern = $"%{q.Trim()}%";
-        var shows = await db.Shows.AsNoTracking()
-            .Where(s => EF.Functions.ILike(s.Title, pattern))
-            .OrderByDescending(s => s.Popularity)
-            .ThenBy(s => s.Title)
-            .Take(8)
-            .ToListAsync(ct);
+        const int take = 8;
+        var all = db.Shows.AsNoTracking();
+        var shows = await TitleSearch.Ranked(TitleSearch.Matching(all, q), q).Take(take).ToListAsync(ct);
+        if (shows.Count < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(q))
+        {
+            shows.AddRange(await TitleSearch.NearlySpelled(TitleSearch.NotMatching(all, q), q).Take(take - shows.Count).ToListAsync(ct));
+        }
         return shows.Select(s => s.ToSummary()).ToList();
+    }
+
+    /// <summary>
+    /// Up to 6 cast members whose name contains the term (or, when none does, is spelled nearly like it), those in the most
+    /// popular shows first, each with the shows they're best known for.
+    /// </summary>
+    private static async Task<List<PersonMatchDto>> SearchPeopleAsync(CatalogContext db, string? q, CancellationToken ct)
+    {
+        q = q?.Trim() ?? "";
+        if (q.Length < 3)
+        {
+            return [];
+        }
+
+        // Cast members only, and decided on those: a creator's name containing the term mustn't stop a near-spelled
+        // actor from being looked for.
+        var cast = db.People.AsNoTracking().Where(p => db.Cast.Any(c => c.PersonId == p.Id));
+        var found = await BestKnownAsync(TitleSearch.Matching(cast, q));
+        if (found.Count == 0 && TitleSearch.AllowsNearSpelling(q))
+        {
+            found = await BestKnownAsync(TitleSearch.NearlySpelled(cast, q));
+        }
+
+        Task<List<(Guid Id, string Name, string? PhotoUrl)>> BestKnownAsync(IQueryable<Person> people) => people
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.PhotoUrl,
+                Top = db.Cast.Where(c => c.PersonId == p.Id).Join(db.Shows, c => c.ShowId, s => s.Id, (c, s) => (double?)s.Popularity).Max()
+            })
+            .OrderByDescending(p => p.Top)
+            .ThenBy(p => p.Name)
+            .Take(6)
+            .Select(p => new ValueTuple<Guid, string, string?>(p.Id, p.Name, p.PhotoUrl))
+            .ToListAsync(ct);
+
+        var ids = found.Select(p => p.Id).ToList();
+        var knownFor = (await db.Cast.AsNoTracking().Where(c => ids.Contains(c.PersonId))
+                .Join(db.Shows, c => c.ShowId, s => s.Id, (c, s) => new { c.PersonId, s.Title, s.Popularity })
+                .ToListAsync(ct))
+            .ToLookup(x => x.PersonId);
+        return found
+            .Select(p => new PersonMatchDto(p.Id, p.Name, p.PhotoUrl,
+                knownFor[p.Id].OrderByDescending(x => x.Popularity).Select(x => x.Title).Distinct().Take(3).ToList()))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The shows with these ids, in the ids' order.
+    /// </summary>
+    private static async Task<List<Show>> InOrderAsync(CatalogContext db, IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+        var found = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+        return ids.Where(found.ContainsKey).Select(id => found[id]).ToList();
     }
 
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(
@@ -143,39 +207,36 @@ public static class CatalogApi
             filtered = filtered.Where(s => s.Nanogenres.Contains(nanogenre));
         }
 
-        var titleMatches = filtered;
-        List<Guid> similar = [];
-        if (!string.IsNullOrWhiteSpace(search))
+        var searching = !string.IsNullOrWhiteSpace(search);
+        var titleMatches = searching ? TitleSearch.Matching(filtered, search!) : filtered;
+        var ordered = searching
+            ? TitleSearch.Ranked(titleMatches, search!)
+            : titleMatches.OrderByDescending(s => s.Popularity).ThenBy(s => s.Title);
+
+        // Title matches fill the first pages; near-spelled titles and then the similar shows come after the last of them.
+        var titleTotal = await titleMatches.CountAsync(ct);
+        List<Guid> after = [];
+        var nearlySpelled = 0;
+        if (searching)
         {
-            var pattern = $"%{search.Trim()}%";
-            titleMatches = filtered.Where(s => EF.Functions.ILike(s.Title, pattern));
+            var others = TitleSearch.NotMatching(filtered, search!);
+            if (titleTotal < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(search!))
+            {
+                after = await TitleSearch.NearlySpelled(others, search!).Select(s => s.Id).Take(12).ToListAsync(ct);
+                nearlySpelled = after.Count;
+            }
             if (semantic is not null)
             {
-                similar = await semantic.FindSimilarAsync(filtered.Where(s => !EF.Functions.ILike(s.Title, pattern)), db, search, ct);
+                after.AddRange((await semantic.FindSimilarAsync(others, db, search!, ct)).Except(after));
             }
         }
 
-        // Title matches fill the first pages; the similar shows come after the last of them.
-        var titleTotal = await titleMatches.CountAsync(ct);
         var skip = (page - 1) * pageSize;
-        var shows = skip < titleTotal
-            ? await titleMatches
-                .OrderByDescending(s => s.Popularity)
-                .ThenBy(s => s.Title)
-                .Skip(skip)
-                .Take(pageSize)
-                .ToListAsync(ct)
-            : [];
-
-        var similarIds = similar.Skip(Math.Max(0, skip - titleTotal)).Take(pageSize - shows.Count).ToList();
-        if (similarIds.Count > 0)
-        {
-            var found = await db.Shows.AsNoTracking().Where(s => similarIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
-            shows.AddRange(similarIds.Where(found.ContainsKey).Select(id => found[id]));
-        }
+        var shows = skip < titleTotal ? await ordered.Skip(skip).Take(pageSize).ToListAsync(ct) : [];
+        shows.AddRange(await InOrderAsync(db, after.Skip(Math.Max(0, skip - titleTotal)).Take(pageSize - shows.Count).ToList(), ct));
 
         return TypedResults.Ok(new PagedResult<ShowSummaryDto>(
-            shows.Select(s => s.ToSummary()).ToList(), page, pageSize, titleTotal + similar.Count));
+            shows.Select(s => s.ToSummary()).ToList(), page, pageSize, titleTotal + after.Count, searching ? titleTotal + nearlySpelled : null));
     }
 
     private static async Task<Ok<List<ShowSummaryDto>>> GetTrendingAsync(CatalogContext db, HybridCache cache, CancellationToken ct)

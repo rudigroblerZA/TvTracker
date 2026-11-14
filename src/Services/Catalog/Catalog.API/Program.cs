@@ -17,12 +17,24 @@ builder.AddDefaultAuthentication();
 
 // Catalog.API owns the catalogdb schema; the sync worker waits for this service to be healthy.
 builder.AddCatalogDbContext();
-builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, _, ct) =>
+builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, services, ct) =>
 {
     // A migration may have just created the pgvector extension; connections opened earlier didn't know its types.
-    var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-    await connection.OpenAsync(ct);
-    await connection.ReloadTypesAsync(ct);
+    // The initializer holds the context's connection open (its lock), so this asks the context for it rather than
+    // opening it a second time.
+    await db.Database.OpenConnectionAsync(ct);
+    await ((NpgsqlConnection)db.Database.GetDbConnection()).ReloadTypesAsync(ct);
+    await db.Database.CloseConnectionAsync();
+
+    // In development with the test network running, an empty affiliate programs table starts with a test program per
+    // main service. Only when empty: programs an admin removed don't come back while any other is left.
+    if (services.GetRequiredService<IHostEnvironment>().IsDevelopment()
+        && AffiliateLinks.TestNetwork(services.GetRequiredService<IConfiguration>()) is not null
+        && !await db.AffiliatePrograms.AnyAsync(ct))
+    {
+        db.AffiliatePrograms.AddRange(StarterPrograms.Missing([], services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime));
+        await db.SaveChangesAsync(ct);
+    }
 });
 
 builder.AddRedisDistributedCache("redis");
@@ -67,13 +79,11 @@ builder.Services.AddSingleton<Universes>();
 builder.Services.AddSingleton<DegreesGraph>();
 builder.Services.AddSingleton<Crossovers>();
 
-// Affiliate programs (none by default); read on each click, so an edited appsettings file applies without a restart.
+// Affiliate programs: an admin's from Settings (the affiliate_programs table), then the configuration's (read on each
+// click, so an edited appsettings file applies without a restart), then the development test network's catch-all, so a
+// real program for a service still wins.
 builder.Services.Configure<AffiliateOptions>(builder.Configuration.GetSection("Affiliates"));
-// The development test network, last, so a real program for a service still wins.
-if (AffiliateLinks.TestNetwork(builder.Configuration) is { } testNetwork)
-{
-    builder.Services.PostConfigure<AffiliateOptions>(options => options.Programs.Add(testNetwork));
-}
+builder.Services.AddScoped<AffiliatePrograms>();
 
 // Publishes only (crossover alerts); Catalog.API subscribes to nothing.
 builder.AddRabbitMQEventBus("eventbus");

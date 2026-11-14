@@ -26,9 +26,23 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<PersonMadeShow> MadeShows => Set<PersonMadeShow>();
     public DbSet<OutboundClick> OutboundClicks => Set<OutboundClick>();
     public DbSet<AffiliateConversion> AffiliateConversions => Set<AffiliateConversion>();
+    public DbSet<AffiliateProgramRecord> AffiliatePrograms => Set<AffiliateProgramRecord>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
+
+    /// <summary>
+    /// How alike the term and the closest stretch of a name must be for search to call it near-spelled (trigram word
+    /// similarity, 0 to 1). Measured on the catalog: "breakng bad" against "Breaking Bad" scores 0.64, "severence"
+    /// against "Severance" 0.54, and the look-alikes to keep out sit at 0.50 ("pokemon" against "Poker Face").
+    /// </summary>
+    public const double NearSpellingThreshold = 0.52;
+
+    /// <summary>
+    /// A name as search compares it: lower case with accents removed (the database's <c>search_text</c> function).
+    /// Only for use in queries.
+    /// </summary>
+    public static string SearchText(string text) => throw new NotSupportedException("Only translated to SQL, in a query.");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -237,6 +251,18 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(c => c.Program).HasMaxLength(64);
         });
 
+        modelBuilder.Entity<AffiliateProgramRecord>(entity =>
+        {
+            entity.ToTable("affiliate_programs");
+            entity.HasKey(p => p.Name);
+            entity.Property(p => p.Name).HasMaxLength(64);
+            entity.Property(p => p.Template).HasMaxLength(1024);
+            entity.Property(p => p.PostbackKey).HasMaxLength(256);
+            entity.Property(p => p.Currency).HasMaxLength(3);
+            entity.Property(p => p.Services).HasDefaultValueSql("'{}'");
+            entity.Property(p => p.Regions).HasDefaultValueSql("'{}'");
+        });
+
         modelBuilder.Entity<AffiliateConversion>(entity =>
         {
             entity.Property(c => c.Id).ValueGeneratedNever();
@@ -251,6 +277,11 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
         });
 
         modelBuilder.HasPostgresExtension("vector");
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
+        // search_text and the trigram indexes on it (shows' titles, people's names) are created by the SearchText
+        // migration in SQL: EF can't model an index on an expression.
+        modelBuilder.HasDbFunction(typeof(CatalogContext).GetMethod(nameof(SearchText), [typeof(string)])!).HasName("search_text");
         modelBuilder.Entity<ShowEmbedding>(entity =>
         {
             entity.ToTable("show_embeddings");

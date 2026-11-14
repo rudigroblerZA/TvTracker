@@ -33,7 +33,7 @@ public static class SignInThroughWebApp
     public static Uri? PublicUrl(IConfiguration configuration) =>
         Uri.TryCreate(configuration["WebApp:PublicUrl"], UriKind.Absolute, out var url) ? url : null;
 
-    public static void AddProxy(IServiceCollection services, string keycloakUrl, Uri publicUrl)
+    public static void AddProxy(IServiceCollection services, string keycloakUrl, Uri publicUrl, bool allowFraming)
     {
         RouteConfig Route(string id, string path) => new() { RouteId = id, ClusterId = Cluster, Match = new() { Path = path } };
 
@@ -47,8 +47,13 @@ public static class SignInThroughWebApp
                 context.AddRequestHeader("X-Forwarded-Host", publicUrl.Authority, append: false);
                 context.AddRequestHeader("X-Forwarded-Proto", publicUrl.Scheme, append: false);
                 context.AddRequestHeader("X-Forwarded-Port", publicUrl.Port.ToString(System.Globalization.CultureInfo.InvariantCulture), append: false);
-                context.AddResponseHeaderRemove("X-Frame-Options");
-                context.AddResponseHeaderRemove("Content-Security-Policy");
+                // Keycloak forbids framing its login pages. That stays so when deployed (a framed login form can be
+                // clickjacked); in development it's lifted, for a preview pane that shows the app in a frame.
+                if (allowFraming)
+                {
+                    context.AddResponseHeaderRemove("X-Frame-Options");
+                    context.AddResponseHeaderRemove("Content-Security-Policy");
+                }
             });
     }
 
@@ -63,14 +68,18 @@ public static class SignInThroughWebApp
 
         options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
 
+        // Keycloak names the address the person signed in at as the token's issuer, which is the public one, while its
+        // metadata (read over the private address) names that one. Both are this realm.
+        options.TokenValidationParameters.ValidIssuers = [authority, publicAuthority];
+
         var signIn = options.Events.OnRedirectToIdentityProvider;
         options.Events.OnRedirectToIdentityProvider = async context =>
         {
             await signIn(context);
             context.ProtocolMessage.IssuerAddress = Public(context.ProtocolMessage.IssuerAddress);
             context.ProtocolMessage.RedirectUri = origin + options.CallbackPath;
-            // The token exchange sends the redirect address the challenge recorded, which must be this one.
-            context.Properties.Items[OpenIdConnectDefaults.RedirectUriForCodePropertiesKey] = context.ProtocolMessage.RedirectUri;
+            // The handler records this address after the event, for the token exchange to send again; setting it here
+            // as well makes it throw (the same key added twice).
         };
 
         var signOut = options.Events.OnRedirectToIdentityProviderForSignOut;

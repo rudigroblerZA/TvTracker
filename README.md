@@ -56,8 +56,15 @@ Search finds any show on TVmaze, not just imported ones. Before searching, Catal
 A new search term takes a second or two. Each term goes to TVmaze at most once every 6 hours. If the worker is down or takes
 longer than 10 seconds, search returns what the catalog already has, and the import still finishes for the next search.
 
-Search also matches by meaning. Results start with shows whose title contains the term (most popular first), followed
-by up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
+Search is forgiving about how a title is typed. Titles containing the term come first, best match first: the show
+whose title is the term (with or without a leading "The"), then titles with a word starting with it, then the rest,
+most popular first within each. Case and accents never matter ("elite" finds Élite, "pokemon" Pokémon). When fewer
+than five titles contain it, titles spelled nearly the same follow (Postgres `pg_trgm`): "breakng bad" finds Breaking
+Bad, "greys anatomy" Grey's Anatomy. Both kinds of match use a trigram index on the title with accents removed. The search page suggests catalog shows as you type (`GET /api/v1/shows/suggest`), lists people whose
+name matches above the results with the shows they're known for (`GET /api/v1/people/search?q=`, cast members
+only), and puts shows that match by meaning rather than title under their own heading.
+
+Search also matches by meaning. After the title matches come up to 30 shows whose title, genres, network and summary are close in meaning ("naval crime investigators" finds NCIS,
 "cooking competition" finds The Great British Bake Off). The vectors come from all-MiniLM-L6-v2, run locally with ONNX
 Runtime (`Catalog.Embeddings`), so there's no API key or extra container. The model (about 90 MB) is downloaded from
 Hugging Face on first start, checksummed, and cached in the user's local app data folder (`Embeddings:ModelDirectory`
@@ -555,7 +562,23 @@ link opens the web app's address in the browser and is counted there, as a signe
   and their rate, commission per currency and per click, by day, service, link (button or list), the viewer's plan
   (signed out, free, plus, family), and the shows sending the most. Services with clicks and no program are named as
   worth a deal.
-- **Programs** go in Catalog.API's configuration, under `Affiliates:Programs`; the file is re-read on change, so no restart:
+- **Programs are set up in Settings** (`/settings/affiliates`, the Programs section, admins only): a name, the services
+  as where-to-watch names them (`*` for all), two-letter regions (empty for all), the currency it pays in, the network's
+  link and the postback key. Saved programs are in Catalog's database and take effect within a minute, no restart. The
+  link must be an https address with `{url}` where the service's own link goes (escaped) and `{click}` for the click id;
+  the key is 16 characters or more and is never shown again. A program can be switched off without losing it: links
+  stop using it, and sales for clicks already sent through it still count. A removed program's later sales aren't
+  taken, so switch off rather than remove while sales may still come in. A click tries live programs from Settings
+  first (one naming its services before a `*` one), then configuration's, then test programs.
+- **Test programs**, for before there's a real deal: tick **Test program** and the program needs no link or key. Its
+  clicks go through the built-in test network's page (below), named for the program, so the report has numbers per
+  service from day one. **Add test programs for the main services** adds one each for Netflix, Prime Video, Disney+,
+  Hulu, Apple TV, HBO Max, Paramount+ and Peacock; a fresh local database gets them on first start. Netflix has no
+  public affiliate programme, so its entry stays a test one until there's a direct deal. Where the test network isn't
+  running (production), test programs aren't used and their services get plain, still counted, links.
+  A service that already has a program doesn't get a starter test program.
+- **Programs in configuration** still work, under Catalog.API's `Affiliates:Programs` (re-read on change), for
+  deployments that keep them with their secrets. A program in Settings with the same name wins:
 
   ```json
   "Affiliates": {
@@ -569,23 +592,31 @@ link opens the web app's address in the browser and is counted there, as a signe
   }
   ```
 
-  `{url}` is the service's link (escaped) and `{click}` the click id. A template that isn't an https address, or a
-  program without a name, service or three-letter currency, isn't used, and the report says so.
+  A program that isn't valid isn't used, and the report says so.
 - **Sales** come from the network's server-to-server postback, to the mobile gateway's public address:
   `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
   key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
   counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
-- **Trying it locally:** run the AppHost with the test network on, turn the `affiliates` flag on, and click any
-  where-to-watch link. The click goes through a pretend network page in the web app, where **Report a sale** sends a
-  commission through the real postback and **Continue to the service** sends you on. The click and the sale then show
-  in `/settings/affiliates` (sign in as `admin`). Real programs you've configured still win for their services.
+- **Trying it locally:** the AppHost runs the test network by default, and the flag is on. Click any where-to-watch
+  link: it goes through a pretend network page in the web app (`/dev/affiliate-network`, the generic test link), where
+  **Report a sale** sends a commission through the real postback and **Continue to the service** sends you on. The
+  click and the sale then show in `/settings/affiliates` and `/settings/revenue` (sign in as `admin`). Live programs
+  still win for their services. To run without it:
 
   ```bash
-  dotnet run --project src/TvTracker.AppHost -- --Affiliates:TestNetwork true
+  dotnet run --project src/TvTracker.AppHost -- --Affiliates:TestNetwork false
   ```
 
 - **Privacy:** a click keeps the show, service, link, region, where it was clicked and the plan, never who clicked:
   no user id, address or browser. Nothing about clicks is in the data export or needs deleting with an account.
+
+**Revenue, in one place** (`/settings/revenue`, Settings → Admin, admins only): everything that can bring money in,
+over 7, 30 or 90 days. Subscriptions: what running subscriptions bring in a month per currency (a yearly plan counts
+as a twelfth), money received in the window, paying accounts and the share of all accounts that pay (the free-to-paid
+rate), the funnel from new accounts to checkouts started, checkouts paid and new subscriptions, how many ended, and
+who pays by plan and billing interval. Affiliate links: commission, clicks, sales and how many programs are live or
+test. Then both by day. Counts only: nothing names a person. The subscription half is Identity.API's
+`GET /api/v1/admin/revenue?days=30`; the affiliate half is Catalog's affiliate report.
 
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
@@ -645,13 +676,15 @@ users to `backups/<UTC timestamp>` (git-ignored); `scripts/restore.sh <dir>` put
 
 `tvtracker-import` (`src/Tools/Catalog.ImportCli`) fills the catalog in bulk while the AppHost is running. It starts a job
 on the sync worker (`/api/v1/imports/bulk`, internal only), which imports the shows through the same synchronizer
-and TVmaze rate limit as everything else, about two shows a second, and the tool shows the job's progress:
+and rate limit as everything else (about two shows a second with TVmaze), and the tool shows the job's progress. The
+shows come from whichever provider the catalog was set up with (`Catalog:Provider`: TVmaze unless said otherwise, or
+Wikidata or TheTVDB), so titles are matched there and ids are that provider's:
 
 ```bash
 cd src/Tools/Catalog.ImportCli
-dotnet run -- titles shows.txt     # the best TVmaze match for each line (# comments and blank lines skipped; - for stdin)
-dotnet run -- ids 82 431 169       # TVmaze show ids (or --file ids.txt)
-dotnet run -- top 500              # TVmaze's most popular shows; reads TVmaze's whole index first (about 4 minutes)
+dotnet run -- titles shows.txt     # the provider's best match for each line (# comments and blank lines skipped; - for stdin)
+dotnet run -- ids 82 431 169       # show ids at the provider, here TVmaze's (or --file ids.txt)
+dotnet run -- top 500              # the provider's most popular shows; with TVmaze its whole index is read first (about 4 minutes)
 dotnet run -- status               # follow the running import, or show the last one
 dotnet run -- cancel               # stop after the current show
 ```
@@ -665,6 +698,17 @@ the sync worker's APIs answer nothing else: in development its default secret wo
 2 done with some shows failing, 1 cancelled, failed or unreachable. Job state lives in the worker's memory, so a
 worker restart ends the job. Imported shows publish the usual catalog events and are embedded for semantic search
 within a minute.
+
+**Against a deployment** the sync worker has no address outside the stack, so the tool runs as a container on the
+stack's network: `scripts/deploy.sh` builds its image, and `scripts/deploy-import.sh` runs it with the deployment's
+addresses and the internal client's secret from `.env`, passing its arguments through:
+
+```bash
+scripts/deploy-import.sh top 500                 # in ~/tvtracker; give another directory first to use that
+scripts/deploy-import.sh titles - < shows.txt    # a file goes in on standard input
+scripts/deploy-import.sh status
+scripts/deploy-import.sh wikidata run
+```
 
 ### Wikidata jobs
 
@@ -718,9 +762,16 @@ dotnet run -- cleanup                          # delete the users and everything
 ```
 
 - **What users do:** each signs in, then visits pages until the run ends, each page a burst of the requests the app
-  makes for it: a show page (seven services), home, an episode, a search, Discover, the feed, stats. Shows come from
-  the catalog's trending list and a few genres. `--writes` adds following, marking watched and rating, and now and then
-  unfollowing so long runs stay bounded.
+  makes for it: a show page (six services), home (with the plan and the app's name, which every page asks for), an
+  episode, a search, stats and the calendar. Shows come from the catalog's trending list and a few genres. `--writes`
+  adds following, marking watched and rating, and now and then unfollowing so long runs stay bounded.
+- **A search is the search page's:** suggestions as the term is typed, then the search itself with the people search
+  beside it. The terms are words in titles, descriptions ("slow burn mystery"), typos and missing apostrophes
+  ("breakng bad", "greys anatomy"), which reach the near-spelling matches, and actors' names.
+- **Only what's switched on:** Discover, the feed, tonight, the waiting room, universes, your taste, and the friends
+  and community-insights parts of a show page belong to feature flags. The warm-up asks for each once; one that
+  answers 404 (the flag is off, or it isn't in a free user's plan) is left out and named at the start of the run, so
+  the report isn't full of 404s for features nobody can reach.
 - **Pacing:** `--ramp-up` (default 10s) starts users evenly; `--think` (default 1s, ±50%) is the pause between pages;
   `--think 0` runs flat out.
 - **Output:** a progress line every 5 seconds (req/s, p95, errors), then a table per endpoint: count, req/s, errors,
@@ -869,6 +920,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `essential-cut` | The shorter way through a long show |
 | `social` | Following people and the feed |
 | `list-links` | A list anyone can open by link, which brings people in |
+| `affiliates` | Where-to-watch clicks counted and sent through affiliate programs: a way to earn |
 
 - **Plans, payments and the Family plan are on too** (they're switches, not features to use); see [Plans](#plans).
 - **Off features' background jobs still run** (Wikiquote lines, the atlas, cast credits, nanogenres, research
@@ -1063,23 +1115,71 @@ read-only, without signing in or having an account.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
 - **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
 
+### Sign in with Google
+
+People can sign up and sign in with a Google account once the app has been given a Google client. Keycloak does the
+work: its sign-in and registration pages show a Google button, and a first sign-in creates the account with the name
+and (already confirmed) email address Google gives.
+
+- **Get a client:** in the Google Cloud console, create an "OAuth client ID" of type "Web application", and add this
+  as an authorised redirect URI:
+  - deployed: `https://<PUBLIC_HOST>/realms/tvtracker/broker/google/endpoint`
+  - locally: `http://localhost:8080/realms/tvtracker/broker/google/endpoint`
+- **Give it to the app:** the client's id and secret.
+  - deployed: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the deployment's `.env`, then run `scripts/deploy.sh`
+    again.
+  - locally: `dotnet user-secrets set "Parameters:google-client-id" "<id>"` and `"Parameters:google-client-secret"`,
+    in `src/TvTracker.AppHost`.
+- **What happens:** Identity.API creates Keycloak's Google identity provider on start, or brings it up to date
+  (`RealmSecretsSeeder`). With neither value set nothing is touched; taking them away again doesn't remove a provider
+  already there (do that in Keycloak's admin console).
+- **An address already registered** with a password isn't taken over: Keycloak asks the person to prove the existing
+  account is theirs before linking the two.
+- **Tried** with placeholder credentials: the provider was created, the sign-in page offered Google, and the button
+  sent the browser to Google with the client id and that redirect address. Signing in for real needs a real client.
+- The privacy policy says what Google learns and tells the app.
+
 ### Landing page, privacy and terms
 
 - **Landing page:** signed out, Home (`/`) opens with what the app does, "Get started free" (Keycloak's sign-in page,
   where Register creates the account), the four things that set it apart, and what Free, Pro and Family include, with
   Trending below. Signed in, Home is unchanged.
 - **Privacy** (`/privacy`) and **Terms** (`/terms`), linked from every page's footer and readable signed out. They
-  describe what the app actually does: what's stored and why, what stays on the device, what others see (activity,
-  posts, shared lists), who else gets data (Stripe, streaming links, TVmaze's pictures), cookies, how long things are
-  kept, export and deletion in Settings, moderation, the paid plans' renewal, cancellation and refunds. Keep them in step
-  when a feature stores something new, and change `PrivacyPage.LastUpdated` with the text.
-- **Who runs it:** `Branding:Operator` (the legal name; default the app's name) and `Branding:ContactEmail` (shown for
-  privacy questions when set) in the AppHost's configuration; the AppHost passes them to the web app.
-- **A starting text, not legal advice:** have both pages reviewed for the country the operator is established in, and
-  the places it sells to, before launch.
+  describe what the app actually does:
+  - **Privacy:** who runs it; what's stored (network addresses in rate limits and logs included); what stays on the
+    device; what each use rests on (the agreement, a legal duty, a legitimate interest, the user's choice); what
+    others see; who else gets data (hosting, Stripe, email delivery, push services, streaming links, the pictures'
+    host); data kept abroad; cookies; how long things are kept (backups and logs included); security; rights, export
+    and deletion in Settings; and where to complain (EU authorities, the UK's ICO, South Africa's Information
+    Regulator).
+  - **Terms:** personal use; accounts and age; posts, moderation and reporting; where the show data comes from and
+    that where-to-watch is inferred; plans, automatic renewal, cancelling, a 14-day refund on a first purchase,
+    failed payments and price changes; ending and closing; what the operator is responsible for; whose law applies.
+  - Keep them in step when a feature stores something new or sends data somewhere new, and change
+    `PrivacyPage.LastUpdated` with the text.
+- **Who runs it:** `Branding:Operator` (the legal name; default the app's name) and `Branding:ContactEmail`, and for
+  a seller the law also wants `Branding:OperatorAddress`, `Branding:CompanyNumber` (a phrase, such as "registered in
+  South Africa, no. 2026/123456/07") and `Branding:GoverningLaw` (whose law the terms are under). The AppHost passes
+  them to the web app; in a deployment they're `OPERATOR_NAME`, `CONTACT_EMAIL`, `OPERATOR_ADDRESS`, `COMPANY_NUMBER`
+  and `GOVERNING_LAW` in `.env`.
+- **Reviewed, not legal advice:** `docs/legal-review.md` records what the pages were checked against, the promises
+  they make (the 14-day refund, 30 days' notice of changes), what in the code they rely on, and twelve things for a
+  lawyer to confirm for the country the operator is established in.
 
 ### White label and theme
 
+- **In Settings, for admins:** Settings → Admin → **Name and company** (`/settings/branding`) sets the app's name, an
+  accent colour, and the company behind it (legal name, contact email, postal address, registration, governing law),
+  which the privacy policy and terms show. No restart:
+  - **Who sees it when:** the admin's own copy of the web app at once; everyone else's pages, the phone app, and the
+    services that put the name in what they write (the weekly digest's subject, push titles, default list names)
+    within a minute.
+  - **What's left empty keeps the configured value** (`Branding:*` below, or `.env` in a deployment), so configuration
+    still sets the defaults and Settings overrides them field by field.
+  - **The accent colour** is six hex digits; it's used as given on a light background and lightened automatically on
+    a dark one, and the gradients' second colour follows it.
+  - **Stored** in Identity's database (`site_settings`, one row). `GET /api/v1/branding` needs no sign-in, since the
+    signed-out pages show it; `PUT /api/v1/admin/branding` is for `Admin:Users`.
 - **App name:** `Branding:AppName` in the AppHost's `appsettings.json` (default "TV Tracker"), or the
   `Branding__AppName` environment variable when starting the AppHost. It names the header, page and browser titles,
   "… users" in insights and Discover, the ops page, and the title of a push notification without one. The AppHost
@@ -1725,17 +1825,135 @@ the day and from the hour you pick, in your time zone. Phone and browser alerts 
 - **API:** `GET /api/v1/digest/preview` on Notifications.API (signed in), and the `weeklyDigest`, `digestDay` and
   `digestHour` preference fields.
 
+## Deploying
+
+A deployment is one machine running Docker Compose. `scripts/deploy.sh` does all of it: it publishes the AppHost to a
+compose file (`aspire publish`), builds each service's container image, fills in the settings, and starts everything.
+
+```bash
+# On the server, in a checkout of this repository. First run:
+PUBLIC_HOST=tv.example.com API_HOST=api.tv.example.com \
+OPERATOR_NAME="Example Ltd" CONTACT_EMAIL=hello@example.com \
+scripts/deploy.sh            # deploys into ~/tvtracker; pass another directory to use that
+
+# Later, to deploy a newer checkout: the settings are remembered.
+git pull && scripts/deploy.sh
+```
+
+**What the machine needs:** Docker with the compose plugin, the .NET SDK (`global.json`), the Aspire CLI
+(`dotnet tool install -g Aspire.Cli`), `jq` and `openssl`; ports 80 and 443 open; and both host names pointing at it
+in DNS before the first run, since the certificates are issued when it starts. About 8 GB of memory and 20 GB of disk
+is a sensible minimum: there are 21 containers, and the embedding model is about 640 MB.
+
+**What you get**
+
+- **One front door.** Caddy is the only container with ports on the machine. It gets and renews Let's Encrypt
+  certificates, redirects http to https, and sends `PUBLIC_HOST` to the web app and `API_HOST` to the mobile gateway
+  (which is also where Stripe and affiliate networks send their webhooks). Nothing else is reachable from outside.
+- **Sign-in through the site.** Keycloak runs in production mode on Postgres and has no address of its own: the web
+  app passes its login pages on under `https://PUBLIC_HOST/realms/…`, so its admin console isn't exposed. The realm is
+  the development one without its demo and admin users and client secrets, requiring HTTPS and locking accounts
+  after repeated wrong passwords.
+- **Secrets made once.** The deployment directory's `.env` holds every setting. Passwords and client secrets are
+  generated on the first run and kept; Identity.API puts them into Keycloak on start. The app's admin signs in as
+  `admin` with `APP_ADMIN_PASSWORD` from that file.
+- **Data in Docker volumes:** Postgres (nine app databases and Keycloak's), Redis, RabbitMQ, the embedding model and
+  Caddy's certificates. Deploying again keeps them.
+- **Daily backups** of every database, kept for two weeks on the machine (Backups, below).
+- **Filling the catalog:** the sync worker imports on its own schedule; `scripts/deploy-import.sh top 500` imports in
+  bulk straight away (Bulk import, above).
+- **Feature flags** come from `Flags/flagd.json` in the checkout, copied on each deploy; what an admin changes on the
+  flags page is kept in the deployment directory's `flags/overrides.json`, which both flagd and Identity.API mount.
+- **Container logs are capped** at five files of 20 MB each per service, so they neither fill the disk nor keep
+  network addresses for longer than they're useful.
+- **Services restart** after a crash or a reboot. They start in no particular order, so on the first start a few fail
+  once and are started again; that settles within a minute or two.
+- **Logs, traces and metrics** go to the Aspire dashboard, on the machine's loopback address only:
+  `ssh -L 18888:localhost:18888 <server>`, then `http://localhost:18888`.
+
+**Backups**
+
+A `backup` container dumps every database on the Postgres server (the nine the services own and Keycloak's, so
+accounts and their passwords too) with `pg_dump`, one file each, into the deployment directory's
+`backups/<UTC timestamp>`.
+
+- **When:** once a day at `BACKUP_HOUR_UTC` (3 by default), and straight away on a start that finds no backup from
+  the last day. Each dump is read back before the backup counts; one cut short is never left looking whole.
+- **How long:** `BACKUP_KEEP_DAYS` (14 by default); older ones are deleted after each new one. Both are in `.env`.
+- **One now:** `docker compose -p tvtracker exec backup bash /backup.sh once` (before a risky change, say).
+- **Putting one back:** `scripts/deploy-restore.sh latest` (or a backup's name; `--list` shows them). It stops
+  everything but Postgres, replaces each database in the backup with the backup's, and starts the stack again.
+  Whatever people did after that backup is lost.
+- **Off the machine is up to you.** These backups are on the same disk as the data: they undo a bad deploy or a
+  mistake, not a lost machine. Copy three things somewhere else on a schedule (`rclone`, `rsync`, your provider's
+  snapshots): `backups/`, `.env` (every secret; a restored database is no use without the passwords Keycloak and the
+  services were given) and `flags/overrides.json`.
+- **Not in it:** RabbitMQ's queued events and Redis (sign-in sessions; people sign in again), and the catalog's
+  embedding model, which is downloaded again.
+- **Tried** on a local deployment: a backup of all ten databases; then the profiles table emptied and the realm
+  disabled; then `deploy-restore.sh latest`, after which the profile was back and the admin could sign in again.
+
+**Settings in `.env` you may want to fill in** (then run the script again)
+
+| Setting | For |
+| --- | --- |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
+| `OPERATOR_NAME`, `CONTACT_EMAIL` | Shown in the privacy policy and terms |
+| `OPERATOR_ADDRESS`, `COMPANY_NUMBER`, `GOVERNING_LAW` | The operator's postal address, its registration ("registered in …, no. …") and whose law the terms are under: shown in the privacy policy and terms, and wanted by law from anyone selling to the public |
+
+Email (alerts and the weekly digest) needs an Azure Communication Services connection string
+(`Parameters:email-connection-string`) and `Email:SenderAddress` given to the publish; without them no email is sent.
+
+**Tried:** the script was run end to end, twice (a first deploy and a redeploy), on one machine with
+`PUBLIC_HOST=localhost`, where Caddy uses its own certificate authority instead of Let's Encrypt. All 21 containers
+came up, the ten databases and the realm were created, the secrets reached Keycloak, and an admin signed in through
+the site over HTTPS and opened the admin pages. Not tried: a public host name with a real certificate, and the
+catalog import from inside the containers (the test machine's network blocked their outbound HTTPS).
+
 ## Before production
 
-- Give every secret parameter a value (`Parameters:<name>`, or azd's environment secrets): `web-client-secret`,
-  `identity-admin-client-secret`, `internal-client-secret`, `app-admin-password` and
-  `keycloak-admin-password`. A publish carries no development values; Identity.API puts the client secrets and the admin
-  password into Keycloak's realm on start.
-- Turn on HTTPS for Keycloak. Its demo user is removed by Identity.API on every start outside Development, and the
-  services accept the Android emulator's token issuer only in Development.
-- Set `Branding:Operator` and `Branding:ContactEmail`, and have the privacy policy and terms reviewed (Landing page,
-  privacy and terms).
-- Remove `usesCleartextTraffic` (Android) and `NSAllowsLocalNetworking` (iOS), and point the mobile app at real hosts.
+Deploying works (above). This is what still stands between that and charging the public.
+
+**Already in place**
+
+- **Development-only parts stay there:** the test payment provider, the test affiliate network and its starter
+  programs, the `/ops` pages and OpenAPI exist only in Development. A publish carries no development secrets and
+  always uses Stripe.
+- **Health checks** (`/health`, `/alive`) are served in every environment. They answer with the overall status only.
+- **Logs** are one JSON object a line outside Development.
+- **Database upgrades** run at start under a Postgres advisory lock, so two copies of a service starting together take
+  turns; a database that doesn't exist yet is created.
+- **The web app** keeps the keys behind its sign-in cookie in Redis (restarts and deploys don't sign people out),
+  sends its cookie over HTTPS only, sends `nosniff` and a referrer policy, and refuses framing by other sites.
+- **Email that isn't configured isn't faked:** outside Development an alert's delivery shows as failed and weekly
+  digests are off, and no address or message is written to a log.
+- **Deleting an account** removes its data before its login, so a failure part-way leaves a login that can ask again.
+
+**Still to do**
+
+- **Backups off the machine.** The daily backups (Deploying) sit on the same disk as the data; copying them, `.env`
+  and the flag overrides elsewhere is for whoever runs the machine to set up.
+- **Email from Keycloak.** The realm has no mail server, so password reset doesn't work and addresses aren't
+  confirmed (`verifyEmail` is off). It needs an SMTP account.
+- **Payments beyond the happy path.** Stripe checkout collects no tax (a decision, for now), and refunds, disputes
+  and failed payments aren't acted on: a refunded subscriber keeps their plan until the period ends. Deleting an
+  account deletes its receipts, which the law may want kept.
+- **One copy of each service.** Notification delivery, digests, the sync worker and the analytics worker don't claim
+  their work, so two copies would do it twice. One machine runs one of each, so this matters only when scaling out.
+- **Events at first start.** Services start in no order, and an event published before its queue exists is dropped
+  by the broker. On a first start with nothing to publish yet that's harmless; after that the queues exist.
+- **Rate limits by address** should be checked behind Caddy: they key on `X-Forwarded-For`.
+- **Admins by username.** `Admin:Users` and `Moderation:Users` match usernames, and registration is open: create
+  those accounts before telling anyone the address.
+- **Mobile.** The app is built for local hosts: remove `usesCleartextTraffic` and `allowBackup` (Android) and
+  `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `API_HOST` and `PUBLIC_HOST`.
+- **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
+  network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
+  charging for the app, and TMDB's and TheTVDB's before turning those on.
+- **A lawyer's reading.** The privacy policy and terms were reviewed against the code and rewritten
+  (`docs/legal-review.md`), which leaves twelve things for someone qualified, starting with where the operator is
+  established.
 
 ## Package versions
 

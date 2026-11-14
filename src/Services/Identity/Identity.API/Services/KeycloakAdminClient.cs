@@ -122,6 +122,71 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Makes the realm require HTTPS from outside addresses and lock an account for a while after repeated wrong
+    /// passwords; false when it already does. The realm file (made for development) has neither.
+    /// </summary>
+    public async Task<bool> HardenRealmAsync(string token, CancellationToken cancellationToken)
+    {
+        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        if (realm is null || (realm["sslRequired"]?.GetValue<string>() == "external" && realm["bruteForceProtected"]?.GetValue<bool>() == true))
+        {
+            return false;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject { ["sslRequired"] = "external", ["bruteForceProtected"] = true },
+            cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Lets people sign up and sign in with an outside account (<paramref name="alias"/> is Keycloak's name for the
+    /// provider, such as "google"): creates the realm's identity provider with the app's client id and secret there,
+    /// or brings an existing one up to date. Returns what it did, for the log.
+    /// <list type="bullet">
+    /// <item><b>The address is trusted:</b> the provider has confirmed it, so the account starts with a verified
+    /// email.</item>
+    /// <item><b>Always written when it exists:</b> Keycloak never gives a stored secret back, so there's nothing to
+    /// compare a new one with.</item>
+    /// </list>
+    /// </summary>
+    public async Task<string> EnsureIdentityProviderAsync(string token, string alias, string clientId, string clientSecret,
+        CancellationToken cancellationToken)
+    {
+        var providers = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/identity-provider/instances";
+        var provider = new JsonObject
+        {
+            ["alias"] = alias,
+            ["providerId"] = alias,
+            ["enabled"] = true,
+            ["trustEmail"] = true,
+            ["config"] = new JsonObject
+            {
+                ["clientId"] = clientId,
+                ["clientSecret"] = clientSecret,
+                ["defaultScope"] = "openid profile email",
+                // Name and address are taken when the account is made, and are the person's to change after.
+                ["syncMode"] = "IMPORT"
+            }
+        };
+        var (status, existing) = await SendAsync<JsonObject>(HttpMethod.Get, $"{providers}/{alias}", token, null, cancellationToken,
+            HttpStatusCode.NotFound);
+        if (status == HttpStatusCode.NotFound)
+        {
+            await SendAsync<JsonNode>(HttpMethod.Post, providers, token, provider, cancellationToken);
+            return "added";
+        }
+        // Keeps what an admin set by hand in Keycloak's console (mappers aside, which live elsewhere).
+        if (existing?["internalId"]?.GetValue<string>() is { } internalId)
+        {
+            provider["internalId"] = internalId;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, $"{providers}/{alias}", token, provider, cancellationToken);
+        return existing?["config"]?["clientId"]?.GetValue<string>() == clientId && existing["enabled"]?.GetValue<bool>() == true
+            ? "kept"
+            : "updated";
+    }
+
+    /// <summary>
     /// Adds <paramref name="pattern"/> to a client's allowed redirect and post-logout redirect addresses unless it's
     /// there. Null when the realm has no such client, else whether it changed.
     /// </summary>

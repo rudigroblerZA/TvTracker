@@ -1,3 +1,7 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
+using StackExchange.Redis;
 ﻿using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -18,12 +22,19 @@ builder.AddRedisDistributedCache("redis");
 builder.Services.AddSingleton<ServerTokenStore>();
 builder.Services.AddHttpClient("keycloak");
 
+// The keys that protect the auth cookie and antiforgery tokens, kept in Redis under a fixed application name: in
+// memory (the default in a container) every restart or deploy would sign everyone out, and two copies of the web app
+// couldn't read each other's cookies.
+builder.Services.AddDataProtection().SetApplicationName("tvtracker-web");
+builder.Services.AddOptions<KeyManagementOptions>().Configure<IConnectionMultiplexer>((options, redis) =>
+    options.XmlRepository = new RedisXmlRepository(() => redis.GetDatabase(), "tvtracker-web:data-protection-keys"));
+
 // Sign-in with Keycloak: an auth cookie for the browser, tokens kept server-side.
 var authority = IdentitySettings.GetAuthority(builder.Configuration);
 var publicUrl = SignInThroughWebApp.PublicUrl(builder.Configuration);
 if (publicUrl is not null)
 {
-    SignInThroughWebApp.AddProxy(builder.Services, builder.Configuration["Identity:Url"]!, publicUrl);
+    SignInThroughWebApp.AddProxy(builder.Services, builder.Configuration["Identity:Url"]!, publicUrl, allowFraming: builder.Environment.IsDevelopment());
 }
 builder.Services
     .AddAuthentication(options =>
@@ -34,6 +45,11 @@ builder.Services
     .AddCookie(options =>
     {
         options.Cookie.Name = "tvtracker";
+        // Deployed, the site is HTTPS only (HSTS and the redirect below), and so is its cookie.
+        if (!builder.Environment.IsDevelopment())
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.SlidingExpiration = true;
     })
@@ -44,7 +60,7 @@ builder.Services
         options.ClientSecret = builder.Configuration["Identity:WebClientSecret"];
         options.ResponseType = "code";
         options.UsePkce = true;
-        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.RequireHttpsMetadata = IdentitySettings.RequireHttpsMetadata(builder.Configuration, builder.Environment);
         options.MapInboundClaims = false;
         options.GetClaimsFromUserInfoEndpoint = true;
         options.SaveTokens = false;
@@ -91,7 +107,8 @@ builder.Services.AddRazorComponents()
 
 // The web app calls each service directly; "https+http://<name>" is resolved by Aspire service discovery.
 builder.Services.AddTvTrackerUi(name => new Uri($"https+http://{name}-api/"), builder.Configuration["Branding:AppName"],
-    builder.Configuration["Branding:Operator"], builder.Configuration["Branding:ContactEmail"], builder.Configuration["Catalog:Provider"]);
+    builder.Configuration["Branding:Operator"], builder.Configuration["Branding:ContactEmail"], builder.Configuration["Catalog:Provider"],
+    builder.Configuration["Branding:OperatorAddress"], builder.Configuration["Branding:CompanyNumber"], builder.Configuration["Branding:GoverningLaw"]);
 
 // Services rate limit per visitor (the UI forwards each browser's IP), so a 429 is one visitor's answer, not a sign the
 // service is down. Don't retry it (every retry spends another of their requests) and don't let it trip the circuit
@@ -136,6 +153,15 @@ if (app.Environment.IsDevelopment() && publicUrl is null)
         return next(http);
     });
 }
+
+// Headers every response carries: no MIME sniffing, and no full addresses in referrers to other sites. Framing by
+// other sites (clickjacking) is already refused: Blazor sends "frame-ancestors 'self'" and antiforgery X-Frame-Options.
+app.Use((http, next) =>
+{
+    http.Response.Headers.XContentTypeOptions = "nosniff";
+    http.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    return next(http);
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

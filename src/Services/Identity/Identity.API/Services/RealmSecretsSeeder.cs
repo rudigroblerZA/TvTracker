@@ -18,11 +18,17 @@ namespace Identity.API.Services;
 /// <item><b>The web app's public address</b> (<c>Keycloak:WebPublicUrl</c>, set when the web app is reached through
 /// one forwarded address, such as a cloud preview): added to the web client's allowed redirects, which the realm file has
 /// only for localhost.</item>
+/// <item><b>Sign in with Google</b> (<c>Keycloak:Google:ClientId</c> and <c>:ClientSecret</c>): the realm's Google
+/// identity provider is created or brought up to date, so the sign-in page offers it. Without them nothing is touched,
+/// and one already in the realm stays as it is.</item>
+/// <item><b>Outside development</b> the realm is also set to require HTTPS from outside addresses and to lock an
+/// account for a while after repeated wrong passwords, which the realm file leaves off.</item>
 /// <item><b>Retried</b> as <see cref="KeycloakRetry"/> says; when it gives up, every service using a changed secret gets
 /// 401 from Keycloak until Identity restarts.</item>
 /// </list>
 /// </summary>
-public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, ILogger<RealmSecretsSeeder> logger) : BackgroundService
+public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfiguration config, IHostEnvironment environment,
+    ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
     private const string WebClientId = "tvtracker-web";
 
@@ -62,6 +68,20 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
                     case true:
                         logger.LogInformation("Set the secret of the Keycloak client {ClientId} from the AppHost", clientId);
                         break;
+                }
+            }
+            if (!environment.IsDevelopment() && await keycloak.HardenRealmAsync(token, stoppingToken))
+            {
+                logger.LogInformation("Set the Keycloak realm to require HTTPS and to lock accounts after repeated wrong passwords");
+            }
+            // Sign in with Google, when the app has been given its Google client (Keycloak:Google:ClientId and
+            // :ClientSecret, from the AppHost's google-client-id and google-client-secret).
+            if (config["Keycloak:Google:ClientId"] is { Length: > 0 } googleId && config["Keycloak:Google:ClientSecret"] is { Length: > 0 } googleSecret)
+            {
+                var outcome = await keycloak.EnsureIdentityProviderAsync(token, "google", googleId, googleSecret, stoppingToken);
+                if (outcome != "kept")
+                {
+                    logger.LogInformation("Sign in with Google: {Outcome} the Keycloak identity provider", outcome);
                 }
             }
             if (webPublicUrl is not null && await keycloak.AllowRedirectAsync(token, WebClientId, webPublicUrl, stoppingToken) == true)

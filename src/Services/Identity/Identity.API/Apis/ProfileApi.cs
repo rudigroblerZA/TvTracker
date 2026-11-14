@@ -86,7 +86,7 @@ public static class ProfileApi
     }
 
     /// <summary>
-    /// Deletes the Keycloak user and the profile, then publishes UserDeleted so every service purges the user's data.
+    /// Deletes the profile and then the Keycloak user, and publishes UserDeleted so every service purges the user's data.
     /// An owner's family ends with them (its members go back to their own plans); a member just leaves theirs.
     /// </summary>
     private static async Task<NoContent> DeleteAccountAsync(
@@ -103,9 +103,8 @@ public static class ProfileApi
     internal static async Task DeleteAccountByIdAsync(string userId, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak,
         TimeProvider time, PaymentProviders payments, ILogger logger, CancellationToken ct)
     {
-        // Subscriptions first, so a failure before the login goes leaves the account whole to try again.
+        // Subscriptions first, so a failure before anything is deleted leaves the account whole to try again.
         await PaymentsApi.StopSubscriptionsAsync(db, payments, userId, logger, ct);
-        await keycloak.DeleteUserAsync(userId, ct);
         await PaymentsApi.RemoveRecordsAsync(db, userId, ct);
 
         var profile = await db.Profiles.FindAsync([userId], ct);
@@ -123,6 +122,9 @@ public static class ProfileApi
         outbox.Add(new UserDeletedIntegrationEvent(userId));
 
         await db.SaveChangesAsync(ct);
+        // The login goes last: were it to go first and the save then fail, the person's data would stay with no way
+        // for them to sign in and ask again. This way round, a failure here leaves a login they can delete once more.
+        await keycloak.DeleteUserAsync(userId, ct);
         await outbox.PublishAddedAsync(ct);
     }
 

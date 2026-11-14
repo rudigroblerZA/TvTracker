@@ -5,9 +5,10 @@ using TvTracker.UI.Services;
 namespace WebApp.Services;
 
 /// <summary>
-/// A pretend affiliate network for trying affiliate links locally (the AppHost's <c>Affiliates:TestNetwork=true</c>):
-/// Catalog.API's test program sends every where-to-watch click here, and this page can report a sale for it through the
-/// real postback (<c>/api/v1/affiliates/postback/test-network</c>) before sending the viewer on to the service, so the
+/// A pretend affiliate network for trying affiliate links locally (on when the AppHost runs locally, unless
+/// <c>Affiliates:TestNetwork=false</c>): Catalog.API's test programs send where-to-watch clicks here, and this page can
+/// report a sale for one through the real postback (<c>/api/v1/affiliates/postback/{program}</c>, in the program's own
+/// currency) before sending the viewer on to the service, so the
 /// report at /settings/affiliates fills with clicks and sales.
 /// <list type="bullet">
 /// <item><b>Development only,</b> and only with <c>Affiliates:TestNetworkKey</c>, the postback key Catalog.API's test
@@ -29,33 +30,41 @@ public static class TestAffiliateNetwork
             return;
         }
 
-        app.MapGet(Path, (string? u, string? click) => Page(u, click, null));
+        app.MapGet(Path, (string? u, string? click, string? program) => Page(u, click, Program(program), null));
 
         app.MapPost($"{Path}/sale", async (HttpRequest request, IHttpClientFactory clients, CancellationToken ct) =>
         {
             var form = await request.ReadFormAsync(ct);
             string? u = form["u"], click = form["click"], amount = form["amount"];
+            // Which program the click went through: a test program an admin set up in Settings, or the network's own catch-all.
+            var program = Program(form["program"]);
             var transaction = Guid.NewGuid().ToString("N");
-            var url = $"api/v1/affiliates/postback/test-network?click={Uri.EscapeDataString(click ?? "")}&transaction={transaction}" +
-                      $"&amount={Uri.EscapeDataString(amount ?? "0")}&currency=USD&key={Uri.EscapeDataString(key)}";
+            var url = $"api/v1/affiliates/postback/{program}?click={Uri.EscapeDataString(click ?? "")}&transaction={transaction}" +
+                      $"&amount={Uri.EscapeDataString(amount ?? "0")}&key={Uri.EscapeDataString(key)}";
             string outcome;
             try
             {
                 using var response = await clients.CreateClient(ApiClients.Catalog).GetAsync(url, ct);
                 var body = await response.Content.ReadAsStringAsync(ct);
                 outcome = response.IsSuccessStatusCode
-                    ? $"Sale reported: ${amount} commission (transaction {transaction[..8]}…). It's in the report now."
+                    ? $"Sale reported: {amount} commission (transaction {transaction[..8]}…). It's in the report now."
                     : $"The postback answered {(int)response.StatusCode}: {body}";
             }
             catch (HttpRequestException ex)
             {
                 outcome = $"The postback failed: {ex.Message}";
             }
-            return Page(u, click, outcome);
+            return Page(u, click, program, outcome);
         }).DisableAntiforgery();
     }
 
-    private static IResult Page(string? u, string? click, string? outcome)
+    /// <summary>
+    /// The program's name when it's one a name can be (it goes into the postback's address), else the catch-all's.
+    /// </summary>
+    private static string Program(string? given) =>
+        given is { Length: > 0 and <= 64 } && given.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-') ? given : "test-network";
+
+    private static IResult Page(string? u, string? click, string program, string? outcome)
     {
         var destination = Uri.TryCreate(u, UriKind.Absolute, out var target) && (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp)
             ? target.AbsoluteUri
@@ -79,13 +88,14 @@ public static class TestAffiliateNetwork
               <p>This page stands in for an affiliate network while you try affiliate links locally. A real network would count
                  the click, send you on, and later report any sale back to the app.</p>
               <div class="card">
+                <div>Program: <code>{{E(program)}}</code></div>
                 <div>Click id: <code>{{E(click)}}</code></div>
                 <div>Destination: <code>{{E(destination ?? "(none)")}}</code></div>
               </div>
               {{(outcome is null ? "" : $"<p class=\"outcome\">{E(outcome)}</p>")}}
               <form method="post" action="{{Path}}/sale" class="card">
-                <input type="hidden" name="u" value="{{E(u)}}"><input type="hidden" name="click" value="{{E(click)}}">
-                <label>Commission (USD) <input name="amount" value="{{E(4.20m.ToString(CultureInfo.InvariantCulture))}}" inputmode="decimal" size="8"></label>
+                <input type="hidden" name="u" value="{{E(u)}}"><input type="hidden" name="click" value="{{E(click)}}"><input type="hidden" name="program" value="{{E(program)}}">
+                <label>Commission, in the program's currency <input name="amount" value="{{E(4.20m.ToString(CultureInfo.InvariantCulture))}}" inputmode="decimal" size="8"></label>
                 <button type="submit">Report a sale</button>
               </form>
               {{(destination is null ? "" : $"<a class=\"go\" href=\"{E(destination)}\" rel=\"noreferrer\">Continue to the service</a>")}}

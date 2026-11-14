@@ -107,6 +107,24 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<List<PlanUser>?> SearchPlanUsersAsync(string? term, CancellationToken ct = default) =>
         GetAsync<List<PlanUser>>(ApiClients.Identity, $"api/v1/admin/plans/users?q={Uri.EscapeDataString(term ?? "")}", ct);
 
+    /// <summary>
+    /// The app's name, accent colour and company details as set in Settings; readable signed out.
+    /// </summary>
+    public Task<BrandingSettings?> GetBrandingAsync(CancellationToken ct = default) =>
+        GetAsync<BrandingSettings>(ApiClients.Identity, "api/v1/branding", ct);
+
+    /// <summary>
+    /// Saves them, for admins; null when it didn't happen (not an admin).
+    /// </summary>
+    public Task<BrandingSettings?> SaveBrandingAsync(BrandingSettings settings, CancellationToken ct = default) =>
+        SendAsync<BrandingSettings>(ApiClients.Identity, HttpMethod.Put, "api/v1/admin/branding", settings, ct);
+
+    /// <summary>
+    /// What subscriptions bring in over the last <paramref name="days"/> days; null for anyone but an admin.
+    /// </summary>
+    public Task<RevenueReport?> GetRevenueReportAsync(int days, CancellationToken ct = default) =>
+        GetAsync<RevenueReport>(ApiClients.Identity, $"api/v1/admin/revenue?days={days}", ct);
+
     public Task<PlanUser?> SetPlanAsync(string userId, string plan, CancellationToken ct = default) =>
         SendAsync<PlanUser>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/plans/users/{Uri.EscapeDataString(userId)}", new { plan }, ct);
 
@@ -239,6 +257,31 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// </summary>
     public Task<AffiliateReport?> GetAffiliateReportAsync(int days, CancellationToken ct = default) =>
         GetAsync<AffiliateReport>(ApiClients.Catalog, $"api/v1/affiliates/report?days={days}", ct);
+
+    /// <summary>
+    /// The affiliate programs admins set up in Settings, and the others in force; null for anyone but an admin.
+    /// </summary>
+    public Task<AffiliatePrograms?> GetAffiliateProgramsAsync(CancellationToken ct = default) =>
+        GetAsync<AffiliatePrograms>(ApiClients.Catalog, "api/v1/affiliates/programs", ct);
+
+    /// <summary>
+    /// False when it didn't happen: affiliate links are switched off, or the viewer isn't an admin.
+    /// </summary>
+    public async Task<bool> SaveAffiliateProgramAsync(string name, SaveAffiliateProgram program, CancellationToken ct = default) =>
+        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct) is not null;
+
+    /// <summary>
+    /// False when there was nothing to remove, or the viewer may not.
+    /// </summary>
+    public async Task<bool> DeleteAffiliateProgramAsync(string name, CancellationToken ct = default) =>
+        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct) is not null;
+
+    /// <summary>
+    /// Adds a test program for each main streaming service that has none; how many were added, or null when it
+    /// didn't happen (switched off, or not an admin).
+    /// </summary>
+    public Task<int?> AddStarterAffiliateProgramsAsync(CancellationToken ct = default) =>
+        SendAsync<int?>(ApiClients.Catalog, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
 
     /// <summary>
     /// Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.
@@ -385,6 +428,12 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
 
     public Task<WatchOrder?> GetWatchOrderAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<WatchOrder>(ApiClients.Catalog, $"api/v1/shows/{showId}/universe/watch-order", ct, cacheForOffline: true);
+
+    /// <summary>
+    /// People in the catalog's casts whose name matches, best known first.
+    /// </summary>
+    public Task<List<PersonMatch>?> SearchPeopleAsync(string term, CancellationToken ct = default) =>
+        GetAsync<List<PersonMatch>>(ApiClients.Catalog, $"api/v1/people/search?q={Uri.EscapeDataString(term)}", ct);
 
     /// <summary>
     /// Catalog shows whose title contains the term, for suggest-as-you-type pickers; no provider import.

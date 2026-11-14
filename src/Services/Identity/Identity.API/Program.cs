@@ -73,6 +73,8 @@ app.MapGet("/api/v1/status", () => new { Service = "identity-api", Status = "ok"
 app.MapProfileApi();
 app.MapFlagsApi();
 app.MapPlansApi();
+app.MapRevenueApi();
+app.MapBrandingApi();
 app.MapFamilyApi();
 app.MapPaymentsApi();
 
