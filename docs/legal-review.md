@@ -87,7 +87,8 @@ Checked in the code on the date above. If one of these changes, the page must.
    checkout and nothing about tax. Selling to EU consumers creates a VAT obligation from the first sale.
 7. **Acceptance at sign-up.** The terms say that creating an account accepts them, but the registration form (the
    sign-in service's) doesn't show them or ask for agreement. A link and a tick box there is the stronger position,
-   and proof of age or of a parent's consent is not collected at all.
+   and proof of age or of a parent's consent is not collected at all. (Since this review, a deployment with a mail
+   account confirms each new account's address before it can be used.)
 8. **The liability cap and the 14-day refund**, for enforceability and for whether the owner wants to offer the
    refund to everyone rather than only where the law requires it.
 9. **TVmaze's licence.** Its data is CC BY-SA, which may require the operator to share its adapted catalog under the

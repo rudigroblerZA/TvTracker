@@ -71,7 +71,7 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     PUBLIC_HOST | API_HOST | OPERATOR_NAME | CONTACT_EMAIL)
       value=$(current "$key")
       [[ -n $value ]] || missing+=("$key") ;;
-    STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
+    STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | SMTP_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
       # Optional: empty until there's an account. Without Stripe's, turn the `payments` flag off (README, Deploying).
       value=$(current "$key") ;;
     *)
