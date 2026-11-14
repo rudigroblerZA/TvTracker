@@ -3,6 +3,36 @@ using TvTracker.Persistence;
 
 namespace Identity.API.Data;
 
+/// <summary>
+/// What admins have set in Settings for the whole site: the app's name and accent colour, and the company behind it.
+/// One row; a field left null falls back to configuration (<see cref="Apis.BrandingApi"/>).
+/// </summary>
+public class SiteSettings
+{
+    /// <summary>
+    /// The one row's key.
+    /// </summary>
+    public const int OnlyId = 1;
+
+    public int Id { get; set; }
+
+    public string? AppName { get; set; }
+
+    public string? AccentColor { get; set; }
+
+    public string? Operator { get; set; }
+
+    public string? ContactEmail { get; set; }
+
+    public string? OperatorAddress { get; set; }
+
+    public string? CompanyNumber { get; set; }
+
+    public string? GoverningLaw { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
 public class UserProfile
 {
     /// <summary>
@@ -182,6 +212,7 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<PaymentReceipt> Receipts => Set<PaymentReceipt>();
     public DbSet<ProcessedPaymentEvent> ProcessedPaymentEvents => Set<ProcessedPaymentEvent>();
+    public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
 
@@ -189,6 +220,19 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<SiteSettings>(entity =>
+        {
+            entity.ToTable("site_settings");
+            entity.Property(s => s.Id).ValueGeneratedNever();
+            entity.Property(s => s.AppName).HasMaxLength(40);
+            entity.Property(s => s.AccentColor).HasMaxLength(7);
+            entity.Property(s => s.Operator).HasMaxLength(120);
+            entity.Property(s => s.ContactEmail).HasMaxLength(256);
+            entity.Property(s => s.OperatorAddress).HasMaxLength(300);
+            entity.Property(s => s.CompanyNumber).HasMaxLength(160);
+            entity.Property(s => s.GoverningLaw).HasMaxLength(80);
+        });
+
         modelBuilder.Entity<UserProfile>(entity =>
         {
             entity.ToTable("profiles");

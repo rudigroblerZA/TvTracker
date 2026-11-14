@@ -28,6 +28,17 @@ public record UpdateProfile(string DisplayName, string? AvatarUrl, string TimeZo
 public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int? TitleCount = null);
 
 /// <summary>
+/// The app's name, accent colour and the company behind it, as an admin set them in Settings; a field left null
+/// keeps what the app was configured with.
+/// </summary>
+/// <param name="CompanyNumber">A phrase, such as "registered in South Africa, no. 2026/123456/07".</param>
+public record BrandingSettings(string? AppName = null, string? AccentColor = null, string? Operator = null, string? ContactEmail = null,
+    string? OperatorAddress = null, string? CompanyNumber = null, string? GoverningLaw = null)
+{
+    public static readonly BrandingSettings None = new();
+}
+
+/// <summary>
 /// A person found by name, with the shows they're best known for.
 /// </summary>
 public record PersonMatch(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
