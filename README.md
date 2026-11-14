@@ -768,10 +768,13 @@ dotnet run -- cleanup                          # delete the users and everything
 - **A search is the search page's:** suggestions as the term is typed, then the search itself with the people search
   beside it. The terms are words in titles, descriptions ("slow burn mystery"), typos and missing apostrophes
   ("breakng bad", "greys anatomy"), which reach the near-spelling matches, and actors' names.
-- **Only what's switched on:** Discover, the feed, tonight, the waiting room, universes, your taste, and the friends
-  and community-insights parts of a show page belong to feature flags. The warm-up asks for each once; one that
-  answers 404 (the flag is off, or it isn't in a free user's plan) is left out and named at the start of the run, so
-  the report isn't full of 404s for features nobody can reach.
+- **Only what's switched on:** the feed, tonight, the waiting room, universes, and the friends and community-insights
+  parts of a show page belong to feature flags the services enforce. The warm-up asks for each once (without counting
+  it); one that answers 404 (the flag is off, or it isn't in a free user's plan) is left out and named at the start of
+  the run. A service that can't be reached counts as on, so it shows in the report as errors.
+- **A term's first search is timed apart** ("a term's first: may import"): the catalog then asks its provider for
+  matches it doesn't have, at most once in six hours a term, and can wait ten seconds for them. So a reads-only run
+  can still add a few shows to the catalog, and that row measures the provider, not the app.
 - **Pacing:** `--ramp-up` (default 10s) starts users evenly; `--think` (default 1s, ±50%) is the pause between pages;
   `--think 0` runs flat out.
 - **Output:** a progress line every 5 seconds (req/s, p95, errors), then a table per endpoint: count, req/s, errors,
