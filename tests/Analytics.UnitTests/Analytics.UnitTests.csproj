@@ -4,6 +4,7 @@
        and the API's on-request calculations (streaks, the essential cut, show value). No database or network. -->
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" VersionOverride="10.0.15" />
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Data\Analytics.Data.csproj" />
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.API\Analytics.API.csproj" />
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
