@@ -445,6 +445,7 @@ else
     identityApi
         .WithEnvironment("Keycloak__Smtp__Host", "mailpit")
         .WithEnvironment("Keycloak__Smtp__Port", "1025")
+        .WithEnvironment("Keycloak__Smtp__Encryption", "none")
         .WithEnvironment("Keycloak__Smtp__From", mailFrom);
     // The app's own email, unless it has an Azure Communication Services account (below).
     if (builder.Configuration["Parameters:email-connection-string"] is not { Length: > 0 })
@@ -645,7 +646,7 @@ if (publishing)
         .WithEnvironment("OFFSITE_ACCESS_KEY", builder.AddParameter("offsite-access-key", ""))
         .WithEnvironment("OFFSITE_SECRET_KEY", builder.AddParameter("offsite-secret-key", "", secret: true))
         .WithEnvironment("OFFSITE_PASSPHRASE", builder.AddParameter("offsite-passphrase", "", secret: true))
-        .WithEnvironment("OFFSITE_KEEP_DAYS", builder.AddParameter("offsite-keep-days"));
+        .WithEnvironment("OFFSITE_KEEP_DAYS", builder.AddParameter("offsite-keep-days", ""));
 
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
     identityApi

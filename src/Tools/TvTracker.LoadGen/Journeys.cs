@@ -313,16 +313,12 @@ public sealed class ShowPool
         // as on, so its feature is visited and shows in the report as errors rather than being quietly left out.
         foreach (var (feature, probe) in Features.Probes)
         {
-            System.Net.HttpStatusCode? status = null;
-            for (var attempt = 0; attempt < 3; attempt++)
+            var path = probe.Replace("{show}", shows[0].ToString());
+            var status = await user.ProbeAsync(path, ct);
+            for (var retry = 0; retry < 2 && IsWaking(status); retry++)
             {
-                status = await user.ProbeAsync(probe.Replace("{show}", shows[0].ToString()), ct);
-                if (status is not (null or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable
-                    or System.Net.HttpStatusCode.GatewayTimeout) || attempt == 2)
-                {
-                    break;
-                }
                 await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                status = await user.ProbeAsync(path, ct);
             }
             if (status != System.Net.HttpStatusCode.NotFound)
             {
@@ -330,6 +326,9 @@ public sealed class ShowPool
             }
         }
     }
+
+    private static bool IsWaking(System.Net.HttpStatusCode? status) => status is null or System.Net.HttpStatusCode.BadGateway
+        or System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.GatewayTimeout;
 
     private readonly HashSet<string> searched = [];
 

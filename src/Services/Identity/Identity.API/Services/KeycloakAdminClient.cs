@@ -14,7 +14,12 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
 {
     private string BaseUrl => (configuration["Identity:Url"] ?? throw new InvalidOperationException("Missing Identity:Url")).TrimEnd('/');
 
-    private string Users => $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}/users";
+    private string RealmUrl => $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
+
+    private string Users => $"{RealmUrl}/users";
+
+    private async Task<JsonObject?> GetRealmAsync(string token, CancellationToken cancellationToken) =>
+        (await SendAsync<JsonObject>(HttpMethod.Get, RealmUrl, token, null, cancellationToken)).Body;
 
     public async Task DeleteUserAsync(string userId, CancellationToken cancellationToken)
     {
@@ -86,6 +91,15 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
             cancellationToken);
 
     /// <summary>
+    /// The same, for the admin in configuration (<c>Keycloak:AdminUsername</c> / <c>AdminPassword</c>); null when
+    /// this service wasn't given one.
+    /// </summary>
+    public async Task<string?> GetMasterAdminTokenAsync(CancellationToken cancellationToken) =>
+        configuration["Keycloak:AdminUsername"] is { Length: > 0 } username && configuration["Keycloak:AdminPassword"] is { Length: > 0 } password
+            ? await GetMasterAdminTokenAsync(username, password, cancellationToken)
+            : null;
+
+    /// <summary>
     /// Sets a confidential client's secret unless it already is that. Null when the realm has no such client, else whether
     /// it changed.
     /// </summary>
@@ -127,15 +141,37 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// </summary>
     public async Task<bool> HardenRealmAsync(string token, CancellationToken cancellationToken)
     {
-        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
-        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        var realm = await GetRealmAsync(token, cancellationToken);
         if (realm is null || (realm["sslRequired"]?.GetValue<string>() == "external" && realm["bruteForceProtected"]?.GetValue<bool>() == true))
         {
             return false;
         }
-        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject { ["sslRequired"] = "external", ["bruteForceProtected"] = true },
+        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token, new JsonObject { ["sslRequired"] = "external", ["bruteForceProtected"] = true },
             cancellationToken);
         return true;
+    }
+
+    /// <summary>
+    /// Brings the realm's mail account in line with configuration (<see cref="MailAccount.FromConfiguration"/>):
+    /// set when the app has one, taken away when it had one and no longer does. Mail comes from the app's name,
+    /// <paramref name="nameInSettings"/> when an admin has set one. Run on start and when that name changes.
+    /// Returns what it did, for the log; null when nothing changed or this service has no Keycloak admin.
+    /// </summary>
+    public async Task<string?> ApplyMailAccountAsync(string? nameInSettings, CancellationToken cancellationToken)
+    {
+        if (await GetMasterAdminTokenAsync(cancellationToken) is not { } token)
+        {
+            return null;
+        }
+        if (MailAccount.FromConfiguration(configuration, MailAccount.AppName(configuration, nameInSettings)) is { } mail)
+        {
+            return await SetMailAccountAsync(token, mail, MailAccount.VerifiesAddresses(configuration), cancellationToken)
+                ? $"Keycloak sends mail through {mail.Host}:{mail.Port} as {mail.FromName} <{mail.From}>"
+                : null;
+        }
+        return await ClearMailAccountAsync(token, cancellationToken)
+            ? "Took the mail account off the Keycloak realm: the app no longer has one"
+            : null;
     }
 
     /// <summary>
@@ -154,10 +190,10 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// compare it with; "changed" is judged on everything else.</item>
     /// </list>
     /// </summary>
-    public async Task<bool> SetMailAccountAsync(string token, MailAccount mail, bool verifyEmail, CancellationToken cancellationToken)
+    private async Task<bool> SetMailAccountAsync(string token, MailAccount mail, bool verifyEmail, CancellationToken cancellationToken)
     {
-        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
-        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        var realm = await GetRealmAsync(token, cancellationToken);
+        var verifying = realm?["verifyEmail"]?.GetValue<bool>() == true;
         var wanted = new JsonObject
         {
             ["host"] = mail.Host,
@@ -171,23 +207,23 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         };
         var current = realm?["smtpServer"] as JsonObject;
         var same = current is not null && wanted.All(w => current[w.Key]?.GetValue<string>() == w.Value!.GetValue<string>())
-            && realm?["verifyEmail"]?.GetValue<bool>() == verifyEmail && realm["resetPasswordAllowed"]?.GetValue<bool>() == true
+            && verifying == verifyEmail && realm?["resetPasswordAllowed"]?.GetValue<bool>() == true
             && MailIsTheApps(realm);
         if (mail.Password is not null)
         {
             wanted["password"] = mail.Password;
         }
         // Before the switch, so a failure part-way is retried rather than leaving people held at the door.
-        if (verifyEmail && realm?["verifyEmail"]?.GetValue<bool>() != true)
+        if (verifyEmail && !verifying)
         {
             await ConfirmExistingAddressesAsync(token, cancellationToken);
         }
-        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject
+        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token, new JsonObject
         {
             ["smtpServer"] = wanted,
             ["verifyEmail"] = verifyEmail,
             ["resetPasswordAllowed"] = true,
-            ["attributes"] = WithMailMark(realm, "true")
+            ["attributes"] = WithMailMark(realm, true)
         }, cancellationToken);
         return !same;
     }
@@ -197,36 +233,16 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// one, and stops asking new accounts to confirm their address (the mail couldn't be sent). Returns whether
     /// there was one to take away; a mail account set by hand in Keycloak's console isn't the app's and stays.
     /// </summary>
-    public async Task<bool> ClearMailAccountAsync(string token, CancellationToken cancellationToken)
+    private async Task<bool> ClearMailAccountAsync(string token, CancellationToken cancellationToken)
     {
-        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
-        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
+        var realm = await GetRealmAsync(token, cancellationToken);
         if (!MailIsTheApps(realm))
         {
             return false;
         }
-        await SendAsync<JsonNode>(HttpMethod.Put, url, token,
-            new JsonObject { ["smtpServer"] = new JsonObject(), ["verifyEmail"] = false, ["attributes"] = WithMailMark(realm, "false") },
+        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token,
+            new JsonObject { ["smtpServer"] = new JsonObject(), ["verifyEmail"] = false, ["attributes"] = WithMailMark(realm, false) },
             cancellationToken);
-        return true;
-    }
-
-    /// <summary>
-    /// The name Keycloak's mail comes from, kept in step with the app's when an admin renames it. Only on a mail
-    /// account the app set; returns whether it changed.
-    /// </summary>
-    public async Task<bool> SetMailNameAsync(string token, string name, CancellationToken cancellationToken)
-    {
-        var url = $"{BaseUrl}/admin/realms/{IdentitySettings.Realm}";
-        var (_, realm) = await SendAsync<JsonObject>(HttpMethod.Get, url, token, null, cancellationToken);
-        if (!MailIsTheApps(realm) || realm?["smtpServer"] is not JsonObject current || current["fromDisplayName"]?.GetValue<string>() == name)
-        {
-            return false;
-        }
-        // The rest goes back as it came, password included: Keycloak gives that as a mask and keeps the stored one for it.
-        var renamed = (JsonObject)current.DeepClone();
-        renamed["fromDisplayName"] = name;
-        await SendAsync<JsonNode>(HttpMethod.Put, url, token, new JsonObject { ["smtpServer"] = renamed }, cancellationToken);
         return true;
     }
 
@@ -240,10 +256,10 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     /// <summary>
     /// The realm's attributes with the mark set. All of them go back: Keycloak drops the ones a save leaves out.
     /// </summary>
-    private static JsonObject WithMailMark(JsonObject? realm, string value)
+    private static JsonObject WithMailMark(JsonObject? realm, bool theApps)
     {
         var attributes = realm?["attributes"] is JsonObject existing ? (JsonObject)existing.DeepClone() : new JsonObject();
-        attributes[MailMark] = value;
+        attributes[MailMark] = theApps ? "true" : "false";
         return attributes;
     }
 
@@ -480,7 +496,7 @@ public sealed record MailAccount(string Host, int Port, string From, string From
     /// The name mail comes from: the one an admin set in Settings, else the one the app was started with.
     /// </summary>
     public static string AppName(IConfiguration configuration, string? fromSettings) =>
-        Text(fromSettings) ?? Text(configuration["Branding:AppName"]) ?? "TV Tracker";
+        Text(fromSettings) ?? Text(configuration["Branding:AppName"]) ?? TvTracker.Branding.DefaultAppName;
 
     private static string? Text(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

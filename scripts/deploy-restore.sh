@@ -26,21 +26,15 @@ tool() { compose run --rm --no-deps -T --entrypoint bash backup /backup.sh "$@";
 # The same, in the container that copies backups off the machine.
 offsite() { compose run --rm --no-deps -T --entrypoint sh offsite /offsite.sh "$@"; }
 
-if [[ $what == --list ]]; then
-  tool list
-  exit
-fi
-if [[ $what == --offsite-list ]]; then
-  offsite list
-  exit
-fi
-if [[ $what == --offsite ]]; then
-  # Brought back into the backups folder first; from there it's a backup like any other.
-  echo "Fetching ${2:?$usage} from the copies off the machine..."
-  what=$(offsite fetch "$2" | tail -1)
-  [[ -n $what ]] || exit 1
-  echo "Fetched $what."
-fi
+case $what in
+  --list) tool list; exit ;;
+  --offsite-list) offsite list; exit ;;
+  --offsite)
+    # Brought back into the backups folder first; from there it's a backup like any other.
+    echo "Fetching ${2:?$usage} from the copies off the machine..."
+    what=$(offsite fetch "$2")
+    echo "Fetched $what." ;;
+esac
 
 echo "Stopping the services..."
 # Postgres stays up; so does nothing that talks to it.
