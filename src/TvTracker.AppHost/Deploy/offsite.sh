@@ -57,8 +57,10 @@ last_copied() { cat /tmp/copied 2> /dev/null || true; }
 last_tried() { cat /tmp/tried 2> /dev/null || true; }
 
 push() {
-  # What an interrupted fetch left behind, once it's a day old.
-  find "$root/.fetch" -maxdepth 0 -mmin +1440 -exec rm -rf {} + 2> /dev/null || true
+  # What an interrupted fetch left behind: nothing in it written for a day, so it isn't one still running.
+  for left in "$root"/.fetch-*; do
+    [ ! -d "$left" ] || [ -n "$(find "$left" -mmin -1440 | head -1)" ] || rm -rf "$left"
+  done
   newest=$(newest_local)
   [ -n "$newest" ] || return 0
   echo "$newest" > /tmp/tried
@@ -77,9 +79,12 @@ push() {
   fi
   # Old copies go, once for each new backup (again next hour if it fails), and only while new ones are arriving.
   if [ "$newest" != "$(cat /tmp/pruned 2> /dev/null || true)" ] && [ -n "$(find "$root/$newest" -maxdepth 0 -mtime -2)" ]; then
-    rclone delete vault:backups --min-age "${keep_days}d" || return 1
-    rclone rmdirs vault:backups --leave-root || return 1
-    echo "$newest" > /tmp/pruned
+    # The copy above stands whether or not this works: a key that may add but not delete is a fair choice.
+    if rclone delete vault:backups --min-age "${keep_days}d" && rclone rmdirs vault:backups --leave-root; then
+      echo "$newest" > /tmp/pruned
+    else
+      echo "$(date -u +%FT%TZ) couldn't delete copies older than $keep_days days (may the key delete?); trying again in an hour" >&2
+    fi
   fi
 }
 
@@ -92,9 +97,9 @@ fetch() {
     || { echo "No backup named '$name' in $OFFSITE_BUCKET." >&2; exit 1; }
   if [ ! -d "$root/$name" ]; then
     # Under another name until it's whole, as a new backup is (but not .partial-*, which backup.sh clears).
-    rm -rf "$root/.fetch"
-    rclone copy "vault:backups/$name" "$root/.fetch" --retries 1 > /tmp/fetch.log 2>&1 || {
-      rm -rf "$root/.fetch"
+    rm -rf "$root/.fetch-$name"
+    rclone copy "vault:backups/$name" "$root/.fetch-$name" --retries 1 > /tmp/fetch.log 2>&1 || {
+      rm -rf "$root/.fetch-$name"
       if grep -q "bad password" /tmp/fetch.log; then
         echo "OFFSITE_PASSPHRASE isn't the one these backups were encrypted with." >&2
       else
@@ -102,7 +107,7 @@ fetch() {
       fi
       exit 1
     }
-    mv "$root/.fetch" "$root/$name"
+    mv "$root/.fetch-$name" "$root/$name"
   fi
   echo "$name"
 }

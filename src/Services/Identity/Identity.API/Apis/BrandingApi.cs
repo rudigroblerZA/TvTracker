@@ -67,14 +67,16 @@ public static partial class BrandingApi
 
     /// <summary>
     /// Keycloak's own mail (password reset, confirming an address) comes from the app's name too, so a rename reaches
-    /// it. Tried on every save, so one that didn't reach Keycloak is put right by saving again. The settings are
-    /// saved either way; the next start sets the name too.
+    /// it. Tried on every save, so one that didn't reach Keycloak is put right by saving again, but for a few seconds
+    /// at most: the settings are saved either way, and the next start sets the name too.
     /// </summary>
     private static async Task RenameMailAsync(string? name, KeycloakAdminClient keycloak, ILogger logger, CancellationToken ct)
     {
+        using var patience = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        patience.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            await keycloak.RenameMailAsync(name, ct);
+            await keycloak.RenameMailAsync(name, patience.Token);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
