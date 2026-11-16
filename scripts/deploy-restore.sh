@@ -32,9 +32,9 @@ case $what in
   --offsite)
     # Brought back into the backups folder first; from there it's a backup like any other.
     echo "Fetching ${2:?$usage} from the copies off the machine..."
-    # The name is the last line; nothing has been stopped yet, so a fetch that gave none ends here.
+    # The name is the last line. Nothing has been stopped yet, so a fetch that left no such backup ends here.
     what=$(offsite fetch "$2" | tail -1)
-    [[ $what == 20* ]] || { echo "Couldn't fetch a backup." >&2; exit 1; }
+    [[ -n $what && -d $home/backups/$what ]] || { echo "The fetch left no backup in $home/backups." >&2; exit 1; }
     echo "Fetched $what." ;;
 esac
 

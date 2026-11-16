@@ -43,10 +43,6 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!keycloak.HasMasterAdmin)
-        {
-            return;
-        }
         var secrets = config.GetSection("Keycloak:ClientSecrets").GetChildren()
             .Where(c => c.Value is { Length: > 0 })
             .ToDictionary(c => c.Key, c => c.Value!);
@@ -59,7 +55,11 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
 
         await KeycloakRetry.RunAsync(logger, "set the realm's client secrets", async () =>
         {
-            var token = (await keycloak.GetMasterAdminTokenAsync(stoppingToken))!;
+            // Without the master realm's admin there's nothing this can set.
+            if (await keycloak.GetMasterAdminTokenAsync(stoppingToken) is not { } token)
+            {
+                return;
+            }
             foreach (var (clientId, name) in serviceClients)
             {
                 if (await keycloak.EnsureServiceClientAsync(token, clientId, name, secrets[clientId], stoppingToken))

@@ -445,6 +445,9 @@ else
     identityApi
         .WithEnvironment("Keycloak__Smtp__Host", "mailpit")
         .WithEnvironment("Keycloak__Smtp__Port", "1025")
+        // Said outright: Mailpit speaks plain SMTP, whatever user or encryption a developer's own settings still hold.
+        .WithEnvironment("Keycloak__Smtp__Encryption", "none")
+        .WithEnvironment("Keycloak__Smtp__User", "")
         .WithEnvironment("Keycloak__Smtp__From", mailFrom);
     // The app's own email, unless it has an Azure Communication Services account (below).
     if (builder.Configuration["Parameters:email-connection-string"] is not { Length: > 0 })

@@ -100,11 +100,6 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
             : null;
 
     /// <summary>
-    /// Whether this service was given the master realm's admin.
-    /// </summary>
-    public bool HasMasterAdmin => configuration["Keycloak:AdminUsername"] is { Length: > 0 } && configuration["Keycloak:AdminPassword"] is { Length: > 0 };
-
-    /// <summary>
     /// Sets a confidential client's secret unless it already is that. Null when the realm has no such client, else whether
     /// it changed.
     /// </summary>
@@ -177,30 +172,33 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
         }
         else if (await SetMailAccountAsync(token, mail, MailAccount.VerifiesAddresses(configuration), cancellationToken))
         {
-            logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {From}", mail.Host, mail.Port, mail.From);
+            logger.LogInformation("Keycloak sends mail through {Host}:{Port} as {FromName} <{From}>", mail.Host, mail.Port, mail.FromName, mail.From);
         }
     }
 
     /// <summary>
     /// The name Keycloak's mail comes from, kept in step with the app's when an admin saves the settings. It changes
     /// the name and nothing else, and only on a mail account the app set: one set by hand in Keycloak's console, and
-    /// whether addresses are confirmed, are left as they are. The rest of the account goes back as configuration has
-    /// it, password included, since Keycloak never gives the stored one back.
+    /// whether addresses are confirmed, are left as they are. The rest of the account goes back as the realm has it;
+    /// Keycloak gives the password as a mask and keeps the stored one when it gets the mask back, as its own console
+    /// relies on.
     /// </summary>
     public async Task RenameMailAsync(string? nameInSettings, CancellationToken cancellationToken)
     {
-        if (await GetMasterAdminTokenAsync(cancellationToken) is not { } token
-            || MailAccount.FromConfiguration(configuration, MailAccount.AppName(configuration, nameInSettings)) is not { } mail)
+        if (await GetMasterAdminTokenAsync(cancellationToken) is not { } token)
         {
             return;
         }
+        var name = MailAccount.FromConfiguration(configuration, MailAccount.AppName(configuration, nameInSettings))?.FromName;
         var realm = await GetRealmAsync(token, cancellationToken);
-        if (!MailIsTheApps(realm) || realm?["smtpServer"]?["fromDisplayName"]?.GetValue<string>() == mail.FromName)
+        if (name is null || !MailIsTheApps(realm) || realm?["smtpServer"] is not JsonObject current || current["fromDisplayName"]?.GetValue<string>() == name)
         {
             return;
         }
-        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token, new JsonObject { ["smtpServer"] = SmtpServer(mail) }, cancellationToken);
-        logger.LogInformation("Keycloak's mail now comes from {Name}", mail.FromName);
+        var renamed = (JsonObject)current.DeepClone();
+        renamed["fromDisplayName"] = name;
+        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token, new JsonObject { ["smtpServer"] = renamed }, cancellationToken);
+        logger.LogInformation("Keycloak's mail now comes from {Name}", name);
     }
 
     /// <summary>
