@@ -647,11 +647,20 @@ aspire secret delete "Parameters:tvdb-api-key"
 ```
 
 It is the same store `dotnet user-secrets` writes to, so values set either way are seen by both. One that isn't
-set takes its development value.
+set takes its development value (AppHost.cs, `Secret`); a deployment has no such defaults and takes every one
+from its `.env`.
 
 **Terminals:** the `postgres` and `redis` resources each have a **REPL** command in the dashboard (the resource's
 menu), or `aspire resource postgres repl`. It opens a signed-in `psql` or `redis-cli` inside the running server, as
 a tab in the dashboard's terminal dock; `aspire terminal ps` lists the open ones. Only when running locally.
+
+- **The session is in the dashboard.** The Aspire CLI can open and list these sessions but not attach to them.
+  For `psql` in a shell without the dashboard:
+  `docker exec -it <the postgres container> sh -c 'PGPASSWORD=$POSTGRES_PASSWORD psql -U postgres'`.
+- **Anyone who can use the dashboard gets these shells,** signed in as the database's superuser and into the Redis
+  that holds sign-in sessions. That is fine on your own machine, where the dashboard asks for its login token. Don't
+  share the dashboard through a tunnel or a forwarded port with people you wouldn't give the databases to.
+- **A preview feature of Aspire:** the terminal dock and the REPL command may change with an Aspire update.
 
 ### Unit tests and CI
 
