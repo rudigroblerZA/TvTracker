@@ -595,7 +595,8 @@ link opens the web app's address in the browser and is counted there, as a signe
   ```
 
   A program that isn't valid isn't used, and the report says so.
-- **Sales** come from the network's server-to-server postback, to the mobile gateway's public address:
+- **Sales** come from the network's server-to-server postback, to the mobile gateway's public address
+  (`https://PUBLIC_HOST/api` in a deployment):
   `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
   key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
   counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
@@ -1907,7 +1908,7 @@ compose file (`aspire publish`), builds each service's container image, fills in
 
 ```bash
 # On the server, in a checkout of this repository. First run:
-PUBLIC_HOST=tv.example.com API_HOST=api.tv.example.com \
+PUBLIC_HOST=tv.example.com \
 OPERATOR_NAME="Example Ltd" CONTACT_EMAIL=hello@example.com \
 scripts/deploy.sh            # deploys into ~/tvtracker; pass another directory to use that
 
@@ -1923,8 +1924,11 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 **What you get**
 
 - **One front door.** Caddy is the only container with ports on the machine. It gets and renews Let's Encrypt
-  certificates, redirects http to https, and sends `PUBLIC_HOST` to the web app and `API_HOST` to the mobile gateway
-  (which is also where Stripe and affiliate networks send their webhooks). Nothing else is reachable from outside.
+  certificates, redirects http to https, and sends `PUBLIC_HOST` to the web app. Nothing else is reachable from outside.
+- **The mobile gateway is under `/api`** on the same host: `https://PUBLIC_HOST/api/catalog/api/v1/shows` reaches the
+  gateway as `/catalog/api/v1/shows`. It is what the phone app talks to, and where Stripe and affiliate networks
+  send their webhooks. One host name and one DNS record are enough. Set `API_HOST` in `.env` (and point its DNS at
+  the machine) to give the gateway a host name of its own as well, such as `api.tv.example.com`; both then work.
 - **Sign-in through the site.** Keycloak runs in production mode on Postgres and has no address of its own: the web
   app passes its login pages on under `https://PUBLIC_HOST/realms/…`, so its admin console isn't exposed. The realm is
   the development one without its demo and admin users and client secrets, requiring HTTPS and locking accounts
@@ -2006,7 +2010,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 
 | Setting | For |
 | --- | --- |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://API_HOST/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
 | `OFFSITE_BUCKET` and the other `OFFSITE_*` | Copies of the backups off the machine, encrypted (see Backups, above) |
 | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
@@ -2056,7 +2060,7 @@ Deploying works (above). This is what still stands between that and charging the
 - **Admins by username.** `Admin:Users` and `Moderation:Users` match usernames, and registration is open: create
   those accounts before telling anyone the address.
 - **Mobile.** The app is built for local hosts: remove `usesCleartextTraffic` and `allowBackup` (Android) and
-  `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `API_HOST` and `PUBLIC_HOST`.
+  `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `https://PUBLIC_HOST/api/` (the gateway) and `PUBLIC_HOST`.
 - **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
   network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
   charging for the app, and TMDB's and TheTVDB's before turning those on.

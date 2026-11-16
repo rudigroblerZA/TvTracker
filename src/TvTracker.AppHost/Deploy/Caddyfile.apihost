@@ -1,0 +1,7 @@
+
+# The gateway under a host name of its own as well (API_HOST), for a deployment that has one. The paths are the
+# same as under PUBLIC_HOST/api, without the prefix.
+{$API_HOST} {
+	encode zstd gzip
+	reverse_proxy {$API_UPSTREAM}
+}
