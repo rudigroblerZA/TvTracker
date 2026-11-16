@@ -6,11 +6,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Passed to the web app and the services that put it in text; the phone has its own (MobileSettings.AppName).
 var appName = builder.Configuration["Branding:AppName"] is { Length: > 0 } configuredName ? configuredName : "TV Tracker";
 
-// Secrets are Aspire secret parameters (Parameters:<name>: user secrets, environment variables, or azd's environment
-// secrets in a deployment). Running locally, one that isn't set takes its development value, which matches
-// Realms/tvtracker-realm.json; a publish never carries those, so a deployment has to be given every one. Identity.API puts
-// them into Keycloak's realm on start (client secrets: RealmSecretsSeeder; the app admin's password: AdminAccountSeeder), so
-// a realm imported from the file doesn't keep the development values.
+// Secrets are Aspire secret parameters (Parameters:<name>: locally the AppHost's user secrets, set with `aspire secret
+// set`; else environment variables, or azd's environment secrets in a deployment). Running locally, one that isn't set
+// takes its development value, which matches Realms/tvtracker-realm.json; a publish never carries those, so a
+// deployment has to be given every one. Identity.API puts them into Keycloak's realm on start (client secrets:
+// RealmSecretsSeeder; the app admin's password: AdminAccountSeeder), so a realm imported from the file doesn't keep the
+// development values.
 IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
 {
     if (!builder.ExecutionContext.IsPublishMode && string.IsNullOrEmpty(builder.Configuration[$"Parameters:{name}"]))
@@ -52,6 +53,33 @@ var socialDb = postgres.AddDatabase("socialdb");
 // Redis holds the web app's server-side tokens and the keys that protect its sign-in cookie, so it keeps its data
 // across restarts: without the volume, restarting Redis signs everyone out.
 var redis = builder.AddRedis("redis").WithDataVolume();
+
+// Terminals, while developing: a psql session on the Postgres server and a redis-cli on Redis, each a tab in the
+// dashboard's terminal view (or `aspire terminal attach psql`). They start when asked for (the resource's Start
+// button), since nothing needs them running, and end when the session is quit.
+if (!publishing)
+{
+#pragma warning disable ASPIRETERMINAL001 // Terminals are a preview feature of Aspire.
+    builder.AddContainer("psql", "pgvector/pgvector", "0.8.7-pg18-trixie")
+        .WithEntrypoint("psql")
+        .WithEnvironment("PGHOST", postgres.Resource.Name)
+        .WithEnvironment("PGUSER", "postgres")
+        .WithEnvironment("PGPASSWORD", postgres.Resource.PasswordParameter)
+        .WithEnvironment("PGDATABASE", "postgres")
+        .WithTerminal()
+        .WithParentRelationship(postgres)
+        .WithExplicitStart();
+    builder.AddContainer("redis-cli", "docker.io/library/redis", "8.6")
+        // With a development certificate Aspire's Redis speaks TLS on 6379 and plainly on 6380; without one, plainly
+        // on 6379. The plain port, whichever it is, so the session needs no certificate.
+        .WithEntrypoint("/bin/sh")
+        .WithArgs("-c", $"redis-cli -h {redis.Resource.Name} -p 6380 ping > /dev/null 2>&1 && exec redis-cli -h {redis.Resource.Name} -p 6380 || exec redis-cli -h {redis.Resource.Name}")
+        .WithEnvironment("REDISCLI_AUTH", redis.Resource.PasswordParameter!)
+        .WithTerminal()
+        .WithParentRelationship(redis)
+        .WithExplicitStart();
+#pragma warning restore ASPIRETERMINAL001
+}
 
 // The queues are durable (events waiting to be handled, retries, dead letters); the volume is what keeps them when
 // the broker's container is replaced.

@@ -15,6 +15,8 @@ of when a show is back, search by meaning and computed show tags. Many more feat
 
 - .NET 10 SDK
 - Docker Desktop or Podman (Aspire runs PostgreSQL, Redis, RabbitMQ, Keycloak and Docker Model Runner as containers)
+- The Aspire CLI (`dotnet tool install -g Aspire.Cli`, or Aspire's install script): the AppHost uses its bundle
+  (`AspireUseCliBundle`), and it gives `aspire secret` and `aspire terminal` below
 - For the mobile app only: the MAUI workload (`dotnet workload install maui`), plus Xcode for iOS or the Android SDK for Android
 
 ## Run it
@@ -497,9 +499,9 @@ takes three or four requests, so a history import adds missing shows more slowly
 
   ```bash
   cd src/TvTracker.AppHost
-  dotnet user-secrets set "Catalog:Provider" "tvdb"
-  dotnet user-secrets set "Parameters:tvdb-api-key" "<your key>"
-  dotnet user-secrets set "Parameters:tvdb-pin" "<a subscriber's PIN>"   # only for a user-supported key
+  aspire secret set "Catalog:Provider" "tvdb"
+  aspire secret set "Parameters:tvdb-api-key" "<your key>"
+  aspire secret set "Parameters:tvdb-pin" "<a subscriber's PIN>"   # only for a user-supported key
   ```
 
   A deployment gives `tvdb-api-key` like its other secrets. With the parameter unset, the Aspire dashboard asks for
@@ -632,6 +634,26 @@ Useful local addresses:
 | Keycloak admin console | http://localhost:8080 (admin / admin) |
 | RabbitMQ management | link on the Aspire dashboard |
 | flagd (feature flags) | `src/TvTracker.AppHost/Flags/flagd.json`; see [Feature flags](#feature-flags) |
+
+### Secrets and terminals
+
+**Secrets** the AppHost needs locally (an API key, a mail account, Stripe's test key) are its secret parameters,
+kept in its user secrets, outside the repository. Set them with the Aspire CLI, from `src/TvTracker.AppHost`:
+
+```bash
+aspire secret set "Parameters:tvdb-api-key" "<your key>"
+aspire secret list            # what's set
+aspire secret delete "Parameters:tvdb-api-key"
+```
+
+It is the same store `dotnet user-secrets` writes to, so values set either way are seen by both. One that isn't
+set takes its development value (AppHost.cs, `Secret`); a deployment has every one in its `.env`.
+
+**Terminals:** two resources give an interactive session while the app runs, `psql` on the Postgres server and
+`redis-cli` on Redis. They don't start with the app: press Start on the resource in the dashboard (or
+`aspire resource psql start`), then open its terminal there or run `aspire terminal attach psql`. Quitting the
+session (`\q`, `quit`) stops the resource. Both sign in with the server's own password, so there's nothing to type.
+Terminals are a preview feature of Aspire.
 
 ### Unit tests and CI
 
@@ -1135,7 +1157,7 @@ Postmark, Brevo, a mailbox at your domain's host).
     | `SMTP_PORT` | 587 when empty. 465 uses SSL; every other port STARTTLS, except 25 and 1025 with no sign-in, which use none |
     | `SMTP_ENCRYPTION` | `starttls`, `ssl` or `none`, when the port doesn't say it |
 
-  - locally: `dotnet user-secrets set "Parameters:smtp-host" "<host>"` and likewise `smtp-from`, `smtp-user`,
+  - locally: `aspire secret set "Parameters:smtp-host" "<host>"` and likewise `smtp-from`, `smtp-user`,
     `smtp-password`, `smtp-port` and `smtp-encryption`, in `src/TvTracker.AppHost`.
 - **Locally there's a mail catcher:** with no mail account set, the AppHost runs [Mailpit](https://mailpit.axllent.org)
   and points Keycloak and the app's own email at it. Open the `mailpit` resource's link in the Aspire dashboard to
@@ -1174,7 +1196,7 @@ and (already confirmed) email address Google gives.
 - **Give it to the app:** the client's id and secret.
   - deployed: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the deployment's `.env`, then run `scripts/deploy.sh`
     again.
-  - locally: `dotnet user-secrets set "Parameters:google-client-id" "<id>"` and `"Parameters:google-client-secret"`,
+  - locally: `aspire secret set "Parameters:google-client-id" "<id>"` and `"Parameters:google-client-secret"`,
     in `src/TvTracker.AppHost`.
 - **What happens:** Identity.API creates Keycloak's Google identity provider on start, or brings it up to date
   (`RealmSecretsSeeder`). With neither value set nothing is touched; taking them away again doesn't remove a provider
