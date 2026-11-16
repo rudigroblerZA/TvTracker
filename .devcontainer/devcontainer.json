@@ -1,0 +1,40 @@
+{
+	"name": "Aspire",
+	"image": "mcr.microsoft.com/devcontainers/base:3-ubuntu24.04",
+	"features": {
+		"ghcr.io/microsoft/aspire-devcontainer-feature/aspire:2": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		},
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "os-provided"
+		},
+		"ghcr.io/devcontainers-extra/features/uv:1": {},
+		"ghcr.io/devcontainers/features/dotnet:2": {
+			"version": "10.0"
+		},
+		"ghcr.io/devcontainers/features/powershell:1": {}
+	},
+	"hostRequirements": {
+		"cpus": 8,
+		"memory": "32gb",
+		"storage": "64gb"
+	},
+	"remoteEnv": {
+		"SSL_CERT_DIR": "/usr/lib/ssl/certs:/home/vscode/.aspnet/dev-certs/trust"
+	},
+	"postStartCommand": "aspire certs trust --non-interactive",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"microsoft-aspire.aspire-vscode",
+				"GitHub.copilot-chat",
+				"dbaeumer.vscode-eslint",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-dotnettools.csdevkit"
+			]
+		}
+	}
+}
