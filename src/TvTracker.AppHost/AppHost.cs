@@ -34,7 +34,8 @@ var publishing = builder.ExecutionContext.IsPublishMode;
 // (trixie, whose collation version existing databases were created with) as Aspire's default postgres image.
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "0.8.7-pg18-trixie")
-    // While developing: an "open a REPL" command on the resource, a signed-in psql in the dashboard's terminal dock.
+    // While developing: a REPL command on the resource, a signed-in psql in the dashboard's terminal dock (a preview
+    // feature of Aspire). Whoever can use the dashboard gets it, as the superuser: keep the dashboard to yourself.
     .WithRepl()
     .WithLifetime(ContainerLifetime.Persistent);
 // Same volume WithDataVolume would create, but mounted where Postgres 18 keeps its data: WithDataVolume picks the path
