@@ -6,11 +6,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Passed to the web app and the services that put it in text; the phone has its own (MobileSettings.AppName).
 var appName = builder.Configuration["Branding:AppName"] is { Length: > 0 } configuredName ? configuredName : "TV Tracker";
 
-// Secrets are Aspire secret parameters (Parameters:<name>: locally the AppHost's user secrets, set with
-// `aspire secret set`; else environment variables, or azd's environment secrets in a deployment). Running locally, one that isn't set takes its development value, which matches
-// Realms/tvtracker-realm.json; a publish never carries those, so a deployment has to be given every one. Identity.API puts
-// them into Keycloak's realm on start (client secrets: RealmSecretsSeeder; the app admin's password: AdminAccountSeeder), so
-// a realm imported from the file doesn't keep the development values.
+// Secrets are Aspire secret parameters (Parameters:<name>: locally the AppHost's user secrets, set with `aspire secret
+// set`; else environment variables, or azd's environment secrets in a deployment). Running locally, one that isn't set
+// takes its development value, which matches Realms/tvtracker-realm.json; a publish never carries those, so a
+// deployment has to be given every one. Identity.API puts them into Keycloak's realm on start (client secrets:
+// RealmSecretsSeeder; the app admin's password: AdminAccountSeeder), so a realm imported from the file doesn't keep the
+// development values.
 IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
 {
     if (!builder.ExecutionContext.IsPublishMode && string.IsNullOrEmpty(builder.Configuration[$"Parameters:{name}"]))
