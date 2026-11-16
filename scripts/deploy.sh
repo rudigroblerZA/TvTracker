@@ -7,11 +7,12 @@
 # what must survive between deploys: .env (settings and generated secrets), the feature-flag overrides, and the
 # compose file. Run it again to deploy a newer checkout; values already in .env are kept.
 #
-# The first run needs four things, as environment variables (later runs read them from .env):
-#   PUBLIC_HOST     the site's host name, e.g. tv.example.com (its DNS must point at this machine)
-#   API_HOST        the mobile gateway's host name, e.g. api.tv.example.com (same)
+# The first run needs three things, as environment variables (later runs read them from .env):
+#   PUBLIC_HOST     the site's host name, e.g. tv.example.com (its DNS must point at this machine). The mobile
+#                   gateway is under it, at https://PUBLIC_HOST/api
 #   OPERATOR_NAME   who runs the site, shown in the privacy policy and terms
 #   CONTACT_EMAIL   where people can write to
+# Optional: API_HOST, a host name of its own for the gateway as well, e.g. api.tv.example.com (its DNS likewise).
 #
 # Needs: Docker with the compose plugin, the .NET SDK (global.json), the Aspire CLI (dotnet tool install -g Aspire.Cli),
 # jq and openssl.
@@ -60,7 +61,8 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     *_PORT)
       # The port .NET's container images listen on.
       value=8080 ;;
-    CADDY_BINDMOUNT_0) value=$apphost/Deploy/Caddyfile ;;
+    # Written below, from the checked-in one.
+    CADDY_BINDMOUNT_0) value=$home/Caddyfile ;;
     FLAGD_BINDMOUNT_0) value=$home/flags ;;
     KEYCLOAK_BINDMOUNT_0) value=$home/keycloak ;;
     BACKUP_BINDMOUNT_0) value=$apphost/Deploy/backup.sh ;;
@@ -73,10 +75,10 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     # Backups: how long they're kept, and the hour (UTC) the daily one is made.
     BACKUP_KEEP_DAYS) value=$(current "$key"); value=${value:-14} ;;
     BACKUP_HOUR_UTC) value=$(current "$key"); value=${value:-3} ;;
-    PUBLIC_HOST | API_HOST | OPERATOR_NAME | CONTACT_EMAIL)
+    PUBLIC_HOST | OPERATOR_NAME | CONTACT_EMAIL)
       value=$(current "$key")
       [[ -n $value ]] || missing+=("$key") ;;
-    STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | SMTP_* | OFFSITE_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
+    API_HOST | STRIPE_* | TMDB_* | TVDB_* | EMAIL_* | GOOGLE_* | SMTP_* | OFFSITE_* | OPERATOR_ADDRESS | COMPANY_NUMBER | GOVERNING_LAW)
       # Optional: empty until there's an account. Without Stripe's, turn the `payments` flag off (README, Deploying).
       value=$(current "$key") ;;
     *)
@@ -95,6 +97,11 @@ echo "IMPORT_CLI_IMAGE=tvtracker/import-cli:$tag" >> "$new_env"
 # Keys from an earlier deploy that this publish no longer asks for are kept, in case a later one does again.
 grep -v -f <(sed 's/=.*/=/; s/^/^/' "$new_env") "$env_file" >> "$new_env" || true
 cp "$new_env" "$env_file"
+
+# The front door's routes: the site, with the gateway under /api, and the gateway's own host name when it has one.
+# Written in place, so the file the running Caddy has open is the one that changes; it's told to re-read it below.
+cat "$apphost/Deploy/Caddyfile" > "$home/Caddyfile"
+[[ -z $(current API_HOST) ]] || cat "$apphost/Deploy/Caddyfile.apihost" >> "$home/Caddyfile"
 
 # Feature flags: the checked-in defaults (replaced on every deploy), and the overrides the flags page writes (kept).
 cp "$apphost/Flags/flagd.json" "$home/flags/flagd.json"
@@ -135,9 +142,15 @@ build_image import-cli "$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.cspr
 
 echo "Starting..."
 docker compose --project-name tvtracker --project-directory "$home" up -d --remove-orphans
+# A Caddy that was already running keeps the routes it started with until told otherwise.
+docker compose --project-name tvtracker --project-directory "$home" exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
+  > /dev/null 2>&1 || true
 
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
+gateway=https://$(current PUBLIC_HOST)/api
+[[ -z $(current API_HOST) ]] || gateway="$gateway and https://$(current API_HOST)"
+echo "The mobile gateway: $gateway"
 echo "The admin signs in as 'admin' with APP_ADMIN_PASSWORD from $env_file."
 echo "To fill the catalog in bulk: scripts/deploy-import.sh top 500 (README, Deploying)."
 if [[ -n $(current OFFSITE_BUCKET) ]]; then

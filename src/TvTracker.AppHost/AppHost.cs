@@ -590,13 +590,15 @@ else
 
 if (publishing)
 {
-    // The site's host name (tv.example.com) and the mobile gateway's (api.tv.example.com); both must point at the machine.
+    // The site's host name (tv.example.com), which must point at the machine. The mobile gateway is under it, at /api;
+    // api-host gives it a host name of its own as well (api.tv.example.com), for a deployment that wants one.
     var publicHost = builder.AddParameter("public-host");
-    var apiHost = builder.AddParameter("api-host");
+    var apiHost = builder.AddParameter("api-host", "");
     var publicUrl = ReferenceExpression.Create($"https://{publicHost}");
 
     // The front door: Caddy, the only container with ports on the machine. It gets and renews the certificates, and
-    // sends the site's host to the web app and the gateway's to the mobile gateway. Nothing else is reachable from outside.
+    // sends /api to the mobile gateway and the rest of the site to the web app (Deploy/Caddyfile, which scripts/deploy.sh
+    // copies into the deployment and extends when there's an api-host). Nothing else is reachable from outside.
     builder.AddContainer("caddy", "docker.io/library/caddy", "2.10")
         .WithBindMount("./Deploy/Caddyfile", "/etc/caddy/Caddyfile", isReadOnly: true)
         .WithVolume("tvtracker-caddy-data", "/data")
