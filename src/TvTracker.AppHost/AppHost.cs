@@ -493,6 +493,7 @@ if ((builder.Configuration["Digest:BaseUrl"] ?? webPublicUrl) is { Length: > 0 }
 }
 
 var webApp = builder.AddProject<Projects.WebApp>("webapp")
+    .WithExternalHttpEndpoints()
     .WithEnvironment("Branding__AppName", appName)
     // Who runs the app and how to reach them, for the privacy policy and terms (README, Privacy and terms).
     .WithEnvironment("Catalog__Provider", catalogProvider ?? "")
