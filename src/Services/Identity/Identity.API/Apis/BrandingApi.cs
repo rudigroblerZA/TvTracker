@@ -57,34 +57,28 @@ public static partial class BrandingApi
             settings = new SiteSettings { Id = SiteSettings.OnlyId };
             db.SiteSettings.Add(settings);
         }
-        var nameBefore = settings.AppName;
         (settings.AppName, settings.AccentColor, settings.Operator, settings.ContactEmail, settings.OperatorAddress, settings.CompanyNumber,
             settings.GoverningLaw, settings.UpdatedAtUtc) = (cleaned.AppName, cleaned.AccentColor, cleaned.Operator, cleaned.ContactEmail,
             cleaned.OperatorAddress, cleaned.CompanyNumber, cleaned.GoverningLaw, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
-        if (settings.AppName != nameBefore)
-        {
-            await RenameMailAsync(settings.AppName, keycloak, loggers.CreateLogger(typeof(BrandingApi)), ct);
-        }
+        await RenameMailAsync(settings.AppName, keycloak, loggers.CreateLogger(typeof(BrandingApi)), ct);
         return TypedResults.Ok(ToDto(settings));
     }
 
     /// <summary>
     /// Keycloak's own mail (password reset, confirming an address) comes from the app's name too, so a rename reaches
-    /// it. The settings are saved either way: if Keycloak can't be reached now, the next start sets the name.
+    /// it. Tried on every save, so one that didn't reach Keycloak is put right by saving again. The settings are
+    /// saved either way; the next start sets the name too.
     /// </summary>
     private static async Task RenameMailAsync(string? name, KeycloakAdminClient keycloak, ILogger logger, CancellationToken ct)
     {
         try
         {
-            if (await keycloak.ApplyMailAccountAsync(name, ct) is { } done)
-            {
-                logger.LogInformation("{Outcome}", done);
-            }
+            await keycloak.RenameMailAsync(name, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Couldn't rename Keycloak's mail; it's set on the next start");
+            logger.LogWarning(ex, "Couldn't rename Keycloak's mail; saving again or the next start sets it");
         }
     }
 

@@ -57,24 +57,29 @@ last_copied() { cat /tmp/copied 2> /dev/null || true; }
 last_tried() { cat /tmp/tried 2> /dev/null || true; }
 
 push() {
+  # What an interrupted fetch left behind, once it's a day old.
+  find "$root/.fetch" -maxdepth 0 -mmin +1440 -exec rm -rf {} + 2> /dev/null || true
   newest=$(newest_local)
   [ -n "$newest" ] || return 0
   echo "$newest" > /tmp/tried
+  # Each step says so when it fails: this runs as "push || ...", where the shell wouldn't stop on its own.
   # Finished backups only (one still being written is under another name), and none the storage would delete again.
-  rclone copy "$root" vault:backups --include '/20*/**' --max-age "${keep_days}d" --transfers 2
-  [ ! -f /flags/overrides.json ] || rclone copyto /flags/overrides.json vault:config/overrides.json
-  [ ! -f /deploy.env ] || rclone copyto /deploy.env vault:config/env
-  # The rest is once for each new backup.
-  [ "$newest" != "$(last_copied)" ] || return 0
-  # Read back through the encryption: what's there is what was sent, and this passphrase opens it.
-  rclone cryptcheck "$root/$newest" "vault:backups/$newest" --one-way > /dev/null 2>&1 \
-    || { echo "The copy of $newest doesn't match what was sent." >&2; return 1; }
-  echo "$(date -u +%FT%TZ) copied $newest to $OFFSITE_BUCKET"
-  echo "$newest" > /tmp/copied
-  # Old copies go, but only while new ones are arriving.
-  if [ -n "$(find "$root/$newest" -maxdepth 0 -mtime -2)" ]; then
-    rclone delete vault:backups --min-age "${keep_days}d"
-    rclone rmdirs vault:backups --leave-root
+  rclone copy "$root" vault:backups --include '/20*/**' --max-age "${keep_days}d" --transfers 2 || return 1
+  [ ! -f /flags/overrides.json ] || rclone copyto /flags/overrides.json vault:config/overrides.json || return 1
+  [ ! -f /deploy.env ] || rclone copyto /deploy.env vault:config/env || return 1
+  # Once for each new backup: read back through the encryption, so what's there is what was sent and this
+  # passphrase opens it.
+  if [ "$newest" != "$(last_copied)" ]; then
+    rclone cryptcheck "$root/$newest" "vault:backups/$newest" --one-way > /dev/null 2>&1 \
+      || { echo "The copy of $newest doesn't match what was sent." >&2; return 1; }
+    echo "$(date -u +%FT%TZ) copied $newest to $OFFSITE_BUCKET"
+    echo "$newest" > /tmp/copied
+  fi
+  # Old copies go, once for each new backup (again next hour if it fails), and only while new ones are arriving.
+  if [ "$newest" != "$(cat /tmp/pruned 2> /dev/null || true)" ] && [ -n "$(find "$root/$newest" -maxdepth 0 -mtime -2)" ]; then
+    rclone delete vault:backups --min-age "${keep_days}d" || return 1
+    rclone rmdirs vault:backups --leave-root || return 1
+    echo "$newest" > /tmp/pruned
   fi
 }
 

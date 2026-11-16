@@ -43,7 +43,7 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (config["Keycloak:AdminUsername"] is not { Length: > 0 } adminUser || config["Keycloak:AdminPassword"] is not { Length: > 0 } adminPassword)
+        if (!keycloak.HasMasterAdmin)
         {
             return;
         }
@@ -59,7 +59,7 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
 
         await KeycloakRetry.RunAsync(logger, "set the realm's client secrets", async () =>
         {
-            var token = await keycloak.GetMasterAdminTokenAsync(adminUser, adminPassword, stoppingToken);
+            var token = (await keycloak.GetMasterAdminTokenAsync(stoppingToken))!;
             foreach (var (clientId, name) in serviceClients)
             {
                 if (await keycloak.EnsureServiceClientAsync(token, clientId, name, secrets[clientId], stoppingToken))
@@ -109,10 +109,7 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
                 nameInSettings = await scope.ServiceProvider.GetRequiredService<IdentityContext>().SiteSettings.AsNoTracking()
                     .Select(s => s.AppName).SingleOrDefaultAsync(stoppingToken);
             }
-            if (await keycloak.ApplyMailAccountAsync(nameInSettings, stoppingToken) is { } done)
-            {
-                logger.LogInformation("{Outcome}", done);
-            }
+            await keycloak.ApplyMailAccountAsync(nameInSettings, stoppingToken);
         }, stoppingToken);
     }
 }
