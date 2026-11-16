@@ -3,6 +3,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>7f3c2a51-9d4e-4b8a-a6f1-2c5e8b9d0a17</UserSecretsId>
+    <!-- Use the Aspire CLI bundle for the dashboard and orchestrator; this also clears the ASPIRE010 build warning. -->
+    <AspireUseCliBundle>true</AspireUseCliBundle>
   </PropertyGroup>
 
   <ItemGroup>

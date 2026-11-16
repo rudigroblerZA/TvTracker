@@ -119,11 +119,11 @@
                                     {
                                         <p class="muted small">Nothing this week, so nothing would be sent.</p>
                                     }
-                                    @foreach (var section in digest.Sections)
+                                    @foreach (var part in digest.Sections)
                                     {
-                                        <h3>@section.Heading</h3>
+                                        <h3>@part.Heading</h3>
                                         <ul>
-                                            @foreach (var line in section.Lines)
+                                            @foreach (var line in part.Lines)
                                             {
                                                 <li>@if (line.Link is { } link) { <a href="@link.TrimStart('/')">@line.Text</a> } else { <span>@line.Text</span> }</li>
                                             }
