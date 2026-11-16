@@ -34,6 +34,8 @@ var publishing = builder.ExecutionContext.IsPublishMode;
 // (trixie, whose collation version existing databases were created with) as Aspire's default postgres image.
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "0.8.7-pg18-trixie")
+    // While developing: an "open a REPL" command on the resource, a signed-in psql in the dashboard's terminal dock.
+    .WithRepl()
     .WithLifetime(ContainerLifetime.Persistent);
 // Same volume WithDataVolume would create, but mounted where Postgres 18 keeps its data: WithDataVolume picks the path
 // from the image tag, and doesn't recognise pgvector's tags as Postgres 18.
@@ -52,34 +54,8 @@ var socialDb = postgres.AddDatabase("socialdb");
 
 // Redis holds the web app's server-side tokens and the keys that protect its sign-in cookie, so it keeps its data
 // across restarts: without the volume, restarting Redis signs everyone out.
-var redis = builder.AddRedis("redis").WithDataVolume();
-
-// Terminals, while developing: a psql session on the Postgres server and a redis-cli on Redis, each a tab in the
-// dashboard's terminal view (or `aspire terminal attach psql`). They start when asked for (the resource's Start
-// button), since nothing needs them running, and end when the session is quit.
-if (!publishing)
-{
-#pragma warning disable ASPIRETERMINAL001 // Terminals are a preview feature of Aspire.
-    builder.AddContainer("psql", "pgvector/pgvector", "0.8.7-pg18-trixie")
-        .WithEntrypoint("psql")
-        .WithEnvironment("PGHOST", postgres.Resource.Name)
-        .WithEnvironment("PGUSER", "postgres")
-        .WithEnvironment("PGPASSWORD", postgres.Resource.PasswordParameter)
-        .WithEnvironment("PGDATABASE", "postgres")
-        .WithTerminal()
-        .WithParentRelationship(postgres)
-        .WithExplicitStart();
-    builder.AddContainer("redis-cli", "docker.io/library/redis", "8.6")
-        // With a development certificate Aspire's Redis speaks TLS on 6379 and plainly on 6380; without one, plainly
-        // on 6379. The plain port, whichever it is, so the session needs no certificate.
-        .WithEntrypoint("/bin/sh")
-        .WithArgs("-c", $"redis-cli -h {redis.Resource.Name} -p 6380 ping > /dev/null 2>&1 && exec redis-cli -h {redis.Resource.Name} -p 6380 || exec redis-cli -h {redis.Resource.Name}")
-        .WithEnvironment("REDISCLI_AUTH", redis.Resource.PasswordParameter!)
-        .WithTerminal()
-        .WithParentRelationship(redis)
-        .WithExplicitStart();
-#pragma warning restore ASPIRETERMINAL001
-}
+// WithRepl: as for Postgres, a signed-in redis-cli.
+var redis = builder.AddRedis("redis").WithDataVolume().WithRepl();
 
 // The queues are durable (events waiting to be handled, retries, dead letters); the volume is what keeps them when
 // the broker's container is replaced.

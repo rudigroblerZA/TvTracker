@@ -647,13 +647,11 @@ aspire secret delete "Parameters:tvdb-api-key"
 ```
 
 It is the same store `dotnet user-secrets` writes to, so values set either way are seen by both. One that isn't
-set takes its development value (AppHost.cs, `Secret`); a deployment has every one in its `.env`.
+set takes its development value.
 
-**Terminals:** two resources give an interactive session while the app runs, `psql` on the Postgres server and
-`redis-cli` on Redis. They don't start with the app: press Start on the resource in the dashboard (or
-`aspire resource psql start`), then open its terminal there or run `aspire terminal attach psql`. Quitting the
-session (`\q`, `quit`) stops the resource. Both sign in with the server's own password, so there's nothing to type.
-Terminals are a preview feature of Aspire.
+**Terminals:** the `postgres` and `redis` resources each have a **REPL** command in the dashboard (the resource's
+menu), or `aspire resource postgres repl`. It opens a signed-in `psql` or `redis-cli` inside the running server, as
+a tab in the dashboard's terminal dock; `aspire terminal ps` lists the open ones. Only when running locally.
 
 ### Unit tests and CI
 
