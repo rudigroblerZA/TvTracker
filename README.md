@@ -1998,6 +1998,19 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
   The gateway is still under `/api` on the same name, so one entry is enough. Without `PROXY_PORT` the deployment
   wants ports 80 and 443 for itself, and beside another proxy it can't start or sign-in goes nowhere. Empty it and
   deploy again to go back.
+- **If the database refuses the password.** Keycloak (and every service) failing with
+  `FATAL: password authentication failed for user "postgres"` means the Postgres volume was made with another
+  password than the one now in `.env`. Postgres takes `POSTGRES_PASSWORD` only when its volume is first made, so this
+  happens when `.env` is deleted and made afresh, or a deploy goes into another folder, while the volume stays (it
+  belongs to the compose project `tvtracker`, not to the folder). `scripts/deploy.sh` checks for it and stops with
+  the ways out:
+  - put the old `.env`'s `POSTGRES_PASSWORD` line back, and deploy again; or
+  - `scripts/deploy-db-password.sh` sets the database's password to the one in `.env`, keeping all the data. It
+    stops the services, starts Postgres once by itself in single-user mode (which asks for no password, and which
+    only someone with the volume can do), and starts everything again; or
+  - `docker compose -p tvtracker --project-directory ~/tvtracker down -v` starts empty, deleting everything.
+
+  Keep `.env` with the backups for this reason: the `offsite` container copies it for you.
 - **If you can't sign in** to a deployment:
   - **`demo` / `demo` and `admin` / `admin` don't exist there.** They are the development logins. The admin is
     `admin` with the password in `.env` (`grep APP_ADMIN_PASSWORD ~/tvtracker/.env`); everyone else registers from the
