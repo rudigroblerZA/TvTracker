@@ -163,17 +163,25 @@ docker compose --project-name tvtracker --project-directory "$home" exec -T cadd
   > /dev/null 2>&1 || true
 
 # Nobody can sign in until Identity.API has set Keycloak up (its realm's secrets, then the admin account), which
-# takes a minute or so on a first start: wait for it, so "Deployed" means it works.
-echo "Waiting for sign-in to be ready..."
-ready=
-for _ in $(seq 60); do
-  if docker compose --project-name tvtracker --project-directory "$home" logs --since 30m identity-api 2> /dev/null | grep -q "is ready in Keycloak"; then
-    ready=yes
-    break
-  fi
-  sleep 5
-done
-[[ -n $ready ]] || echo "Sign-in isn't ready after five minutes: docker compose -p tvtracker logs identity-api keycloak" >&2
+# takes a minute or so after it starts: wait for it, so "Deployed" means it works. A deploy that left Identity.API
+# running finds it long done; its log's line saying so may be gone by then, so one up for ten minutes isn't waited on.
+identity=$(docker compose --project-name tvtracker --project-directory "$home" ps -q identity-api 2> /dev/null | head -1 || true)
+started=$(docker inspect -f '{{.State.StartedAt}}' "$identity" 2> /dev/null || true)
+if [[ -n $started ]] && (( $(date +%s) - $(date -d "$started" +%s) < 600 )); then
+  echo "Waiting for sign-in to be ready..."
+  ready=
+  for _ in $(seq 60); do
+    # Not grep -q: it stops reading at the first match, which ends docker's side of the pipe with an error, and
+    # under pipefail that reads as "not found" once the log is longer than a pipe holds.
+    # Since this start only: a restarted container keeps the log of its earlier runs.
+    if docker logs --since "$started" "$identity" 2>&1 | grep "is ready in Keycloak" > /dev/null; then
+      ready=yes
+      break
+    fi
+    sleep 5
+  done
+  [[ -n $ready ]] || echo "Sign-in isn't ready after five minutes: docker compose -p tvtracker logs identity-api keycloak" >&2
+fi
 
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
