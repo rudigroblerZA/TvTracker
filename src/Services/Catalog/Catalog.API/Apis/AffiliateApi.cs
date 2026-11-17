@@ -26,6 +26,10 @@ public record AffiliateBreakdownDto(string Key, int Clicks, int Conversions);
 
 public record AffiliateDayDto(DateOnly Day, int Clicks, int Conversions);
 
+/// <param name="Month">The month's first day.</param>
+/// <param name="Conversions">Sales the networks reported in the month.</param>
+public record AffiliateMonthDto(DateOnly Month, string Currency, int Conversions, decimal Commission);
+
 public record AffiliateShowRowDto(Guid ShowId, string Title, int Clicks, int Conversions);
 
 /// <summary>
@@ -76,6 +80,7 @@ public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int Aff
 public static partial class AffiliateApi
 {
     private const int MaxReportDays = 365;
+    private const int MaxReportMonths = 36;
     private const string SignedOut = "signed-out";
     private const string UnknownPlan = "unknown";
 
@@ -86,6 +91,7 @@ public static partial class AffiliateApi
             .RequireFeature(FeatureFlags.Affiliates);
         api.MapGet("/affiliates/postback/{program}", PostbackAsync);
         api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+        api.MapGet("/affiliates/monthly", MonthlyAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
 
         // Programs, set up by admins in Settings (404 for anyone else).
         var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates)
@@ -318,6 +324,30 @@ public static partial class AffiliateApi
     /// <summary>
     /// The last <paramref name="days"/> days (UTC), for admins; anyone else gets 404, as with the flags page.
     /// </summary>
+    /// <summary>
+    /// Commission by month and currency, for the financials page (which gets subscriptions and costs from Identity.API).
+    /// Counted in the month the network reported the sale, this month included. Admins only.
+    /// </summary>
+    private static async Task<Results<Ok<List<AffiliateMonthDto>>, NotFound>> MonthlyAsync(ClaimsPrincipal user, IConfiguration config,
+        CatalogContext db, TimeProvider time, int months = 12, CancellationToken ct = default)
+    {
+        if (!Admins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var today = time.GetUtcNow().UtcDateTime;
+        var start = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(Math.Clamp(months, 1, MaxReportMonths) - 1));
+        var sales = await db.AffiliateConversions.AsNoTracking().Where(c => c.ReceivedAtUtc >= start)
+            .Select(c => new { c.ReceivedAtUtc, c.Currency, c.Amount })
+            .ToListAsync(ct);
+        return TypedResults.Ok(sales
+            .GroupBy(c => (Month: new DateOnly(c.ReceivedAtUtc.Year, c.ReceivedAtUtc.Month, 1), Currency: c.Currency.ToUpperInvariant()))
+            .Select(g => new AffiliateMonthDto(g.Key.Month, g.Key.Currency, g.Count(), g.Sum(c => c.Amount)))
+            .OrderByDescending(m => m.Month).ThenBy(m => m.Currency, StringComparer.Ordinal)
+            .ToList());
+    }
+
     private static async Task<Results<Ok<AffiliateReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
         AffiliatePrograms programs, TimeProvider time, int days = 30, CancellationToken ct = default)
     {

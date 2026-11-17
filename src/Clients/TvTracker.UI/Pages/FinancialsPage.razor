@@ -1,0 +1,415 @@
+@using static TvTracker.UI.Services.ReportFormat
+@page "/settings/financials"
+@inject IdentityClient Identity
+@inject CatalogClient Catalog
+@inject FeatureFlagStore Flags
+@inject TimeProvider Time
+
+<PageTitle>Financials · @Brand.AppName</PageTitle>
+
+<p><a href="settings">← Settings</a></p>
+<h1>Financials</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <p class="muted">
+            What comes in, what goes out and what's left, month by month: subscription payments and affiliate commission
+            against the costs you enter below. <a href="settings/revenue">Revenue</a> has the detail behind the income.
+        </p>
+
+        <div class="actions" role="group" aria-label="Window">
+            @foreach (var option in Financials.Windows)
+            {
+                <button class="btn @(months == option ? "" : "btn-quiet")" aria-pressed="@(months == option)" @onclick="() => SetMonthsAsync(option)">
+                    @($"{option} months")
+                </button>
+            }
+        </div>
+
+        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+        @if (statement is null)
+        {
+            @if (error is null)
+            {
+                <p class="muted">@(loaded ? "Only admins can see the financials." : "Loading…")</p>
+            }
+        }
+        else
+        {
+            <p class="muted small">@($"{statement.From:MMMM yyyy} to {statement.To:d MMMM yyyy}, by UTC month.")</p>
+
+            @if (books.Count == 0)
+            {
+                <p class="muted">Nothing has been earned or spent yet. Add what the business pays for under Costs, below.</p>
+            }
+            @foreach (var book in books)
+            {
+                var runRate = book.RunRate(statement.FeePercent);
+                <section aria-label="@($"Financials in {book.Currency}")">
+                    <h2>@book.Currency</h2>
+                    <div class="stat-tiles">
+                        <div class="stat">
+                            <div class="stat-value">@Financials.Signed(book.Total.Net, book.Currency)</div>
+                            <div class="muted">@(book.Total.Net < 0 ? "lost in this window" : "left in this window")</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@Amount(book.Total.Income, book.Currency)</div>
+                            <div class="muted">came in</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@Amount(book.Total.Costs + book.Total.Fees, book.Currency)</div>
+                            <div class="muted">went out, fees included</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">@Financials.Signed(runRate, book.Currency)</div>
+                            <div class="muted">
+                                @(runRate >= 0 ? "a month at today's rate: subscriptions cover the running costs" : "a month at today's rate: subscriptions don't cover the running costs yet")
+                            </div>
+                        </div>
+                    </div>
+                    <p class="muted small">
+                        @($"Today's rate: {Amount(book.Recurring, book.Currency)} a month from running subscriptions, {Amount(book.RunningCosts, book.Currency)} a month in running costs.")
+                    </p>
+
+                    @if (book.Months.Count > 0)
+                    {
+                        <div class="table-scroll">
+                            <table class="table wide">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th class="num">Subscriptions</th>
+                                        <th class="num">Affiliates</th>
+                                        <th class="num">Fees (est.)</th>
+                                        <th class="num">Costs</th>
+                                        <th class="num">Left</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var month in book.Months)
+                                    {
+                                        <tr>
+                                            <td>@month.Month.ToString("MMM yyyy")</td>
+                                            <td class="num">@month.Subscriptions.ToString("N2")</td>
+                                            <td class="num">@month.Affiliates.ToString("N2")</td>
+                                            <td class="num">@month.Fees.ToString("N2")</td>
+                                            <td class="num">@month.Costs.ToString("N2")</td>
+                                            <td class="num"><strong>@Financials.Signed(month.Net, "").Trim()</strong></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th scope="row">Total</th>
+                                        <td class="num">@book.Total.Subscriptions.ToString("N2")</td>
+                                        <td class="num">@book.Total.Affiliates.ToString("N2")</td>
+                                        <td class="num">@book.Total.Fees.ToString("N2")</td>
+                                        <td class="num">@book.Total.Costs.ToString("N2")</td>
+                                        <td class="num"><strong>@Financials.Signed(book.Total.Net, "").Trim()</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                    @if (book.CostsByCategory.Count > 0)
+                    {
+                        <h3>Where the costs went</h3>
+                        <ul class="bars wide-values">
+                            @{ var most = (int)Math.Ceiling(book.CostsByCategory.Max(c => c.Amount)); }
+                            @foreach (var category in book.CostsByCategory)
+                            {
+                                <li>
+                                    <span>@Financials.CategoryName(category.Category)</span>
+                                    <span class="bar" style="width:@(Width((int)Math.Ceiling(category.Amount), most))%"></span>
+                                    <span>@Amount(category.Amount, book.Currency)</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+
+            <section>
+                <h2>Costs</h2>
+                <p class="muted">
+                    What the business pays for: the server, data licences, the domain, an accountant. A yearly cost is counted a
+                    twelfth each month, so one bill doesn't make one month look like a loss.
+                </p>
+                @if (costs.Count > 0)
+                {
+                    <div class="table-scroll">
+                        <table class="table wide">
+                            <thead>
+                                <tr><th>Cost</th><th>Category</th><th class="num">Amount</th><th>Runs</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var cost in costs)
+                                {
+                                    <tr>
+                                        <td>
+                                            @cost.Name
+                                            @if (cost.Notes is { Length: > 0 } notes)
+                                            {
+                                                <div class="muted small">@notes</div>
+                                            }
+                                        </td>
+                                        <td>@Financials.CategoryName(cost.Category)</td>
+                                        <td class="num">@($"{Amount(cost.Amount, cost.Currency)} {Financials.RecurrenceName(cost.Recurrence)}")</td>
+                                        <td>@Runs(cost)</td>
+                                        <td>
+                                            <button class="btn btn-quiet small" type="button" @onclick="() => Edit(cost)">Edit</button>
+                                            @if (deleting == cost.Id)
+                                            {
+                                                <button class="btn small" type="button" disabled="@busy" @onclick="() => DeleteAsync(cost)">Delete it</button>
+                                                <button class="btn btn-quiet small" type="button" @onclick="() => deleting = null">Keep</button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-quiet small" type="button" @onclick="() => deleting = cost.Id">Delete</button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <EditForm Model="form" OnSubmit="SaveAsync" class="panel stack" aria-label="@(editing is null ? "Add a cost" : "Change a cost")" Context="editingForm">
+                    <h3>@(editing is null ? "Add a cost" : $"Change {editing.Name}")</h3>
+                    <label>
+                        Name
+                        <input id="cost-name" @bind="form.Name" maxlength="120" placeholder="Server (4 cores, 16 GB)" required />
+                    </label>
+                    <label>
+                        Category
+                        <select id="cost-category" @bind="form.Category">
+                            @foreach (var category in statement.Categories)
+                            {
+                                <option value="@category">@Financials.CategoryName(category)</option>
+                            }
+                        </select>
+                    </label>
+                    <div class="actions">
+                        <label>
+                            Amount
+                            <input id="cost-amount" type="number" min="0.01" step="0.01" @bind="form.Amount" required />
+                        </label>
+                        <label>
+                            Currency
+                            <input id="cost-currency" @bind="form.Currency" maxlength="3" size="4" placeholder="USD" required />
+                        </label>
+                        <label>
+                            Paid
+                            <select id="cost-recurrence" @bind="form.Recurrence">
+                                <option value="monthly">every month</option>
+                                <option value="yearly">every year</option>
+                                <option value="once">once</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <label>
+                            @(form.Recurrence == "once" ? "On" : "From")
+                            <input id="cost-starts" type="date" @bind="form.StartsOn" required />
+                        </label>
+                        @if (form.Recurrence != "once")
+                        {
+                            <label>
+                                Until <span class="muted small">(empty while it runs)</span>
+                                <input id="cost-ends" type="date" @bind="form.EndsOn" />
+                            </label>
+                        }
+                    </div>
+                    <label>
+                        Notes <span class="muted small">(optional)</span>
+                        <input id="cost-notes" @bind="form.Notes" maxlength="500" placeholder="Invoice number, what it's for" />
+                    </label>
+                    <div class="actions">
+                        <button class="btn" type="submit" disabled="@busy">@(editing is null ? "Add" : "Save")</button>
+                        @if (editing is not null)
+                        {
+                            <button class="btn btn-quiet" type="button" @onclick="Reset">Cancel</button>
+                        }
+                        @if (notice is not null)
+                        {
+                            <span class="muted small" role="status">@notice</span>
+                        }
+                    </div>
+                    <ErrorNotice Message="@formError" />
+                </EditForm>
+            </section>
+
+            <p class="muted small">
+                How it's worked out. Subscriptions are the payments received in the month. Affiliate commission is counted in the
+                month the network reported the sale@(affiliatesOn ? "" : " (affiliate links are switched off, so there is none)").
+                @($"Fees are an estimate, {statement.FeePercent:0.##}% of each payment plus {statement.FeeFixed:0.00}, not the payment provider's bill. ")
+                Each currency is kept apart: nothing is converted. No tax is worked out.
+            </p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <p class="muted">Sign in as an admin to see the financials.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private int months = 12;
+    private int loads;
+    private bool loaded;
+    private bool busy;
+    private bool affiliatesOn;
+    private string? error;
+    private string? formError;
+    private string? notice;
+    private FinancialStatement? statement;
+    private IReadOnlyList<FinancialBook> books = [];
+    private IReadOnlyList<CostItem> costs = [];
+    private CostItem? editing;
+    private Guid? deleting;
+    private CostForm form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Reset();
+        await LoadAsync();
+    }
+
+    private Task SetMonthsAsync(int value)
+    {
+        months = value;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        // The window asked for last wins: an earlier answer arriving late is dropped.
+        var load = ++loads;
+        var window = months;
+        error = null;
+        var statementTask = Identity.GetFinancialsAsync(window);
+        var costsTask = Identity.GetCostsAsync();
+        var affiliatesTask = AffiliatesAsync(window);
+        try
+        {
+            var report = await statementTask;
+            var items = report is null ? [] : await costsTask;
+            var (on, commission) = await affiliatesTask;
+            if (load == loads)
+            {
+                (statement, costs, affiliatesOn) = (report, items, on);
+                books = report is null ? [] : Financials.Books(report, commission);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            if (load == loads)
+            {
+                (statement, books, error) = (null, [], ErrorNotice.Describe(ex));
+            }
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
+
+    /// <summary>
+    /// The affiliate half, only while its flag is on; its failure leaves the rest of the page standing.
+    /// </summary>
+    private async Task<(bool On, IReadOnlyList<AffiliateMonth> Months)> AffiliatesAsync(int window)
+    {
+        try
+        {
+            return await Flags.IsEnabledAsync(FeatureFlags.Affiliates) ? (true, await Catalog.GetAffiliateMonthsAsync(window)) : (false, []);
+        }
+        catch (HttpRequestException)
+        {
+            return (true, []);
+        }
+    }
+
+    private void Edit(CostItem cost)
+    {
+        (editing, deleting, notice, formError) = (cost, null, null, null);
+        form = new CostForm
+        {
+            Name = cost.Name, Category = cost.Category, Amount = cost.Amount, Currency = cost.Currency, Recurrence = cost.Recurrence,
+            StartsOn = cost.StartsOn, EndsOn = cost.EndsOn, Notes = cost.Notes
+        };
+    }
+
+    private void Reset()
+    {
+        (editing, formError) = (null, null);
+        // The next one is most likely in the currency of the last.
+        form = new CostForm { Currency = costs.LastOrDefault()?.Currency ?? "USD", StartsOn = DateOnly.FromDateTime(Time.GetUtcNow().UtcDateTime) };
+    }
+
+    private async Task SaveAsync()
+    {
+        (busy, formError, notice) = (true, null, null);
+        try
+        {
+            var saved = await Identity.SaveCostAsync(editing?.Id, new SaveCostItem(form.Name, form.Category, form.Amount ?? 0, form.Currency,
+                form.Recurrence, form.StartsOn, form.EndsOn, form.Notes));
+            if (saved is null)
+            {
+                formError = "That didn't go through: only admins can change costs, or it was deleted meanwhile.";
+                return;
+            }
+            var what = editing is null ? "Added." : "Saved.";
+            Reset();
+            await LoadAsync();
+            notice = what;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            formError = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(CostItem cost)
+    {
+        (busy, formError, notice) = (true, null, null);
+        try
+        {
+            await Identity.DeleteCostAsync(cost.Id);
+            deleting = null;
+            if (editing?.Id == cost.Id)
+            {
+                Reset();
+            }
+            await LoadAsync();
+            notice = $"Deleted {cost.Name}.";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            formError = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string Runs(CostItem cost) => cost.Recurrence == "once"
+        ? cost.StartsOn.ToString("d MMM yyyy")
+        : cost.EndsOn is { } end ? $"{cost.StartsOn:d MMM yyyy} to {end:d MMM yyyy}" : $"since {cost.StartsOn:d MMM yyyy}";
+
+    private sealed class CostForm
+    {
+        public string? Name { get; set; }
+        public string Category { get; set; } = "hosting";
+        public decimal? Amount { get; set; }
+        public string? Currency { get; set; }
+        public string Recurrence { get; set; } = "monthly";
+        public DateOnly StartsOn { get; set; }
+        public DateOnly? EndsOn { get; set; }
+        public string? Notes { get; set; }
+    }
+}

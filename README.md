@@ -621,6 +621,32 @@ who pays by plan and billing interval. Affiliate links: commission, clicks, sale
 test. Then both by day. Counts only: nothing names a person. The subscription half is Identity.API's
 `GET /api/v1/admin/revenue?days=30`; the affiliate half is Catalog's affiliate report.
 
+**Financials** (`/settings/financials`, Settings → Admin, admins only): what's left once the costs are paid. Income
+(subscription payments and affiliate commission) against the costs an admin enters, month by month.
+
+- **Costs** are entered on the page: a name, a category (hosting, data licences, services, payments, marketing, legal
+  and accounting, people, other), an amount and currency, and how it's paid.
+  - **Every month:** counted in each month it runs for any part of, until its end date if it has one.
+  - **Every year:** counted a twelfth each month, so one bill doesn't make one month look like a loss.
+  - **Once:** counted in the month it's paid.
+- **Each month** shows subscriptions, affiliate commission, estimated payment fees, costs and what's left; the window
+  is 3, 12 or 24 months, by UTC month, this month included.
+- **Today's rate:** what the running subscriptions bring in a month, after their fee share, less the costs running
+  today. It answers "do subscriptions cover the running costs yet?".
+- **Fees are an estimate:** a percent of each payment plus a fixed part, 2.9% and 0.30 unless `Financials:PaymentFeePercent`
+  and `Financials:PaymentFeeFixed` on Identity.API say otherwise. Set them from the payment provider's own statement.
+- **Currencies are kept apart.** Nothing is converted: each currency anything was earned or spent in has its own
+  figures and table. No tax is worked out.
+- **Where it comes from:** `GET /api/v1/admin/financials?months=12` (Identity.API: receipts, the fee estimate and
+  costs) and `GET /api/v1/affiliates/monthly?months=12` (Catalog.API: commission in the month the network reported the
+  sale; nothing while the `affiliates` flag is off). The page puts the two together (`Financials.Books`). Costs:
+  `GET`, `POST`, `PUT /{id}` and `DELETE /{id}` under `/api/v1/admin/financials/costs`, in Identity's `cost_items` table.
+  Anyone but an admin gets 404.
+- **Tried:** as the admin, three costs were added (monthly, yearly, once), one changed and one deleted, and the months
+  and totals followed each time, beside the development data's real payments and commission; `demo` sees neither
+  the link nor the figures; the page doesn't scroll sideways on a phone. What a cost may be (its category, amount,
+  currency, dates) is covered by unit tests, not tried on the page.
+
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
 neither keeps the plain poster layout. An image that fails to load falls back to the next. Shows imported earlier
