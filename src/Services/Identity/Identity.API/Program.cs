@@ -30,7 +30,6 @@ if (!builder.Environment.IsDevelopment())
 // Payments: the provider named in Payments:Provider sells plans; Stripe is always registered (its webhooks need its
 // signing secret, so it does nothing unconfigured), the test provider only in development.
 builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
-builder.Services.Configure<Identity.API.Apis.FinancialOptions>(builder.Configuration.GetSection("Financials"));
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
@@ -75,7 +74,6 @@ app.MapProfileApi();
 app.MapFlagsApi();
 app.MapPlansApi();
 app.MapRevenueApi();
-app.MapFinancialsApi();
 app.MapBrandingApi();
 app.MapFamilyApi();
 app.MapPaymentsApi();

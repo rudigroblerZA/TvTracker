@@ -221,9 +221,7 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
 /// </summary>
 public static class Admins
 {
-    public static bool Is(ClaimsPrincipal user, IConfiguration config) =>
-        user.FindFirstValue("preferred_username") is { } name
-        && (config.GetSection("Admin:Users").Get<string[]>() ?? []).Contains(name, StringComparer.OrdinalIgnoreCase);
+    public static bool Is(ClaimsPrincipal user, IConfiguration config) => TvTracker.AppAdmins.Is(user, config);
 }
 
 /// <summary>

@@ -231,9 +231,7 @@ public static class FlagsApi
     /// <summary>
     /// An app admin: a Keycloak username in <c>Admin:Users</c>. Plans use the same list.
     /// </summary>
-    internal static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) =>
-        user.FindFirstValue("preferred_username") is { } name
-        && (config.GetSection("Admin:Users").Get<string[]>() ?? []).Contains(name, StringComparer.OrdinalIgnoreCase);
+    internal static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) => TvTracker.AppAdmins.Is(user, config);
 
     private static string? Directory(IConfiguration config) =>
         config["Flags:Directory"] is { Length: > 0 } directory && System.IO.Directory.Exists(directory) ? directory : null;

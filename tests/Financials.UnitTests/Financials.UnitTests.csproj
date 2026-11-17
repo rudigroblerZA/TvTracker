@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unit tests of the financial statement's rules: its months, what a cost comes to in one, the fee estimate, how
+       income and costs add up by currency, and what a cost may be. No database or network. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Financials\Financials.API\Financials.API.csproj" />
+  </ItemGroup>
+
+</Project>

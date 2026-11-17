@@ -38,12 +38,51 @@ public record RevenueReportDto(DateOnly From, DateOnly To, int Accounts, int New
 /// <summary>
 /// The subscription side of revenue, for the admins' Revenue page (the affiliate side is Catalog.API's report).
 /// </summary>
+/// <summary>
+/// Subscription payments received in one month and currency.
+/// </summary>
+/// <param name="Month">The month's first day (UTC).</param>
+public record IncomeMonthDto(DateOnly Month, string Currency, decimal Amount, int Payments);
+
+/// <summary>
+/// What subscriptions brought in by month, and what the running ones bring in a month now: Identity's half of the
+/// business's books, which Financials.API puts together with costs and affiliate commission.
+/// </summary>
+public record IncomeDto(IReadOnlyList<IncomeMonthDto> Months, IReadOnlyList<RevenueMoneyDto> MonthlyRecurring);
+
 public static class RevenueApi
 {
     private const int MaxReportDays = 365;
+    private const int MaxIncomeMonths = 36;
 
-    public static void MapRevenueApi(this IEndpointRouteBuilder app) =>
+    public static void MapRevenueApi(this IEndpointRouteBuilder app)
+    {
         app.MapGet("/api/v1/admin/revenue", ReportAsync).RequireAuthorization();
+        app.MapGet("/api/v1/admin/income", IncomeAsync).RequireAuthorization();
+    }
+
+    /// <summary>
+    /// Payments by month for the last <paramref name="months"/> months, this one included. Admins only: Financials.API
+    /// asks with the admin's own token.
+    /// </summary>
+    private static async Task<Results<Ok<IncomeDto>, NotFound>> IncomeAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
+        TimeProvider time, int months = 12, CancellationToken ct = default)
+    {
+        if (!FlagsApi.IsAdmin(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var today = time.GetUtcNow().UtcDateTime;
+        var start = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(Math.Clamp(months, 1, MaxIncomeMonths) - 1));
+        var receipts = await db.Receipts.AsNoTracking().Where(r => r.PaidAtUtc >= start)
+            .Select(r => new Receipt(r.PaidAtUtc, r.Amount, r.Currency))
+            .ToListAsync(ct);
+        var active = await db.Subscriptions.AsNoTracking().Where(s => s.Status == SubscriptionStatus.Active)
+            .Select(s => new ActiveSubscription(s.UserId, s.Plan, s.Interval, s.Amount, s.Currency, s.CancelAtPeriodEnd))
+            .ToListAsync(ct);
+        return TypedResults.Ok(new IncomeDto(RevenueReport.ByMonth(receipts), RevenueReport.MonthlyRecurring(active)));
+    }
 
     private static async Task<Results<Ok<RevenueReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
         TimeProvider time, int days = 30, CancellationToken ct = default)
@@ -91,10 +130,7 @@ public static class RevenueReport
         int checkoutsStarted, int checkoutsCompleted)
     {
         var paying = active.Select(s => s.UserId).Distinct().Count();
-        var monthly = active.GroupBy(s => s.Currency.ToUpperInvariant())
-            .Select(g => new RevenueMoneyDto(g.Key, Math.Round(g.Sum(s => s.Interval == PlanPrices.Year ? s.Amount / 12 : s.Amount), 2)))
-            .OrderBy(m => m.Currency, StringComparer.Ordinal)
-            .ToList();
+        var monthly = MonthlyRecurring(active);
         var received = receipts.GroupBy(r => r.Currency.ToUpperInvariant())
             .Select(g => new RevenueMoneyDto(g.Key, g.Sum(r => r.Amount)))
             .OrderBy(m => m.Currency, StringComparer.Ordinal)
@@ -115,6 +151,24 @@ public static class RevenueReport
             accounts == 0 ? 0 : Math.Round((double)paying / accounts, 4), monthly, received, checkoutsStarted, checkoutsCompleted, started.Count,
             ended, plans, days);
     }
+
+    /// <summary>
+    /// What the running subscriptions bring in a month, by currency; a yearly plan counts as a twelfth.
+    /// </summary>
+    public static List<RevenueMoneyDto> MonthlyRecurring(IReadOnlyList<ActiveSubscription> active) =>
+        active.GroupBy(s => s.Currency.ToUpperInvariant())
+            .Select(g => new RevenueMoneyDto(g.Key, Math.Round(g.Sum(s => s.Interval == PlanPrices.Year ? s.Amount / 12 : s.Amount), 2)))
+            .OrderBy(m => m.Currency, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>
+    /// Payments by the month they were received in (UTC) and currency, newest month first.
+    /// </summary>
+    public static List<IncomeMonthDto> ByMonth(IReadOnlyList<Receipt> receipts) =>
+        receipts.GroupBy(r => (Month: new DateOnly(r.PaidAtUtc.Year, r.PaidAtUtc.Month, 1), Currency: r.Currency.ToUpperInvariant()))
+            .Select(g => new IncomeMonthDto(g.Key.Month, g.Key.Currency, g.Sum(r => r.Amount), g.Count()))
+            .OrderByDescending(m => m.Month).ThenBy(m => m.Currency, StringComparer.Ordinal)
+            .ToList();
 
     private static Dictionary<DateOnly, int> PerDay(IEnumerable<DateTime> times) =>
         times.GroupBy(DateOnly.FromDateTime).ToDictionary(g => g.Key, g => g.Count());
