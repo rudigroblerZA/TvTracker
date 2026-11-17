@@ -1957,6 +1957,21 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 - **Secrets made once.** The deployment directory's `.env` holds every setting. Passwords and client secrets are
   generated on the first run and kept; Identity.API puts them into Keycloak on start. The app's admin signs in as
   `admin` with `APP_ADMIN_PASSWORD` from that file.
+- **Behind your own reverse proxy.** If the machine already runs a proxy of yours on ports 80 and 443 (your own
+  Caddy, nginx, a load balancer) that holds the certificate, set `PROXY_PORT` in `.env`, say `PROXY_PORT=8088`, and
+  run `scripts/deploy.sh` again. The deployment's Caddy then asks for no certificate, listens in plain HTTP on that
+  port of the machine only (`127.0.0.1`), and takes your proxy's word for who the visitor is. Have your proxy send
+  the site there with the `Host` header kept, which Caddy does by default:
+
+  ```
+  tv.example.com {
+      reverse_proxy 127.0.0.1:8088
+  }
+  ```
+
+  The gateway is still under `/api` on the same name, so one entry is enough. Without `PROXY_PORT` the deployment
+  wants ports 80 and 443 for itself, and beside another proxy it can't start or sign-in goes nowhere. Empty it and
+  deploy again to go back.
 - **If you can't sign in** to a deployment:
   - **`demo` / `demo` and `admin` / `admin` don't exist there.** They are the development logins. The admin is
     `admin` with the password in `.env` (`grep APP_ADMIN_PASSWORD ~/tvtracker/.env`); everyone else registers from the
@@ -2046,6 +2061,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `PROXY_PORT` | The local port your own reverse proxy sends the site to, when you run one in front (see Behind your own reverse proxy, above) |
 | `OFFSITE_BUCKET` and the other `OFFSITE_*` | Copies of the backups off the machine, encrypted (see Backups, above) |
 | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google (see [Sign in with Google](#sign-in-with-google)) |
