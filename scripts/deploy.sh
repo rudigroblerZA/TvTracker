@@ -162,6 +162,27 @@ docker compose --project-name tvtracker --project-directory "$home" up -d --remo
 docker compose --project-name tvtracker --project-directory "$home" exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
   > /dev/null 2>&1 || true
 
+# The database has to accept the password every service was just given. It takes POSTGRES_PASSWORD only when its
+# volume is first made, so a .env made afresh beside an older volume (a deleted .env, a deploy into another folder)
+# leaves Keycloak and every service refused, which is far from obvious in their logs.
+for _ in $(seq 30); do
+  docker compose --project-name tvtracker --project-directory "$home" exec -T postgres pg_isready -q > /dev/null 2>&1 && break
+  sleep 2
+done
+if ! tried=$(docker compose --project-name tvtracker --project-directory "$home" exec -T postgres \
+    sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -U postgres -d postgres -Atc "select 1"' 2>&1) \
+    && [[ $tried == *"password authentication failed"* ]]; then
+  cat >&2 <<EOF
+
+The database doesn't accept the password in $env_file: its volume was made with another one, by an earlier deployment
+whose .env this isn't. Keycloak and every service will fail with "password authentication failed" until that's put right.
+  - If you still have that deployment's .env, put its POSTGRES_PASSWORD line in $env_file and run this again; or
+  - scripts/deploy-db-password.sh $home     sets the database's password to this .env's, keeping the data; or
+  - docker compose -p tvtracker --project-directory $home down -v     starts empty, deleting everything it holds.
+EOF
+  exit 1
+fi
+
 # Nobody can sign in until Identity.API has set Keycloak up (its realm's secrets, then the admin account), which
 # takes a minute or so after it starts: wait for it, so "Deployed" means it works. A deploy that left Identity.API
 # running finds it long done; its log's line saying so may be gone by then, so one up for ten minutes isn't waited on.
