@@ -1957,6 +1957,20 @@ is a sensible minimum: there are 21 containers, and the embedding model is about
 - **Secrets made once.** The deployment directory's `.env` holds every setting. Passwords and client secrets are
   generated on the first run and kept; Identity.API puts them into Keycloak on start. The app's admin signs in as
   `admin` with `APP_ADMIN_PASSWORD` from that file.
+- **If you can't sign in** to a deployment:
+  - **`demo` / `demo` and `admin` / `admin` don't exist there.** They are the development logins. The admin is
+    `admin` with the password in `.env` (`grep APP_ADMIN_PASSWORD ~/tvtracker/.env`); everyone else registers from the
+    sign-in page.
+  - **Give a first start a minute.** Identity.API sets Keycloak up once Keycloak is running (the realm's secrets,
+    then the admin account); `scripts/deploy.sh` waits for that before it says "Deployed". Until then the admin
+    doesn't exist, and "Invalid username or password" is what Keycloak says.
+  - **With a mail account set** (`SMTP_HOST`), a new account can't be used until the link in its confirmation email
+    is followed.
+  - **The site answers only at `PUBLIC_HOST`.** By the machine's IP address or another name there's no certificate
+    and the page doesn't load at all; `PUBLIC_HOST`'s DNS record has to point at the machine, with ports 80 and 443
+    open, for the certificate to be issued.
+  - **What went wrong** is in `docker compose -p tvtracker logs keycloak identity-api webapp`: Keycloak logs each
+    failed sign-in with its reason (`user_not_found`, `invalid_user_credentials`, `invalid_redirect_uri`).
 - **Data in Docker volumes:** Postgres (nine app databases and Keycloak's), Redis, RabbitMQ, the embedding model and
   Caddy's certificates. Deploying again keeps them.
 - **Daily backups** of every database, kept for two weeks on the machine (Backups, below).

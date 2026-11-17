@@ -146,12 +146,26 @@ docker compose --project-name tvtracker --project-directory "$home" up -d --remo
 docker compose --project-name tvtracker --project-directory "$home" exec -T caddy caddy reload --config /etc/caddy/Caddyfile \
   > /dev/null 2>&1 || true
 
+# Nobody can sign in until Identity.API has set Keycloak up (its realm's secrets, then the admin account), which
+# takes a minute or so on a first start: wait for it, so "Deployed" means it works.
+echo "Waiting for sign-in to be ready..."
+ready=
+for _ in $(seq 60); do
+  if docker compose --project-name tvtracker --project-directory "$home" logs --since 30m identity-api 2> /dev/null | grep -q "is ready in Keycloak"; then
+    ready=yes
+    break
+  fi
+  sleep 5
+done
+[[ -n $ready ]] || echo "Sign-in isn't ready after five minutes: docker compose -p tvtracker logs identity-api keycloak" >&2
+
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
 gateway=https://$(current PUBLIC_HOST)/api
 [[ -z $(current API_HOST) ]] || gateway="$gateway and https://$(current API_HOST)"
 echo "The mobile gateway: $gateway"
-echo "The admin signs in as 'admin' with APP_ADMIN_PASSWORD from $env_file."
+echo "The admin signs in as 'admin' with this deployment's own password: grep APP_ADMIN_PASSWORD $env_file"
+echo "The development logins (demo / demo, admin / admin) don't exist here; anyone else registers from the sign-in page."
 echo "To fill the catalog in bulk: scripts/deploy-import.sh top 500 (README, Deploying)."
 if [[ -n $(current OFFSITE_BUCKET) ]]; then
   echo "Backups: daily, in $home/backups, and copied encrypted to $(current OFFSITE_BUCKET). Keep OFFSITE_PASSPHRASE somewhere else too."
