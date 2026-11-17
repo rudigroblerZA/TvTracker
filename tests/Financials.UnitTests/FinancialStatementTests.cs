@@ -22,7 +22,7 @@ public class FinancialStatementTests
 
     private static FinancialStatementDto Build(int months = 3, IReadOnlyList<IncomeMonth>? subscriptions = null, IReadOnlyList<Money>? recurring = null,
         IReadOnlyList<CommissionMonth>? commission = null, bool affiliatesOff = false, params CostItem[] costs) =>
-        FinancialStatement.Build(Today, months, subscriptions ?? [], recurring ?? [], commission ?? [], affiliatesOff, costs, Fees);
+        FinancialStatement.Build(Today, months, new(subscriptions ?? [], recurring ?? []), affiliatesOff ? AffiliateIncome.Off : AffiliateIncome.On(commission ?? []), costs, Fees);
 
     // --- The window and a cost's month ---------------------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ public class FinancialStatementTests
     {
         var book = Assert.Single(Build(
             subscriptions: [new(Nov, "usd", 100m, 3), new(Oct, "USD", 50m, 1)],
-            commission: [new(Nov, "USD", 2, 12.50m), new(Sep, "usd", 1, 5m)],
+            commission: [new(Nov, "USD", 12.50m), new(Sep, "usd", 5m)],
             costs: [Cost(40m, CostRecurrence.Monthly, new DateOnly(2026, 10, 1))]).Books);
 
         Assert.Equal(
@@ -98,7 +98,7 @@ public class FinancialStatementTests
     {
         var book = Assert.Single(Build(months: 2,
             subscriptions: [new(Nov, "USD", 10m, 1), new(Sep, "USD", 99m, 1), new(new DateOnly(2026, 12, 1), "USD", 99m, 1)],
-            commission: [new(new DateOnly(2026, 8, 1), "USD", 1, 99m)]).Books);
+            commission: [new(new DateOnly(2026, 8, 1), "USD", 99m)]).Books);
 
         Assert.Equal((10m, 0m), (book.Total.Subscriptions, book.Total.Affiliates));
     }
@@ -139,9 +139,9 @@ public class FinancialStatementTests
     public void A_statement_says_which_income_it_couldnt_get()
     {
         var whole = Build();
-        var noIdentity = FinancialStatement.Build(Today, 3, subscriptions: null, recurring: [], commission: [], affiliatesOff: false, costs: [], Fees);
-        var noCatalog = FinancialStatement.Build(Today, 3, subscriptions: [], recurring: [], commission: null, affiliatesOff: false, costs: [], Fees);
-        var off = FinancialStatement.Build(Today, 3, subscriptions: [], recurring: [], commission: [], affiliatesOff: true, costs: [], Fees);
+        var noIdentity = FinancialStatement.Build(Today, 3, subscriptions: null, AffiliateIncome.On([]), costs: [], Fees);
+        var noCatalog = FinancialStatement.Build(Today, 3, new([], []), AffiliateIncome.Unknown, costs: [], Fees);
+        var off = FinancialStatement.Build(Today, 3, new([], []), AffiliateIncome.Off, costs: [], Fees);
 
         Assert.Equal((true, "on"), (whole.SubscriptionsKnown, whole.Affiliates));
         Assert.False(noIdentity.SubscriptionsKnown);

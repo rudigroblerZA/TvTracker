@@ -146,7 +146,7 @@ public static class OpsApi
     private static async Task<Results<Ok<IReadOnlyDictionary<string, int>>, NotFound>> ReplayDeadLettersAsync(
         ClaimsPrincipal user, IConfiguration config, RabbitMQEventBus bus, int? max, CancellationToken ct)
     {
-        if (!Admins.Is(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }

@@ -234,6 +234,8 @@ var financialsApi = builder.AddProject<Projects.Financials_API>("financials-api"
     .WithReference(identityApi)
     .WithReference(catalogApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
+    // It never says the app's name, so it needn't follow it.
+    .WithEnvironment("Branding__Refresh", "false")
     .WithHttpHealthCheck("/health");
 
 // The data export collects each service's data for the user.

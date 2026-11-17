@@ -52,7 +52,7 @@ public static class PlansApi
     private static async Task<Results<Ok<List<PlanUserDto>>, NotFound>> SearchUsersAsync(
         string? q, ClaimsPrincipal user, IConfiguration config, IdentityContext db, CancellationToken ct)
     {
-        if (!FlagsApi.IsAdmin(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }
@@ -74,7 +74,7 @@ public static class PlansApi
         string userId, SetPlanRequest request, ClaimsPrincipal user, IConfiguration config, IdentityContext db,
         IIntegrationEventOutbox outbox, TimeProvider time, ILoggerFactory loggers, CancellationToken ct)
     {
-        if (!FlagsApi.IsAdmin(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }

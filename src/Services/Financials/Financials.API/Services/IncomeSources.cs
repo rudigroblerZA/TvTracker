@@ -19,8 +19,6 @@ public sealed class IncomeSources(IHttpClientFactory clients, ILogger<IncomeSour
     public const string Identity = "identity-income";
     public const string Catalog = "catalog-income";
 
-    public sealed record SubscriptionIncome(IReadOnlyList<IncomeMonth> Months, IReadOnlyList<Money> MonthlyRecurring);
-
     /// <summary>
     /// Null when Identity.API couldn't be asked.
     /// </summary>
@@ -32,12 +30,12 @@ public sealed class IncomeSources(IHttpClientFactory clients, ILogger<IncomeSour
 
     /// <summary>
     /// The commission, and whether affiliate links are on at all. Catalog.API answers 404 while its flag is off (the
-    /// caller is already known to be an admin). Null months when it couldn't be asked.
+    /// caller is already known to be an admin).
     /// </summary>
-    public async Task<(IReadOnlyList<CommissionMonth>? Months, bool Off)> CommissionAsync(string? authorization, int months, CancellationToken ct)
+    public async Task<AffiliateIncome> CommissionAsync(string? authorization, int months, CancellationToken ct)
     {
         var (status, commission) = await GetAsync<List<CommissionMonth>>(Catalog, $"api/v1/affiliates/monthly?months={months}", authorization, ct);
-        return status == HttpStatusCode.NotFound ? ([], true) : (status == HttpStatusCode.OK ? commission : null, false);
+        return status == HttpStatusCode.NotFound ? AffiliateIncome.Off : commission is null ? AffiliateIncome.Unknown : AffiliateIncome.On(commission);
     }
 
     private async Task<(HttpStatusCode? Status, T? Body)> GetAsync<T>(string client, string url, string? authorization, CancellationToken ct)

@@ -36,9 +36,6 @@ public record RevenueReportDto(DateOnly From, DateOnly To, int Accounts, int New
     int NewSubscriptions, int Ended, IReadOnlyList<RevenuePlanRowDto> Plans, IReadOnlyList<RevenueDayDto> Days);
 
 /// <summary>
-/// The subscription side of revenue, for the admins' Revenue page (the affiliate side is Catalog.API's report).
-/// </summary>
-/// <summary>
 /// Subscription payments received in one month and currency.
 /// </summary>
 /// <param name="Month">The month's first day (UTC).</param>
@@ -50,6 +47,9 @@ public record IncomeMonthDto(DateOnly Month, string Currency, decimal Amount, in
 /// </summary>
 public record IncomeDto(IReadOnlyList<IncomeMonthDto> Months, IReadOnlyList<RevenueMoneyDto> MonthlyRecurring);
 
+/// <summary>
+/// The subscription side of revenue, for the admins' Revenue page (the affiliate side is Catalog.API's report).
+/// </summary>
 public static class RevenueApi
 {
     private const int MaxReportDays = 365;
@@ -68,7 +68,7 @@ public static class RevenueApi
     private static async Task<Results<Ok<IncomeDto>, NotFound>> IncomeAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
         TimeProvider time, int months = 12, CancellationToken ct = default)
     {
-        if (!FlagsApi.IsAdmin(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }
@@ -87,7 +87,7 @@ public static class RevenueApi
     private static async Task<Results<Ok<RevenueReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
         TimeProvider time, int days = 30, CancellationToken ct = default)
     {
-        if (!FlagsApi.IsAdmin(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }

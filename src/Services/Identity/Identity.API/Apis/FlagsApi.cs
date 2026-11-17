@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
+using TvTracker;
 
 namespace Identity.API.Apis;
 
@@ -63,7 +64,7 @@ public static class FlagsApi
 
     private static async Task<Results<Ok<List<FlagDto>>, NotFound>> GetAsync(ClaimsPrincipal user, IConfiguration config, CancellationToken ct)
     {
-        if (!IsAdmin(user, config) || Directory(config) is not { } directory)
+        if (!AppAdmins.Is(user, config) || Directory(config) is not { } directory)
         {
             return TypedResults.NotFound();
         }
@@ -73,7 +74,7 @@ public static class FlagsApi
     private static async Task<Results<Ok<FlagDto>, NotFound, ValidationProblem>> SetAsync(
         string key, SetFlagRequest request, ClaimsPrincipal user, IConfiguration config, ILogger<SetFlagRequest> logger, CancellationToken ct)
     {
-        if (!IsAdmin(user, config) || Directory(config) is not { } directory)
+        if (!AppAdmins.Is(user, config) || Directory(config) is not { } directory)
         {
             return TypedResults.NotFound();
         }
@@ -227,11 +228,6 @@ public static class FlagsApi
         var document = await JsonNode.ParseAsync(stream, cancellationToken: ct);
         return document?["flags"]?.DeepClone().AsObject() ?? [];
     }
-
-    /// <summary>
-    /// An app admin: a Keycloak username in <c>Admin:Users</c>. Plans use the same list.
-    /// </summary>
-    internal static bool IsAdmin(ClaimsPrincipal user, IConfiguration config) => TvTracker.AppAdmins.Is(user, config);
 
     private static string? Directory(IConfiguration config) =>
         config["Flags:Directory"] is { Length: > 0 } directory && System.IO.Directory.Exists(directory) ? directory : null;

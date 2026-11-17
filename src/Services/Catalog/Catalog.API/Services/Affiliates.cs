@@ -217,14 +217,6 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
 }
 
 /// <summary>
-/// App admins: Keycloak usernames in <c>Admin:Users</c>, as Identity's flags page reads them.
-/// </summary>
-public static class Admins
-{
-    public static bool Is(ClaimsPrincipal user, IConfiguration config) => TvTracker.AppAdmins.Is(user, config);
-}
-
-/// <summary>
 /// The streaming services given a test program to start with, so their clicks, and sales reported on the test
 /// network's page, are tracked per service before any real deal exists. Names are as where-to-watch lists them.
 /// </summary>

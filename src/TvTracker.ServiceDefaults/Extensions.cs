@@ -39,8 +39,9 @@ public static class Extensions
 
         builder.Services.AddServiceDiscovery();
         builder.Services.AddSingleton(new Branding(builder.Configuration[$"{Branding.Section}:AppName"]));
-        // A service that can reach Identity.API follows the name an admin sets in Settings (BrandingRefresher).
-        if (builder.Configuration.GetSection("services:identity-api").Exists())
+        // A service that can reach Identity.API follows the name an admin sets in Settings (BrandingRefresher), unless it
+        // never says the name (Branding:Refresh false).
+        if (builder.Configuration.GetSection("services:identity-api").Exists() && builder.Configuration.GetValue($"{Branding.Section}:Refresh", true))
         {
             builder.Services.AddHttpClient(BrandingRefresher.ClientName, client => client.BaseAddress = new Uri("https+http://identity-api/"));
             builder.Services.AddHostedService<BrandingRefresher>();

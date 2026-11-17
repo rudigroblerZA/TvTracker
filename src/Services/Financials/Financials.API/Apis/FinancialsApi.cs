@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Financials.API.Data;
 using Financials.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -23,7 +22,7 @@ public static class FinancialsApi
 {
     public static void MapFinancialsApi(this IEndpointRouteBuilder app)
     {
-        var api = app.MapGroup("/api/v1/financials").RequireAuthorization();
+        var api = app.MapGroup("/api/v1/financials").RequireAuthorization().RequireAppAdmin();
         api.MapGet("/", StatementAsync);
         api.MapGet("/costs", CostsAsync);
         api.MapPost("/costs", AddCostAsync);
@@ -31,41 +30,26 @@ public static class FinancialsApi
         api.MapDelete("/costs/{id:guid}", DeleteCostAsync);
     }
 
-    private static async Task<Results<Ok<FinancialStatementDto>, NotFound>> StatementAsync(HttpContext http, ClaimsPrincipal user,
-        IConfiguration config, FinancialsContext db, IncomeSources income, IOptions<FinancialOptions> options, TimeProvider time, int months = 12,
-        CancellationToken ct = default)
+    private static async Task<Ok<FinancialStatementDto>> StatementAsync(HttpContext http, FinancialsContext db, IncomeSources income,
+        IOptions<FinancialOptions> options, TimeProvider time, int months = 12, CancellationToken ct = default)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
-
         var window = FinancialStatement.Clamp(months);
         var authorization = http.Request.Headers.Authorization.ToString();
         // Both services at once, and the costs meanwhile.
         var subscriptionsTask = income.SubscriptionsAsync(authorization, window, ct);
         var commissionTask = income.CommissionAsync(authorization, window, ct);
         var costs = await db.CostItems.AsNoTracking().ToListAsync(ct);
-        var subscriptions = await subscriptionsTask;
-        var (commission, affiliatesOff) = await commissionTask;
 
-        return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, subscriptions?.Months,
-            subscriptions?.MonthlyRecurring ?? [], commission, affiliatesOff, costs, options.Value));
+        return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, await subscriptionsTask,
+            await commissionTask, costs, options.Value));
     }
 
-    private static async Task<Results<Ok<List<CostItemDto>>, NotFound>> CostsAsync(ClaimsPrincipal user, IConfiguration config, FinancialsContext db,
-        CancellationToken ct) =>
-        !AppAdmins.Is(user, config)
-            ? TypedResults.NotFound()
-            : TypedResults.Ok((await db.CostItems.AsNoTracking().OrderBy(c => c.Category).ThenBy(c => c.Name).ToListAsync(ct)).Select(ToDto).ToList());
+    private static async Task<Ok<List<CostItemDto>>> CostsAsync(FinancialsContext db, CancellationToken ct) =>
+        TypedResults.Ok((await db.CostItems.AsNoTracking().OrderBy(c => c.Category).ThenBy(c => c.Name).ToListAsync(ct)).Select(ToDto).ToList());
 
-    private static async Task<Results<Ok<CostItemDto>, NotFound, ValidationProblem>> AddCostAsync(CostItemRequest request, ClaimsPrincipal user,
-        IConfiguration config, FinancialsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Results<Ok<CostItemDto>, ValidationProblem>> AddCostAsync(CostItemRequest request, FinancialsContext db,
+        TimeProvider time, CancellationToken ct)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
         if (FinancialStatement.Problem(request) is { } problem)
         {
             return Invalid(problem);
@@ -78,9 +62,9 @@ public static class FinancialsApi
     }
 
     private static async Task<Results<Ok<CostItemDto>, NotFound, ValidationProblem>> SaveCostAsync(Guid id, CostItemRequest request,
-        ClaimsPrincipal user, IConfiguration config, FinancialsContext db, TimeProvider time, CancellationToken ct)
+        FinancialsContext db, TimeProvider time, CancellationToken ct)
     {
-        if (!AppAdmins.Is(user, config) || await db.CostItems.FindAsync([id], ct) is not { } item)
+        if (await db.CostItems.FindAsync([id], ct) is not { } item)
         {
             return TypedResults.NotFound();
         }
@@ -93,13 +77,8 @@ public static class FinancialsApi
         return TypedResults.Ok(ToDto(item));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteCostAsync(Guid id, ClaimsPrincipal user, IConfiguration config,
-        FinancialsContext db, CancellationToken ct)
+    private static async Task<NoContent> DeleteCostAsync(Guid id, FinancialsContext db, CancellationToken ct)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
         // Gone already is as good as deleted.
         await db.CostItems.Where(c => c.Id == id).ExecuteDeleteAsync(ct);
         return TypedResults.NoContent();
