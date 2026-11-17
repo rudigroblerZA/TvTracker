@@ -48,6 +48,7 @@ var catalogDb = postgres.AddDatabase("catalogdb");
 var trackingDb = postgres.AddDatabase("trackingdb");
 var ratingsDb = postgres.AddDatabase("ratingsdb");
 var researchDb = postgres.AddDatabase("researchdb");
+var financialsDb = postgres.AddDatabase("financialsdb");
 var recommendationsDb = postgres.AddDatabase("recommendationsdb");
 var notificationsDb = postgres.AddDatabase("notificationsdb");
 var analyticsDb = postgres.AddDatabase("analyticsdb");
@@ -225,6 +226,16 @@ else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Resea
     researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
 }
 
+// Financials: the business's own books, for admins. It keeps the costs an admin enters and asks Identity.API (subscription
+// payments) and Catalog.API (affiliate commission) for the income, with the admin's own token. Nothing about any user,
+// so it takes no part in the data export or account deletion, and it sends and hears no events.
+var financialsApi = builder.AddProject<Projects.Financials_API>("financials-api")
+    .WithReference(financialsDb).WaitFor(financialsDb)
+    .WithReference(identityApi)
+    .WithReference(catalogApi)
+    .WithEnvironment("Identity__Url", keycloakUrl)
+    .WithHttpHealthCheck("/health");
+
 // The data export collects each service's data for the user.
 // Moderators (Ratings.API's moderation page): admins and Moderation:Users. Moderation:BlockedTerms are refused in posts.
 foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:BlockedTerms" })
@@ -247,6 +258,8 @@ foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildre
     identityApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
     // ...and the affiliate report (Catalog.API).
     catalogApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
+    // ...and the financials.
+    financialsApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
 }
 identityApi
     .WithEnvironment("Admin__Account__Username", "admin")
@@ -396,7 +409,8 @@ var mobileBff = builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi);
+    .WithReference(researchApi)
+    .WithReference(financialsApi);
 
 // WebApp:PublicUrl: the web app's address when it's reached through one forwarded address only (a cloud session's
 // preview), where the browser can't reach Keycloak. Sign-in then goes through the web app (SignInThroughWebApp), and
@@ -515,7 +529,8 @@ var webApp = builder.AddProject<Projects.WebApp>("webapp")
     .WithReference(notificationsApi)
     .WithReference(analyticsApi)
     .WithReference(socialApi)
-    .WithReference(researchApi);
+    .WithReference(researchApi)
+    .WithReference(financialsApi);
 if (!string.IsNullOrEmpty(webPublicUrl))
 {
     webApp.WithEnvironment("WebApp__PublicUrl", webPublicUrl);

@@ -19,9 +19,10 @@ public static class ApiClients
     public const string Analytics = "analytics";
     public const string Social = "social";
     public const string Research = "research";
+    public const string Financials = "financials";
 
     public static readonly IReadOnlyList<string> All =
-        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social, Research];
+        [Identity, Catalog, Tracking, Ratings, Recommendations, Notifications, Analytics, Social, Research, Financials];
 }
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
@@ -124,28 +125,6 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     /// </summary>
     public Task<RevenueReport?> GetRevenueReportAsync(int days, CancellationToken ct = default) =>
         GetAsync<RevenueReport>(ApiClients.Identity, $"api/v1/admin/revenue?days={days}", ct);
-
-    /// <summary>
-    /// Subscription income, estimated payment fees and entered costs for the last <paramref name="months"/> months;
-    /// null for anyone but an admin.
-    /// </summary>
-    public Task<FinancialStatement?> GetFinancialsAsync(int months, CancellationToken ct = default) =>
-        GetAsync<FinancialStatement>(ApiClients.Identity, $"api/v1/admin/financials?months={months}", ct);
-
-    public async Task<IReadOnlyList<CostItem>> GetCostsAsync(CancellationToken ct = default) =>
-        await GetAsync<List<CostItem>>(ApiClients.Identity, "api/v1/admin/financials/costs", ct) ?? [];
-
-    /// <summary>
-    /// Adds a cost, or changes the one with <paramref name="id"/>; null when it didn't happen (not an admin, or the
-    /// cost is gone).
-    /// </summary>
-    public Task<CostItem?> SaveCostAsync(Guid? id, SaveCostItem cost, CancellationToken ct = default) =>
-        id is { } existing
-            ? SendAsync<CostItem>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/financials/costs/{existing}", cost, ct)
-            : SendAsync<CostItem>(ApiClients.Identity, HttpMethod.Post, "api/v1/admin/financials/costs", cost, ct);
-
-    public Task DeleteCostAsync(Guid id, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Identity, HttpMethod.Delete, $"api/v1/admin/financials/costs/{id}", null, ct);
 
     public Task<PlanUser?> SetPlanAsync(string userId, string plan, CancellationToken ct = default) =>
         SendAsync<PlanUser>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/plans/users/{Uri.EscapeDataString(userId)}", new { plan }, ct);
@@ -283,13 +262,6 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// <summary>
     /// The affiliate programs admins set up in Settings, and the others in force; null for anyone but an admin.
     /// </summary>
-    /// <summary>
-    /// Affiliate commission by month and currency, for the financials page; empty when there is none, affiliate links
-    /// are off, or the viewer isn't an admin.
-    /// </summary>
-    public async Task<IReadOnlyList<AffiliateMonth>> GetAffiliateMonthsAsync(int months, CancellationToken ct = default) =>
-        await GetAsync<List<AffiliateMonth>>(ApiClients.Catalog, $"api/v1/affiliates/monthly?months={months}", ct) ?? [];
-
     public Task<AffiliatePrograms?> GetAffiliateProgramsAsync(CancellationToken ct = default) =>
         GetAsync<AffiliatePrograms>(ApiClients.Catalog, "api/v1/affiliates/programs", ct);
 
@@ -1050,6 +1022,34 @@ public sealed class SocialClient(IHttpClientFactory f, IAccessTokenProvider t, I
 
     public Task UnfollowAsync(string userId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Social, HttpMethod.Delete, $"api/v1/people/{Uri.EscapeDataString(userId)}/follow", null, ct);
+}
+
+/// <summary>
+/// Financials.API: the business's books, for admins.
+/// </summary>
+public sealed class FinancialsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
+{
+    /// <summary>
+    /// Income, the estimated payment fees, costs and what's left for the last <paramref name="months"/> months, by
+    /// currency; null for anyone but an admin.
+    /// </summary>
+    public Task<FinancialStatement?> GetStatementAsync(int months, CancellationToken ct = default) =>
+        GetAsync<FinancialStatement>(ApiClients.Financials, $"api/v1/financials?months={months}", ct);
+
+    public async Task<IReadOnlyList<CostItem>> GetCostsAsync(CancellationToken ct = default) =>
+        await GetAsync<List<CostItem>>(ApiClients.Financials, "api/v1/financials/costs", ct) ?? [];
+
+    /// <summary>
+    /// Adds a cost, or changes the one with <paramref name="id"/>; null when it didn't happen (not an admin, or the
+    /// cost is gone).
+    /// </summary>
+    public Task<CostItem?> SaveCostAsync(Guid? id, SaveCostItem cost, CancellationToken ct = default) =>
+        id is { } existing
+            ? SendAsync<CostItem>(ApiClients.Financials, HttpMethod.Put, $"api/v1/financials/costs/{existing}", cost, ct)
+            : SendAsync<CostItem>(ApiClients.Financials, HttpMethod.Post, "api/v1/financials/costs", cost, ct);
+
+    public Task DeleteCostAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Financials, HttpMethod.Delete, $"api/v1/financials/costs/{id}", null, ct);
 }
 
 public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

@@ -634,18 +634,25 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
 - **Today's rate:** what the running subscriptions bring in a month, after their fee share, less the costs running
   today. It answers "do subscriptions cover the running costs yet?".
 - **Fees are an estimate:** a percent of each payment plus a fixed part, 2.9% and 0.30 unless `Financials:PaymentFeePercent`
-  and `Financials:PaymentFeeFixed` on Identity.API say otherwise. Set them from the payment provider's own statement.
+  and `Financials:PaymentFeeFixed` on Financials.API say otherwise. Set them from the payment provider's own statement.
 - **Currencies are kept apart.** Nothing is converted: each currency anything was earned or spent in has its own
   figures and table. No tax is worked out.
-- **Where it comes from:** `GET /api/v1/admin/financials?months=12` (Identity.API: receipts, the fee estimate and
-  costs) and `GET /api/v1/affiliates/monthly?months=12` (Catalog.API: commission in the month the network reported the
-  sale; nothing while the `affiliates` flag is off). The page puts the two together (`Financials.Books`). Costs:
-  `GET`, `POST`, `PUT /{id}` and `DELETE /{id}` under `/api/v1/admin/financials/costs`, in Identity's `cost_items` table.
-  Anyone but an admin gets 404.
+- **Where it comes from:** its own service, Financials.API (port 5115, database `financialsdb`, gateway route
+  `/api/v1/financials`). `GET /api/v1/financials?months=12` answers with the whole statement: the service keeps the
+  costs (table `cost_items`) and asks Identity.API for subscription income by month
+  (`GET /api/v1/admin/income?months=12`) and Catalog.API for commission in the month the network reported the sale
+  (`GET /api/v1/affiliates/monthly?months=12`; nothing while the `affiliates` flag is off), passing on the admin's own
+  sign-in. Costs: `GET`, `POST`, `PUT /{id}` and `DELETE /{id}` under `/api/v1/financials/costs`. Anyone but an admin
+  gets 404.
+- **When a source is down:** each is given 5 seconds and isn't retried. The statement still comes, with the costs
+  complete, and the page says which income is missing and offers to try again.
+- **Moved from Identity.API:** costs were first kept in Identity's database. That table is dropped and its rows are
+  not copied, so costs entered before the move have to be entered again.
 - **Tried:** as the admin, three costs were added (monthly, yearly, once), one changed and one deleted, and the months
   and totals followed each time, beside the development data's real payments and commission; `demo` sees neither
   the link nor the figures; the page doesn't scroll sideways on a phone. What a cost may be (its category, amount,
-  currency, dates) is covered by unit tests, not tried on the page.
+  currency, dates) is covered by unit tests, not tried on the page; so are the statement's sums. With Catalog.API stopped, and then
+  Identity.API too, the page answered in about 6 seconds with the costs and a note of what was missing.
 
 Show pages open with the show's artwork: TVmaze's large background image across the top, faded into the page, with
 the poster overlapping it. A show without one gets TVmaze's thin logo banner as a strip instead, and a show with
@@ -702,6 +709,7 @@ dotnet test tests/Recommendations.UnitTests
 dotnet test tests/Notifications.UnitTests
 dotnet test tests/Research.UnitTests
 dotnet test tests/Identity.UnitTests
+dotnet test tests/Financials.UnitTests
 dotnet test tests/Ratings.UnitTests
 dotnet test tests/UI.UnitTests
 ```
@@ -1354,6 +1362,7 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
+| Financials.API | `src/Services/Financials` | Admins' financials: the costs, and the monthly statement of subscription income (from Identity.API) and affiliate commission (from Catalog.API) against them |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
@@ -1887,8 +1896,8 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Identity, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
-(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
+Catalog, Analytics, Financials, Identity, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.API/Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
 `Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
 `Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is

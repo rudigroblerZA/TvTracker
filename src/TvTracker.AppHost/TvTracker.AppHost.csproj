@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Services\Identity\Identity.API\Identity.API.csproj" />
     <ProjectReference Include="..\Services\Catalog\Catalog.API\Catalog.API.csproj" />
     <ProjectReference Include="..\Services\Research\Research.API\Research.API.csproj" />
+    <ProjectReference Include="..\Services\Financials\Financials.API\Financials.API.csproj" />
     <ProjectReference Include="..\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
     <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" />
     <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />

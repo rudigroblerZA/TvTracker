@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Financials.API: the business's own books, for admins. It keeps the costs an admin enters, asks Identity.API for
+       subscription income and Catalog.API for affiliate commission, and answers with what's left, month by month. It
+       holds nothing about any user. -->
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Financials.UnitTests" />
+  </ItemGroup>
+
+</Project>

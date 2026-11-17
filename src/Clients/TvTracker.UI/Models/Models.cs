@@ -1368,19 +1368,26 @@ public record SaveCostItem(string? Name, string? Category, decimal Amount, strin
 public record FinancialCategory(string Category, decimal Amount);
 
 /// <summary>
-/// One month in one currency, from Identity.API: subscription income, the estimated payment fees and the entered costs.
+/// One month of the books in one currency (Financials.API).
 /// </summary>
 /// <param name="Month">The month's first day.</param>
-public record FinancialMonth(DateOnly Month, string Currency, decimal Subscriptions, int Payments, decimal PaymentFees, decimal Costs,
-    IReadOnlyList<FinancialCategory> CostsByCategory);
-
-public record FinancialStatement(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialMonth> Months,
-    IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> MonthlyCosts, IReadOnlyList<string> Categories);
+/// <param name="Fees">The estimate of what the payment provider kept.</param>
+public record FinancialRow(DateOnly Month, decimal Subscriptions, decimal Affiliates, decimal Fees, decimal Costs, decimal Net)
+{
+    public decimal Income => Subscriptions + Affiliates;
+}
 
 /// <summary>
-/// Affiliate commission in one month and currency, from Catalog.API.
+/// A currency's books: its months, newest first, their totals, and today's monthly rate. Currencies are never added
+/// together or converted.
 /// </summary>
-public record AffiliateMonth(DateOnly Month, string Currency, int Conversions, decimal Commission);
+public record FinancialBook(string Currency, IReadOnlyList<FinancialRow> Months, FinancialRow Total, decimal Recurring, decimal RunningCosts,
+    decimal RunRate, IReadOnlyList<FinancialCategory> CostsByCategory);
+
+/// <param name="SubscriptionsKnown">False when the subscription figures couldn't be fetched, so they're missing.</param>
+/// <param name="Affiliates">"on", "off" (affiliate links are switched off) or "unknown" (the figures couldn't be fetched).</param>
+public record FinancialStatement(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialBook> Books,
+    IReadOnlyList<string> Categories, bool SubscriptionsKnown, string Affiliates);
 
 public record RevenueReport(DateOnly From, DateOnly To, int Accounts, int NewAccounts, int PayingAccounts, int OnPaidPlan, double PaidShare,
     IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> Received, int CheckoutsStarted, int CheckoutsCompleted, int NewSubscriptions,

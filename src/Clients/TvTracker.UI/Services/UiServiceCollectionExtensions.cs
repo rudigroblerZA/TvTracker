@@ -44,6 +44,7 @@ public static class UiServiceCollectionExtensions
         services.AddScoped<AnalyticsClient>();
         services.AddScoped<SocialClient>();
         services.AddScoped<ResearchClient>();
+        services.AddScoped<FinancialsClient>();
 
         return services;
     }

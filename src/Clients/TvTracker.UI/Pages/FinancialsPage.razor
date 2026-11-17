@@ -1,8 +1,6 @@
 @using static TvTracker.UI.Services.ReportFormat
 @page "/settings/financials"
-@inject IdentityClient Identity
-@inject CatalogClient Catalog
-@inject FeatureFlagStore Flags
+@inject FinancialsClient Books
 @inject TimeProvider Time
 
 <PageTitle>Financials · @Brand.AppName</PageTitle>
@@ -37,6 +35,15 @@
         else
         {
             <p class="muted small">@($"{statement.From:MMMM yyyy} to {statement.To:d MMMM yyyy}, by UTC month.")</p>
+            @if (!statement.SubscriptionsKnown || statement.Affiliates == "unknown")
+            {
+                <p class="notice" role="status">
+                    @(!statement.SubscriptionsKnown && statement.Affiliates == "unknown" ? "Subscription and affiliate income couldn't be fetched"
+                        : !statement.SubscriptionsKnown ? "Subscription income couldn't be fetched" : "Affiliate commission couldn't be fetched"),
+                    so the figures below are without it. Costs are complete.
+                    <button class="btn btn-quiet small" type="button" @onclick="LoadAsync">Try again</button>
+                </p>
+            }
 
             @if (books.Count == 0)
             {
@@ -44,7 +51,7 @@
             }
             @foreach (var book in books)
             {
-                var runRate = book.RunRate(statement.FeePercent);
+                var runRate = book.RunRate;
                 <section aria-label="@($"Financials in {book.Currency}")">
                     <h2>@book.Currency</h2>
                     <div class="stat-tiles">
@@ -242,7 +249,7 @@
 
             <p class="muted small">
                 How it's worked out. Subscriptions are the payments received in the month. Affiliate commission is counted in the
-                month the network reported the sale@(affiliatesOn ? "" : " (affiliate links are switched off, so there is none)").
+                month the network reported the sale@(statement.Affiliates == "off" ? " (affiliate links are switched off, so there is none)" : "").
                 @($"Fees are an estimate, {statement.FeePercent:0.##}% of each payment plus {statement.FeeFixed:0.00}, not the payment provider's bill. ")
                 Each currency is kept apart: nothing is converted. No tax is worked out.
             </p>
@@ -258,7 +265,6 @@
     private int loads;
     private bool loaded;
     private bool busy;
-    private bool affiliatesOn;
     private string? error;
     private string? formError;
     private string? notice;
@@ -287,18 +293,15 @@
         var load = ++loads;
         var window = months;
         error = null;
-        var statementTask = Identity.GetFinancialsAsync(window);
-        var costsTask = Identity.GetCostsAsync();
-        var affiliatesTask = AffiliatesAsync(window);
+        var statementTask = Books.GetStatementAsync(window);
+        var costsTask = Books.GetCostsAsync();
         try
         {
             var report = await statementTask;
             var items = report is null ? [] : await costsTask;
-            var (on, commission) = await affiliatesTask;
             if (load == loads)
             {
-                (statement, costs, affiliatesOn) = (report, items, on);
-                books = report is null ? [] : Financials.Books(report, commission);
+                (statement, costs, books) = (report, items, report?.Books ?? []);
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
@@ -311,21 +314,6 @@
         finally
         {
             loaded = true;
-        }
-    }
-
-    /// <summary>
-    /// The affiliate half, only while its flag is on; its failure leaves the rest of the page standing.
-    /// </summary>
-    private async Task<(bool On, IReadOnlyList<AffiliateMonth> Months)> AffiliatesAsync(int window)
-    {
-        try
-        {
-            return await Flags.IsEnabledAsync(FeatureFlags.Affiliates) ? (true, await Catalog.GetAffiliateMonthsAsync(window)) : (false, []);
-        }
-        catch (HttpRequestException)
-        {
-            return (true, []);
         }
     }
 
@@ -351,7 +339,7 @@
         (busy, formError, notice) = (true, null, null);
         try
         {
-            var saved = await Identity.SaveCostAsync(editing?.Id, new SaveCostItem(form.Name, form.Category, form.Amount ?? 0, form.Currency,
+            var saved = await Books.SaveCostAsync(editing?.Id, new SaveCostItem(form.Name, form.Category, form.Amount ?? 0, form.Currency,
                 form.Recurrence, form.StartsOn, form.EndsOn, form.Notes));
             if (saved is null)
             {
@@ -378,7 +366,7 @@
         (busy, formError, notice) = (true, null, null);
         try
         {
-            await Identity.DeleteCostAsync(cost.Id);
+            await Books.DeleteCostAsync(cost.Id);
             deleting = null;
             if (editing?.Id == cost.Id)
             {

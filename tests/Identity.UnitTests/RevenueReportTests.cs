@@ -68,4 +68,23 @@ public class RevenueReportTests
         Assert.Empty(report.MonthlyRecurring);
         Assert.Equal(3, report.Days.Count);
     }
+
+    [Fact]
+    public void Income_by_month_groups_payments_by_the_month_received_and_currency_newest_first()
+    {
+        var months = RevenueReport.ByMonth(
+        [
+            new(new DateTime(2026, 11, 3, 9, 0, 0, DateTimeKind.Utc), 2.99m, "usd"),
+            new(new DateTime(2026, 11, 30, 23, 59, 0, DateTimeKind.Utc), 29.99m, "USD"),
+            new(new DateTime(2026, 10, 31, 23, 59, 0, DateTimeKind.Utc), 89m, "ZAR"),
+            new(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc), 89m, "ZAR")
+        ]);
+
+        Assert.Equal(
+        [
+            new IncomeMonthDto(new DateOnly(2026, 11, 1), "USD", 32.98m, 2),
+            new IncomeMonthDto(new DateOnly(2026, 11, 1), "ZAR", 89m, 1),
+            new IncomeMonthDto(new DateOnly(2026, 10, 1), "ZAR", 89m, 1)
+        ], months);
+    }
 }
