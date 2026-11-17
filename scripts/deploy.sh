@@ -13,6 +13,9 @@
 #   OPERATOR_NAME   who runs the site, shown in the privacy policy and terms
 #   CONTACT_EMAIL   where people can write to
 # Optional: API_HOST, a host name of its own for the gateway as well, e.g. api.tv.example.com (its DNS likewise).
+# Optional: PROXY_PORT, when a reverse proxy of your own (Caddy, nginx, a load balancer) already has ports 80 and 443
+#           and holds the certificate: this deployment then listens on that port of this machine only, in plain
+#           HTTP, for your proxy to send PUBLIC_HOST to (README, Deploying: behind your own reverse proxy).
 #
 # Needs: Docker with the compose plugin, the .NET SDK (global.json), the Aspire CLI (dotnet tool install -g Aspire.Cli),
 # jq and openssl.
@@ -94,6 +97,10 @@ if (( ${#missing[@]} )); then
 fi
 # The import tool's image, for scripts/deploy-import.sh; not part of the compose file.
 echo "IMPORT_CLI_IMAGE=tvtracker/import-cli:$tag" >> "$new_env"
+# This script's own setting, likewise: the port a reverse proxy of your own sends the site to (empty for none).
+proxy_port=$(current PROXY_PORT)
+[[ -z $proxy_port || $proxy_port =~ ^[0-9]+$ ]] || { echo "PROXY_PORT is a port number, like 8088." >&2; exit 1; }
+echo "PROXY_PORT=$proxy_port" >> "$new_env"
 # Keys from an earlier deploy that this publish no longer asks for are kept, in case a later one does again.
 grep -v -f <(sed 's/=.*/=/; s/^/^/' "$new_env") "$env_file" >> "$new_env" || true
 cp "$new_env" "$env_file"
@@ -102,6 +109,15 @@ cp "$new_env" "$env_file"
 # Written in place, so the file the running Caddy has open is the one that changes; it's told to re-read it below.
 cat "$apphost/Deploy/Caddyfile" > "$home/Caddyfile"
 [[ -z $(current API_HOST) ]] || cat "$apphost/Deploy/Caddyfile.apihost" >> "$home/Caddyfile"
+if [[ -n $proxy_port ]]; then
+  # Behind a reverse proxy of your own: it has ports 80 and 443 and the certificate, so this Caddy asks for none
+  # (an http:// address), believes the proxy about who the visitor is, and is reachable from this machine only.
+  routes=$(sed -E 's#^\{\$(PUBLIC_HOST|API_HOST)\} \{#http://{$\1} {#' "$home/Caddyfile")
+  printf '{\n\tservers {\n\t\ttrusted_proxies static private_ranges\n\t}\n}\n\n%s\n' "$routes" > "$home/Caddyfile"
+  printf 'services:\n  caddy:\n    ports: !override\n      - "127.0.0.1:%s:80"\n' "$proxy_port" > "$home/docker-compose.override.yaml"
+else
+  rm -f "$home/docker-compose.override.yaml"
+fi
 
 # Feature flags: the checked-in defaults (replaced on every deploy), and the overrides the flags page writes (kept).
 cp "$apphost/Flags/flagd.json" "$home/flags/flagd.json"
@@ -161,6 +177,7 @@ done
 
 echo
 echo "Deployed to $home. The site: https://$(current PUBLIC_HOST)"
+[[ -z $proxy_port ]] || echo "Behind your reverse proxy: have it send $(current PUBLIC_HOST) to http://127.0.0.1:$proxy_port, keeping the Host header."
 gateway=https://$(current PUBLIC_HOST)/api
 [[ -z $(current API_HOST) ]] || gateway="$gateway and https://$(current API_HOST)"
 echo "The mobile gateway: $gateway"
