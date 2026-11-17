@@ -19,10 +19,9 @@ public sealed class AdminAccountSeeder(KeycloakAdminClient keycloak, IConfigurat
 
         await KeycloakRetry.RunAsync(logger, "set up the admin account", async () =>
         {
-            if (await keycloak.EnsureUserAsync(username, password, $"{username}@example.com", "App", "Admin", stoppingToken))
-            {
-                logger.LogInformation("Created the admin account {Username} in Keycloak", username);
-            }
+            var created = await keycloak.EnsureUserAsync(username, password, $"{username}@example.com", "App", "Admin", stoppingToken);
+            // Said every start, not only when it's new: scripts/deploy.sh waits for this line before saying sign-in works.
+            logger.LogInformation("The admin account {Username} is ready in Keycloak ({What})", username, created ? "created" : "password set");
         }, stoppingToken);
     }
 }
