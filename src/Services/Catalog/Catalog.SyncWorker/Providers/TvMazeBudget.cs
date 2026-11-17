@@ -4,39 +4,6 @@ using System.Diagnostics.Metrics;
 namespace Catalog.SyncWorker.Providers;
 
 /// <summary>
-/// Who a TVmaze call is for: people waiting on it, or the background jobs that keep the catalog fresh.
-/// </summary>
-public enum TvMazeLane
-{
-    Background,
-    Interactive
-}
-
-/// <summary>
-/// The caller of the TVmaze calls made in the current flow (an <see cref="AsyncLocal{T}"/>), set by each entry point
-/// with <see cref="Begin"/>: the limiter picks its lane by it and the usage is counted under its name. Calls made outside
-/// any scope are background work named "other".
-/// </summary>
-public static class TvMazeCaller
-{
-    private static readonly AsyncLocal<(string Name, TvMazeLane Lane)?> current = new();
-
-    public static (string Name, TvMazeLane Lane) Current => current.Value ?? ("other", TvMazeLane.Background);
-
-    public static IDisposable Begin(string name, TvMazeLane lane)
-    {
-        var previous = current.Value;
-        current.Value = (name, lane);
-        return new Scope(previous);
-    }
-
-    private sealed class Scope((string, TvMazeLane)? previous) : IDisposable
-    {
-        public void Dispose() => current.Value = previous;
-    }
-}
-
-/// <summary>
 /// TVmaze's budget, shared by every call this process makes: at most <see cref="PermitLimit"/> calls in any
 /// <see cref="Window"/> (TVmaze allows at least 20; two are left for retries and clocks), and two lanes.
 /// <list type="bullet">
@@ -82,14 +49,14 @@ public sealed class TvMazeRateLimiter(TimeProvider time)
     /// <summary>
     /// Waits for a permit in <paramref name="lane"/>; completes at once when one is free.
     /// </summary>
-    public Task AcquireAsync(TvMazeLane lane, CancellationToken ct)
+    public Task AcquireAsync(ProviderLane lane, CancellationToken ct)
     {
         lock (gate)
         {
             var now = time.GetUtcNow();
             Expire(now);
-            var queue = lane == TvMazeLane.Interactive ? interactive : background;
-            if (queue.Count == 0 && (lane == TvMazeLane.Interactive || interactive.Count == 0) && granted.Count < Limit(lane))
+            var queue = lane == ProviderLane.Interactive ? interactive : background;
+            if (queue.Count == 0 && (lane == ProviderLane.Interactive || interactive.Count == 0) && granted.Count < Limit(lane))
             {
                 granted.Enqueue(now);
                 return Task.CompletedTask;
@@ -117,7 +84,7 @@ public sealed class TvMazeRateLimiter(TimeProvider time)
         }
     }
 
-    private static int Limit(TvMazeLane lane) => lane == TvMazeLane.Interactive ? PermitLimit : BackgroundLimit;
+    private static int Limit(ProviderLane lane) => lane == ProviderLane.Interactive ? PermitLimit : BackgroundLimit;
 
     private void Expire(DateTimeOffset now)
     {
@@ -194,11 +161,11 @@ public sealed class TvMazeUsage
         waits = meter.CreateHistogram<double>("tvmaze.permit.wait", "ms", "Time a TVmaze call waited for a permit");
     }
 
-    private sealed record Call(DateTimeOffset At, string Caller, TvMazeLane Lane, int Status, double WaitedMs);
+    private sealed record Call(DateTimeOffset At, string Caller, ProviderLane Lane, int Status, double WaitedMs);
 
-    public void Record(string caller, TvMazeLane lane, int status, TimeSpan waited)
+    public void Record(string caller, ProviderLane lane, int status, TimeSpan waited)
     {
-        var tags = new TagList { { "caller", caller }, { "lane", lane == TvMazeLane.Interactive ? "interactive" : "background" } };
+        var tags = new TagList { { "caller", caller }, { "lane", lane == ProviderLane.Interactive ? "interactive" : "background" } };
         waits.Record(waited.TotalMilliseconds, tags);
         tags.Add("status", status);
         calls.Add(1, tags);
@@ -259,7 +226,7 @@ public sealed class TvMazeUsage
         return new TvMazeUsageReport(calls.Count, calls.Count(TooMany), TvMazeRateLimiter.PermitLimit, TvMazeRateLimiter.BackgroundLimit,
             waiting.Interactive, waiting.Background,
             calls.GroupBy(c => (c.Caller, c.Lane))
-                .Select(g => new TvMazeCallerUsage(g.Key.Caller, g.Key.Lane == TvMazeLane.Interactive ? "interactive" : "background", g.Count(),
+                .Select(g => new TvMazeCallerUsage(g.Key.Caller, g.Key.Lane == ProviderLane.Interactive ? "interactive" : "background", g.Count(),
                     g.Count(TooMany), g.Count(Failed), Math.Round(g.Average(c => c.WaitedMs)),
                     Math.Round(g.Max(c => c.WaitedMs))))
                 .OrderByDescending(c => c.Calls).ThenBy(c => c.Caller, StringComparer.Ordinal)
@@ -281,7 +248,7 @@ public sealed class TvMazeRateLimitHandler(TvMazeRateLimiter limiter, TvMazeUsag
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var (caller, lane) = TvMazeCaller.Current;
+        var (caller, lane) = ProviderCaller.Current;
         var started = time.GetTimestamp();
         await limiter.AcquireAsync(lane, cancellationToken);
         var waited = time.GetElapsedTime(started);

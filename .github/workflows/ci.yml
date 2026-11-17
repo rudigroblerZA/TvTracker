@@ -47,7 +47,9 @@ jobs:
           dotnet build src/Tools/Catalog.ImportCli -c Release
           dotnet build src/Tools/TvTracker.LoadGen -c Release
 
-      - name: Unit tests
+      # Every project in tests/: the unit tests, and the integration tests, which start Postgres in a container
+      # (the runner has Docker).
+      - name: Tests
         run: |
           status=0
           for project in tests/*/*.csproj; do

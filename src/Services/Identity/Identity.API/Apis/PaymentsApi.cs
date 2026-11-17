@@ -158,7 +158,7 @@ public static class PaymentsApi
         return TypedResults.Ok(ToDto(subscription, providers));
     }
 
-    private static async Task<Results<Ok, BadRequest, NotFound, UnprocessableEntity, Conflict>> WebhookAsync(
+    private static async Task<Results<Ok, BadRequest, NotFound, StatusCodeHttpResult>> WebhookAsync(
         string provider, HttpRequest request, PaymentProviders providers, SubscriptionLedger ledger, TimeProvider time,
         ILoggerFactory loggers, CancellationToken ct)
     {
@@ -177,15 +177,8 @@ public static class PaymentsApi
         {
             return TypedResults.Ok();
         }
-        // An unknown subscription is 422 so the provider retries (a first payment's session may not be saved yet); a
-        // refused payment is 409, and logged to be refunded.
-        // A change to a subscription the app doesn't have (its account deleted) is acknowledged: a retry changes nothing.
-        return await ledger.ApplyAsync(named.Name, e, ct) switch
-        {
-            LedgerResult.Unknown => TypedResults.UnprocessableEntity(),
-            LedgerResult.Refused => TypedResults.Conflict(),
-            _ => TypedResults.Ok()
-        };
+        // The answer decides whether the provider sends it again (LedgerResults.WebhookStatus).
+        return TypedResults.StatusCode((await ledger.ApplyAsync(named.Name, e, ct)).WebhookStatus());
     }
 
     /// <summary>

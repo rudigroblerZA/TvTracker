@@ -663,7 +663,7 @@ a tab in the dashboard's terminal dock; `aspire terminal ps` lists the open ones
   share the dashboard through a tunnel or a forwarded port with people you wouldn't give the databases to.
 - **A preview feature of Aspire:** the terminal dock and the REPL command may change with an Aspire update.
 
-### Unit tests and CI
+### Tests and CI
 
 Unit tests cover the services' rules (title matching, crossovers, Wikiquote parsing, overrides, streaks, the essential
 cut, forecasts, the season verdict, recommendations, quiet hours and the digest, payments, moderation), that the
@@ -679,6 +679,27 @@ dotnet test tests/Identity.UnitTests
 dotnet test tests/Ratings.UnitTests
 dotnet test tests/UI.UnitTests
 ```
+
+**Integration tests** drive a module through its own interface against a real Postgres, the image the AppHost runs,
+started in a container by the tests themselves (Testcontainers; `tests/Shared`). They need Docker and nothing else
+running:
+
+```bash
+dotnet test tests/Identity.IntegrationTests   # the subscription ledger: events in; subscriptions, receipts, plan and published events out
+dotnet test tests/Catalog.IntegrationTests    # show sync: a scripted provider in; catalog rows and published events out
+```
+
+- **The subscription ledger** (`SubscriptionLedger.ApplyAsync`): a first payment, the same event again, a checkout
+  the app doesn't know yet, one subscription per checkout and one running per person, renewals and their receipts,
+  cancel and resume, an ending (and an admin's change in between), a lapsed subscription paid again. Two races are
+  made to happen rather than hoped for, by putting the other writer between the ledger's check and its save: two
+  checkouts paid at once (the database's one-running index refuses the second) and one event delivered twice at once.
+- **Show sync** (`CatalogSynchronizer`): importing and refreshing through a scripted provider at the
+  `ICatalogProvider` seam. What is stored, which events go out and in what order, a moved episode, a new season, a
+  show ending, corrections surviving a refresh, the Wikidata supplement filling only what's empty, and one person
+  across shows.
+- **Each test class gets a database of its own,** migrated as the service migrates it; tests in a class keep apart
+  by using their own users and shows.
 
 GitHub Actions (`.github/workflows/ci.yml`) builds the services, the web app and the tools and runs every project in
 `tests/` on each pull request and on `main`. To make a red run block merging, require the "build-and-test" check in the

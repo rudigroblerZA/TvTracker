@@ -35,6 +35,26 @@ public enum LedgerResult
     Refused
 }
 
+public static class LedgerResults
+{
+    /// <summary>
+    /// What the provider's webhook is answered with, which decides whether it sends the event again:
+    /// <list type="bullet">
+    /// <item><b>422 for <see cref="LedgerResult.Unknown"/>,</b> so it retries: a first payment's checkout session may
+    /// not be saved yet.</item>
+    /// <item><b>409 for <see cref="LedgerResult.Refused"/>:</b> not applied, and logged to be refunded.</item>
+    /// <item><b>200 for the rest,</b> including a duplicate and a change to a subscription the app doesn't have (its
+    /// account was deleted): a retry would change nothing.</item>
+    /// </list>
+    /// </summary>
+    public static int WebhookStatus(this LedgerResult result) => result switch
+    {
+        LedgerResult.Unknown => StatusCodes.Status422UnprocessableEntity,
+        LedgerResult.Refused => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status200OK
+    };
+}
+
 /// <summary>
 /// Applies a provider's events to the app's sessions, subscriptions and receipts, and moves the plan.
 /// <list type="bullet">

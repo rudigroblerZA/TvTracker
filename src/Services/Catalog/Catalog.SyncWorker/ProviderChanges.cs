@@ -32,7 +32,7 @@ public sealed class ProviderChanges(IServiceScopeFactory scopes, TimeProvider ti
     /// <returns>Shows marked due and people marked stale; nulls when the provider keeps no update list.</returns>
     public async Task<(int? Shows, int? People)> MarkAsync(CancellationToken ct)
     {
-        using var caller = TvMazeCaller.Begin("updates", TvMazeLane.Background);
+        using var caller = ProviderCaller.Begin("updates", ProviderLane.Background);
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

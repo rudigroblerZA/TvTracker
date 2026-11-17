@@ -33,7 +33,7 @@ public class WikidataSparqlTests
         await Task.Delay(50);
         var c = Task.Run(() =>
         {
-            using var lane = TvMazeCaller.Begin("search-import", TvMazeLane.Interactive);
+            using var lane = ProviderCaller.Begin("search-import", ProviderLane.Interactive);
             return sparql.QueryAsync("C", default);
         });
         await Task.Delay(50);
@@ -60,7 +60,7 @@ public class WikidataSparqlTests
             return Task.FromResult(busy);
         });
         var sparql = new WikidataSparql(new Factory(handler), time);
-        using var lane = TvMazeCaller.Begin("history-import", TvMazeLane.Interactive);
+        using var lane = ProviderCaller.Begin("history-import", ProviderLane.Interactive);
 
         var refused = await Assert.ThrowsAsync<HttpRequestException>(() => sparql.QueryAsync("A", default));
         Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);

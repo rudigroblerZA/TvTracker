@@ -36,11 +36,11 @@ public sealed class CatalogSyncService(IServiceScopeFactory scopeFactory, Provid
                     await RunAsync(async s =>
                     {
                         int imported, refreshed;
-                        using (TvMazeCaller.Begin("featured-import", TvMazeLane.Background))
+                        using (ProviderCaller.Begin("featured-import", ProviderLane.Background))
                         {
                             imported = await s.ImportFeaturedAsync(stoppingToken);
                         }
-                        using (TvMazeCaller.Begin("refresh", TvMazeLane.Background))
+                        using (ProviderCaller.Begin("refresh", ProviderLane.Background))
                         {
                             refreshed = await s.RefreshDueAsync(stoppingToken);
                         }
