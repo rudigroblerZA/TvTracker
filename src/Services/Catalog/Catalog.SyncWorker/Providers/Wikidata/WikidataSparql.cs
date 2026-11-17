@@ -66,7 +66,7 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
     /// </summary>
     private async Task<JsonDocument?> SendAsync(Func<HttpRequestMessage> build, CancellationToken ct)
     {
-        var interactive = TvMazeCaller.Current.Lane == TvMazeLane.Interactive;
+        var interactive = ProviderCaller.Current.Lane == ProviderLane.Interactive;
         for (var attempt = 0; ; attempt++)
         {
             // Wikimedia asked everyone to wait: a person's request fails at once (search answers from the catalog, a
@@ -132,7 +132,7 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
         new($"Wikimedia answered 429 Too Many Requests (retry after {after.TotalSeconds:0} s).", null, HttpStatusCode.TooManyRequests);
 
     /// <summary>
-    /// One request at a time, a waiting interactive caller (search and history imports, by <see cref="TvMazeCaller"/>'s
+    /// One request at a time, a waiting interactive caller (search and history imports, by <see cref="ProviderCaller"/>'s
     /// lane) always before a background one, as TVmaze's limiter does: a cast-credits round shouldn't put a search
     /// behind dozens of queries.
     /// </summary>

@@ -56,7 +56,7 @@ public sealed class CreativesService(
 
     private async Task<int> BackfillShowsAsync(CancellationToken ct)
     {
-        using var caller = TvMazeCaller.Begin("crew", TvMazeLane.Background);
+        using var caller = ProviderCaller.Begin("crew", ProviderLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
@@ -95,7 +95,7 @@ public sealed class CreativesService(
 
     private async Task<int> RefreshCareersAsync(CancellationToken ct)
     {
-        using var caller = TvMazeCaller.Begin("careers", TvMazeLane.Background);
+        using var caller = ProviderCaller.Begin("careers", ProviderLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests of the catalog's modules through their interfaces, against a real Postgres in a container (tests/Shared):
+       show sync decides what is stored and what the other services are told, which tests of its pure helpers and of
+       each provider's mapping don't reach. Needs Docker. -->
+
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="System.Formats.Cbor" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
+  </ItemGroup>
+
+</Project>

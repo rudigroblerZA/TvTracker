@@ -32,7 +32,7 @@ public static class ImportApi
             {
                 return Results.Problem($"Give 1 to {HistoryImports.MaxShows} shows.", statusCode: StatusCodes.Status400BadRequest);
             }
-            using var caller = TvMazeCaller.Begin("history-import", TvMazeLane.Interactive);
+            using var caller = ProviderCaller.Begin("history-import", ProviderLane.Interactive);
             return Results.Ok(await resolver.ResolveAsync(request, lifetime.ApplicationStopping));
         });
 
@@ -98,7 +98,7 @@ public static class ImportApi
 
         // Not the request's token: if the caller stops waiting, finish anyway so the next search finds the shows. A search
         // is waiting on it, so its calls go first.
-        using var caller = TvMazeCaller.Begin("search-import", TvMazeLane.Interactive);
+        using var caller = ProviderCaller.Begin("search-import", ProviderLane.Interactive);
         var imported = await synchronizer.ImportSearchResultsAsync(query, SearchImportLimit, lifetime.ApplicationStopping);
         return TypedResults.Ok(new SearchImportResult(imported));
     }

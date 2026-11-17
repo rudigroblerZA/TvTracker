@@ -48,7 +48,7 @@ public sealed class CastCreditsService(
 
     private async Task<int> RefreshAsync(CancellationToken ct)
     {
-        using var caller = TvMazeCaller.Begin("cast-credits", TvMazeLane.Background);
+        using var caller = ProviderCaller.Begin("cast-credits", ProviderLane.Background);
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
         var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

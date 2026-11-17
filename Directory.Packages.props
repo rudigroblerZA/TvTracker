@@ -65,6 +65,10 @@
   <ItemGroup Label="Tests">
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="$(ExtensionsVersion)" />
+    <!-- A real Postgres in a container, for the *.IntegrationTests projects. -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.17.0" />
+    <!-- Testcontainers brings in 8.0.0, which has a known vulnerability; the test projects ask for the current one. -->
+    <PackageVersion Include="System.Formats.Cbor" Version="10.0.15" />
   </ItemGroup>
   <ItemGroup Label="Tools">
     <PackageVersion Include="System.CommandLine" Version="3.0.0" />
