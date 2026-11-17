@@ -35,23 +35,24 @@
         else
         {
             <p class="muted small">@($"{statement.From:MMMM yyyy} to {statement.To:d MMMM yyyy}, by UTC month.")</p>
-            @if (!statement.SubscriptionsKnown || statement.Affiliates == "unknown")
+            var noSubscriptions = !statement.SubscriptionsKnown;
+            var noAffiliates = statement.Affiliates == Financials.AffiliatesUnknown;
+            @if (noSubscriptions || noAffiliates)
             {
                 <p class="notice" role="status">
-                    @(!statement.SubscriptionsKnown && statement.Affiliates == "unknown" ? "Subscription and affiliate income couldn't be fetched"
-                        : !statement.SubscriptionsKnown ? "Subscription income couldn't be fetched" : "Affiliate commission couldn't be fetched"),
+                    @(noSubscriptions && noAffiliates ? "Subscription and affiliate income couldn't be fetched"
+                        : noSubscriptions ? "Subscription income couldn't be fetched" : "Affiliate commission couldn't be fetched"),
                     so the figures below are without it. Costs are complete.
                     <button class="btn btn-quiet small" type="button" @onclick="LoadAsync">Try again</button>
                 </p>
             }
 
-            @if (books.Count == 0)
+            @if (statement.Books.Count == 0)
             {
                 <p class="muted">Nothing has been earned or spent yet. Add what the business pays for under Costs, below.</p>
             }
-            @foreach (var book in books)
+            @foreach (var book in statement.Books)
             {
-                var runRate = book.RunRate;
                 <section aria-label="@($"Financials in {book.Currency}")">
                     <h2>@book.Currency</h2>
                     <div class="stat-tiles">
@@ -68,9 +69,9 @@
                             <div class="muted">went out, fees included</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value">@Financials.Signed(runRate, book.Currency)</div>
+                            <div class="stat-value">@Financials.Signed(book.RunRate, book.Currency)</div>
                             <div class="muted">
-                                @(runRate >= 0 ? "a month at today's rate: subscriptions cover the running costs" : "a month at today's rate: subscriptions don't cover the running costs yet")
+                                @(book.RunRate >= 0 ? "a month at today's rate: subscriptions cover the running costs" : "a month at today's rate: subscriptions don't cover the running costs yet")
                             </div>
                         </div>
                     </div>
@@ -249,7 +250,7 @@
 
             <p class="muted small">
                 How it's worked out. Subscriptions are the payments received in the month. Affiliate commission is counted in the
-                month the network reported the sale@(statement.Affiliates == "off" ? " (affiliate links are switched off, so there is none)" : "").
+                month the network reported the sale@(statement.Affiliates == Financials.AffiliatesOff ? " (affiliate links are switched off, so there is none)" : "").
                 @($"Fees are an estimate, {statement.FeePercent:0.##}% of each payment plus {statement.FeeFixed:0.00}, not the payment provider's bill. ")
                 Each currency is kept apart: nothing is converted. No tax is worked out.
             </p>
@@ -269,7 +270,6 @@
     private string? formError;
     private string? notice;
     private FinancialStatement? statement;
-    private IReadOnlyList<FinancialBook> books = [];
     private IReadOnlyList<CostItem> costs = [];
     private CostItem? editing;
     private Guid? deleting;
@@ -301,14 +301,14 @@
             var items = report is null ? [] : await costsTask;
             if (load == loads)
             {
-                (statement, costs, books) = (report, items, report?.Books ?? []);
+                (statement, costs) = (report, items);
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             if (load == loads)
             {
-                (statement, books, error) = (null, [], ErrorNotice.Describe(ex));
+                (statement, error) = (null, ErrorNotice.Describe(ex));
             }
         }
         finally

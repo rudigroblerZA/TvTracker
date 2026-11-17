@@ -4,6 +4,7 @@ using Identity.API.Data;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using TvTracker;
 
 namespace Identity.API.Apis;
 
@@ -40,7 +41,7 @@ public static partial class BrandingApi
     private static async Task<Results<Ok<BrandingDto>, NotFound, ValidationProblem>> SaveAsync(BrandingDto request, ClaimsPrincipal user,
         IConfiguration config, IdentityContext db, TimeProvider time, KeycloakAdminClient keycloak, ILoggerFactory loggers, CancellationToken ct)
     {
-        if (!FlagsApi.IsAdmin(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }

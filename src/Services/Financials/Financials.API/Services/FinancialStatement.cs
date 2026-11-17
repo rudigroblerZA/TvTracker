@@ -58,7 +58,25 @@ public sealed record IncomeMonth(DateOnly Month, string Currency, decimal Amount
 /// <summary>
 /// Affiliate commission in one month and currency, as Catalog.API reports it.
 /// </summary>
-public sealed record CommissionMonth(DateOnly Month, string Currency, int Conversions, decimal Commission);
+public sealed record CommissionMonth(DateOnly Month, string Currency, decimal Commission);
+
+/// <summary>
+/// Identity.API's answer: payments by month, and what the running subscriptions bring in a month now.
+/// </summary>
+public sealed record SubscriptionIncome(IReadOnlyList<IncomeMonth> Months, IReadOnlyList<Money> MonthlyRecurring);
+
+/// <summary>
+/// Catalog.API's answer. <see cref="Off"/>: affiliate links are switched off, so there is no commission to ask for.
+/// <see cref="Unknown"/>: it couldn't be asked.
+/// </summary>
+/// <param name="State">One of <see cref="FinancialStatement"/>'s Affiliates values.</param>
+public sealed record AffiliateIncome(string State, IReadOnlyList<CommissionMonth> Months)
+{
+    public static readonly AffiliateIncome Off = new(FinancialStatement.AffiliatesOff, []);
+    public static readonly AffiliateIncome Unknown = new(FinancialStatement.AffiliatesUnknown, []);
+
+    public static AffiliateIncome On(IReadOnlyList<CommissionMonth> months) => new(FinancialStatement.AffiliatesOn, months);
+}
 
 public sealed record Money(string Currency, decimal Amount);
 
@@ -87,30 +105,30 @@ public static partial class FinancialStatement
     public static DateOnly FirstMonth(DateOnly today, int months) => new DateOnly(today.Year, today.Month, 1).AddMonths(-(Clamp(months) - 1));
 
     /// <summary>
-    /// Null for <paramref name="subscriptions"/> or <paramref name="commission"/> means that service couldn't be asked;
-    /// <paramref name="affiliatesOff"/> that affiliate links are switched off, so there is no commission to ask for.
+    /// Null for <paramref name="subscriptions"/> means Identity.API couldn't be asked.
     /// </summary>
-    public static FinancialStatementDto Build(DateOnly today, int months, IReadOnlyList<IncomeMonth>? subscriptions, IReadOnlyList<Money> recurring,
-        IReadOnlyList<CommissionMonth>? commission, bool affiliatesOff, IReadOnlyList<CostItem> costs, FinancialOptions fees)
+    public static FinancialStatementDto Build(DateOnly today, int months, SubscriptionIncome? subscriptions, AffiliateIncome commission,
+        IReadOnlyList<CostItem> costs, FinancialOptions fees)
     {
-        var from = FirstMonth(today, months);
-        var thisMonth = new DateOnly(today.Year, today.Month, 1);
+        var thisMonth = FirstMonth(today, 1);
         var window = Enumerable.Range(0, Clamp(months)).Select(i => thisMonth.AddMonths(-i)).ToList();
+        var from = window[^1];
 
         // Only the statement's own months, whatever the other services sent.
-        var paid = (subscriptions ?? []).Where(s => s.Month >= from && s.Month <= thisMonth)
+        var paid = (subscriptions?.Months ?? []).Where(s => s.Month >= from && s.Month <= thisMonth)
             .GroupBy(s => (s.Month, Currency: s.Currency.ToUpperInvariant()))
             .ToDictionary(g => g.Key, g => (Amount: g.Sum(s => s.Amount), Payments: g.Sum(s => s.Payments)));
-        var earned = (commission ?? []).Where(c => c.Month >= from && c.Month <= thisMonth)
+        var earned = commission.Months.Where(c => c.Month >= from && c.Month <= thisMonth)
             .GroupBy(c => (c.Month, Currency: c.Currency.ToUpperInvariant()))
             .ToDictionary(g => g.Key, g => g.Sum(c => c.Commission));
         var spent = window.SelectMany(month => costs.Select(c => (Month: month, c.Currency, c.Category, Amount: InMonth(c, month))))
             .Where(c => c.Amount > 0)
             .ToList();
+        var spentIn = spent.GroupBy(s => (s.Month, s.Currency)).ToDictionary(g => g.Key, g => g.Sum(s => s.Amount));
         var running = costs.Where(c => c.Recurrence != CostRecurrence.Once && c.StartsOn <= today && (c.EndsOn is null || c.EndsOn >= today))
             .GroupBy(c => c.Currency)
             .ToDictionary(g => g.Key, g => Math.Round(g.Sum(c => c.Recurrence == CostRecurrence.Yearly ? c.Amount / 12 : c.Amount), 2));
-        var monthly = recurring.GroupBy(m => m.Currency.ToUpperInvariant()).ToDictionary(g => g.Key, g => g.Sum(m => m.Amount));
+        var monthly = (subscriptions?.MonthlyRecurring ?? []).GroupBy(m => m.Currency.ToUpperInvariant()).ToDictionary(g => g.Key, g => g.Sum(m => m.Amount));
 
         var currencies = paid.Keys.Select(k => k.Currency).Concat(earned.Keys.Select(k => k.Currency)).Concat(spent.Select(s => s.Currency))
             .Concat(running.Keys).Concat(monthly.Keys).Distinct(StringComparer.Ordinal);
@@ -121,7 +139,7 @@ public static partial class FinancialStatement
                     {
                         var (amount, payments) = paid.GetValueOrDefault((month, currency));
                         return Row(month, amount, earned.GetValueOrDefault((month, currency)), Fee(amount, payments, fees),
-                            spent.Where(s => s.Month == month && s.Currency == currency).Sum(s => s.Amount));
+                            spentIn.GetValueOrDefault((month, currency)));
                     })
                     .Where(r => r.Subscriptions != 0 || r.Affiliates != 0 || r.Costs != 0)
                     .ToList();
@@ -140,7 +158,7 @@ public static partial class FinancialStatement
             .ToList();
 
         return new FinancialStatementDto(from, today, fees.PaymentFeePercent, fees.PaymentFeeFixed, books, Categories, subscriptions is not null,
-            affiliatesOff ? AffiliatesOff : commission is null ? AffiliatesUnknown : AffiliatesOn);
+            commission.State);
     }
 
     private static FinancialRowDto Row(DateOnly month, decimal subscriptions, decimal affiliates, decimal fees, decimal costs) =>

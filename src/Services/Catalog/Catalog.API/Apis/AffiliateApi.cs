@@ -95,10 +95,7 @@ public static partial class AffiliateApi
 
         // Programs, set up by admins in Settings (404 for anyone else).
         var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates)
-            .AddEndpointFilter(async (context, next) =>
-                Admins.Is(context.HttpContext.User, context.HttpContext.RequestServices.GetRequiredService<IConfiguration>())
-                    ? await next(context)
-                    : TypedResults.NotFound());
+            .RequireAppAdmin();
         programs.MapGet("/", GetProgramsAsync);
         programs.MapPut("/{name}", SaveProgramAsync);
         programs.MapDelete("/{name}", DeleteProgramAsync);
@@ -322,16 +319,13 @@ public static partial class AffiliateApi
     }
 
     /// <summary>
-    /// The last <paramref name="days"/> days (UTC), for admins; anyone else gets 404, as with the flags page.
-    /// </summary>
-    /// <summary>
-    /// Commission by month and currency, for the financials page (which gets subscriptions and costs from Identity.API).
+    /// Commission by month and currency, for Financials.API's statement (which gets subscriptions from Identity.API).
     /// Counted in the month the network reported the sale, this month included. Admins only.
     /// </summary>
     private static async Task<Results<Ok<List<AffiliateMonthDto>>, NotFound>> MonthlyAsync(ClaimsPrincipal user, IConfiguration config,
         CatalogContext db, TimeProvider time, int months = 12, CancellationToken ct = default)
     {
-        if (!Admins.Is(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }
@@ -351,7 +345,7 @@ public static partial class AffiliateApi
     private static async Task<Results<Ok<AffiliateReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, CatalogContext db,
         AffiliatePrograms programs, TimeProvider time, int days = 30, CancellationToken ct = default)
     {
-        if (!Admins.Is(user, config))
+        if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
         }
