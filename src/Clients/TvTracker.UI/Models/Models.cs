@@ -1355,6 +1355,33 @@ public record RevenueDay(DateOnly Day, int NewAccounts, int Payments, int NewSub
 /// <param name="PaidShare">Paying accounts of all accounts, 0 to 1.</param>
 /// <param name="MonthlyRecurring">What running subscriptions come to a month, per currency.</param>
 /// <param name="Received">Payments received in the window, per currency.</param>
+/// <summary>
+/// Something the business pays for, entered by an admin on the financials page.
+/// </summary>
+/// <param name="Recurrence">"monthly", "yearly" (counted a twelfth a month) or "once".</param>
+public record CostItem(Guid Id, string Name, string Category, decimal Amount, string Currency, string Recurrence, DateOnly StartsOn,
+    DateOnly? EndsOn, string? Notes);
+
+public record SaveCostItem(string? Name, string? Category, decimal Amount, string? Currency, string? Recurrence, DateOnly StartsOn,
+    DateOnly? EndsOn, string? Notes);
+
+public record FinancialCategory(string Category, decimal Amount);
+
+/// <summary>
+/// One month in one currency, from Identity.API: subscription income, the estimated payment fees and the entered costs.
+/// </summary>
+/// <param name="Month">The month's first day.</param>
+public record FinancialMonth(DateOnly Month, string Currency, decimal Subscriptions, int Payments, decimal PaymentFees, decimal Costs,
+    IReadOnlyList<FinancialCategory> CostsByCategory);
+
+public record FinancialStatement(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialMonth> Months,
+    IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> MonthlyCosts, IReadOnlyList<string> Categories);
+
+/// <summary>
+/// Affiliate commission in one month and currency, from Catalog.API.
+/// </summary>
+public record AffiliateMonth(DateOnly Month, string Currency, int Conversions, decimal Commission);
+
 public record RevenueReport(DateOnly From, DateOnly To, int Accounts, int NewAccounts, int PayingAccounts, int OnPaidPlan, double PaidShare,
     IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> Received, int CheckoutsStarted, int CheckoutsCompleted, int NewSubscriptions,
     int Ended, IReadOnlyList<RevenuePlanRow> Plans, IReadOnlyList<RevenueDay> Days);
