@@ -4,7 +4,7 @@
     "blend": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Blend: shows that sit between two others (/blend, and the link on show pages)." }
     },
     "universes": {
@@ -50,7 +50,7 @@
     "show-dna": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Show DNA: the trait profile on show pages. Recommendations use DNA either way." }
     },
     "forecasts": {
@@ -63,7 +63,7 @@
     "nanogenres": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Nanogenres: chips on show pages, /nanogenres browse pages, and the search filter. Recommendations use them either way." }
     },
     "dna-twins": {
@@ -76,7 +76,7 @@
     "gets-good": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "When it gets good: the section on show pages, the nudge in Will you finish it?, and the Worth the wait discovery list." }
     },
     "creator-fingerprint": {
@@ -94,7 +94,7 @@
     "endings": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Does it stick the landing?: the section on ended shows' pages, and the Great endings discovery list." }
     },
     "refresher": {
@@ -217,7 +217,7 @@
     "episode-grid": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Episode grid: every episode's rating by season on the show page, with the best and weakest episodes and the best run." }
     },
     "title-formulas": {
@@ -253,7 +253,7 @@
     "tv-atlas": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "TV atlas: where your shows are set, on a world map, and where each show is set on its page." }
     },
     "tv-clock": {
@@ -304,7 +304,7 @@
     "call-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Call it: predict a season's rating before it premieres, and see whether you beat the forecast model." }
     },
     "show-puzzle": {
@@ -346,7 +346,7 @@
     "weekly-digest": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Weekly digest: one email a week, at the user's day and hour, instead of an email per alert; its setting and preview in Settings." }
     },
     "taste-twins": {
@@ -359,7 +359,7 @@
     "awards-shelf": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Awards shelf: awards from saved research on show pages, and Prestige picks: the most-awarded shows you haven't started." }
     },
     "network-reports": {
@@ -428,7 +428,7 @@
     "worth-it": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Is it worth it?: a 0-100 score on show pages, with the parts behind it, and the Worth your time discovery list." }
     },
     "year-in-tv": {
@@ -441,7 +441,7 @@
     "research": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Research: moderators enrich a show from Wikidata, Wikipedia, TMDB and pasted pages, with a model-drafted insight; the saved research shows on the show page and overrides catalog fields." }
     },
     "research-assistant": {
