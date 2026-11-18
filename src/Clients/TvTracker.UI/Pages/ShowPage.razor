@@ -21,6 +21,8 @@
 }
 else
 {
+    @* The look of the landing page, carried to the show page: see .show-page in app.css. *@
+    <div class="show-page">
     <ShowBanner Title="@show.Title" BackdropUrl="@show.BackdropUrl" BannerUrl="@show.BannerUrl" />
     <section class="show-hero">
         <Poster Title="@show.Title" Url="@show.PosterUrl" Size="large" />
@@ -311,6 +313,7 @@ else
     }
 
     <Feature Flag="@FeatureFlags.DnaTwins"><DnaTwinsSection ShowId="show.Id" Title="@show.Title" /></Feature>
+    </div>
 }
 
 @code {

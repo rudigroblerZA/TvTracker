@@ -562,6 +562,12 @@ the discovery tools, the plans, and a last call to sign up.
 - **Tried** in a browser at desktop and phone widths, dark and light, with the showcased flags on and with the
   checked-in flags (where Blend, nanogenres and the paid insights are off, so those sections don't show).
 
+**Show page look:** the show page wears the landing page's look (`.show-page` in `app.css`, laid over the page's own
+classes, so its components are unchanged). The hero is a glass panel with the gradient glow and a larger title.
+Insights sit on a canvas of their own under "What the numbers say": findings as glass cards with their tone as a bar
+down the side, bigger figures, and charts in the landing page's purple and cyan. Best and weakest seasons and rating
+tones keep green, red and neutral: those colours carry meaning. Light theme has its counterpart.
+
 **Watch on Netflix:** a streaming show's page has a "▶ Watch on Netflix" button (and the same link under Where to watch)
 that goes straight to the show on the service: `netflix.com/title/…`, `tv.apple.com/show/…`, `hbomax.com/show/…`,
 `primevideo.com/detail/…`, Disney+, Hulu, Peacock and others. On a phone, the OS opens these in the service's app when
