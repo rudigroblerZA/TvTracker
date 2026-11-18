@@ -43,6 +43,8 @@
     <Project Path="tests/Recommendations.UnitTests/Recommendations.UnitTests.csproj" />
     <Project Path="tests/Research.UnitTests/Research.UnitTests.csproj" />
     <Project Path="tests/Financials.UnitTests/Financials.UnitTests.csproj" />
+    <Project Path="tests/Social.IntegrationTests/Social.IntegrationTests.csproj" />
+    <Project Path="tests/Tracking.IntegrationTests/Tracking.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tools/">
     <Project Path="src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" />

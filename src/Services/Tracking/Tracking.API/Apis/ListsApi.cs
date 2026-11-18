@@ -48,7 +48,7 @@ public static class ListsApi
         api.MapDelete("/{id:guid}/link", DeleteLinkAsync).RequireFeature(FeatureFlags.ListLinks);
 
         // What a link opens: anonymous, so it works for anyone the owner sends it to.
-        app.MapGet("/api/v1/linked-lists/{token}", GetLinkedListAsync).AllowAnonymous().RequireFeature(FeatureFlags.ListLinks);
+        app.MapGet("/api/v1/linked-lists/{token}", GetLinkedListAsync).AllowAnonymous().RequireRateLimiting(ClientRateLimiting.LinkedList).RequireFeature(FeatureFlags.ListLinks);
 
         return api;
     }

@@ -5,5 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Known-vulnerable packages, direct or transitive, fail the build. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
   </PropertyGroup>
 </Project>

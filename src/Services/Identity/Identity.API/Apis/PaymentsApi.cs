@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Identity.API.Data;
 using Identity.API.Payments;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -47,7 +48,7 @@ public static class PaymentsApi
         api.MapPost("/me/subscription/resume", ResumeAsync);
 
         // Not behind the flags: a payment already taken must still be recorded while they're off.
-        app.MapPost("/api/v1/payments/webhooks/{provider}", WebhookAsync).AllowAnonymous();
+        app.MapPost("/api/v1/payments/webhooks/{provider}", WebhookAsync).AllowAnonymous().RequireRateLimiting(ClientRateLimiting.Webhook);
     }
 
     private static async Task<Ok<PlanPricesDto>> GetPricesAsync(
@@ -158,6 +159,11 @@ public static class PaymentsApi
         return TypedResults.Ok(ToDto(subscription, providers));
     }
 
+    /// <summary>
+    /// The largest webhook body read; provider events are a few KB, and the body is read before its signature is checked.
+    /// </summary>
+    internal const int MaxWebhookBodyBytes = 256 * 1024;
+
     private static async Task<Results<Ok, BadRequest, NotFound, StatusCodeHttpResult>> WebhookAsync(
         string provider, HttpRequest request, PaymentProviders providers, SubscriptionLedger ledger, TimeProvider time,
         ILoggerFactory loggers, CancellationToken ct)
@@ -166,8 +172,24 @@ public static class PaymentsApi
         {
             return TypedResults.NotFound();
         }
-        using var reader = new StreamReader(request.Body);
-        var body = await reader.ReadToEndAsync(ct);
+        if (request.ContentLength > MaxWebhookBodyBytes)
+        {
+            return TypedResults.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+        if (request.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+        {
+            limit.MaxRequestBodySize = MaxWebhookBodyBytes;
+        }
+        string body;
+        try
+        {
+            using var reader = new StreamReader(request.Body);
+            body = await reader.ReadToEndAsync(ct);
+        }
+        catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return TypedResults.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
         if (named.ReadWebhook(body, request.Headers, time.GetUtcNow()) is not { } e)
         {
             loggers.CreateLogger(typeof(PaymentsApi)).LogWarning("A {Provider} webhook was refused: bad or stale signature, or not an event the app acts on", provider);

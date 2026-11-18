@@ -13,7 +13,9 @@ builder.AddNpgsqlDbContext<FinancialsContext>("financialsdb", configureSettings:
 builder.Services.AddDatabaseInitializer<FinancialsContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.Configure<FinancialOptions>(builder.Configuration.GetSection("Financials"));
+builder.Services.AddOptions<FinancialOptions>().Bind(builder.Configuration.GetSection("Financials"))
+    .Validate(o => o.PaymentFeePercent is >= 0 and < 100 && o.PaymentFeeFixed >= 0, "Financials fee settings must be a percent from 0 to under 100 and a fixed fee of 0 or more.")
+    .ValidateOnStart();
 
 // Income is the other services' to report (IncomeSources). One quick try each, without the default retries: a
 // service that's down should cost the statement a few seconds and leave a gap the page names, not hold it for the

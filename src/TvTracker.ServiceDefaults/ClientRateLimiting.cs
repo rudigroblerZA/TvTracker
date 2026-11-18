@@ -33,6 +33,22 @@ public sealed class ClientRateLimitOptions
     /// Data exports (<see cref="ClientRateLimiting.Export"/>) a user may ask for an hour: each one reads every service.
     /// </summary>
     public int ExportsPerHour { get; set; } = 3;
+
+    /// <summary>
+    /// Payment webhooks (<see cref="ClientRateLimiting.Webhook"/>) one caller address may send: anonymous, so the cap
+    /// is generous for a provider's burst of retries but stops a flood.
+    /// </summary>
+    public int WebhooksBurst { get; set; } = 60;
+
+    public int WebhooksPerMinute { get; set; } = 120;
+
+    /// <summary>
+    /// Opens of a shared list's link (<see cref="ClientRateLimiting.LinkedList"/>) one visitor address may make: anonymous,
+    /// and the token is the only secret, so guessing it is capped.
+    /// </summary>
+    public int LinkedListsBurst { get; set; } = 30;
+
+    public int LinkedListsPerMinute { get; set; } = 60;
 }
 
 /// <summary>
@@ -46,6 +62,8 @@ public static class ClientRateLimiting
 {
     public const string PeopleSearch = "people-search";
     public const string Export = "export";
+    public const string Webhook = "webhook";
+    public const string LinkedList = "linked-list";
 
     /// <summary>
     /// Who a request counts against, and whether that's a shared bucket for other services rather than a person. A
@@ -136,6 +154,11 @@ public static class ClientRateLimiting
                 var (key, shared) = PartitionKey(context);
                 return shared ? RateLimitPartition.GetNoLimiter("unlimited") : Bucket(key, options.PeopleSearchBurst, options.PeopleSearchPerMinute);
             });
+
+            // Unlike the others, a shared (service or unknown address) caller is limited too: nothing authenticates a webhook.
+            limiter.AddPolicy(Webhook, context => Bucket($"webhook:{PartitionKey(context).Key}", options.WebhooksBurst, options.WebhooksPerMinute));
+
+            limiter.AddPolicy(LinkedList, context => Bucket($"linked-list:{PartitionKey(context).Key}", options.LinkedListsBurst, options.LinkedListsPerMinute));
 
             limiter.AddPolicy(Export, context =>
             {

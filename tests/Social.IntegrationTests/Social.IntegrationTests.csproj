@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests of Social's visibility rules (blocks, private profiles, shared activity) against a real Postgres in a
+       container (tests/Shared): the rules are queries, so they're tested as queries. Needs Docker. -->
+
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="System.Formats.Cbor" />
+    <ProjectReference Include="..\..\src\Services\Social\Social.API\Social.API.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -15,4 +15,8 @@
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Social.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

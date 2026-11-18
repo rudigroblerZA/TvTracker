@@ -29,7 +29,8 @@ if (!builder.Environment.IsDevelopment())
 
 // Payments: the provider named in Payments:Provider sells plans; Stripe is always registered (its webhooks need its
 // signing secret, so it does nothing unconfigured), the test provider only in development.
-builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection("Payments"));
+builder.Services.AddOptions<PaymentOptions>().Bind(builder.Configuration.GetSection("Payments")).ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<PaymentOptions>, PaymentOptionsValidator>();
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
