@@ -3,8 +3,6 @@
 @inject TrackingClient Tracking
 @inject RecommendationsClient Recommendations
 @inject UserSession Session
-@inject IAuthActions Auth
-@inject FeatureFlagStore Flags
 
 <PageTitle>@Brand.AppName</PageTitle>
 
@@ -13,53 +11,7 @@
         <h1>@Brand.AppName</h1>
     </Authorized>
     <NotAuthorized>
-        @* The landing page: what the app is, for someone who isn't signed in. Above the plans section, each claim is a
-           feature a free account has (not flagged, or on by default with no plan rule): keep it in step when a flag's
-           default or plan changes. What Pro adds is read from the flags. *@
-        <section class="landing-hero">
-            <h1>Know what to watch next, and never lose your place</h1>
-            <p class="landing-lead">
-                @Brand.AppName tracks every show you follow, tells you when the next episode airs and when a show you're
-                caught up on is back.
-            </p>
-            <div class="landing-actions">
-                <button class="btn" @onclick="SignUpAsync">Get started free</button>
-                <a class="btn btn-quiet" href="search">Browse shows</a>
-            </div>
-            <p class="muted small">New here? Choose <em>Register</em> on the sign-in page. Tracking is free, with no limit on shows or lists.</p>
-        </section>
-
-        <section class="landing-features" aria-label="What you get">
-            <div class="landing-feature">
-                <h2>Never lose your place</h2>
-                <p>Up Next lines up the next episode of everything you're watching, the calendar shows what airs this week,
-                    and the waiting room says when each show you're caught up on is back.</p>
-            </div>
-            <div class="landing-feature">
-                <h2>In order, unspoiled</h2>
-                <p>Universes puts a franchise's shows and crossovers in watch order, and the spoiler shield hides the
-                    episodes you haven't seen.</p>
-            </div>
-            <div class="landing-feature">
-                <h2>Bring your history</h2>
-                <p>Import your TV Time or Trakt history with the date of every episode, so your stats start full.</p>
-            </div>
-            <div class="landing-feature">
-                <h2>Watch with friends</h2>
-                <p>Follow people, see what they're watching, and share lists by link. Your profile can be private.</p>
-            </div>
-        </section>
-
-        <Feature Flag="@FeatureFlags.Plans">
-            <section class="landing-plans">
-                <h2>@($"Free, with {Plans.Name(Plans.Plus)} when you want more")</h2>
-                <p>
-                    Browse the catalog without an account. A free account has @(Plans.FreeIncludes.ToLowerInvariant()).
-                    <strong>@Plans.Name(Plans.Plus)</strong> adds every insight@(proAdds is { Count: > 0 } ? ": " + string.Join(", ", proAdds) : "").
-                    <strong>@Plans.Name(Plans.Family)</strong> is @Plans.Name(Plans.Plus) for you and up to @Plans.FamilyMembers people you invite.
-                </p>
-            </section>
-        </Feature>
+        <Welcome Trending="trending" />
     </NotAuthorized>
 </AuthorizeView>
 
@@ -145,11 +97,8 @@
 </section>
 
 @code {
-    private Task SignUpAsync() => Auth.SignInAsync();
-
     private List<ShowSummary>? trending;
     private List<UpNextItem>? upNext;
-    private List<string>? proAdds;
     private List<RecommendedShow>? forYou;
     private string? error;
 
@@ -167,13 +116,6 @@
             {
                 upNext = await Tracking.GetUpNextAsync() ?? [];
                 forYou = await Recommendations.GetForYouAsync(6) ?? [];
-            }
-            else
-            {
-                // The landing page's plans section: what Pro adds, from the flags, as the plan page lists it.
-                proAdds = (await Flags.PlanFeaturesAsync())
-                    .Where(f => f.Plans.Contains(Plans.Plus) && !f.Plans.Contains(Plans.Free))
-                    .Select(f => f.Name).ToList();
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)

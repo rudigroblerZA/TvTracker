@@ -1,0 +1,398 @@
+@inject CatalogClient Catalog
+@inject FeatureFlagStore Flags
+@inject IAuthActions Auth
+
+@* The landing page, for someone who isn't signed in.
+   - Every claim is a feature the app has. A section whose flag is off isn't shown; one that needs a paid plan says so.
+   - Real where it can be: the nanogenres, universes, posters and catalog numbers are the catalog's own. The charts are
+     an example profile, and each says so: a visitor has no history to draw.
+   - Keep it in step when a feature's flag, plan or wording changes. *@
+<div class="lp">
+    <section class="lp-hero">
+        <div class="lp-hero-copy">
+            <p class="lp-eyebrow">More than a watchlist</p>
+            <h1>Your Entertainment Universe, <span class="lp-grad">Mapped.</span></h1>
+            <p class="lp-lead">
+                Track what you watch. Discover why you love it. Explore connections, insights and recommendations
+                shaped by your own taste.
+            </p>
+            <div class="lp-actions">
+                <button class="btn lp-btn" @onclick="SignUpAsync">Start Tracking Free</button>
+                <a class="btn btn-quiet lp-btn-quiet" href="@(Shown(FeatureFlags.Universes) ? "universes" : "search")">See Your Universe</a>
+            </div>
+            <p class="lp-fine">Free to track, with no limit on shows or lists. Choose <em>Register</em> on the sign-in page.</p>
+        </div>
+
+        @* The product at a glance: four of its views on one glass panel. *@
+        <div class="lp-dash lp-glass" aria-label="A look at the app">
+            @if (Shown(FeatureFlags.TvClock))
+            {
+                <div class="lp-tile lp-tile-wide">
+                    <div class="lp-tile-head"><span>Your TV clock</span><span class="lp-chip">Example</span></div>
+                    <div class="lp-heat" role="img" aria-label="Example: episodes watched by weekday and time of day, busiest on weekend evenings">
+                        @for (var day = 0; day < Days.Length; day++)
+                        {
+                            <span class="lp-heat-day" aria-hidden="true">@Days[day]</span>
+                            @for (var slot = 0; slot < Slots.Length; slot++)
+                            {
+                                <span class="lp-cell" style="--v:@Heat(day, slot)" title="@($"{Days[day]}, {Slots[slot]}: {Heat(day, slot)} episodes")"></span>
+                            }
+                        }
+                    </div>
+                    <div class="lp-heat-axis" aria-hidden="true"><span>Morning</span><span>Afternoon</span><span>Evening</span><span>Late</span></div>
+                </div>
+            }
+            else
+            {
+                <div class="lp-tile lp-tile-wide">
+                    <div class="lp-tile-head"><span>What you watch</span><span class="lp-chip">Example</span></div>
+                    @GenreBars
+                </div>
+            }
+            <div class="lp-tile">
+                <div class="lp-tile-head"><span>Universes</span></div>
+                <svg class="lp-mini-graph" viewBox="0 0 160 110" role="img" aria-label="Shows joined by the characters they share">
+                    <g class="lp-links">
+                        <line x1="80" y1="52" x2="32" y2="24" /><line x1="80" y1="52" x2="128" y2="26" /><line x1="80" y1="52" x2="42" y2="88" />
+                        <line x1="80" y1="52" x2="124" y2="84" /><line x1="32" y1="24" x2="42" y2="88" /><line x1="128" y1="26" x2="124" y2="84" />
+                    </g>
+                    <circle class="lp-node lp-node-hub" cx="80" cy="52" r="11" />
+                    <circle class="lp-node" cx="32" cy="24" r="7" /><circle class="lp-node lp-node-b" cx="128" cy="26" r="8" />
+                    <circle class="lp-node lp-node-b" cx="42" cy="88" r="6" /><circle class="lp-node" cx="124" cy="84" r="7" />
+                </svg>
+            </div>
+            <div class="lp-tile">
+                <div class="lp-tile-head"><span>Nanogenres</span></div>
+                <div class="lp-tags">
+                    @foreach (var name in (nanogenres is { Count: > 0 } ? nanogenres.Take(5).Select(n => n.Name) : SampleNanogenres))
+                    {
+                        <span class="lp-tag">@name</span>
+                    }
+                </div>
+            </div>
+            @if (Trending is { Count: >= 4 })
+            {
+                <div class="lp-tile lp-tile-wide">
+                    <div class="lp-tile-head"><span>Trending now</span></div>
+                    <div class="lp-posters">
+                        @foreach (var show in Trending.Take(6))
+                        {
+                            <a href="@($"shows/{show.Id}")" title="@show.Title"><Poster Url="@show.PosterUrl" Title="@show.Title" Size="small" /></a>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (Numbers().ToList() is { Count: >= 3 } numbers)
+    {
+        <section class="lp-numbers lp-reveal" aria-label="The catalog in numbers">
+            @foreach (var (value, label) in numbers)
+            {
+                <div class="lp-number"><strong>@value.ToString("N0")</strong><span>@label</span></div>
+            }
+        </section>
+    }
+
+    <section class="lp-feature lp-reveal">
+        <div class="lp-feature-copy">
+            <p class="lp-eyebrow">Insights</p>
+            <h2>@(Shown(FeatureFlags.YearInTv) ? "Your year in TV, and every hour of it" : "See what your watching adds up to")</h2>
+            <p>
+                Every episode you mark adds to the picture: how much you watch, what you finish and which genres you keep
+                coming back to.
+            </p>
+            <ul class="lp-points">
+                @if (Shown(FeatureFlags.YearInTv)) { <li><a href="year">Year in TV</a>: episodes, hours, top shows and your busiest day @Plus(FeatureFlags.YearInTv)</li> }
+                @if (Shown(FeatureFlags.TvClock)) { <li><a href="tv-clock">Your TV clock</a>: the hours and days you watch most @Plus(FeatureFlags.TvClock)</li> }
+                @if (Shown(FeatureFlags.Streaks)) { <li><a href="streaks">Streaks</a>: days in a row, and shows you keep up with as they air @Plus(FeatureFlags.Streaks)</li> }
+                <li><a href="stats">Stats</a>: episodes, hours and shows finished, by genre and by year</li>
+                <li><a href="insights">Your taste</a>: the genres you rate highest, and how you rate against everyone else</li>
+            </ul>
+        </div>
+        <div class="lp-visual lp-glass" role="img" aria-label="Example: 412 episodes and 286 hours watched; drama is the most watched genre">
+            <div class="lp-tile-head"><span>@(Shown(FeatureFlags.YearInTv) ? "A year in TV" : "Your stats")</span><span class="lp-chip">Example</span></div>
+            <div class="lp-stats" aria-hidden="true">
+                <div><strong>412</strong><span>episodes</span></div>
+                <div><strong>286</strong><span>hours</span></div>
+                @if (Shown(FeatureFlags.Streaks)) { <div><strong>23</strong><span>day streak</span></div> } else { <div><strong>31</strong><span>shows finished</span></div> }
+            </div>
+            @GenreBars
+        </div>
+    </section>
+
+    @if (Shown(FeatureFlags.Blend) || Shown(FeatureFlags.TonightTogether) || Shown(FeatureFlags.TasteTwins))
+    {
+        <section class="lp-feature lp-feature-flip lp-reveal">
+            <div class="lp-feature-copy">
+                <p class="lp-eyebrow">Blend</p>
+                <h2>Find what everyone will love</h2>
+                <p>Two tastes, one answer. Meet in the middle of two shows, line up a night with a friend, or find the people who rate like you.</p>
+                <ul class="lp-points">
+                    @if (Shown(FeatureFlags.Blend)) { <li><a href="blend">Blend</a>: pick two shows and get the ones that sit between them @Plus(FeatureFlags.Blend)</li> }
+                    @if (Shown(FeatureFlags.TonightTogether)) { <li>Tonight together: what you and someone you follow can both watch next @Plus(FeatureFlags.TonightTogether)</li> }
+                    @if (Shown(FeatureFlags.TasteTwins)) { <li><a href="taste-twins">Taste twins</a>: how closely others' ratings track yours, and what they loved @Plus(FeatureFlags.TasteTwins)</li> }
+                </ul>
+            </div>
+            <div class="lp-visual lp-glass" role="img" aria-label="Example: two viewers whose tastes overlap, with 82% agreement and six shows to watch together">
+                <div class="lp-tile-head"><span>Taste overlap</span><span class="lp-chip">Example</span></div>
+                <div class="lp-venn" aria-hidden="true">
+                    <div class="lp-venn-a"><span>You</span></div>
+                    <div class="lp-venn-b"><span>Them</span></div>
+                    <div class="lp-venn-mid"><strong>82%</strong><span>agreement</span></div>
+                </div>
+                <div class="lp-legend" aria-hidden="true">
+                    <span><i class="lp-dot lp-dot-a"></i>Only you: 14 shows</span>
+                    <span><i class="lp-dot lp-dot-mix"></i>Both: 6 to watch together</span>
+                    <span><i class="lp-dot lp-dot-b"></i>Only them: 9 shows</span>
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (Shown(FeatureFlags.Nanogenres) && nanogenres is { Count: > 0 })
+    {
+        <section class="lp-feature lp-reveal">
+            <div class="lp-feature-copy">
+                <p class="lp-eyebrow">Nanogenres</p>
+                <h2>Discover through hyper-specific tastes</h2>
+                <p>
+                    "Drama" says little. The catalog is clustered by what shows are actually about, so you can browse the
+                    exact corner you're in the mood for. @Plus(FeatureFlags.Nanogenres)
+                </p>
+                <p class="lp-metric"><strong>@nanogenres.Count.ToString("N0")</strong> nanogenres found in the catalog, not picked by hand.</p>
+                <a class="lp-more" href="nanogenres">Browse nanogenres</a>
+            </div>
+            <div class="lp-visual lp-glass">
+                <div class="lp-tile-head"><span>From the catalog</span></div>
+                <div class="lp-cloud">
+                    @foreach (var genre in Cloud(nanogenres))
+                    {
+                        <a class="lp-cloud-tag" style="--s:@genre.Size" href="@($"nanogenres/{genre.Slug}")" title="@($"{genre.ShowCount} shows")">@genre.Name</a>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (Shown(FeatureFlags.Universes) && universes is { Count: > 0 })
+    {
+        <section class="lp-feature lp-feature-flip lp-reveal">
+            <div class="lp-feature-copy">
+                <p class="lp-eyebrow">Universes</p>
+                <h2>Explore how every story connects</h2>
+                <p>
+                    Spin-offs, crossovers and the characters who walk from one show into another, drawn as one map, with a
+                    watch order that keeps the crossovers in sequence. @Plus(FeatureFlags.Universes)
+                </p>
+                <p class="lp-metric">
+                    <strong>@universes.Count.ToString("N0")</strong> universes linking <strong>@universes.Sum(u => u.ShowCount).ToString("N0")</strong> shows.
+                </p>
+                <a class="lp-more" href="universes">Explore universes</a>
+            </div>
+            <div class="lp-visual lp-glass lp-galaxy">
+                <div class="lp-tile-head"><span>The biggest universes</span></div>
+                <svg viewBox="0 0 400 280" role="img" aria-label="@($"The biggest universes: {string.Join(", ", universes.Take(Hubs.Length).Select(u => $"{u.Name} with {u.ShowCount} shows"))}")">
+                    <g class="lp-links">
+                        @for (var i = 0; i < Math.Min(Hubs.Length, universes.Count); i++)
+                        {
+                            var hub = Hubs[i];
+                            @if (i > 0)
+                            {
+                                <line class="lp-link-far" x1="@Hubs[0].X" y1="@Hubs[0].Y" x2="@hub.X" y2="@hub.Y" />
+                            }
+                            @foreach (var (x, y) in Satellites(hub, universes[i].ShowCount))
+                            {
+                                <line x1="@hub.X" y1="@hub.Y" x2="@x" y2="@y" />
+                            }
+                        }
+                    </g>
+                    @for (var i = 0; i < Math.Min(Hubs.Length, universes.Count); i++)
+                    {
+                        var (hub, universe) = (Hubs[i], universes[i]);
+                        @foreach (var (x, y) in Satellites(hub, universe.ShowCount))
+                        {
+                            <circle class="lp-node @(i % 2 == 1 ? "lp-node-b" : "")" cx="@x" cy="@y" r="4" />
+                        }
+                        <a href="@($"universes/{universe.Id}")">
+                            <title>@($"{universe.Name}: {universe.ShowCount} shows")</title>
+                            <circle class="lp-node lp-node-hub @(i % 2 == 1 ? "lp-node-b" : "")" cx="@hub.X" cy="@hub.Y" r="@(9 + Math.Min(7, universe.ShowCount))" />
+                            <text class="lp-node-label" x="@hub.X" y="@(hub.Y + (hub.LabelBelow ? 34 : -24))" text-anchor="middle">@Short(universe.Name)</text>
+                        </a>
+                    }
+                </svg>
+            </div>
+        </section>
+    }
+
+    <section class="lp-discover lp-reveal">
+        <h2>Entertainment discovery that understands your taste.</h2>
+        <div class="lp-cards">
+            <a class="lp-card lp-glass" href="for-you">
+                <h3>For you</h3>
+                <p>Picks from what you follow and rate: shows like yours, and what viewers like you went on to watch.</p>
+            </a>
+            <a class="lp-card lp-glass" href="insights">
+                <h3>Your taste</h3>
+                <p>The genres you rate highest, how generous a rater you are, and what you finish against what you drop.</p>
+            </a>
+            <a class="lp-card lp-glass" href="discover">
+                <h3>Hidden gems</h3>
+                <p>Highly rated shows that fly under the radar, beside the bingeable ones and the fan favourites.</p>
+            </a>
+            @if (Shown(FeatureFlags.TasteTwins))
+            {
+                <a class="lp-card lp-glass" href="taste-twins">
+                    <h3>Taste twins @Plus(FeatureFlags.TasteTwins)</h3>
+                    <p>Shows loved by the people whose ratings track yours. Nobody is named.</p>
+                </a>
+            }
+        </div>
+    </section>
+
+    <Feature Flag="@FeatureFlags.Plans">
+        <section class="lp-plans lp-glass lp-reveal">
+            <h2>@($"Free, with {Plans.Name(Plans.Plus)} when you want more")</h2>
+            <p>
+                Browse the catalog without an account. A free account has @(Plans.FreeIncludes.ToLowerInvariant()).
+                <strong>@Plans.Name(Plans.Plus)</strong> adds every insight@(plusNames is { Count: > 0 } ? ": " + string.Join(", ", plusNames) : "").
+                <strong>@Plans.Name(Plans.Family)</strong> is @Plans.Name(Plans.Plus) for you and up to @Plans.FamilyMembers people you invite.
+            </p>
+        </section>
+    </Feature>
+
+    <section class="lp-final lp-reveal">
+        <h2>Go beyond tracking. <span class="lp-grad">Understand your entertainment DNA.</span></h2>
+        <button class="btn lp-btn" @onclick="SignUpAsync">Create Your Universe</button>
+    </section>
+</div>
+
+@code {
+    /// <summary>
+    /// The catalog's most popular shows, which the page under this one loads anyway.
+    /// </summary>
+    [Parameter] public IReadOnlyList<ShowSummary>? Trending { get; set; }
+
+    private static readonly string[] Days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    private static readonly string[] Slots = ["6am", "8am", "10am", "noon", "2pm", "4pm", "6pm", "8pm", "10pm", "midnight", "2am", "4am"];
+    private static readonly string[] SampleNanogenres = ["Slow-burn political thriller", "Cozy supernatural mystery", "Workplace comedy"];
+    private static readonly (string Genre, int Share)[] SampleGenres = [("Drama", 38), ("Comedy", 22), ("Crime", 17), ("Sci-fi", 12)];
+
+    /// <summary>
+    /// Where the galaxy's biggest universes sit, the largest in the middle.
+    /// </summary>
+    private static readonly (int X, int Y, bool LabelBelow)[] Hubs = [(200, 140, true), (86, 78, false), (318, 84, false), (96, 214, true), (312, 208, true)];
+
+    private List<NanogenreSummary>? nanogenres;
+    private List<UniverseSummary>? universes;
+    private CatalogNumbers? numbers;
+    private HashSet<string> on = [];
+    private HashSet<string> plus = [];
+    private List<string>? plusNames;
+
+    private Task SignUpAsync() => Auth.SignInAsync();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // What Plus adds, from the flags, as the plan page lists it; a feature in that list is on, for those who pay.
+            var planFeatures = (await Flags.PlanFeaturesAsync()).Where(f => f.Plans.Contains(Plans.Plus) && !f.Plans.Contains(Plans.Free)).ToList();
+            plus = planFeatures.Select(f => f.Key).ToHashSet();
+            plusNames = planFeatures.Select(f => f.Name).ToList();
+            foreach (var flag in new[] { FeatureFlags.Universes, FeatureFlags.Nanogenres, FeatureFlags.Blend, FeatureFlags.TonightTogether,
+                         FeatureFlags.TasteTwins, FeatureFlags.YearInTv, FeatureFlags.TvClock, FeatureFlags.Streaks })
+            {
+                if (await Flags.IsEnabledAsync(flag))
+                {
+                    on.Add(flag);
+                }
+            }
+
+            var numbersTask = Catalog.GetNumbersAsync();
+            var nanogenresTask = Shown(FeatureFlags.Nanogenres) ? Catalog.GetNanogenresAsync() : Task.FromResult<List<NanogenreSummary>?>(null);
+            var universesTask = Shown(FeatureFlags.Universes) ? Catalog.GetUniversesAsync() : Task.FromResult<List<UniverseSummary>?>(null);
+            numbers = await numbersTask;
+            nanogenres = (await nanogenresTask)?.OrderByDescending(n => n.ShowCount).ToList();
+            universes = (await universesTask)?.OrderByDescending(u => u.ShowCount).ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // The page stands without the catalog's own figures: those sections are left out.
+        }
+    }
+
+    /// <summary>
+    /// Whether to talk about a feature: it's on for a visitor, or on for those on a paid plan.
+    /// </summary>
+    private bool Shown(string flag) => on.Contains(flag) || plus.Contains(flag);
+
+    private static readonly RenderFragment GenreBars = @<div class="lp-bars" aria-hidden="true">
+        @foreach (var (genre, share) in SampleGenres)
+        {
+            <div class="lp-bar" title="@($"{genre}: {share}% of episodes")">
+                <span>@genre</span>
+                <span class="lp-bar-track"><span class="lp-bar-fill" style="--w:@(share * 100 / SampleGenres[0].Share)%"></span></span>
+                <span class="lp-bar-value">@share%</span>
+            </div>
+        }
+    </div>;
+
+    private RenderFragment? Plus(string flag) => plus.Contains(flag) ? @<span class="lp-chip lp-chip-plus">@Plans.Name(Plans.Plus)</span> : null;
+
+    private IEnumerable<(int Value, string Label)> Numbers()
+    {
+        if (numbers is { Shows: > 0 })
+        {
+            yield return (numbers.Shows, "shows");
+            yield return (numbers.Episodes, "episodes");
+            yield return (numbers.People, "cast and makers");
+        }
+        if (nanogenres is { Count: > 0 })
+        {
+            yield return (nanogenres.Count, "nanogenres");
+        }
+        if (universes is { Count: > 0 })
+        {
+            yield return (universes.Count, "universes");
+        }
+    }
+
+    /// <summary>
+    /// The example week: quiet mornings, busy evenings, busiest at the weekend. Episodes in the slot, 0 to 9.
+    /// </summary>
+    private static int Heat(int day, int slot)
+    {
+        var evening = slot is >= 6 and <= 9 ? 4 + (slot is 7 or 8 ? 3 : 0) : slot is 4 or 5 ? 2 : slot >= 10 ? 1 : 0;
+        var weekend = day >= 5 ? 2 : day == 4 && slot >= 7 ? 1 : 0;
+        return Math.Clamp(evening + (evening > 0 || day >= 5 ? weekend : 0) - (day + slot) % 3 % 2, 0, 9);
+    }
+
+    /// <summary>
+    /// The biggest nanogenres, sized by how many shows each holds (1 to 4), in the catalog's own order.
+    /// </summary>
+    private static IEnumerable<(string Slug, string Name, int ShowCount, int Size)> Cloud(List<NanogenreSummary> all)
+    {
+        var top = all.Take(18).ToList();
+        var (min, max) = (top.Min(n => n.ShowCount), top.Max(n => n.ShowCount));
+        return top.OrderBy(n => n.Name.Length % 5).ThenBy(n => n.Name, StringComparer.Ordinal)
+            .Select(n => (n.Slug, n.Name, n.ShowCount, 1 + (max == min ? 1 : 3 * (n.ShowCount - min) / (max - min))));
+    }
+
+    /// <summary>
+    /// A universe's shows around its hub: one point each, up to eight.
+    /// </summary>
+    private static IEnumerable<(int X, int Y)> Satellites((int X, int Y, bool LabelBelow) hub, int shows)
+    {
+        var count = Math.Clamp(shows, 2, 8);
+        for (var i = 0; i < count; i++)
+        {
+            var angle = 2 * Math.PI * i / count + hub.X / 50.0;
+            var distance = 34 + 9 * (i % 2);
+            yield return ((int)Math.Round(hub.X + distance * Math.Cos(angle)), (int)Math.Round(hub.Y + distance * 0.8 * Math.Sin(angle)));
+        }
+    }
+
+    private static string Short(string name) => name.Length <= 22 ? name : name[..21].TrimEnd() + "…";
+}

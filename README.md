@@ -542,6 +542,22 @@ words its own; Wikidata's (CC0) needs none, but its Wikipedia overviews are CC B
 per-region streaming availability, so similar-show lists are empty, keywords are the show type and language, and a worldwide
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
+**Landing page** (the home page, signed out; `Components/Welcome.razor`): what the app is, for a visitor. A hero with
+a look at the product, the catalog in numbers, a section each for insights, blending tastes, nanogenres and universes,
+the discovery tools, the plans, and a last call to sign up.
+
+- **Only what's there.** A section whose feature flag is off isn't shown, and a feature that needs a paid plan carries
+  the plan's name. It's about TV shows: the app doesn't track films.
+- **Real where it can be.** The numbers (`GET /api/v1/numbers` on Catalog.API: shows, episodes, people), the nanogenre
+  cloud, the universe map and the posters are the catalog's own, and link to their pages. The charts are an example
+  profile and each says "Example": a visitor has no history to draw.
+- **Look:** a dark-first canvas of its own (light theme has its counterpart), glass panels, purple, blue and cyan. In
+  the charts only purple and cyan carry meaning; the pair was checked for colour-blind separation in both themes.
+  Motion stops for anyone who asks their device for less of it.
+- **Keep it in step** when a feature's flag, plan or wording changes.
+- **Tried** in a browser at desktop and phone widths, dark and light, with the showcased flags on and with the
+  checked-in flags (where Blend, nanogenres and the paid insights are off, so those sections don't show).
+
 **Watch on Netflix:** a streaming show's page has a "▶ Watch on Netflix" button (and the same link under Where to watch)
 that goes straight to the show on the service: `netflix.com/title/…`, `tv.apple.com/show/…`, `hbomax.com/show/…`,
 `primevideo.com/detail/…`, Disney+, Hulu, Peacock and others. On a phone, the OS opens these in the service's app when

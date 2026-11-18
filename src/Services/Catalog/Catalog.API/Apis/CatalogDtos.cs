@@ -12,6 +12,11 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int
 /// </summary>
 public record PersonMatchDto(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
 
+/// <summary>
+/// How much the catalog holds, for the landing page.
+/// </summary>
+public record CatalogNumbersDto(int Shows, int Episodes, int People);
+
 public record ShowSummaryDto(
     Guid Id,
     string Title,

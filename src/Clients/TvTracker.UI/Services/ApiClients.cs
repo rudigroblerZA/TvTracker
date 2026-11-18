@@ -382,6 +382,9 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
             ? GetAsync<Holiday>(ApiClients.Catalog, $"api/v1/holidays/{Uri.EscapeDataString(key)}", ct)
             : SendAsync<Holiday>(ApiClients.Catalog, HttpMethod.Post, $"api/v1/holidays/{Uri.EscapeDataString(key)}/shows", new { ShowIds = showIds }, ct);
 
+    public Task<CatalogNumbers?> GetNumbersAsync(CancellationToken ct = default) =>
+        GetAsync<CatalogNumbers>(ApiClients.Catalog, "api/v1/numbers", ct, cacheForOffline: true);
+
     public Task<List<ShowSummary>?> GetTrendingAsync(CancellationToken ct = default) =>
         GetAsync<List<ShowSummary>>(ApiClients.Catalog, "api/v1/shows/trending", ct, cacheForOffline: true);
 

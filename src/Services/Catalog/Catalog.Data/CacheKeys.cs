@@ -7,6 +7,8 @@ public static class CacheKeys
 {
     public const string Trending = "catalog:trending";
 
+    public const string Numbers = "catalog:numbers";
+
     public static string Show(Guid showId, string region) => $"catalog:show:{showId}:{region}";
 
     public static string ShowTag(Guid showId) => $"catalog:show:{showId}";
