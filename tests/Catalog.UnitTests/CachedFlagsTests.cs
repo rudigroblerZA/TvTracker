@@ -81,6 +81,7 @@ public class CachedFlagsTests
         var (flags, _, _) = await BuildAsync([]);
         var context = FeatureFlags.ContextFor(null);
         Assert.True(await flags.IsEnabledAsync(FeatureFlags.Universes, context, TestContext.Current.CancellationToken));
-        Assert.False(await flags.IsEnabledAsync(FeatureFlags.Blend, context, TestContext.Current.CancellationToken));
+        // Streaks is off in flagd.json; any flag that is would do.
+        Assert.False(await flags.IsEnabledAsync(FeatureFlags.Streaks, context, TestContext.Current.CancellationToken));
     }
 }
