@@ -43,6 +43,11 @@ public record BrandingSettings(string? AppName = null, string? AccentColor = nul
 /// </summary>
 public record PersonMatch(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<string> KnownFor);
 
+/// <summary>
+/// How much the catalog holds (Catalog.API's numbers), for the landing page.
+/// </summary>
+public record CatalogNumbers(int Shows, int Episodes, int People);
+
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
 /// <summary>

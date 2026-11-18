@@ -21,6 +21,7 @@ public static class CatalogApi
 
         api.MapGet("/shows", SearchShowsAsync).RequireRateLimiting(SearchRateLimiting.Policy);
         api.MapGet("/shows/trending", GetTrendingAsync);
+        api.MapGet("/numbers", GetNumbersAsync);
         api.MapGet("/shows/batch", GetShowsByIdsAsync);
         api.MapGet("/shows/suggest", SuggestShowsAsync);
         api.MapBlendApi();
@@ -238,6 +239,16 @@ public static class CatalogApi
         return TypedResults.Ok(new PagedResult<ShowSummaryDto>(
             shows.Select(s => s.ToSummary()).ToList(), page, pageSize, titleTotal + after.Count, searching ? titleTotal + nearlySpelled : null));
     }
+
+    /// <summary>
+    /// The catalog's size: counts only, the same for everyone, kept for ten minutes.
+    /// </summary>
+    private static async Task<Ok<CatalogNumbersDto>> GetNumbersAsync(CatalogContext db, HybridCache cache, CancellationToken ct) =>
+        TypedResults.Ok(await cache.GetOrCreateAsync(
+            CacheKeys.Numbers,
+            async token => new CatalogNumbersDto(await db.Shows.CountAsync(token), await db.Episodes.CountAsync(token), await db.People.CountAsync(token)),
+            new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(10), LocalCacheExpiration = TimeSpan.FromMinutes(1) },
+            cancellationToken: ct));
 
     private static async Task<Ok<List<ShowSummaryDto>>> GetTrendingAsync(CatalogContext db, HybridCache cache, CancellationToken ct)
     {
