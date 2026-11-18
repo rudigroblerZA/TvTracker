@@ -543,7 +543,8 @@ per-region streaming availability, so similar-show lists are empty, keywords are
 streaming service (e.g. Netflix) is listed under each region in `TvMaze:WatchRegions`.
 
 **Landing page** (the home page, signed out; `Components/Welcome.razor`): what the app is, for a visitor. A hero with
-a look at the product, the catalog in numbers, a section each for insights, blending tastes, nanogenres and universes,
+a look at the product, the catalog in numbers, a live search by meaning, a section each for insights, blending tastes,
+nanogenres and universes,
 the discovery tools, the plans, and a last call to sign up.
 
 - **Only what's there.** A section whose feature flag is off isn't shown, and a feature that needs a paid plan carries
@@ -551,6 +552,9 @@ the discovery tools, the plans, and a last call to sign up.
 - **Real where it can be.** The numbers (`GET /api/v1/numbers` on Catalog.API: shows, episodes, people), the nanogenre
   cloud, the universe map and the posters are the catalog's own, and link to their pages. The charts are an example
   profile and each says "Example": a visitor has no history to draw.
+- **Search by meaning is live,** not a picture: the box asks the catalog's own search (titles first, then meaning),
+  starting with "buddy cop". Four examples to press, six results, and a link to the full search page. The examples were
+  picked for answering well on the catalog as it is; check them again if the catalog changes much.
 - **Look:** a dark-first canvas of its own (light theme has its counterpart), glass panels, purple, blue and cyan. In
   the charts only purple and cyan carry meaning; the pair was checked for colour-blind separation in both themes.
   Motion stops for anyone who asks their device for less of it.

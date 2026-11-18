@@ -95,6 +95,55 @@
         </section>
     }
 
+    @* Search by meaning, live: the catalog's own search answering, starting with an example. *@
+    <section class="lp-search lp-reveal">
+        <div class="lp-search-copy">
+            <p class="lp-eyebrow">Search by meaning</p>
+            <h2>Say what you're in the mood for</h2>
+            <p>No title needed. Describe the kind of show and the catalog finds the ones that fit. Try it:</p>
+        </div>
+        <div class="lp-search-box lp-glass">
+            <form class="lp-search-form" role="search" @onsubmit="() => SearchAsync(query)">
+                <input type="search" @bind="query" @bind:event="oninput" placeholder="buddy cop" maxlength="80" aria-label="Describe a kind of show" />
+                <button class="btn lp-btn" type="submit" disabled="@searching">Search</button>
+            </form>
+            <div class="lp-search-examples">
+                <span class="lp-fine">Or try</span>
+                @foreach (var example in SearchExamples)
+                {
+                    <button type="button" class="lp-tag lp-example @(example == searched ? "lp-example-on" : "")" @onclick="() => SearchAsync(example)">@example</button>
+                }
+            </div>
+            <div class="lp-search-results" aria-live="polite" aria-busy="@searching">
+                @if (searchFailed)
+                {
+                    <p class="lp-fine">Search isn't answering right now. <a href="@($"search?q={Uri.EscapeDataString(searched ?? "")}")">Try it on the search page</a>.</p>
+                }
+                else if (found is { Count: > 0 })
+                {
+                    <p class="lp-fine">@($"Shows for \u201c{searched}\u201d") · <a href="@($"search?q={Uri.EscapeDataString(searched ?? "")}")">See all</a></p>
+                    <div class="lp-search-grid">
+                        @foreach (var show in found)
+                        {
+                            <a @key="show.Id" class="lp-search-hit" href="@($"shows/{show.Id}")">
+                                <Poster Url="@show.PosterUrl" Title="@show.Title" />
+                                <span>@show.Title</span>
+                            </a>
+                        }
+                    </div>
+                }
+                else if (found is not null)
+                {
+                    <p class="lp-fine">@($"Nothing fits \u201c{searched}\u201d yet. Try other words.")</p>
+                }
+                else
+                {
+                    <p class="lp-fine">Searching…</p>
+                }
+            </div>
+        </div>
+    </section>
+
     <section class="lp-feature lp-reveal">
         <div class="lp-feature-copy">
             <p class="lp-eyebrow">Insights</p>
@@ -286,6 +335,15 @@
 
     private List<NanogenreSummary>? nanogenres;
     private List<UniverseSummary>? universes;
+
+    private static readonly string[] SearchExamples = ["buddy cop", "rich family fighting over the company", "stranded on an island", "found family in space"];
+    private const int SearchHits = 6;
+    private string query = "";
+    private string? searched;
+    private List<ShowSummary>? found;
+    private bool searching;
+    private bool searchFailed;
+    private int searches;
     private CatalogNumbers? numbers;
     private HashSet<string> on = [];
     private HashSet<string> plus = [];
@@ -313,13 +371,48 @@
             var numbersTask = Catalog.GetNumbersAsync();
             var nanogenresTask = Shown(FeatureFlags.Nanogenres) ? Catalog.GetNanogenresAsync() : Task.FromResult<List<NanogenreSummary>?>(null);
             var universesTask = Shown(FeatureFlags.Universes) ? Catalog.GetUniversesAsync() : Task.FromResult<List<UniverseSummary>?>(null);
+            var searchTask = SearchAsync(SearchExamples[0]);
             numbers = await numbersTask;
             nanogenres = (await nanogenresTask)?.OrderByDescending(n => n.ShowCount).ToList();
             universes = (await universesTask)?.OrderByDescending(u => u.ShowCount).ToList();
+            await searchTask;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
             // The page stands without the catalog's own figures: those sections are left out.
+        }
+    }
+
+    /// <summary>
+    /// Asks the catalog's search, which matches titles first and then meaning. The latest question wins: an earlier
+    /// answer arriving late is dropped.
+    /// </summary>
+    private async Task SearchAsync(string? text)
+    {
+        text = string.IsNullOrWhiteSpace(text) ? SearchExamples[0] : text.Trim();
+        var search = ++searches;
+        (searched, searching, searchFailed, found) = (text, true, false, null);
+        try
+        {
+            var page = await Catalog.SearchAsync(text);
+            if (search == searches)
+            {
+                found = page?.Items.Take(SearchHits).ToList() ?? [];
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            if (search == searches)
+            {
+                searchFailed = true;
+            }
+        }
+        finally
+        {
+            if (search == searches)
+            {
+                searching = false;
+            }
         }
     }
 
