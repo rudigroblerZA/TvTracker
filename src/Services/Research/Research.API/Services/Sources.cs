@@ -9,16 +9,41 @@ namespace Research.API.Services;
 
 public static class ExternalSources
 {
+    public const string Client = "external-sources";
+
     /// <summary>
-    /// A client for outside sources, without the standard resilience handler: a refusal (the MediaWiki API answers
-    /// 429 to shared addresses) has a fallback, while the handler's backoff on 429 used up the request's 30 s. Wikimedia
-    /// asks API clients to identify themselves with a contact.
+    /// The same client with a longer timeout, for the catalog checks' large SPARQL batches.
     /// </summary>
-    public static HttpClient CreateClient(TimeSpan? timeout = null) => new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
+    public const string LongClient = "external-sources-long";
+
+    /// <summary>
+    /// Registers the clients for outside sources, without the standard resilience handler: a refusal (the MediaWiki API
+    /// answers 429 to shared addresses) has a fallback, while the handler's backoff on 429 used up the request's 30 s.
+    /// Wikimedia asks API clients to identify themselves with a contact.
+    /// </summary>
+    public static IServiceCollection AddExternalSources(this IServiceCollection services)
     {
-        Timeout = timeout ?? TimeSpan.FromSeconds(20),
-        DefaultRequestHeaders = { { "User-Agent", "TvTracker-research/1.0 (+https://github.com/rudigroblerZA/TvTracker)" } }
-    };
+        Register(services, Client, TimeSpan.FromSeconds(20));
+        Register(services, LongClient, TimeSpan.FromSeconds(70));
+        return services;
+    }
+
+    private static void Register(IServiceCollection services, string name, TimeSpan timeout)
+    {
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+        services.AddHttpClient(name, client =>
+            {
+                client.Timeout = timeout;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker-research/1.0 (+https://github.com/rudigroblerZA/TvTracker)");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AutomaticDecompression = DecompressionMethods.All,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            })
+            .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+    }
 }
 
 /// <summary>
@@ -37,9 +62,10 @@ public sealed record FoundSource(string Kind, string Url, string Title, string E
 /// when Wikipedia describes it as a TV series.</item>
 /// </list>
 /// </summary>
-public sealed partial class WikimediaSource(ILogger<WikimediaSource> logger)
+public sealed partial class WikimediaSource(IHttpClientFactory httpClients, ILogger<WikimediaSource> logger)
 {
-    private static readonly HttpClient Http = ExternalSources.CreateClient();
+    // A client per use, so connections follow DNS changes.
+    private HttpClient Http => httpClients.CreateClient(ExternalSources.Client);
 
     private const string Sparql = """
         SELECT ?item ?article ?imdb ?tmdb ?start ?end ?seasons ?episodes
@@ -241,9 +267,9 @@ public sealed partial class WikimediaSource(ILogger<WikimediaSource> logger)
 /// counts, creators and its users' rating. Found by the TMDB id from Wikidata, else the IMDb id, else a title search
 /// in the premiere year.
 /// </summary>
-public sealed class TmdbSource(IConfiguration config)
+public sealed class TmdbSource(IHttpClientFactory httpClients, IConfiguration config)
 {
-    private static readonly HttpClient Http = ExternalSources.CreateClient();
+    private HttpClient Http => httpClients.CreateClient(ExternalSources.Client);
 
     public bool Configured => config["Research:TmdbApiKey"] is { Length: > 0 };
 

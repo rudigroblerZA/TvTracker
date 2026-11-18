@@ -7,7 +7,7 @@ namespace TvTracker.Mobile.Services;
 /// Offline support in SQLite: the last response of each cached GET (Up Next, my shows, lists, show pages...)
 /// and a queue of changes made while offline, replayed in order by <see cref="OfflineSyncService"/>.
 /// </summary>
-public sealed class SqliteOfflineStore : IOfflineStore
+public sealed class SqliteOfflineStore(TimeProvider time) : IOfflineStore
 {
     private readonly Lazy<Task<SQLiteAsyncConnection>> _db = new(async () =>
     {
@@ -24,7 +24,7 @@ public sealed class SqliteOfflineStore : IOfflineStore
     public async Task StoreResponseAsync(string key, string json)
     {
         var db = await _db.Value;
-        await db.InsertOrReplaceAsync(new CachedResponse { Key = key, Json = json, StoredAtUtc = DateTime.UtcNow });
+        await db.InsertOrReplaceAsync(new CachedResponse { Key = key, Json = json, StoredAtUtc = time.GetUtcNow().UtcDateTime });
     }
 
     public async Task<string?> GetResponseAsync(string key)

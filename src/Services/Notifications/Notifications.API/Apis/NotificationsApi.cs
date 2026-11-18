@@ -88,16 +88,16 @@ public static class NotificationsApi
         return app;
     }
 
-    private static async Task<Ok<PreferencesDto>> GetPreferencesAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    private static async Task<Ok<PreferencesDto>>     GetPreferencesAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
-        var prefs = await GetOrCreateAsync(user, db, ct);
+            var prefs = await GetOrCreateAsync(user, db, time, ct);
         return TypedResults.Ok(ToDto(prefs));
     }
 
     private static async Task<Ok<PreferencesDto>> UpdatePreferencesAsync(
-        UpdatePreferencesRequest request, ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+        UpdatePreferencesRequest request, ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
-        var prefs = await GetOrCreateAsync(user, db, ct);
+        var prefs = await GetOrCreateAsync(user, db, time, ct);
 
         prefs.NewEpisodes = request.NewEpisodes;
         prefs.NewSeasons = request.NewSeasons;
@@ -113,7 +113,7 @@ public static class NotificationsApi
         prefs.DigestHour = request.DigestHour is { } hour ? Math.Clamp(hour, 0, 23) : prefs.DigestHour;
         prefs.SeasonVerdicts = request.SeasonVerdicts ?? prefs.SeasonVerdicts;
         prefs.Email = user.GetEmail() ?? prefs.Email;
-        prefs.UpdatedAtUtc = DateTime.UtcNow;
+        prefs.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(ToDto(prefs));
@@ -155,7 +155,7 @@ public static class NotificationsApi
     /// Registers (or re-registers) a device. A token moves to the signed-in user if it was registered by someone else.
     /// </summary>
     private static async Task<Results<Ok<DeviceDto>, ValidationProblem>> RegisterDeviceAsync(
-        RegisterDeviceRequest request, ClaimsPrincipal user, NotificationsContext db, NotificationHubPush push, CancellationToken ct)
+        RegisterDeviceRequest request, ClaimsPrincipal user, NotificationsContext db, NotificationHubPush push, TimeProvider time, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Token) || request.Token.Length > 1024)
         {
@@ -167,7 +167,7 @@ public static class NotificationsApi
         }
 
         var userId = user.GetUserId();
-        var now = DateTime.UtcNow;
+        var now = time.GetUtcNow().UtcDateTime;
 
         var device = await db.Devices.SingleOrDefaultAsync(d => d.Token == request.Token, ct);
         if (device is null)
@@ -228,24 +228,26 @@ public static class NotificationsApi
         return TypedResults.Ok(new InboxPageDto(items, unread));
     }
 
-    private static async Task<Results<NoContent, NotFound>> MarkReadAsync(Guid id, ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>>     MarkReadAsync(Guid id, ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var updated = await db.Inbox
-            .Where(i => i.Id == id && i.UserId == userId && i.ReadAtUtc == null)
-            .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, DateTime.UtcNow), ct);
+            var now = time.GetUtcNow().UtcDateTime;
+            var updated = await db.Inbox
+                .Where(i => i.Id == id && i.UserId == userId && i.ReadAtUtc == null)
+                .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
 
         return updated > 0 || await db.Inbox.AnyAsync(i => i.Id == id && i.UserId == userId, ct)
             ? TypedResults.NoContent()
             : TypedResults.NotFound();
     }
 
-    private static async Task<NoContent> MarkAllReadAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    private static async Task<NoContent>     MarkAllReadAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        await db.Inbox
-            .Where(i => i.UserId == userId && i.ReadAtUtc == null)
-            .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, DateTime.UtcNow), ct);
+            var now = time.GetUtcNow().UtcDateTime;
+            await db.Inbox
+                .Where(i => i.UserId == userId && i.ReadAtUtc == null)
+                .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
         return TypedResults.NoContent();
     }
 
@@ -265,13 +267,13 @@ public static class NotificationsApi
         });
     }
 
-    private static async Task<NotificationPreferences> GetOrCreateAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    private static async Task<NotificationPreferences> GetOrCreateAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var prefs = await db.Preferences.FindAsync([userId], ct);
         if (prefs is null)
         {
-            prefs = new NotificationPreferences { UserId = userId, Email = user.GetEmail(), UpdatedAtUtc = DateTime.UtcNow };
+            prefs = new NotificationPreferences { UserId = userId, Email = user.GetEmail(), UpdatedAtUtc = time.GetUtcNow().UtcDateTime };
             db.Preferences.Add(prefs);
             await db.SaveChangesAsync(ct);
         }
@@ -286,9 +288,9 @@ public static class NotificationsApi
     /// This week's digest for the caller as it would go out now, whether or not they've turned it on.
     /// </summary>
     private static async Task<Ok<DigestDto>> PreviewDigestAsync(ClaimsPrincipal user, NotificationsContext db, WeeklyDigest digests,
-        CancellationToken ct)
+            TimeProvider time, CancellationToken ct)
     {
-        var prefs = await GetOrCreateAsync(user, db, ct);
+            var prefs = await GetOrCreateAsync(user, db, time, ct);
         var digest = await digests.BuildAsync(prefs, ct);
         return TypedResults.Ok(new DigestDto(digest.Subject, digest.Sections));
     }

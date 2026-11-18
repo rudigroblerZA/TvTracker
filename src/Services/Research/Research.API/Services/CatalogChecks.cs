@@ -37,7 +37,7 @@ namespace Research.API.Services;
 /// 2 episodes and 10%: specials and double episodes are counted differently.</item>
 /// </list>
 /// </summary>
-public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time, [FromKeyedServices(CatalogChecks.JobName)] JobRun run,
+public sealed class CatalogChecks(IServiceScopeFactory scopes, IHttpClientFactory httpClients, TimeProvider time, [FromKeyedServices(CatalogChecks.JobName)] JobRun run,
     ILogger<CatalogChecks> logger) : BackgroundService
 {
     /// <summary>
@@ -59,7 +59,8 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
     private const int Attempts = 3;
     // Longer than the usual 20 s: a batch of 100 shows the query service hasn't answered lately took 14 s, and its own
     // limit is 60 s. A timeout used to end the whole check.
-    private static readonly HttpClient Http = ExternalSources.CreateClient(TimeSpan.FromSeconds(70));
+    // The client is registered with the 70 s timeout (ExternalSources.LongClient).
+    private HttpClient Http => httpClients.CreateClient(ExternalSources.LongClient);
 
     private const string Sparql = """
         SELECT ?tvmaze ?item (GROUP_CONCAT(DISTINCT CONCAT(STR(?start), "@", STR(?precision)); separator="|") AS ?starts)
@@ -279,7 +280,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         }
     }
 
-    private static async Task<Dictionary<string, WikidataAwards>> QueryAwardsAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
+    private async Task<Dictionary<string, WikidataAwards>> QueryAwardsAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var found = new Dictionary<string, WikidataAwards>();
         foreach (var row in await SparqlAsync(AwardsSparql, tvmazeIds, ct))
@@ -297,7 +298,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
     /// <summary>
     /// A SPARQL query over a batch of TVmaze ids (<c>{IDS}</c>), its result rows.
     /// </summary>
-    private static async Task<List<JsonElement>> SparqlAsync(string sparql, IEnumerable<string> tvmazeIds, CancellationToken ct)
+    private async Task<List<JsonElement>> SparqlAsync(string sparql, IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://query.wikidata.org/sparql")
@@ -320,7 +321,7 @@ public sealed class CatalogChecks(IServiceScopeFactory scopes, TimeProvider time
         public TimeSpan? RetryAfter { get; } = retryAfter;
     }
 
-    private static async Task<Dictionary<string, WikidataFacts>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
+    private async Task<Dictionary<string, WikidataFacts>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
     {
         var rows = await SparqlAsync(Sparql, tvmazeIds, ct);
         var found = new Dictionary<string, WikidataFacts>();

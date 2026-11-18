@@ -51,14 +51,14 @@ public static class ProfileApi
     /// Returns the profile, creating it from the token's claims on first sign-in.
     /// </summary>
     private static async Task<Ok<ProfileDto>> GetProfileAsync(
-        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
+        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
-        var profile = await GetOrCreateProfileAsync(user, db, outbox, ct);
+        var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
         return TypedResults.Ok(ToDto(profile));
     }
 
     private static async Task<Results<Ok<ProfileDto>, ValidationProblem>> UpdateProfileAsync(
-        UpdateProfileRequest request, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
+        UpdateProfileRequest request, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
         var errors = Validate(request);
         if (errors.Count > 0)
@@ -66,7 +66,7 @@ public static class ProfileApi
             return TypedResults.ValidationProblem(errors);
         }
 
-        var profile = await GetOrCreateProfileAsync(user, db, outbox, ct);
+        var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
 
         profile.DisplayName = request.DisplayName.Trim();
         profile.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
@@ -74,7 +74,7 @@ public static class ProfileApi
         profile.Region = request.Region.ToUpperInvariant();
         profile.Language = request.Language;
         profile.Email = user.GetEmail() ?? profile.Email;
-        profile.UpdatedAtUtc = DateTime.UtcNow;
+        profile.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
 
         outbox.Add(new UserProfileUpdatedIntegrationEvent(
             profile.UserId, profile.DisplayName, profile.Email, profile.TimeZone, profile.Region, profile.Language));
@@ -134,15 +134,15 @@ public static class ProfileApi
     /// </summary>
     private static async Task<IResult> ExportAsync(
         HttpContext httpContext, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox,
-        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, PaymentProviders payments, CancellationToken ct)
+        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, PaymentProviders payments, TimeProvider time, CancellationToken ct)
     {
         var logger = loggerFactory.CreateLogger("Identity.API.Export");
-        var profile = await GetOrCreateProfileAsync(user, db, outbox, ct);
+        var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
         var authorization = httpContext.Request.Headers.Authorization.ToString();
 
         var export = new JsonObject
         {
-            ["exportedAtUtc"] = DateTime.UtcNow,
+            ["exportedAtUtc"] = time.GetUtcNow().UtcDateTime,
             ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile)),
             ["payments"] = new JsonObject
             {
@@ -177,7 +177,7 @@ public static class ProfileApi
     }
 
     internal static async Task<UserProfile> GetOrCreateProfileAsync(
-        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
+        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var profile = await db.Profiles.FindAsync([userId], ct);
@@ -186,7 +186,7 @@ public static class ProfileApi
             return profile;
         }
 
-        var now = DateTime.UtcNow;
+        var now = time.GetUtcNow().UtcDateTime;
         profile = new UserProfile
         {
             UserId = userId,

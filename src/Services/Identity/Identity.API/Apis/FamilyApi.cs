@@ -157,7 +157,7 @@ public static class FamilyApi
         }
         var ownerId = found.Owner.UserId;
         // Make sure the joiner has a profile, so their effective plan can be kept.
-        await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, ct);
+        await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, time, ct);
 
         // In a transaction holding the family's row, so the seat count can't change between the check and the insert.
         var refusal = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>

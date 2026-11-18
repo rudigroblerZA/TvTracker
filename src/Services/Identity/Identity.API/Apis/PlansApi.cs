@@ -40,9 +40,9 @@ public static class PlansApi
     }
 
     private static async Task<Ok<PlanDto>> GetMyPlanAsync(
-        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, CancellationToken ct)
+        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
     {
-        var profile = await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, ct);
+        var profile = await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, time, ct);
         return TypedResults.Ok(ToDto(profile));
     }
 

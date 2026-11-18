@@ -96,7 +96,7 @@ public static class TimeMachineApi
         return TypedResults.Ok(machine with { Premieres = Mark(machine.Premieres), Finales = Mark(machine.Finales), BestEpisodes = Mark(machine.BestEpisodes) });
     }
 
-    private static async Task<TimeMachineDto> ComputeAsync(AnalyticsContext db, TimeZoneInfo zone, DateOnly today, DateOnly? date, CancellationToken ct)
+    internal static async Task<TimeMachineDto> ComputeAsync(AnalyticsContext db, TimeZoneInfo zone, DateOnly today, DateOnly? date, CancellationToken ct)
     {
         // Every year: the same day in each past year, its week taken whole. Near New Year that week spans two years
         // (29 December to 4 January), and the latest one is still a year back.
@@ -173,7 +173,7 @@ public static class TimeMachineApi
     /// Regular episodes that aired within <paramref name="halfWidth"/> days of any of <paramref name="middles"/>, in
     /// <paramref name="zone"/>'s calendar: one range scan of the air-time index per day.
     /// </summary>
-    private static Task<List<EpisodeCopy>> InWeeksAsync(AnalyticsContext db, TimeZoneInfo zone, List<DateOnly> middles, int halfWidth, CancellationToken ct)
+    internal static Task<List<EpisodeCopy>> InWeeksAsync(AnalyticsContext db, TimeZoneInfo zone, List<DateOnly> middles, int halfWidth, CancellationToken ct)
     {
         var starts = middles.Select(m => StartOfDayUtc(m.AddDays(-halfWidth), zone)).ToArray();
         var ends = middles.Select(m => StartOfDayUtc(m.AddDays(halfWidth + 1), zone)).ToArray();

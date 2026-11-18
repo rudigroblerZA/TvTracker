@@ -25,7 +25,11 @@ public sealed class CatalogReplayRunner(IServiceScopeFactory scopeFactory, IHost
                 await using var scope = scopeFactory.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<CatalogSynchronizer>().ReplayAllAsync(lifetime.ApplicationStopping);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Catalog replay stopped: the worker is shutting down");
+            }
+            catch (Exception ex)
             {
                 logger.LogError(ex, "Catalog replay failed");
             }

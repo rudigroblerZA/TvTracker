@@ -81,7 +81,7 @@ public static class PaymentsApi
         {
             return TypedResults.Problem("Plans can't be bought here yet.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
-        var profile = await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, ct);
+        var profile = await ProfileApi.GetOrCreateProfileAsync(user, db, outbox, time, ct);
         if (await db.Subscriptions.AnyAsync(s => s.UserId == profile.UserId && s.Status == SubscriptionStatus.Active, ct))
         {
             return TypedResults.Conflict("You already have a subscription; cancel it before buying another plan.");

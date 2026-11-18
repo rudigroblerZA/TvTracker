@@ -176,8 +176,9 @@ public static class FlagsApi
                 Gate.Release();
             }
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
+            // Nothing awaits this task, so any failure (not only I/O) must be logged here or it's lost.
             logger.LogWarning(ex, "Couldn't make flagd re-read flagd.json; a flag reset to it may be missing until flagd.json changes");
         }
     });

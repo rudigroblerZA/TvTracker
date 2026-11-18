@@ -94,9 +94,10 @@ public sealed class BulkImportRunner(
     private async Task RunAsync(Job job, BulkImportRequest request)
     {
         var ct = job.Cancellation.Token;
-        using var caller = ProviderCaller.Begin("bulk-import", ProviderLane.Background);
         try
         {
+            // Inside the try: nothing awaits this task, so a throw before it would leave the job "running" for ever.
+            using var caller = ProviderCaller.Begin("bulk-import", ProviderLane.Background);
             await using (var scope = scopeFactory.CreateAsyncScope())
             {
                 var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();

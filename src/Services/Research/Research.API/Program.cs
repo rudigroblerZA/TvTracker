@@ -39,6 +39,7 @@ builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
 builder.Services.AddHttpClient<CatalogOverrides>(http => http.BaseAddress = new Uri("https+http://catalog-sync/"))
     .AddHttpMessageHandler<ServiceTokenHandler>();
 
+builder.Services.AddExternalSources();
 builder.Services.AddSingleton<WikimediaSource>();
 builder.Services.AddSingleton<TmdbSource>();
 
