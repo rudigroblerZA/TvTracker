@@ -5,7 +5,8 @@
 @if (insights is not null)
 {
     <section class="insights">
-        <h2>Insights</h2>
+        <p class="lp-eyebrow">Insights</p>
+        <h2>What the numbers say</h2>
 
         @if (Highlighted() is { Count: > 0 } prolific)
         {
@@ -239,7 +240,8 @@
             <Feature Flag="@FeatureFlags.Forecasts"><ShowOutlookPanel ShowId="insights.ShowId" Outlook="insights.Outlook" /></Feature>
             <Feature Flag="@FeatureFlags.ShowDna"><ShowDnaPanel Dna="insights.Dna" /></Feature>
 
-            @if (insights.Viewing is { } viewing && (viewing.Seasons.Count > 0 || viewing.DropOff is not null))
+            @* Something to say only with a drop-off point or seasons to compare; one season alone would leave the card empty. *@
+            @if (insights.Viewing is { } viewing && (viewing.Seasons.Count > 1 || viewing.DropOff is not null))
             {
                 <div class="insight-card">
                     <h3>Who's watching</h3>
