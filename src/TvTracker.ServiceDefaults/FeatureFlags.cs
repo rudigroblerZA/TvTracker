@@ -96,6 +96,7 @@ public static class FeatureFlags
     {
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
         Plans, Payments, FamilyPlan, Affiliates,
+        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt,
     };
 
     /// <summary>
