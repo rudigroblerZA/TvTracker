@@ -17,14 +17,25 @@ public static class ExternalSources
     public const string LongClient = "external-sources-long";
 
     /// <summary>
+    /// How long a source gets to answer. Shorter than the 30 s the app's own clients wait for this service, so a slow
+    /// source ends as a missing source, not as a failed request.
+    /// </summary>
+    public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// For the background catalog checks, which nobody waits on: within Wikidata's own 60 s query limit.
+    /// </summary>
+    public static readonly TimeSpan LongTimeout = TimeSpan.FromSeconds(70);
+
+    /// <summary>
     /// Registers the clients for outside sources, without the standard resilience handler: a refusal (the MediaWiki API
     /// answers 429 to shared addresses) has a fallback, while the handler's backoff on 429 used up the request's 30 s.
     /// Wikimedia asks API clients to identify themselves with a contact.
     /// </summary>
     public static IServiceCollection AddExternalSources(this IServiceCollection services)
     {
-        Register(services, Client, TimeSpan.FromSeconds(20));
-        Register(services, LongClient, TimeSpan.FromSeconds(70));
+        Register(services, Client, Timeout);
+        Register(services, LongClient, LongTimeout);
         return services;
     }
 
