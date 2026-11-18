@@ -19,7 +19,7 @@ namespace Catalog.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -226,6 +226,32 @@ namespace Catalog.Data.Migrations
                     b.HasIndex("ShowId", "SeasonNumber", "EpisodeNumber");
 
                     b.ToTable("episodes", (string)null);
+                });
+
+            modelBuilder.Entity("Catalog.Data.JustWatchListing", b =>
+                {
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<DateTime>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Found")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Path")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.HasKey("ShowId", "Region");
+
+                    b.HasIndex("CheckedAtUtc");
+
+                    b.ToTable("justwatch_listings", (string)null);
                 });
 
             modelBuilder.Entity("Catalog.Data.Nanogenre", b =>
@@ -552,6 +578,10 @@ namespace Catalog.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
+                    b.Property<string>("ImdbId")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.PrimitiveCollection<List<string>>("Keywords")
                         .IsRequired()
                         .HasColumnType("text[]");
@@ -869,6 +899,9 @@ namespace Catalog.Data.Migrations
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -960,6 +993,15 @@ namespace Catalog.Data.Migrations
                 {
                     b.HasOne("Catalog.Data.Show", null)
                         .WithMany("Episodes")
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Catalog.Data.JustWatchListing", b =>
+                {
+                    b.HasOne("Catalog.Data.Show", null)
+                        .WithMany()
                         .HasForeignKey("ShowId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

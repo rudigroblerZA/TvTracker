@@ -15,6 +15,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<Nanogenre> Nanogenres => Set<Nanogenre>();
     public DbSet<CatalogOverride> Overrides => Set<CatalogOverride>();
     public DbSet<WatchProvider> WatchProviders => Set<WatchProvider>();
+    public DbSet<JustWatchListing> JustWatchListings => Set<JustWatchListing>();
     public DbSet<ShowEmbedding> ShowEmbeddings => Set<ShowEmbedding>();
     public DbSet<ShowQuoteSource> QuoteSources => Set<ShowQuoteSource>();
     public DbSet<Quote> Quotes => Set<Quote>();
@@ -61,6 +62,7 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(s => s.ExternalId).HasMaxLength(64);
             entity.Property(s => s.Title).HasMaxLength(256);
             entity.Property(s => s.Network).HasMaxLength(128);
+            entity.Property(s => s.ImdbId).HasMaxLength(16);
             entity.Property(s => s.Tags).HasDefaultValueSql("'{}'");
             entity.HasIndex(s => s.Tags).HasMethod("gin");
             entity.Property(s => s.Nanogenres).HasDefaultValueSql("'{}'");
@@ -223,6 +225,16 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.HasIndex(w => new { w.ShowId, w.Region });
             entity.Property(w => w.Region).HasMaxLength(2);
             entity.Property(w => w.ProviderName).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<JustWatchListing>(entity =>
+        {
+            entity.ToTable("justwatch_listings");
+            entity.HasKey(l => new { l.ShowId, l.Region });
+            entity.HasOne<Show>().WithMany().HasForeignKey(l => l.ShowId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(l => l.Region).HasMaxLength(2);
+            entity.Property(l => l.Path).HasMaxLength(512);
+            entity.HasIndex(l => l.CheckedAtUtc);
         });
 
         modelBuilder.Entity<PersonMadeShow>(entity =>

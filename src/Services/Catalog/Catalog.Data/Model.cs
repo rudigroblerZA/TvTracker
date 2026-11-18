@@ -32,6 +32,11 @@ public class Show
 
     public DateOnly? FirstAirDate { get; set; }
 
+    /// <summary>
+    /// The show's IMDb id ("tt0903747"), when the provider gives one: what JustWatch is asked for it by.
+    /// </summary>
+    public string? ImdbId { get; set; }
+
     public ShowStatus Status { get; set; }
 
     public string? Network { get; set; }
@@ -568,6 +573,42 @@ public enum WatchProviderType
     Buy
 }
 
+/// <summary>
+/// Where a where-to-watch row came from: the catalog's provider (TVmaze's network or web channel, a guess at where
+/// the show streams) or JustWatch's Partner API (what the service lists in that country, with JustWatch's own link).
+/// </summary>
+public enum WatchSource
+{
+    Catalog,
+    JustWatch
+}
+
+/// <summary>
+/// What JustWatch said about a show in one country, and when it was asked. While <see cref="Found"/>, the country's
+/// where-to-watch rows are JustWatch's alone, even when it lists nothing there.
+/// </summary>
+public class JustWatchListing
+{
+    public Guid ShowId { get; set; }
+
+    /// <summary>
+    /// ISO 3166-1 country code.
+    /// </summary>
+    public required string Region { get; set; }
+
+    /// <summary>
+    /// Whether JustWatch knows the show in this country.
+    /// </summary>
+    public bool Found { get; set; }
+
+    /// <summary>
+    /// The show's page on justwatch.com ("/us/tv-show/breaking-bad"): where the credit beside the list links to.
+    /// </summary>
+    public string? Path { get; set; }
+
+    public DateTime CheckedAtUtc { get; set; }
+}
+
 public class WatchProvider
 {
     public Guid Id { get; set; }
@@ -584,6 +625,8 @@ public class WatchProvider
     public WatchProviderType Type { get; set; }
 
     public string? Url { get; set; }
+
+    public WatchSource Source { get; set; }
 }
 
 /// <summary>

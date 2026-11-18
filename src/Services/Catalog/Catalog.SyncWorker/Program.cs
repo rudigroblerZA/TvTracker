@@ -1,4 +1,5 @@
 using Catalog.SyncWorker.Alerts;
+using Catalog.SyncWorker.JustWatch;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.SyncWorker;
@@ -100,6 +101,22 @@ builder.Services.AddHostedService<CreativesService>();
 builder.Services.AddHostedService<CastCreditsService>();
 // Memorable lines from Wikiquote, for show and episode pages.
 builder.Services.AddHostedService<QuotesService>();
+
+// Where to watch from JustWatch's Partner API, when there's a token (JustWatch:Token). One try per request and no
+// request logging: the token travels in the query string.
+builder.Services.Configure<JustWatchOptions>(builder.Configuration.GetSection("JustWatch"));
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+builder.Services.AddHttpClient<JustWatchClient>(JustWatchClient.HttpClientName, (sp, http) =>
+    {
+        var baseUrl = sp.GetRequiredService<IOptions<JustWatchOptions>>().Value.BaseUrl;
+        http.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+        http.Timeout = TimeSpan.FromSeconds(20);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("TvTracker/1.0");
+    })
+    .RemoveAllResilienceHandlers()
+    .RemoveAllLoggers();
+#pragma warning restore EXTEXP0001
+builder.Services.AddHostedService<JustWatchService>();
 // Where shows are set, from Wikidata, for the TV atlas.
 // Each can be run now from the import CLI (tvtracker-import wikidata): the job and the endpoint share its JobRun.
 builder.Services.AddKeyedSingleton(WikidataJobs.Atlas, new JobRun(WikidataJobs.Atlas, "Shows whose setting and filming places are looked up."));

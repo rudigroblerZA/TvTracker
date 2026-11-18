@@ -471,6 +471,8 @@ public sealed class CatalogSynchronizer(
         }
         show.Network = p.Network;
         show.FirstAirDate = p.FirstAirDate;
+        // Kept when the provider has none this time: JustWatch is asked by it.
+        show.ImdbId = p.ImdbId ?? show.ImdbId;
         show.Genres = p.Genres.ToList();
         show.Keywords = p.Keywords.ToList();
         show.Popularity = p.Popularity;
@@ -489,7 +491,9 @@ public sealed class CatalogSynchronizer(
             detailsChanged |= await SyncCreativesAsync(show, creatives, ct) || !show.CreativesImported;
             show.CreativesImported = true;
         }
-        SyncWatchProviders(show, p.WatchOptions);
+        // A country JustWatch knows the show in keeps JustWatch's rows; the provider's guess is for the others.
+        var justWatched = isNew ? [] : await db.JustWatchListings.Where(l => l.ShowId == show.Id && l.Found).Select(l => l.Region).ToListAsync(ct);
+        SyncWatchProviders(show, p.WatchOptions.Where(o => !justWatched.Contains(o.Region)).ToList());
 
         // Seasons
         foreach (var ps in p.Seasons)
@@ -773,7 +777,7 @@ public sealed class CatalogSynchronizer(
 
     private static void SyncWatchProviders(Show show, IReadOnlyList<ProviderWatchOption> options)
     {
-        show.WatchProviders.Clear();
+        show.WatchProviders.RemoveAll(w => w.Source == WatchSource.Catalog);
         foreach (var o in options.DistinctBy(o => (o.Region, o.ProviderName, o.Type)))
         {
             show.WatchProviders.Add(new WatchProvider

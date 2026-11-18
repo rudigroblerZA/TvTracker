@@ -300,6 +300,18 @@ if (catalogProvider is not null)
     catalogApi.WithEnvironment("Catalog__Provider", catalogProvider);
     catalogSync.WithEnvironment("Catalog__Provider", catalogProvider);
 }
+// JustWatch's Partner API, for where to watch country by country: a secret parameter (locally, user secrets:
+// Parameters:justwatch-token). The token comes with a contract with JustWatch; without one the catalog keeps its own
+// guess. A deployment always has the parameter, empty until there is a token (JUSTWATCH_TOKEN).
+if (builder.ExecutionContext.IsPublishMode || builder.Configuration["Parameters:justwatch-token"] is { Length: > 0 })
+{
+    catalogSync.WithEnvironment("JustWatch__Token", builder.AddParameter("justwatch-token", secret: true));
+}
+// Another address for it (JustWatch:BaseUrl), for trying the integration against a stand-in before there is a contract.
+if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["JustWatch:BaseUrl"] is { Length: > 0 } justWatchUrl)
+{
+    catalogSync.WithEnvironment("JustWatch__BaseUrl", justWatchUrl);
+}
 // TheTVDB needs the project's API key: a secret parameter (locally, user secrets: Parameters:tvdb-api-key), and a
 // subscriber's PIN when the key is on TheTVDB's user-supported model (Parameters:tvdb-pin).
 if (catalogProvider == "tvdb")

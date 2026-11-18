@@ -245,10 +245,14 @@ else
 
     <ShowInsightsPanel ShowId="Id" Creatives="show.Creatives" Watched="watched" />
 
-    @if (show.WatchProviders.Count > 0)
+    @if (show.WatchProviders.Count > 0 || show.JustWatchUrl is not null)
     {
         <section>
             <h2>Where to watch <span class="muted small">(@show.Region)</span></h2>
+            @if (show.WatchProviders.Count == 0)
+            {
+                <p class="muted">Not on any service here at the moment.</p>
+            }
             <ul class="providers">
                 @foreach (var provider in show.WatchProviders)
                 {
@@ -265,6 +269,12 @@ else
                     </li>
                 }
             </ul>
+            @if (show.JustWatchUrl is { } justWatch)
+            {
+                <p class="muted small">
+                    Streaming data and links by <a href="@justWatch" target="_blank" rel="noopener noreferrer">JustWatch</a>.
+                </p>
+            }
         </section>
     }
 

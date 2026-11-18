@@ -398,6 +398,7 @@ public sealed partial class TvMazeCatalogProvider(
             Rating: s.Rating?.Average,
             CastMissing: embedded.CastMissing,
             ImagesMissing: embedded.ImagesMissing,
+            ImdbId: s.Externals?.Imdb is { Length: > 2 and <= 16 } imdb && imdb.StartsWith("tt", StringComparison.Ordinal) ? imdb : null,
             BannerUrl: Image("banner"));
     }
 
@@ -643,10 +644,13 @@ internal sealed record TvMazeShow
     public string? Summary { get; init; }
     public TvMazeRating? Rating { get; init; }
     public TvMazeSchedule? Schedule { get; init; }
+    public TvMazeExternals? Externals { get; init; }
 
     [JsonPropertyName("_embedded")]
     public TvMazeEmbedded? Embedded { get; init; }
 }
+
+internal sealed record TvMazeExternals(string? Imdb);
 
 internal sealed record TvMazeSchedule
 {

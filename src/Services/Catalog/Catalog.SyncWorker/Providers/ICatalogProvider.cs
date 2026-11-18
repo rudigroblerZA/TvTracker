@@ -82,6 +82,7 @@ public interface ICatalogProvider
 /// <param name="CastMissing">The provider failed to return the cast this time (an outage): Cast is empty, and the catalog keeps the cast it has.</param>
 /// <param name="ImagesMissing">Likewise for images: BackdropUrl and BannerUrl are null, and the catalog keeps the ones it has.</param>
 /// <param name="BannerUrl">A thin wide banner (with the show's logo), when the provider has one.</param>
+/// <param name="ImdbId">The show's IMDb id ("tt0903747"), when the provider has one.</param>
 public record ProviderShow(
     string ExternalId,
     string Title,
@@ -103,7 +104,8 @@ public record ProviderShow(
     IReadOnlyList<ProviderCreative>? Creatives = null,
     bool CastMissing = false,
     bool ImagesMissing = false,
-    string? BannerUrl = null);
+    string? BannerUrl = null,
+    string? ImdbId = null);
 
 /// <summary>
 /// Someone who made the show: its creators and executive producers.
