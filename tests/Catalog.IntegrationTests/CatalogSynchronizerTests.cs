@@ -1,5 +1,6 @@
 using Catalog.Data;
 using Catalog.SyncWorker;
+using Catalog.SyncWorker.JustWatch;
 using Catalog.SyncWorker.Providers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -260,6 +261,67 @@ public sealed class CatalogSynchronizerTests(CatalogDatabase database) : IClassF
 
         Assert.Equal("Charlie Cale", Assert.Single((await StoredAsync(show)).Cast).Character);
         Assert.Empty(bus.Published);
+    }
+
+    // --- Where to watch, with JustWatch ------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_country_JustWatch_knows_the_show_in_keeps_its_rows_through_a_refresh()
+    {
+        var guess = new[] { new ProviderWatchOption("US", "Apple TV", WatchProviderType.Stream, "https://tv.apple.com/"), new ProviderWatchOption("GB", "Apple TV", WatchProviderType.Stream, "https://tv.apple.com/") };
+        var show = await ImportedAsync(Show("Pachinko") with { WatchOptions = guess, ImdbId = "tt8888462" });
+        var stored = await StoredAsync(show);
+        Assert.Equal("tt8888462", stored.ImdbId);
+
+        await JustWatchAsync(stored.Id, "US", [new("Apple TV", WatchProviderType.Stream, "https://click.justwatch.com/a?r=x"), new("Prime Video", WatchProviderType.Buy, "https://click.justwatch.com/a?r=y")],
+            "/us/tv-show/pachinko");
+        // The provider has no IMDb id this time: the one the catalog holds stays.
+        await SyncAsync(s => s.RefreshAsync(show with { ImdbId = null }, Ct));
+
+        var rows = await WatchRowsAsync(stored.Id);
+        Assert.Equal([("GB", "Apple TV", WatchSource.Catalog), ("US", "Apple TV", WatchSource.JustWatch), ("US", "Prime Video", WatchSource.JustWatch)], rows);
+        Assert.Equal("tt8888462", (await StoredAsync(show)).ImdbId);
+    }
+
+    [Fact]
+    public async Task A_show_JustWatch_lists_nowhere_in_a_country_has_no_rows_there()
+    {
+        var show = await ImportedAsync(Show("Tehran") with { WatchOptions = [new ProviderWatchOption("US", "Apple TV", WatchProviderType.Stream, null)] });
+        var id = (await StoredAsync(show)).Id;
+
+        await JustWatchAsync(id, "US", [], "/us/tv-show/tehran");
+        await SyncAsync(s => s.RefreshAsync(show, Ct));
+
+        Assert.Empty(await WatchRowsAsync(id));
+        await using var db = database.Context();
+        Assert.True((await db.JustWatchListings.SingleAsync(l => l.ShowId == id, Ct)).Found);
+    }
+
+    [Fact]
+    public async Task A_show_JustWatch_no_longer_knows_gets_the_providers_guess_back_on_its_next_refresh()
+    {
+        var show = await ImportedAsync(Show("Trying") with { WatchOptions = [new ProviderWatchOption("US", "Apple TV", WatchProviderType.Stream, null)] });
+        var id = (await StoredAsync(show)).Id;
+        await JustWatchAsync(id, "US", [new("Apple TV", WatchProviderType.Stream, "https://click.justwatch.com/a?r=x")], "/us/tv-show/trying");
+
+        await JustWatchAsync(id, "US", null, null);
+        Assert.Empty(await WatchRowsAsync(id));
+        await SyncAsync(s => s.RefreshAsync(show, Ct));
+
+        Assert.Equal([("US", "Apple TV", WatchSource.Catalog)], await WatchRowsAsync(id));
+    }
+
+    private async Task JustWatchAsync(Guid showId, string region, IReadOnlyList<JustWatchOption>? offers, string? path)
+    {
+        await using var db = database.Context();
+        await JustWatchService.ApplyAsync(db, showId, region, offers, path, Now.UtcDateTime, Ct);
+    }
+
+    private async Task<List<(string Region, string Provider, WatchSource Source)>> WatchRowsAsync(Guid showId)
+    {
+        await using var db = database.Context();
+        return (await db.WatchProviders.AsNoTracking().Where(w => w.ShowId == showId).OrderBy(w => w.Region).ThenBy(w => w.ProviderName).ToListAsync(Ct))
+            .Select(w => (w.Region, w.ProviderName, w.Source)).ToList();
     }
 
     // --- Helpers ------------------------------------------------------------------------------------------------------

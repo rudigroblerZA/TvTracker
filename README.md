@@ -553,6 +553,34 @@ addresses count as the show's page (`netflix.com/title/…`, not `netflix.com/br
 API's `watchProviders[].link` says which (`WatchLink`: site, search or title). Shows pick up their links on their next
 refresh. The button is behind the `watch-now` flag.
 
+**Where to watch from JustWatch** (off until there is a token): with a JustWatch Partner API token, where-to-watch is
+what JustWatch lists for the show in each country (stream, free, rent, buy) instead of the guess from TVmaze's network.
+
+- **The token comes with a contract.** JustWatch's Partner API isn't self-serve: you sign with them and they issue a
+  token. Until then nothing changes.
+  ```bash
+  cd src/TvTracker.AppHost
+  aspire secret set "Parameters:justwatch-token" "<your token>"
+  ```
+  In a deployment it's `JUSTWATCH_TOKEN` in the `.env` file (empty by default).
+- **How it's filled:** the sync worker asks about the most popular shows first, in batches of 25 per country, and asks
+  again after `JustWatch:RefreshDays` (7). The countries are `JustWatch:Regions`, or `TvMaze:WatchRegions` when that's
+  empty; a country JustWatch isn't active in is left to the guess. At most `JustWatch:RequestsPerMinute` (60) requests
+  a minute: JustWatch publishes no limit.
+- **Which show:** by IMDb id (stored from TVmaze on a show's next refresh); a show without one is looked up by title
+  and premiere year, and taken only when both match what comes back.
+- **What a country shows:**
+  - **JustWatch knows the show:** only JustWatch's rows, with a "Streaming data and links by JustWatch" credit linking
+    to the show's page there, as its linking rules ask. No offers means "Not on any service here at the moment".
+  - **It doesn't:** the catalog's guess, as before (back on the show's next refresh if JustWatch had known it).
+- **Links are JustWatch's own** (`click.justwatch.com/…`), passed on untouched. Clicks are still counted by `/go`, but
+  never sent through an affiliate program: the attribution on those links is JustWatch's.
+- **Names:** a service the catalog knows keeps the catalog's name ("Prime Video", not "Amazon Prime Video"), so
+  affiliate programs and "your services" keep matching; others get JustWatch's name.
+- **Tried:** against a stand-in server shaped like JustWatch's published API examples, not the real API (there is no
+  token yet): shows known, unknown and with no offers in a country, the credit, and a click through `/go`. The first
+  run with a real token is the first real test; `JustWatch:BaseUrl` on the AppHost points the worker elsewhere.
+
 **Affiliate links, measured** (`affiliates` flag): with the flag on, the "Watch on" button and the Where to watch links go
 through the web app's `/go/{showId}` redirect, which asks Catalog.API to count the click and sends the viewer on, in a
 new tab, to the same link the page lists. When an affiliate program covers the service and region, the link is the
@@ -2162,7 +2190,8 @@ Deploying works (above). This is what still stands between that and charging the
   `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `https://PUBLIC_HOST/api/` (the gateway) and `PUBLIC_HOST`.
 - **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
   network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
-  charging for the app, and TMDB's and TheTVDB's before turning those on.
+  charging for the app, and TMDB's and TheTVDB's before turning those on. JustWatch's data comes under its partner
+  contract: follow its terms on attribution, linking and caching before turning the token on.
 - **A lawyer's reading.** The privacy policy and terms were reviewed against the code and rewritten
   (`docs/legal-review.md`), which leaves twelve things for someone qualified, starting with where the operator is
   established.

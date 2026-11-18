@@ -338,6 +338,9 @@ public static class CatalogApi
             .OrderByDescending(e => e.AirsAtUtc)
             .FirstOrDefault();
 
+        // The country's rows are JustWatch's when it knows the show there; its linking rules want its name beside them.
+        var justWatch = await db.JustWatchListings.AsNoTracking().FirstOrDefaultAsync(l => l.ShowId == id && l.Region == region && l.Found, ct);
+
         return new ShowDetailDto(
             show.Id,
             show.Title,
@@ -370,14 +373,19 @@ public static class CatalogApi
             show.BannerUrl,
             await NanogenreApi.RefsAsync(db, show.Nanogenres, ct),
             show.Source,
-            show.ExternalId);
+            show.ExternalId,
+            justWatch is null ? null : JustWatchSite + justWatch.Path);
     }
+
+    private const string JustWatchSite = "https://www.justwatch.com";
 
     /// <summary>
     /// The best link for a provider (see <see cref="StreamingServices"/>): the show's page, a search, or the site.
     /// </summary>
     internal static WatchProviderDto WatchLinkFor(WatchProvider provider, string title) =>
-        StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
+        // JustWatch's link goes to the show on the service, through JustWatch; it is used as given.
+        provider.Source == WatchSource.JustWatch ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
+        : StreamingServices.IsTitlePage(provider.Url) ? new(provider.ProviderName, provider.Type, provider.Url, WatchLink.Title)
         : StreamingServices.SearchFor(provider.Url, provider.ProviderName, title) is { } search
             ? new(provider.ProviderName, provider.Type, search, WatchLink.Search)
         : new(provider.ProviderName, provider.Type, provider.Url, provider.Url is null ? null : WatchLink.Site);

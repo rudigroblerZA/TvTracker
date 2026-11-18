@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Catalog.UnitTests" />
+    <InternalsVisibleTo Include="Catalog.IntegrationTests" />
   </ItemGroup>
 
 </Project>

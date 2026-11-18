@@ -160,7 +160,7 @@ public record Episode(Guid Id, Guid ShowId, int SeasonNumber, int EpisodeNumber,
 public record ShowDetail(Guid Id, string Title, string? Overview, string? PosterUrl, string? BackdropUrl, DateOnly? FirstAirDate,
     ShowStatus Status, string? Network, IReadOnlyList<string> Genres, IReadOnlyList<SeasonSummary> Seasons,
     IReadOnlyList<CastMember> Cast, string Region, IReadOnlyList<WatchProvider> WatchProviders, Episode? NextEpisode, Episode? LastEpisode,
-    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null, IReadOnlyList<NanogenreRef>? Nanogenres = null);
+    IReadOnlyList<Creative>? Creatives, string? BannerUrl = null, IReadOnlyList<NanogenreRef>? Nanogenres = null, string? JustWatchUrl = null);
 
 /// <summary>
 /// A fine-grained genre the catalog discovered ("Sports comedy"), by its slug for /nanogenres/{slug}.

@@ -245,7 +245,8 @@ public static partial class AffiliateApi
             Plan = await PlanAsync(http),
             ClickedAtUtc = time.GetUtcNow().UtcDateTime
         };
-        var program = AffiliateLinks.For(await programs.AllAsync(ct), click.Service, region);
+        // JustWatch's links are its own attributed ones and go out untouched: counted here, never through a program.
+        var program = listing.Provider.Source == WatchSource.JustWatch ? null : AffiliateLinks.For(await programs.AllAsync(ct), click.Service, region);
         click.Program = program?.Name;
         db.OutboundClicks.Add(click);
         await db.SaveChangesAsync(ct);

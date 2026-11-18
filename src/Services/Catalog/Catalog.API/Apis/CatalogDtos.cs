@@ -83,6 +83,8 @@ public record ShowRefDto(Guid Id, string Title);
 /// <param name="Link">What <paramref name="Url"/> opens; null without one.</param>
 public record WatchProviderDto(string ProviderName, WatchProviderType Type, string? Url, WatchLink? Link = null);
 
+/// <param name="JustWatchUrl">The show's page on justwatch.com when the region's where-to-watch is JustWatch's (even an
+/// empty list: not streaming there): the credit to show beside it. Null when it's the catalog's own guess.</param>
 public record ShowDetailDto(
     Guid Id,
     string Title,
@@ -103,7 +105,8 @@ public record ShowDetailDto(
     string? BannerUrl = null,
     IReadOnlyList<NanogenreRefDto>? Nanogenres = null,
     string? Source = null,
-    string? ExternalId = null);
+    string? ExternalId = null,
+    string? JustWatchUrl = null);
 
 /// <summary>
 /// A nanogenre the show is in (see <see cref="Catalog.Data.Nanogenre"/>), most specific first.
