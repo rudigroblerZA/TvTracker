@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Unit tests of Research's rules: when saved research is due a refresh, and when the research assistant leaves a
-       workspace alone. No database or network. -->
+  <!-- Unit tests of Research's rules: when saved research is due a refresh, when the research assistant leaves a
+       workspace alone, what the catalog checks and a web page source make of their answers, and how the clients for
+       outside sources are set up (built as the service builds them, answered by a stand-in). No database or network. -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Research\Research.API\Research.API.csproj" />
