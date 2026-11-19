@@ -562,6 +562,32 @@ the discovery tools, the plans, and a last call to sign up.
 - **Tried** in a browser at desktop and phone widths, dark and light, with the showcased flags on and with the
   checked-in flags (where Blend, nanogenres and the paid insights are off, so those sections don't show).
 
+**Comments** (episode pages): words, emoji, a GIF, or any mix, hidden until you've watched the episode as before.
+
+- **They refresh on their own.** While an episode page is open it asks for the comments again every 20 seconds, so
+  other people's appear without a reload. What you chose to reveal (unwatched, spoilers) stays revealed.
+- **Emoji:** a row of twelve under the box adds one to what you're writing; any emoji typed in works too.
+- **GIFs come from GIPHY and are off until there is a key.**
+  ```bash
+  cd src/TvTracker.AppHost
+  aspire secret set "Parameters:giphy-api-key" "<your key>"
+  ```
+  In a deployment it's `GIPHY_API_KEY` in the `.env` file. `Giphy:Rating` on Ratings.API (`g`, `pg`, `pg-13` or `r`;
+  `pg` by default) caps what searches return.
+  - **GIPHY's terms shape it.** Its API is to be called from the client, and its media addresses may not be stored.
+    So the reader's browser searches and shows GIFs itself (`wwwroot/gifs.js`), the key is handed to signed-in
+    readers (it is a browser key, not a secret), and a comment stores only the GIF's id.
+  - **Picked, never uploaded.** There is no upload, so nothing a user posts is hosted here.
+  - **Clearing the key takes every GIF off the site:** no picker, and the GIFs already posted aren't sent to readers.
+  - **Moderation is unchanged:** a GIF comment is flagged and hidden like any other; a moderator sees its GIF as a
+    link to its page on giphy.com.
+  - **Before going live:** a new GIPHY key is a beta key, limited to 100 calls an hour for the whole site, so apply
+    for a production key. "Powered by GIPHY" is shown in the picker as text; GIPHY's terms ask for its approved mark,
+    which comes with the production application. The privacy policy says what GIPHY sees.
+- **Tried** in a browser with two signed-in readers and GIPHY's answers faked (there is no key yet): words with emoji, a
+  GIF on its own through the picker, and each reader seeing the other's comment within 20 seconds without reloading.
+  Not tried: a real GIPHY key, or clearing the key with GIFs already posted.
+
 **Show page look:** the show page wears the landing page's look (`.show-page` in `app.css`, laid over the page's own
 classes, so its components are unchanged). The hero is a glass panel with the gradient glow and a larger title.
 Insights sit on a canvas of their own under "What the numbers say": findings as glass cards with their tone as a bar

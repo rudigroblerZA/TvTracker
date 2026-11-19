@@ -302,6 +302,22 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); border-radius:
 .comment-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .comments li { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .comments p { margin: 4px 0; }
+/* Writing a comment: emoji to add, a GIF to pick. GIFs keep their shape and stay modest in size. */
+.comment-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.comment-emoji { display: flex; flex-wrap: wrap; gap: 2px; }
+.comment-emoji button { border: 0; background: none; padding: 4px 6px; border-radius: 8px; font-size: 1.2rem; line-height: 1; cursor: pointer; transition: transform 0.12s var(--ease), background 0.12s; }
+.comment-emoji button:hover { background: var(--tint); transform: scale(1.2); }
+.comment-gif { display: block; max-width: min(100%, 320px); max-height: 220px; width: auto; height: auto; border-radius: 12px; margin: 6px 0; background: var(--skeleton); }
+.comment-gif-picked { display: flex; align-items: flex-end; gap: 10px; }
+.comment-text { white-space: pre-line; overflow-wrap: anywhere; }
+.gif-picker { display: grid; gap: 10px; margin: 0; }
+.gif-picker-head { display: flex; gap: 8px; }
+.gif-picker-head input { flex: 1; min-width: 0; }
+.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 320px; overflow-y: auto; }
+.gif-grid button { border: 2px solid transparent; padding: 0; border-radius: 10px; overflow: hidden; background: var(--skeleton); cursor: pointer; aspect-ratio: 4 / 3; }
+.gif-grid button:hover, .gif-grid button:focus-visible { border-color: var(--accent); }
+.gif-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.gif-credit { margin: 0; text-align: right; }
 
 /* Up next, calendar, inbox */
 

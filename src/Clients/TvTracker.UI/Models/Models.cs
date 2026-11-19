@@ -228,10 +228,22 @@ public record MyRating(int Stars, DateTime RatedAtUtc);
 public record RatingSummary(double Average, int Count, IReadOnlyList<int> Distribution);
 
 /// <param name="HiddenReason">Only on the user's own hidden comment: "flags", "held" or "moderator".</param>
+/// <param name="GifId">The GIPHY id of its GIF, if it has one and GIFs are on.</param>
 public record Comment(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc,
-    string? HiddenReason = null, bool FlaggedByMe = false);
+    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null);
 
-public record CommentsPage(bool HiddenUntilWatched, int TotalCount, IReadOnlyList<Comment> Comments);
+/// <summary>
+/// What the browser needs to search GIPHY and show its GIFs (Ratings.API's comments answer); see gifs.js.
+/// </summary>
+public record GifSettings(string ApiKey, string Rating);
+
+/// <summary>
+/// A GIF as GIPHY describes it to the browser. Its address is used while the page is open and never stored.
+/// </summary>
+public record GifPicture(string Id, string Title, string Url, int Width, int Height);
+
+/// <param name="Gifs">Null while GIFs are off.</param>
+public record CommentsPage(bool HiddenUntilWatched, int TotalCount, IReadOnlyList<Comment> Comments, GifSettings? Gifs = null);
 
 public record ReactionCount(string Emoji, int Count);
 

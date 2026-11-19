@@ -67,7 +67,7 @@ public static class ModerationApi
             flags[(kind, id)].OrderBy(f => f.CreatedAtUtc).Select(f => new PostFlagDto(f.Reason, f.Note, f.CreatedAtUtc)).ToList();
 
         var posts = comments
-            .Select(c => new ModeratedPostDto(CommunityApi.CommentKind, c.Id, c.ShowId, c.EpisodeId, c.DisplayName, c.Text, c.IsSpoiler,
+            .Select(c => new ModeratedPostDto(CommunityApi.CommentKind, c.Id, c.ShowId, c.EpisodeId, c.DisplayName, Gifs.WithGif(c.Text, c.GifId), c.IsSpoiler,
                 c.HiddenReason, c.CreatedAtUtc, FlagsOf(CommunityApi.CommentKind, c.Id)))
             .Concat(insights.Select(i => new ModeratedPostDto(CommunityApi.InsightKind, i.Id, i.ShowId, i.EpisodeId, i.DisplayName, i.Text,
                 i.IsSpoiler, i.HiddenReason, i.CreatedAtUtc, FlagsOf(CommunityApi.InsightKind, i.Id))))
@@ -102,7 +102,7 @@ public static class ModerationApi
         post.HiddenReason = restore ? null : HiddenReasons.Moderator;
         await db.Flags.Where(f => f.TargetKind == kind && f.TargetId == id && !f.Resolved)
             .ExecuteUpdateAsync(f => f.SetProperty(x => x.Resolved, true), ct);
-        var text = post is Comment c ? c.Text : ((CommunityInsight)post).Text;
+        var text = post is Comment c ? Gifs.WithGif(c.Text, c.GifId) : ((CommunityInsight)post).Text;
         Log(db, user, restore ? "restore" : "remove", kind, id, text);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
