@@ -216,4 +216,11 @@ public class FinancialStatementTests
 
         if (problem is null) { Assert.Null(found); } else { Assert.Contains(problem, found); }
     }
+
+    [Fact]
+    public void A_fee_rate_with_a_part_left_out_isnt_taken_for_zero()
+    {
+        Assert.Contains("both", FinancialStatement.Problem(new Financials.API.Apis.FeeSettingsRequest(2.9m, null)));
+        Assert.Contains("both", FinancialStatement.Problem(new Financials.API.Apis.FeeSettingsRequest(null, null)));
+    }
 }

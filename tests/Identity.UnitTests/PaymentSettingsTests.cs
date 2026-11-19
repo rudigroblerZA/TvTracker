@@ -115,4 +115,33 @@ public class PaymentSettingsTests
     [InlineData(null, null)]
     public void The_webhook_address_is_given_only_where_the_sites_address_is_known(string? returnUrl, string? webhook) =>
         Assert.Equal(webhook, PaymentSettingsApi.PublicWebhookUrl(returnUrl));
+
+    private static readonly PaymentOptions SellingStripe = Configured(secretKey: "sk_live_1", webhookSecret: "whsec_1");
+    private static readonly PaymentOptions StripeNoKeys = Configured();
+    private static readonly PaymentOptions StripeOneKey = Configured(secretKey: "sk_live_1");
+    private static readonly PaymentOptions Nothing = Configured(provider: "");
+
+    [Fact]
+    public void A_provider_that_isnt_selling_yet_can_be_set_up_a_key_at_a_time() =>
+        // The webhook secret only exists once the endpoint is registered at Stripe, so the secret key comes first.
+        Assert.Null(PaymentSettingsApi.Refusal(StripeNoKeys, StripeOneKey, choosesProvider: false));
+
+    [Fact]
+    public void Taking_a_key_from_the_provider_that_sells_is_refused() =>
+        Assert.Contains("would stop plans being sold", PaymentSettingsApi.Refusal(SellingStripe, StripeOneKey, choosesProvider: false));
+
+    [Fact]
+    public void Going_back_to_a_configuration_without_the_keys_is_refused_while_selling() =>
+        Assert.Contains("webhook signing secret", PaymentSettingsApi.Refusal(SellingStripe, StripeNoKeys, choosesProvider: false));
+
+    [Fact]
+    public void Choosing_a_provider_that_couldnt_sell_is_refused_even_when_nothing_is_sold() =>
+        Assert.NotNull(PaymentSettingsApi.Refusal(Nothing, StripeOneKey, choosesProvider: true));
+
+    [Fact]
+    public void Stopping_sales_on_purpose_is_allowed() => Assert.Null(PaymentSettingsApi.Refusal(SellingStripe, Nothing, choosesProvider: false));
+
+    [Fact]
+    public void A_change_that_leaves_the_provider_selling_is_allowed() =>
+        Assert.Null(PaymentSettingsApi.Refusal(SellingStripe, Configured(secretKey: "sk_live_2", webhookSecret: "whsec_1"), choosesProvider: true));
 }

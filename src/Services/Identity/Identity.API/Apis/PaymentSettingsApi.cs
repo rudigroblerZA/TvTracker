@@ -35,7 +35,9 @@ public record SavePaymentSettingsRequest(string? Provider, string? StripeSecretK
 /// <list type="bullet">
 /// <item><b>Keys go in, never out.</b> They are stored encrypted (<see cref="SettingsCipher"/>) and the answer only says
 /// where each comes from.</item>
-/// <item><b>A change that would stop sales is refused:</b> choosing Stripe without both of its keys in force.</item>
+/// <item><b>A change that would stop sales is refused</b> (<see cref="Refusal"/>): choosing a provider that lacks a
+/// key, or taking a key away from the one selling, by a save or by going back to configuration. A provider that
+/// isn't selling yet can be set up a field at a time, and "none" stops sales on purpose.</item>
 /// </list>
 /// </summary>
 public static class PaymentSettingsApi
@@ -67,17 +69,13 @@ public static class PaymentSettingsApi
         // What the row will hold: a field the request leaves alone keeps what it has.
         var newProvider = provider ?? row?.Provider;
         var newPortal = portal is null ? row?.StripePortalUrl : portal.Length == 0 ? null : portal;
-        var problem = Problem(provider, secretKey, webhookSecret, portal, providers, cipher);
-        if (problem is null)
-        {
-            // The settings as they'd be, to see that the chosen provider could sell with them.
-            var after = new StoredPaymentSettings(newProvider, secretKey ?? options.Stored?.StripeSecretKey,
-                webhookSecret ?? options.Stored?.StripeWebhookSecret, newPortal);
-            if (PaymentOptionsValidator.Missing(EffectivePaymentOptions.Merge(options.Configured, after)) is { Count: > 0 } missing)
-            {
-                problem = $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}";
-            }
-        }
+        // Before and after from the row just read, keys included: the copy in memory can be a minute behind another
+        // instance's change.
+        var before = options.Read(row);
+        var after = new StoredPaymentSettings(newProvider, secretKey ?? before?.StripeSecretKey, webhookSecret ?? before?.StripeWebhookSecret, newPortal);
+        var problem = Problem(provider, secretKey, webhookSecret, portal, providers, cipher)
+            ?? Refusal(EffectivePaymentOptions.Merge(options.Configured, before), EffectivePaymentOptions.Merge(options.Configured, after),
+                choosesProvider: provider is { Length: > 0 });
         if (problem is not null)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["payments"] = [problem] });
@@ -85,8 +83,11 @@ public static class PaymentSettingsApi
 
         if (row is null)
         {
-            row = new PaymentSettings { Id = PaymentSettings.OnlyId };
-            db.PaymentSettings.Add(row);
+            // Two first saves at once would both add the one row: whichever is second finds it there instead.
+            var now = time.GetUtcNow().UtcDateTime;
+            await db.Database.ExecuteSqlAsync(
+                $"insert into payment_settings (\"Id\", \"UpdatedAtUtc\") values ({PaymentSettings.OnlyId}, {now}) on conflict (\"Id\") do nothing", ct);
+            row = await db.PaymentSettings.SingleAsync(ct);
         }
         (row.Provider, row.StripePortalUrl) = (newProvider, newPortal);
         row.StripeSecretKey = secretKey is null ? row.StripeSecretKey : cipher.Protect(secretKey);
@@ -104,14 +105,37 @@ public static class PaymentSettingsApi
     /// <summary>
     /// Back to configuration alone: the stored settings, keys included, are deleted.
     /// </summary>
-    private static async Task<Ok<PaymentSettingsDto>> ClearAsync(ClaimsPrincipal user, IdentityContext db, EffectivePaymentOptions options,
-        PaymentProviders providers, SettingsCipher cipher, ILoggerFactory loggers, CancellationToken ct)
+    private static async Task<Results<Ok<PaymentSettingsDto>, ValidationProblem>> ClearAsync(ClaimsPrincipal user, IdentityContext db,
+        EffectivePaymentOptions options, PaymentProviders providers, SettingsCipher cipher, ILoggerFactory loggers, CancellationToken ct)
     {
+        // The keys go with the row: configuration alone must be able to carry on selling.
+        var before = options.Read(await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct));
+        if (Refusal(EffectivePaymentOptions.Merge(options.Configured, before), options.Configured, choosesProvider: false) is { } refused)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["payments"] = [$"{refused} The deployment's configuration doesn't have it. To stop selling on purpose, choose \"None\" first."]
+            });
+        }
         await db.PaymentSettings.ExecuteDeleteAsync(ct);
         await options.ReloadAsync(db, ct);
         loggers.CreateLogger(typeof(PaymentSettingsApi)).LogInformation("Payment settings cleared by {Admin}; configuration is in force",
             user.FindFirstValue("preferred_username"));
         return TypedResults.Ok(Describe(options, providers, cipher));
+    }
+
+    /// <summary>
+    /// Why a change is refused for what it would do to sales, or null. Refused: plans are sold now and wouldn't be
+    /// after, though a provider is still chosen; or the change itself chooses a provider that couldn't sell. Not
+    /// refused: choosing none, and adding to a provider that isn't selling yet (its keys arrive one at a time).
+    /// </summary>
+    internal static string? Refusal(PaymentOptions before, PaymentOptions after, bool choosesProvider)
+    {
+        var missing = PaymentOptionsValidator.Missing(after);
+        var sellsNow = before.Provider is { Length: > 0 } && PaymentOptionsValidator.Missing(before).Count == 0;
+        return missing.Count > 0 && (sellsNow || choosesProvider)
+            ? $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}"
+            : null;
     }
 
     /// <summary>

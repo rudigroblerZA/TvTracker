@@ -737,8 +737,10 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
     AppHost's `payment-settings-key` secret (`PAYMENT_SETTINGS_KEY` in a deployment, made up once by `deploy.sh`).
     The page only says whether each is set and where from. Change that secret and the saved keys can't be read:
     enter them again. Without it, keys can only come from configuration.
-  - **A change that would stop sales is refused:** choosing Stripe without both keys and an absolute return address
-    in force. "None" stops selling on purpose.
+  - **A change that would stop sales is refused:** choosing a provider that lacks a key, taking a key from the one
+    selling, or going back to a configuration that doesn't have the keys. A provider that isn't selling yet can be
+    set up one key at a time (Stripe's webhook secret only exists once its endpoint is registered). "None" stops
+    selling on purpose.
   - **The fee rate** set here is the one the estimate uses; without it, the configured `Financials:PaymentFee*`.
   - **Identity.API now starts without Stripe's keys.** It used to refuse to start when Stripe was the provider and a
     key was missing. Now plans simply aren't sold until the keys are there, from configuration or this page, and the

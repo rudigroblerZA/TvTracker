@@ -193,9 +193,10 @@ public static partial class FinancialStatement
     /// What's wrong with a fee rate as entered, or null.
     /// </summary>
     public static string? Problem(Apis.FeeSettingsRequest fees) =>
-        fees.Percent is < 0 or > 30 ? "The percentage is between 0 and 30."
-        : fees.Fixed is < 0 or > 10 ? "The fixed part is between 0 and 10."
-        : decimal.Round(fees.Percent, 2) != fees.Percent || decimal.Round(fees.Fixed, 2) != fees.Fixed ? "Give at most two decimals."
+        fees is not { Percent: { } percent, Fixed: { } @fixed } ? "Give both the percentage and the fixed part."
+        : percent is < 0 or > 30 ? "The percentage is between 0 and 30."
+        : @fixed is < 0 or > 10 ? "The fixed part is between 0 and 10."
+        : decimal.Round(percent, 2) != percent || decimal.Round(@fixed, 2) != @fixed ? "Give at most two decimals."
         : null;
 
     /// <summary>
