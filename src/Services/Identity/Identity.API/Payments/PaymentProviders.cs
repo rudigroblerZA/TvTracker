@@ -81,10 +81,16 @@ public sealed class PaymentProviders(IEnumerable<IPaymentProvider> providers, Mi
     private readonly Dictionary<string, IPaymentProvider> byName = providers.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Null when nothing is sold, the named provider isn't registered, or it still lacks a key.
+    /// False until what an admin set has been read once after a start (<see cref="EffectivePaymentOptions.Loaded"/>).
+    /// </summary>
+    public bool Ready => options is not EffectivePaymentOptions { Loaded: false };
+
+    /// <summary>
+    /// Null when nothing is sold, the named provider isn't registered, it still lacks a key, or the settings haven't
+    /// been read yet.
     /// </summary>
     public IPaymentProvider? Selling =>
-        options.Value is { Provider: { Length: > 0 } name } current && PaymentOptionsValidator.Missing(current).Count == 0
+        Ready && options.Value is { Provider: { Length: > 0 } name } current && PaymentOptionsValidator.Missing(current).Count == 0
             ? byName.GetValueOrDefault(name) : null;
 
     public IEnumerable<string> Names => byName.Keys;

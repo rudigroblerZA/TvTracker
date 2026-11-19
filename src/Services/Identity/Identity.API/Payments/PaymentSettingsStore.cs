@@ -60,8 +60,10 @@ public sealed class SettingsCipher(IConfiguration configuration)
 /// What an admin has set for payments, read into plain values.
 /// </summary>
 /// <param name="Provider">Null follows configuration; "" sells nothing; else a provider's name.</param>
+/// <param name="KeysUnreadable">A key is stored but can't be decrypted: <c>Payments:SettingsKey</c> isn't the one it
+/// was saved under. It then counts as not set, and has to be entered again.</param>
 public sealed record StoredPaymentSettings(string? Provider, string? StripeSecretKey, string? StripeWebhookSecret, string? StripePortalUrl,
-    DateTime? UpdatedAtUtc = null, string? UpdatedBy = null);
+    DateTime? UpdatedAtUtc = null, string? UpdatedBy = null, bool KeysUnreadable = false);
 
 /// <summary>
 /// The payment options in force: configuration (<c>Payments:*</c>), with what an admin set on the Financials page laid
@@ -72,9 +74,12 @@ public sealed record StoredPaymentSettings(string? Provider, string? StripeSecre
 /// <item><b>Read from the database</b> at start, after every save, and every <see cref="RefreshEvery"/>, so another
 /// instance of the service follows a change within that time.</item>
 /// <item><b>Merged once</b> for each pair of configuration and stored settings, not on every read.</item>
+/// <item><b>Nothing is sold or believed until the first read</b> (<see cref="Loaded"/>): before it, configuration alone
+/// could be selling through an account an admin switched off, or refusing webhooks signed with the key they set.</item>
 /// </list>
 /// </summary>
-public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> configured, SettingsCipher cipher) : IOptions<PaymentOptions>
+public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> configured, SettingsCipher cipher, ILogger<EffectivePaymentOptions> logger)
+    : IOptions<PaymentOptions>
 {
     public static readonly TimeSpan RefreshEvery = TimeSpan.FromMinutes(1);
 
@@ -90,6 +95,11 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
     public PaymentOptions Configured => configured.CurrentValue;
 
     public StoredPaymentSettings? Stored => stored;
+
+    /// <summary>
+    /// Whether the stored settings have been read at least once since the service started.
+    /// </summary>
+    public bool Loaded { get; private set; }
 
     public PaymentOptions Value
     {
@@ -109,7 +119,14 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
         await reloading.WaitAsync(ct);
         try
         {
-            stored = Read(await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct));
+            var (was, now) = (stored, Read(await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct)));
+            (stored, Loaded) = (now, true);
+            // Said once, when it starts being so: otherwise the only sign is a key that "isn't set".
+            if (now is { KeysUnreadable: true } && was is not { KeysUnreadable: true })
+            {
+                logger.LogWarning("Stripe keys saved on the Financials page can't be decrypted: Payments:SettingsKey isn't the one they were saved "
+                    + "under (or is shorter than 16 characters). They count as not set until they are entered again.");
+            }
         }
         finally
         {
@@ -120,8 +137,16 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
     /// <summary>
     /// A row as plain values, its keys decrypted; null for no row.
     /// </summary>
-    public StoredPaymentSettings? Read(PaymentSettings? row) => row is null ? null : new StoredPaymentSettings(row.Provider,
-        cipher.Unprotect(row.StripeSecretKey), cipher.Unprotect(row.StripeWebhookSecret), row.StripePortalUrl, row.UpdatedAtUtc, row.UpdatedBy);
+    public StoredPaymentSettings? Read(PaymentSettings? row)
+    {
+        if (row is null)
+        {
+            return null;
+        }
+        var (secretKey, webhookSecret) = (cipher.Unprotect(row.StripeSecretKey), cipher.Unprotect(row.StripeWebhookSecret));
+        return new StoredPaymentSettings(row.Provider, secretKey, webhookSecret, row.StripePortalUrl, row.UpdatedAtUtc, row.UpdatedBy,
+            KeysUnreadable: (row.StripeSecretKey is not null && secretKey is null) || (row.StripeWebhookSecret is not null && webhookSecret is null));
+    }
 
     internal static PaymentOptions Merge(PaymentOptions options, StoredPaymentSettings? settings) => settings is null ? options : new PaymentOptions
     {

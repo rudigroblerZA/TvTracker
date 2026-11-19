@@ -208,7 +208,8 @@ public class FinancialStatementTests
     [InlineData(0, 0, null)]
     [InlineData(-1, 0.30, "between 0 and 30")]
     [InlineData(31, 0.30, "between 0 and 30")]
-    [InlineData(2.9, 11, "between 0 and 10")]
+    [InlineData(1.5, 30, null)]
+    [InlineData(2.9, 10001, "between 0 and 10000")]
     [InlineData(2.955, 0.30, "two decimals")]
     public void A_fee_rate_is_a_sensible_percentage_and_a_small_fixed_part(double percent, double @fixed, string? problem)
     {

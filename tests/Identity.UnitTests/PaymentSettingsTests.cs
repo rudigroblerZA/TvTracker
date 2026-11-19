@@ -144,4 +144,25 @@ public class PaymentSettingsTests
     [Fact]
     public void A_change_that_leaves_the_provider_selling_is_allowed() =>
         Assert.Null(PaymentSettingsApi.Refusal(SellingStripe, Configured(secretKey: "sk_live_2", webhookSecret: "whsec_1"), choosesProvider: true));
+
+    [Theory]
+    [InlineData("sk_live_ключ")]
+    [InlineData("sk_live_with space")]
+    public void A_key_with_characters_Stripe_doesnt_use_is_refused(string key) =>
+        Assert.Contains("letters, digits and underscores", PaymentSettingsApi.Problem("stripe", key, null, null, Providers(Configured()), Cipher()));
+
+    [Fact]
+    public void A_key_longer_than_Stripe_makes_them_is_refused() =>
+        Assert.NotNull(PaymentSettingsApi.Problem("stripe", "sk_" + new string('a', 300), null, null, Providers(Configured()), Cipher()));
+
+    [Fact]
+    public void A_long_username_is_cut_to_what_the_column_holds()
+    {
+        static System.Security.Claims.ClaimsPrincipal Named(string name) =>
+            new(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("preferred_username", name)]));
+
+        Assert.Equal("admin", PaymentSettingsApi.Admin(Named("admin")));
+        Assert.Equal(PaymentSettingsApi.UpdatedByLength, PaymentSettingsApi.Admin(Named(new string('a', 255)))!.Length);
+        Assert.Null(PaymentSettingsApi.Admin(new System.Security.Claims.ClaimsPrincipal()));
+    }
 }
