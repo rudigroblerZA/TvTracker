@@ -300,6 +300,13 @@ if (catalogProvider is not null)
     catalogApi.WithEnvironment("Catalog__Provider", catalogProvider);
     catalogSync.WithEnvironment("Catalog__Provider", catalogProvider);
 }
+// GIFs in comments, from GIPHY: its API key (locally, user secrets: Parameters:giphy-api-key). It is a browser key,
+// handed to signed-in readers, since GIPHY's terms ask for its API to be called from the client. Without one there
+// are no GIFs. A deployment always has the parameter, empty until there is a key (GIPHY_API_KEY).
+if (builder.ExecutionContext.IsPublishMode || builder.Configuration["Parameters:giphy-api-key"] is { Length: > 0 })
+{
+    ratingsApi.WithEnvironment("Giphy__ApiKey", builder.AddParameter("giphy-api-key"));
+}
 // JustWatch's Partner API, for where to watch country by country: a secret parameter (locally, user secrets:
 // Parameters:justwatch-token). The token comes with a contract with JustWatch; without one the catalog keeps its own
 // guess. A deployment always has the parameter, empty until there is a token (JUSTWATCH_TOKEN).

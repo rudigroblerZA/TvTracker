@@ -596,8 +596,8 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
         GetAsync<CommentsPage>(ApiClients.Ratings,
             $"api/v1/episodes/{episodeId}/comments?reveal={reveal.ToString().ToLowerInvariant()}&includeSpoilers={includeSpoilers.ToString().ToLowerInvariant()}", ct);
 
-    public Task<Comment?> PostCommentAsync(Guid episodeId, Guid showId, string text, bool isSpoiler, CancellationToken ct = default) =>
-        SendAsync<Comment>(ApiClients.Ratings, HttpMethod.Post, $"api/v1/episodes/{episodeId}/comments", new { showId, text, isSpoiler }, ct);
+    public Task<Comment?> PostCommentAsync(Guid episodeId, Guid showId, string? text, bool isSpoiler, string? gifId = null, CancellationToken ct = default) =>
+        SendAsync<Comment>(ApiClients.Ratings, HttpMethod.Post, $"api/v1/episodes/{episodeId}/comments", new { showId, text, isSpoiler, gifId }, ct);
 
     public Task DeleteCommentAsync(Guid commentId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/comments/{commentId}", null, ct);

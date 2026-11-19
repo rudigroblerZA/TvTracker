@@ -40,6 +40,12 @@ public class Comment : IModeratedPost
     public required string Text { get; set; }
 
     /// <summary>
+    /// The GIPHY id of a GIF posted with (or instead of) the text. Only the id is kept: GIPHY's terms don't allow
+    /// storing its media or their addresses, so the reader's browser asks GIPHY for the picture.
+    /// </summary>
+    public string? GifId { get; set; }
+
+    /// <summary>
     /// The author says the comment contains spoilers; it stays hidden until the reader opts in.
     /// </summary>
     public bool IsSpoiler { get; set; }
@@ -283,6 +289,7 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
             entity.Property(c => c.UserId).HasMaxLength(64);
             entity.Property(c => c.DisplayName).HasMaxLength(100);
             entity.Property(c => c.Text).HasMaxLength(2000);
+            entity.Property(c => c.GifId).HasMaxLength(64);
             entity.Property(c => c.HiddenReason).HasMaxLength(16);
         });
 

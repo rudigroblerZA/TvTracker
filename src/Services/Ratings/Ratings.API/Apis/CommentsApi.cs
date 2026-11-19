@@ -1,21 +1,30 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Ratings.API.Data;
 using Ratings.API.Services;
 
 namespace Ratings.API.Apis;
 
-public record PostCommentRequest(Guid ShowId, string Text, bool IsSpoiler);
+/// <param name="GifId">A GIPHY id, with or instead of <paramref name="Text"/>.</param>
+public record PostCommentRequest(Guid ShowId, string? Text, bool IsSpoiler, string? GifId = null);
 
 /// <param name="Text">Null for a spoiler comment the reader hasn't chosen to reveal.</param>
 /// <param name="HiddenReason">Set only on the reader's own hidden comment: "flags", "held" or "moderator".</param>
 /// <param name="FlaggedByMe">The reader has flagged it.</param>
+/// <param name="GifId">The GIPHY id of its GIF; null without one, for a hidden spoiler, and while GIFs are off.</param>
 public record CommentDto(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc,
-    string? HiddenReason = null, bool FlaggedByMe = false);
+    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null);
+
+/// <summary>
+/// What the reader's browser needs to search GIPHY and show its GIFs.
+/// </summary>
+public record GifSettingsDto(string ApiKey, string Rating);
 
 /// <param name="HiddenUntilWatched">True when the reader hasn't watched the episode and didn't ask to see comments anyway.</param>
-public record CommentsDto(bool HiddenUntilWatched, int TotalCount, IReadOnlyList<CommentDto> Comments);
+/// <param name="Gifs">Null while GIFs are off (no GIPHY key).</param>
+public record CommentsDto(bool HiddenUntilWatched, int TotalCount, IReadOnlyList<CommentDto> Comments, GifSettingsDto? Gifs = null);
 
 public record ReactRequest(string Emoji);
 
@@ -47,10 +56,11 @@ public static class CommentsApi
     /// Spoiler-flagged comments additionally need <paramref name="includeSpoilers"/>.
     /// </summary>
     private static async Task<Ok<CommentsDto>> GetCommentsAsync(
-        Guid episodeId, ClaimsPrincipal user, RatingsContext db, bool reveal = false, bool includeSpoilers = false,
-        int page = 1, int pageSize = 50, CancellationToken ct = default)
+        Guid episodeId, ClaimsPrincipal user, RatingsContext db, IOptionsSnapshot<GiphyOptions> giphy, bool reveal = false,
+        bool includeSpoilers = false, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var userId = user.GetUserId();
+        var gifs = Gifs.Enabled(giphy.Value) ? new GifSettingsDto(giphy.Value.ApiKey!.Trim(), Gifs.RatingOf(giphy.Value)) : null;
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
@@ -60,7 +70,7 @@ public static class CommentsApi
 
         if (!watched && !reveal)
         {
-            return TypedResults.Ok(new CommentsDto(true, total, []));
+            return TypedResults.Ok(new CommentsDto(true, total, [], gifs));
         }
 
         var comments = await db.Comments.AsNoTracking()
@@ -74,27 +84,39 @@ public static class CommentsApi
             .Select(f => f.TargetId).ToListAsync(ct)).ToHashSet();
 
         return TypedResults.Ok(new CommentsDto(false, total, comments
-            .Select(c => new CommentDto(
-                c.Id,
-                c.DisplayName,
-                c.IsSpoiler && !includeSpoilers && c.UserId != userId ? null : c.Text,
-                c.IsSpoiler,
-                c.UserId == userId,
-                c.CreatedAtUtc,
-                c.UserId == userId ? c.HiddenReason : null,
-                flagged.Contains(c.Id)))
-            .ToList()));
+            .Select(c =>
+            {
+                var hiddenSpoiler = c.IsSpoiler && !includeSpoilers && c.UserId != userId;
+                return new CommentDto(
+                    c.Id,
+                    c.DisplayName,
+                    hiddenSpoiler ? null : c.Text,
+                    c.IsSpoiler,
+                    c.UserId == userId,
+                    c.CreatedAtUtc,
+                    c.UserId == userId ? c.HiddenReason : null,
+                    flagged.Contains(c.Id),
+                    hiddenSpoiler || gifs is null ? null : c.GifId);
+            })
+            .ToList(), gifs));
     }
 
     private static async Task<Results<Created<CommentDto>, ValidationProblem, ProblemHttpResult>> PostCommentAsync(
-        Guid episodeId, PostCommentRequest request, ClaimsPrincipal user, RatingsContext db, Moderation moderation, CancellationToken ct)
+        Guid episodeId, PostCommentRequest request, ClaimsPrincipal user, RatingsContext db, Moderation moderation,
+        IOptionsSnapshot<GiphyOptions> giphy, CancellationToken ct)
     {
         var text = request.Text?.Trim() ?? "";
-        if (text.Length is 0 or > 2000)
+        var gifId = string.IsNullOrWhiteSpace(request.GifId) ? null : request.GifId.Trim();
+        if (gifId is not null && (!Gifs.Enabled(giphy.Value) || !Gifs.IsId(gifId)))
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Comments must be 1 to 2000 characters."] });
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["gifId"] = ["That GIF can't be posted."] });
         }
-        if (CommunityApi.CheckPost(text, moderation) is { } refused)
+        // Words, emoji, a GIF, or any mix: something, and not too much of it.
+        if (text.Length > 2000 || (text.Length == 0 && gifId is null))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Write up to 2000 characters, or pick a GIF."] });
+        }
+        if (text.Length > 0 && CommunityApi.CheckPost(text, moderation) is { } refused)
         {
             return refused;
         }
@@ -111,6 +133,7 @@ public static class CommentsApi
             UserId = user.GetUserId(),
             DisplayName = user.GetDisplayName() ?? "Viewer",
             Text = text,
+            GifId = gifId,
             IsSpoiler = request.IsSpoiler,
             HiddenReason = moderation.Check(text) == TextVerdict.Held ? HiddenReasons.Held : null,
             CreatedAtUtc = DateTime.UtcNow
@@ -119,7 +142,7 @@ public static class CommentsApi
         await db.SaveChangesAsync(ct);
 
         return TypedResults.Created($"/api/v1/comments/{comment.Id}",
-            new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc, comment.HiddenReason));
+            new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc, comment.HiddenReason, GifId: comment.GifId));
     }
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)

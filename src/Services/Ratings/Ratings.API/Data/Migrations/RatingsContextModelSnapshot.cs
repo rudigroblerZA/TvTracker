@@ -17,7 +17,7 @@ namespace Ratings.API.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -38,6 +38,10 @@ namespace Ratings.API.Data.Migrations
 
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("GifId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("HiddenReason")
                         .HasMaxLength(16)

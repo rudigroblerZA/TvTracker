@@ -4,6 +4,9 @@
 @inject RatingsClient Ratings
 @inject UserSession Session
 @inject SpoilerShield Shield
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>@(episode is null ? "Episode" : hideTitle ? Format.EpisodeCode(episode.SeasonNumber, episode.EpisodeNumber) : episode.Title) · @Brand.AppName</PageTitle>
 
@@ -91,9 +94,62 @@ else
                 else
                 {
                     <form class="comment-form" @onsubmit="PostCommentAsync">
-                        <textarea @bind="newComment" @bind:event="oninput" maxlength="2000" placeholder="What did you think?" aria-label="Comment"></textarea>
+                        <textarea @bind="newComment" @bind:event="oninput" maxlength="2000" placeholder="What did you think? Words, emoji or a GIF." aria-label="Comment"></textarea>
+                        @if (pickedGif is { } picked)
+                        {
+                            <div class="comment-gif-picked">
+                                <img class="comment-gif" src="@picked.Url" alt="@GifAlt(picked)" />
+                                <button class="link small" type="button" @onclick="() => pickedGif = null">Remove GIF</button>
+                            </div>
+                        }
+                        <div class="comment-tools">
+                            <div class="comment-emoji" role="group" aria-label="Add an emoji">
+                                @foreach (var emoji in CommentEmoji)
+                                {
+                                    <button type="button" title="@($"Add {emoji}")" @onclick="() => newComment += emoji">@emoji</button>
+                                }
+                            </div>
+                            @if (comments.Gifs is not null)
+                            {
+                                <button class="btn btn-quiet small" type="button" aria-expanded="@gifPickerOpen" @onclick="ToggleGifPickerAsync">GIF</button>
+                            }
+                        </div>
+                        @if (gifPickerOpen)
+                        {
+                            <div class="gif-picker panel">
+                                <div class="gif-picker-head">
+                                    <input type="search" value="@gifQuery" @oninput="e => gifQuery = e.Value?.ToString()" @onkeydown="OnGifKeyAsync" @onkeydown:preventDefault="gifEnter"
+                                           placeholder="Search GIPHY" maxlength="50" aria-label="Search for a GIF" />
+                                    <button class="btn btn-quiet small" type="button" @onclick="SearchGifsAsync">Search</button>
+                                </div>
+                                @if (gifError is not null)
+                                {
+                                    <p class="muted small">@gifError</p>
+                                }
+                                else if (gifResults is null)
+                                {
+                                    <p class="muted small">Loading…</p>
+                                }
+                                else if (gifResults.Count == 0)
+                                {
+                                    <p class="muted small">No GIFs for that. Try other words.</p>
+                                }
+                                else
+                                {
+                                    <div class="gif-grid">
+                                        @foreach (var gif in gifResults)
+                                        {
+                                            <button @key="gif.Id" type="button" title="@GifAlt(gif)" @onclick="() => PickGif(gif)">
+                                                <img src="@gif.Url" alt="@GifAlt(gif)" loading="lazy" />
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                                <p class="gif-credit small muted">Powered by <a href="https://giphy.com" target="_blank" rel="noopener noreferrer">GIPHY</a></p>
+                            </div>
+                        }
                         <label class="inline checkbox"><input type="checkbox" @bind="newCommentIsSpoiler" /> Contains spoilers</label>
-                        <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newComment))">Post</button>
+                        <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(newComment) && pickedGif is null)">Post</button>
                     </form>
 
                     @if (comments.Comments.Any(c => c.IsSpoiler && c.Text is null))
@@ -112,7 +168,14 @@ else
                                 }
                                 else
                                 {
-                                    <p>@if (comment.IsSpoiler) { <span class="tag">Spoiler</span> }@(" " + comment.Text)</p>
+                                    @if (comment.IsSpoiler || !string.IsNullOrEmpty(comment.Text))
+                                    {
+                                        <p class="comment-text">@if (comment.IsSpoiler) { <span class="tag">Spoiler</span> }@(" " + comment.Text)</p>
+                                    }
+                                    @if (comment.GifId is { } gifId && gifs.TryGetValue(gifId, out var gif))
+                                    {
+                                        <img class="comment-gif" src="@gif.Url" alt="@GifAlt(gif)" loading="lazy" />
+                                    }
                                 }
                                 <div class="insight-meta small">
                                     @if (comment.HiddenReason is { } hidden)
@@ -178,6 +241,29 @@ else
     };
     private string? newComment;
     private bool newCommentIsSpoiler;
+
+    private static readonly string[] CommentEmoji = ["😂", "😮", "😢", "😡", "😍", "🔥", "👏", "🤯", "❤️", "👍", "💀", "🍿"];
+
+    /// <summary>
+    /// How often the open page asks for new comments.
+    /// </summary>
+    private static readonly TimeSpan Refresh = TimeSpan.FromSeconds(20);
+
+    // What the reader last chose to see, so a refresh shows the same.
+    private bool revealed;
+    private bool spoilersShown;
+    private CancellationTokenSource? refreshing;
+
+    // GIFs: the browser's GIPHY module, the pictures of the GIFs in view (by id), and the picker's state.
+    private IJSObjectReference? giphy;
+    private readonly Dictionary<string, GifPicture> gifs = [];
+    private readonly HashSet<string> gifsAsked = [];
+    private bool gifPickerOpen;
+    private bool gifEnter;
+    private string? gifQuery;
+    private string? gifError;
+    private List<GifPicture>? gifResults;
+    private GifPicture? pickedGif;
     private string? error;
 
     protected override async Task OnParametersSetAsync()
@@ -220,7 +306,143 @@ else
 
     private async Task LoadCommentsAsync(bool reveal = false, bool includeSpoilers = false)
     {
-        comments = await Ratings.GetCommentsAsync(Id, reveal || watched, includeSpoilers);
+        (revealed, spoilersShown) = (revealed || reveal, spoilersShown || includeSpoilers);
+        comments = await Ratings.GetCommentsAsync(Id, revealed || watched, spoilersShown);
+        await ShowGifsAsync();
+        KeepFresh();
+    }
+
+    /// <summary>
+    /// While the page is open, asks for the comments again every <see cref="Refresh"/>, so other people's appear
+    /// without a reload. A failed round is skipped: the next one tries again.
+    /// </summary>
+    private void KeepFresh()
+    {
+        if (refreshing is not null)
+        {
+            return;
+        }
+        refreshing = new CancellationTokenSource();
+        var stop = refreshing.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                using var timer = new PeriodicTimer(Refresh);
+                while (await timer.WaitForNextTickAsync(stop))
+                {
+                    try
+                    {
+                        var latest = await Ratings.GetCommentsAsync(Id, revealed || watched, spoilersShown, stop);
+                        if (latest is not null)
+                        {
+                            comments = latest;
+                            await ShowGifsAsync();
+                            StateHasChanged();
+                        }
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+                    {
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
+
+    private async Task<IJSObjectReference> GiphyAsync() =>
+        giphy ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/TvTracker.UI/gifs.js");
+
+    /// <summary>
+    /// Has the browser ask GIPHY for the GIFs in the comments it hasn't asked about yet. One that GIPHY no longer has,
+    /// or a GIPHY that isn't answering, leaves the comment without its picture.
+    /// </summary>
+    private async Task ShowGifsAsync()
+    {
+        if (comments?.Gifs is not { } settings)
+        {
+            return;
+        }
+        var wanted = comments.Comments.Select(c => c.GifId).OfType<string>().Where(gifsAsked.Add).ToArray();
+        if (wanted.Length == 0)
+        {
+            return;
+        }
+        try
+        {
+            foreach (var gif in await (await GiphyAsync()).InvokeAsync<List<GifPicture>>("resolve", settings.ApiKey, wanted))
+            {
+                gifs[gif.Id] = gif;
+            }
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or OperationCanceledException)
+        {
+            // Not rendered in a browser yet, or GIPHY didn't answer: ask again next time.
+            gifsAsked.ExceptWith(wanted);
+        }
+    }
+
+    private async Task ToggleGifPickerAsync()
+    {
+        gifPickerOpen = !gifPickerOpen;
+        if (gifPickerOpen && gifResults is null)
+        {
+            await SearchGifsAsync();
+        }
+    }
+
+    private async Task OnGifKeyAsync(KeyboardEventArgs e)
+    {
+        // Enter searches; it mustn't post the comment the picker sits in.
+        gifEnter = e.Key == "Enter";
+        if (gifEnter)
+        {
+            await SearchGifsAsync();
+        }
+    }
+
+    private async Task SearchGifsAsync()
+    {
+        if (comments?.Gifs is not { } settings)
+        {
+            return;
+        }
+        (gifError, gifResults) = (null, null);
+        try
+        {
+            gifResults = await (await GiphyAsync()).InvokeAsync<List<GifPicture>>("search", settings.ApiKey, settings.Rating, gifQuery?.Trim() ?? "");
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or OperationCanceledException)
+        {
+            gifError = "GIPHY isn't answering right now. Try again in a moment.";
+        }
+    }
+
+    private void PickGif(GifPicture gif)
+    {
+        (pickedGif, gifPickerOpen) = (gif, false);
+        gifs[gif.Id] = gif;
+        gifsAsked.Add(gif.Id);
+    }
+
+    private static string GifAlt(GifPicture gif) => string.IsNullOrWhiteSpace(gif.Title) ? "GIF" : gif.Title;
+
+    public async ValueTask DisposeAsync()
+    {
+        refreshing?.Cancel();
+        refreshing?.Dispose();
+        if (giphy is not null)
+        {
+            try
+            {
+                await giphy.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
     }
 
     private Task ToggleWatchedAsync(ChangeEventArgs e) => RunAsync(async () =>
@@ -259,13 +481,14 @@ else
 
     private Task PostCommentAsync() => RunAsync(async () =>
     {
-        if (string.IsNullOrWhiteSpace(newComment))
+        if (string.IsNullOrWhiteSpace(newComment) && pickedGif is null)
         {
             return;
         }
-        await Ratings.PostCommentAsync(Id, episode!.ShowId, newComment, newCommentIsSpoiler);
+        await Ratings.PostCommentAsync(Id, episode!.ShowId, newComment, newCommentIsSpoiler, pickedGif?.Id);
         newComment = null;
         newCommentIsSpoiler = false;
+        (pickedGif, gifPickerOpen) = (null, false);
         await LoadCommentsAsync(reveal: true);
     });
 
