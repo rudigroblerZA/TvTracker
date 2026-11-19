@@ -741,6 +741,12 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
     selling, or going back to a configuration that doesn't have the keys. A provider that isn't selling yet can be
     set up one key at a time (Stripe's webhook secret only exists once its endpoint is registered). "None" stops
     selling on purpose.
+  - **Just after a start,** until the stored settings have been read once, no plan is sold and webhooks are answered
+    503 (the provider sends them again): configuration alone could otherwise sell through an account an admin
+    switched off. If that read keeps failing, or a saved key can't be decrypted because the settings key changed,
+    the service logs a warning, and the page says to enter the keys again.
+  - **Two admins at once:** a save or a clear locks the settings for its length, so the second is checked against
+    what the first left.
   - **The fee rate** set here is the one the estimate uses; without it, the configured `Financials:PaymentFee*`.
   - **Identity.API now starts without Stripe's keys.** It used to refuse to start when Stripe was the provider and a
     key was missing. Now plans simply aren't sold until the keys are there, from configuration or this page, and the

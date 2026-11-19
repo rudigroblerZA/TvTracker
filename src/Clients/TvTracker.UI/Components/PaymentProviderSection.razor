@@ -56,6 +56,10 @@
                     <input id="stripe-webhook-secret" type="password" autocomplete="off" @bind="form.WebhookSecret" maxlength="255" disabled="@(!settings.CanStoreSecrets)"
                            placeholder="@(settings.StripeWebhookSecret.Length > 0 ? "Leave empty to keep the one in force" : "whsec_…")" />
                 </label>
+                @if (settings.KeysUnreadable)
+                {
+                    <p class="notice">A key saved here can't be read any more: the deployment's settings key (PAYMENT_SETTINGS_KEY) has changed since. Enter the keys again.</p>
+                }
                 @if (!settings.CanStoreSecrets)
                 {
                     <p class="muted small">Keys can't be saved here: this deployment has no key to encrypt them with (Payments:SettingsKey). Set them in its configuration.</p>
@@ -117,7 +121,7 @@
                     </label>
                     <label>
                         Plus, per payment
-                        <input id="fee-fixed" type="number" min="0" max="10" step="0.01" @bind="form.FeeFixed" required />
+                        <input id="fee-fixed" type="number" min="0" max="10000" step="0.01" @bind="form.FeeFixed" required />
                     </label>
                 </div>
                 <p class="muted small">
@@ -233,7 +237,6 @@
     {
         var saved = await Books.SaveFeesAsync(form.FeePercent, form.FeeFixed);
         Show(saved);
-        await OnFeesChanged.InvokeAsync();
         return saved is null ? null : "Saved.";
     });
 
@@ -241,7 +244,6 @@
     {
         var cleared = await Books.ClearFeesAsync();
         Show(cleared);
-        await OnFeesChanged.InvokeAsync();
         return cleared is null ? null : "The configured rate is in force again.";
     });
 
@@ -274,6 +276,12 @@
         else
         {
             (feesNotice, feesError) = (said, failed);
+            if (said is not null)
+            {
+                // The rate changed: the statement above is worked out again. Said first, so the confirmation stands
+                // whatever becomes of that reload.
+                await OnFeesChanged.InvokeAsync();
+            }
         }
     }
 

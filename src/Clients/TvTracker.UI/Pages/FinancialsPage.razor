@@ -310,7 +310,9 @@
         {
             if (load == loads)
             {
-                (statement, error) = (null, ErrorNotice.Describe(ex));
+                // A statement already on the page stays, under the error: a reload that fails (after a change to a
+                // cost or the fee rate, say) shouldn't take the page and its forms away.
+                error = ErrorNotice.Describe(ex);
             }
         }
         finally

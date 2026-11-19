@@ -189,13 +189,16 @@ public static partial class FinancialStatement
     public static decimal Fee(decimal amount, int payments, FinancialOptions fees) =>
         Math.Round(amount * fees.PaymentFeePercent / 100 + payments * fees.PaymentFeeFixed, 2);
 
+    public const decimal MaxFixedFee = 10_000;
+
     /// <summary>
     /// What's wrong with a fee rate as entered, or null.
     /// </summary>
     public static string? Problem(Apis.FeeSettingsRequest fees) =>
         fees is not { Percent: { } percent, Fixed: { } @fixed } ? "Give both the percentage and the fixed part."
         : percent is < 0 or > 30 ? "The percentage is between 0 and 30."
-        : @fixed is < 0 or > 10 ? "The fixed part is between 0 and 10."
+        // In the payment's own currency, so the ceiling is loose: 30 yen or 3 kronor are ordinary fixed fees.
+        : @fixed is < 0 or > MaxFixedFee ? $"The fixed part is between 0 and {MaxFixedFee:0}."
         : decimal.Round(percent, 2) != percent || decimal.Round(@fixed, 2) != @fixed ? "Give at most two decimals."
         : null;
 
