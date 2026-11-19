@@ -4,11 +4,17 @@
 @* The payment provider, on the admins' financials page: which one sells plans and Stripe's keys (Identity.API), and
    the rate it charges, which the fee estimate above uses (Financials.API). Two forms, saved on their own, since two
    services keep them. Keys go in and never come back: the page only says whether each is set. *@
-@if (settings is not null)
+@if (settings is not null || fees is not null)
 {
     <section class="payment-provider">
         <h2>Payment provider</h2>
         <p class="muted">Who takes the money when someone buys a plan. What you set here takes the place of the deployment's own configuration.</p>
+        @if (settings is null)
+        {
+            <p class="notice" role="status">The provider's settings couldn't be fetched just now. The fee rate can still be changed.</p>
+        }
+        else
+        {
 
         <p class="@(settings.Missing.Count > 0 ? "notice" : "")" role="status">
             @if (settings.Provider.Length == 0)
@@ -38,7 +44,7 @@
                 </select>
             </label>
 
-            @if (form.Provider == "stripe" || settings.Provider == "stripe")
+            @if (StripeShown)
             {
                 <label>
                     Stripe secret key <span class="muted small">@KeyState(settings.StripeSecretKey)</span>
@@ -99,6 +105,7 @@
             }
             <ErrorNotice Message="@error" />
         </EditForm>
+        }
 
         @if (fees is not null)
         {
@@ -157,18 +164,29 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Two services, each on its own: one that isn't answering doesn't take the other's form with it.
+        var settingsTask = Identity.GetPaymentSettingsAsync();
+        var feesTask = Books.GetFeesAsync();
+        Show(await OrNothingAsync(settingsTask));
+        Show(await OrNothingAsync(feesTask));
+    }
+
+    private static async Task<T?> OrNothingAsync<T>(Task<T?> load) where T : class
+    {
         try
         {
-            var settingsTask = Identity.GetPaymentSettingsAsync();
-            var feesTask = Books.GetFeesAsync();
-            Show(await settingsTask);
-            Show(await feesTask);
+            return await load;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            // The section is left out; the rest of the page says what's wrong with the connection.
+            return null;
         }
     }
+
+    /// <summary>
+    /// Whether Stripe's fields are on the page: it is chosen in the form, or it is the provider in force.
+    /// </summary>
+    private bool StripeShown => form.Provider == "stripe" || settings?.Provider == "stripe";
 
     private void Show(PaymentSettings? payments)
     {
@@ -197,7 +215,8 @@
         var portalWas = current.StripePortalUrlFrom == FromSettings ? current.StripePortalUrl ?? "" : "";
         var saved = await Identity.SavePaymentSettingsAsync(new SavePaymentSettings(
             (form.Provider ?? "") == current.Provider ? null : form.Provider ?? "",
-            form.SecretKey, form.WebhookSecret,
+            // Keys typed and then hidden by choosing another provider aren't on the page any more: they aren't saved.
+            StripeShown ? form.SecretKey : null, StripeShown ? form.WebhookSecret : null,
             (form.PortalUrl ?? "") == portalWas ? null : form.PortalUrl ?? ""));
         Show(saved);
         return saved is null ? null : "Saved.";

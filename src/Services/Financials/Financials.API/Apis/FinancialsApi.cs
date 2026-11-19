@@ -14,7 +14,10 @@ public record CostItemDto(Guid Id, string Name, string Category, decimal Amount,
 /// <param name="Set">True when an admin set the rate here; false when it is the configured one.</param>
 public record FeeSettingsDto(decimal Percent, decimal Fixed, bool Set);
 
-public record FeeSettingsRequest(decimal Percent, decimal Fixed);
+/// <summary>
+/// Both parts are needed: one left out isn't taken for zero.
+/// </summary>
+public record FeeSettingsRequest(decimal? Percent, decimal? Fixed);
 
 public record CostItemRequest(string? Name, string? Category, decimal Amount, string? Currency, string? Recurrence, DateOnly StartsOn,
     DateOnly? EndsOn, string? Notes);
@@ -57,15 +60,13 @@ public static class FinancialsApi
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["fees"] = [problem] });
         }
-        var set = await db.FeeSettings.SingleOrDefaultAsync(ct);
-        if (set is null)
-        {
-            set = new FeeSettings { Id = FeeSettings.OnlyId };
-            db.FeeSettings.Add(set);
-        }
-        (set.Percent, set.Fixed, set.UpdatedAtUtc) = (request.Percent, request.Fixed, time.GetUtcNow().UtcDateTime);
-        await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(Describe(set, options.Value));
+        // One statement, so two saves at once can't both add the one row.
+        var (percent, @fixed, now) = (request.Percent!.Value, request.Fixed!.Value, time.GetUtcNow().UtcDateTime);
+        await db.Database.ExecuteSqlAsync($"""
+            insert into fee_settings ("Id", "Percent", "Fixed", "UpdatedAtUtc") values ({FeeSettings.OnlyId}, {percent}, {@fixed}, {now})
+            on conflict ("Id") do update set "Percent" = excluded."Percent", "Fixed" = excluded."Fixed", "UpdatedAtUtc" = excluded."UpdatedAtUtc"
+            """, ct);
+        return TypedResults.Ok(await FeesInForceAsync(db, options.Value, ct));
     }
 
     /// <summary>

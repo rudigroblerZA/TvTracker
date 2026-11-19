@@ -81,6 +81,10 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
     private volatile StoredPaymentSettings? stored;
     private volatile Merged? merged;
 
+    // One reload at a time, each reading and then publishing: a read begun before a save can't land after the
+    // save's own, and put the old settings back.
+    private readonly SemaphoreSlim reloading = new(1, 1);
+
     private sealed record Merged(PaymentOptions From, StoredPaymentSettings? With, PaymentOptions Result);
 
     public PaymentOptions Configured => configured.CurrentValue;
@@ -102,10 +106,22 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
 
     public async Task ReloadAsync(IdentityContext db, CancellationToken ct)
     {
-        var row = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct);
-        stored = row is null ? null : new StoredPaymentSettings(row.Provider, cipher.Unprotect(row.StripeSecretKey),
-            cipher.Unprotect(row.StripeWebhookSecret), row.StripePortalUrl, row.UpdatedAtUtc, row.UpdatedBy);
+        await reloading.WaitAsync(ct);
+        try
+        {
+            stored = Read(await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct));
+        }
+        finally
+        {
+            reloading.Release();
+        }
     }
+
+    /// <summary>
+    /// A row as plain values, its keys decrypted; null for no row.
+    /// </summary>
+    public StoredPaymentSettings? Read(PaymentSettings? row) => row is null ? null : new StoredPaymentSettings(row.Provider,
+        cipher.Unprotect(row.StripeSecretKey), cipher.Unprotect(row.StripeWebhookSecret), row.StripePortalUrl, row.UpdatedAtUtc, row.UpdatedBy);
 
     internal static PaymentOptions Merge(PaymentOptions options, StoredPaymentSettings? settings) => settings is null ? options : new PaymentOptions
     {
@@ -136,6 +152,13 @@ public sealed class PaymentSettingsRefresher(IServiceScopeFactory scopes, Effect
     /// </summary>
     private static readonly TimeSpan Retry = TimeSpan.FromSeconds(3);
 
+    /// <summary>
+    /// Failed reads in a row that are expected while the database starts; after that each is worth a warning.
+    /// </summary>
+    private const int QuietFailures = 5;
+
+    private int failures;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!await ReloadAsync(stoppingToken))
@@ -160,12 +183,23 @@ public sealed class PaymentSettingsRefresher(IServiceScopeFactory scopes, Effect
         {
             await using var scope = scopes.CreateAsyncScope();
             await options.ReloadAsync(scope.ServiceProvider.GetRequiredService<IdentityContext>(), ct);
+            failures = 0;
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // The database may not be ready at start, or briefly away later: what was last read stays in force.
-            logger.LogDebug(ex, "Couldn't read the payment settings; trying again shortly");
+            // The database may not be ready at start, or briefly away later: what was last read stays in force. A few
+            // misses at start are expected; one that lasts is said out loud (and again every twentieth time), since
+            // until it's read, what an admin set on the Financials page (Stripe's keys) isn't in force.
+            failures++;
+            if (failures == QuietFailures + 1 || (failures > QuietFailures && failures % 20 == 0))
+            {
+                logger.LogWarning(ex, "The payment settings can't be read ({Failures} tries); what an admin set on the Financials page isn't in force", failures);
+            }
+            else
+            {
+                logger.LogDebug(ex, "Couldn't read the payment settings; trying again shortly");
+            }
             return false;
         }
     }
