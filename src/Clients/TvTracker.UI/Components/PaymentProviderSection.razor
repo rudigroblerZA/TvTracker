@@ -1,9 +1,9 @@
 @inject IdentityClient Identity
 @inject FinancialsClient Books
-@inject NavigationManager Navigation
 
-@* The payment provider, on the admins' financials page: which one sells plans, Stripe's keys, and the rate it charges
-   (which the fee estimate above uses). Keys go in and never come back: the page only says whether each is set. *@
+@* The payment provider, on the admins' financials page: which one sells plans and Stripe's keys (Identity.API), and
+   the rate it charges, which the fee estimate above uses (Financials.API). Two forms, saved on their own, since two
+   services keep them. Keys go in and never come back: the page only says whether each is set. *@
 @if (settings is not null)
 {
     <section class="payment-provider">
@@ -23,10 +23,10 @@
             {
                 <span><strong>@($"Plans are sold through {ProviderName(settings.Provider)}.")</strong></span>
             }
-            <span class="muted small">@($" Set in {Where(settings.ProviderFrom)}.")</span>
+            <span class="muted small">@($" Set in {(settings.ProviderFrom == FromSettings ? "these settings" : "the deployment's configuration")}.")</span>
         </p>
 
-        <EditForm Model="form" OnSubmit="SaveAsync" class="panel stack" aria-label="Payment provider" Context="providerForm">
+        <EditForm Model="form" OnSubmit="SaveProviderAsync" class="panel stack" aria-label="Payment provider" Context="providerForm">
             <label>
                 Provider
                 <select id="payment-provider" @bind="form.Provider">
@@ -59,7 +59,14 @@
                     <input id="stripe-portal" type="url" @bind="form.PortalUrl" maxlength="512" placeholder="https://billing.stripe.com/p/login/…" />
                 </label>
                 <p class="muted small">
-                    In Stripe, send webhooks to <code>@(Navigation.BaseUri.TrimEnd('/') + settings.WebhookPath)</code>.
+                    @if (settings.WebhookUrl is { } webhook)
+                    {
+                        <span>In Stripe, send webhooks to <code>@webhook</code>.</span>
+                    }
+                    else
+                    {
+                        <span>In Stripe, send webhooks to Identity's <code>/api/v1/payments/webhooks/stripe</code> (README, Payments).</span>
+                    }
                     @if (settings.ReturnUrl is { Length: > 0 } back)
                     {
                         <span>@($" Buyers come back to {back}.")</span>
@@ -68,28 +75,12 @@
             }
 
             <div class="actions">
-                <label>
-                    Fee, % of each payment
-                    <input id="fee-percent" type="number" min="0" max="30" step="0.01" @bind="form.FeePercent" required />
-                </label>
-                <label>
-                    Plus, per payment
-                    <input id="fee-fixed" type="number" min="0" max="10" step="0.01" @bind="form.FeeFixed" required />
-                </label>
-            </div>
-            <p class="muted small">
-                The provider's rate, from its own statement. The fee estimate above uses it.
-                @(fees is { Set: false } ? " This is the configured rate." : "")
-            </p>
-
-            <div class="actions">
                 <button class="btn" type="submit" disabled="@busy">Save</button>
-                @if (settings.ProviderFrom == "settings" || settings.StripeSecretKey == "settings" || settings.StripeWebhookSecret == "settings"
-                     || settings.StripePortalUrlFrom == "settings" || fees is { Set: true })
+                @if (settings.HasStored)
                 {
                     @if (confirmClear)
                     {
-                        <button class="btn btn-danger" type="button" disabled="@busy" @onclick="ClearAsync">Yes, delete what was set here</button>
+                        <button class="btn btn-danger" type="button" disabled="@busy" @onclick="ClearProviderAsync">Yes, delete what was set here</button>
                         <button class="btn btn-quiet" type="button" @onclick="() => confirmClear = false">Cancel</button>
                     }
                     else
@@ -108,10 +99,47 @@
             }
             <ErrorNotice Message="@error" />
         </EditForm>
+
+        @if (fees is not null)
+        {
+            <EditForm Model="form" OnSubmit="SaveFeesAsync" class="panel stack" aria-label="The provider's fee rate" Context="feesForm">
+                <div class="actions">
+                    <label>
+                        Fee, % of each payment
+                        <input id="fee-percent" type="number" min="0" max="30" step="0.01" @bind="form.FeePercent" required />
+                    </label>
+                    <label>
+                        Plus, per payment
+                        <input id="fee-fixed" type="number" min="0" max="10" step="0.01" @bind="form.FeeFixed" required />
+                    </label>
+                </div>
+                <p class="muted small">
+                    The provider's rate, from its own statement. The fee estimate above uses it.
+                    @(fees.Set ? "" : " This is the configured rate.")
+                </p>
+                <div class="actions">
+                    <button class="btn" type="submit" disabled="@busy">Save rate</button>
+                    @if (fees.Set)
+                    {
+                        <button class="btn btn-quiet" type="button" disabled="@busy" @onclick="ClearFeesAsync">Use the configured rate</button>
+                    }
+                    @if (feesNotice is not null)
+                    {
+                        <span class="muted small" role="status">@feesNotice</span>
+                    }
+                </div>
+                <ErrorNotice Message="@feesError" />
+            </EditForm>
+        }
     </section>
 }
 
 @code {
+    /// <summary>
+    /// What the API says of a value an admin set here (Identity.API's PaymentSettingsApi).
+    /// </summary>
+    private const string FromSettings = "settings";
+
     /// <summary>
     /// Raised after the fee rate changed, so the statement above is worked out again.
     /// </summary>
@@ -124,6 +152,8 @@
     private bool confirmClear;
     private string? notice;
     private string? error;
+    private string? feesNotice;
+    private string? feesError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,7 +161,8 @@
         {
             var settingsTask = Identity.GetPaymentSettingsAsync();
             var feesTask = Books.GetFeesAsync();
-            Show(await settingsTask, await feesTask);
+            Show(await settingsTask);
+            Show(await feesTask);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
@@ -139,66 +170,91 @@
         }
     }
 
-    private void Show(PaymentSettings? payments, FeeSettings? rate)
+    private void Show(PaymentSettings? payments)
     {
-        (settings, fees) = (payments, rate ?? fees);
         if (payments is not null)
         {
-            form = new Form { Provider = payments.Provider, PortalUrl = payments.StripePortalUrlFrom == "settings" ? payments.StripePortalUrl : null,
-                FeePercent = fees?.Percent ?? 0, FeeFixed = fees?.Fixed ?? 0 };
+            settings = payments;
+            (form.Provider, form.SecretKey, form.WebhookSecret) = (payments.Provider, null, null);
+            form.PortalUrl = payments.StripePortalUrlFrom == FromSettings ? payments.StripePortalUrl : null;
         }
     }
 
-    private async Task SaveAsync()
+    private void Show(FeeSettings? rate)
     {
-        (busy, error, notice, confirmClear) = (true, null, null, false);
+        if (rate is not null)
+        {
+            (fees, form.FeePercent, form.FeeFixed) = (rate, rate.Percent, rate.Fixed);
+        }
+    }
+
+    /// <summary>
+    /// Only what changed is sent, so a field left alone goes on following the deployment's configuration.
+    /// </summary>
+    private Task SaveProviderAsync() => ChangeAsync(provider: true, async () =>
+    {
+        var current = settings!;
+        var portalWas = current.StripePortalUrlFrom == FromSettings ? current.StripePortalUrl ?? "" : "";
+        var saved = await Identity.SavePaymentSettingsAsync(new SavePaymentSettings(
+            (form.Provider ?? "") == current.Provider ? null : form.Provider ?? "",
+            form.SecretKey, form.WebhookSecret,
+            (form.PortalUrl ?? "") == portalWas ? null : form.PortalUrl ?? ""));
+        Show(saved);
+        return saved is null ? null : "Saved.";
+    });
+
+    private Task ClearProviderAsync() => ChangeAsync(provider: true, async () =>
+    {
+        var cleared = await Identity.ClearPaymentSettingsAsync();
+        Show(cleared);
+        return cleared is null ? null : "The deployment's configuration is in force again.";
+    });
+
+    private Task SaveFeesAsync() => ChangeAsync(provider: false, async () =>
+    {
+        var saved = await Books.SaveFeesAsync(form.FeePercent, form.FeeFixed);
+        Show(saved);
+        await OnFeesChanged.InvokeAsync();
+        return saved is null ? null : "Saved.";
+    });
+
+    private Task ClearFeesAsync() => ChangeAsync(provider: false, async () =>
+    {
+        var cleared = await Books.ClearFeesAsync();
+        Show(cleared);
+        await OnFeesChanged.InvokeAsync();
+        return cleared is null ? null : "The configured rate is in force again.";
+    });
+
+    /// <summary>
+    /// Runs one change to the provider's form or the fee rate's: busy meanwhile, then that form's notice or error.
+    /// </summary>
+    /// <param name="change">Returns what to say, or null when it didn't go through.</param>
+    private async Task ChangeAsync(bool provider, Func<Task<string?>> change)
+    {
+        (busy, confirmClear) = (true, false);
+        (notice, error, feesNotice, feesError) = (null, null, null, null);
+        string? said = null, failed = null;
         try
         {
-            var saved = await Identity.SavePaymentSettingsAsync(new SavePaymentSettings(form.Provider ?? "",
-                string.IsNullOrWhiteSpace(form.SecretKey) ? null : form.SecretKey, string.IsNullOrWhiteSpace(form.WebhookSecret) ? null : form.WebhookSecret,
-                form.PortalUrl ?? ""));
-            if (saved is null)
-            {
-                error = "That didn't go through: only admins can change the payment provider.";
-                return;
-            }
-            var feesChanged = fees is null || fees.Percent != form.FeePercent || fees.Fixed != form.FeeFixed;
-            var rate = feesChanged ? await Books.SaveFeesAsync(form.FeePercent, form.FeeFixed) : fees;
-            Show(saved, rate);
-            notice = "Saved.";
-            if (feesChanged)
-            {
-                await OnFeesChanged.InvokeAsync();
-            }
+            said = await change();
+            failed = said is null ? "That didn't go through: only admins can change this." : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            error = ErrorNotice.Describe(ex);
+            failed = ErrorNotice.Describe(ex);
         }
         finally
         {
             busy = false;
         }
-    }
-
-    private async Task ClearAsync()
-    {
-        (busy, error, notice, confirmClear) = (true, null, null, false);
-        try
+        if (provider)
         {
-            var cleared = await Identity.ClearPaymentSettingsAsync();
-            var rate = await Books.ClearFeesAsync();
-            Show(cleared, rate);
-            notice = "The deployment's configuration is in force again.";
-            await OnFeesChanged.InvokeAsync();
+            (notice, error) = (said, failed);
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        else
         {
-            error = ErrorNotice.Describe(ex);
-        }
-        finally
-        {
-            busy = false;
+            (feesNotice, feesError) = (said, failed);
         }
     }
 
@@ -209,11 +265,9 @@
         _ => provider
     };
 
-    private static string Where(string from) => from == "settings" ? "these settings" : "the deployment's configuration";
-
     private static string KeyState(string from) => from switch
     {
-        "settings" => "(set here)",
+        FromSettings => "(set here)",
         "configuration" => "(set in the deployment's configuration)",
         _ => "(not set)"
     };

@@ -16,11 +16,12 @@ namespace Identity.API.Apis;
 /// <param name="StripeSecretKey">"settings", "configuration" or "" (not set): where the key in force comes from.</param>
 /// <param name="StripeWebhookSecret">Likewise.</param>
 /// <param name="Missing">What the provider still needs before plans can be bought; empty when it can sell.</param>
-/// <param name="WebhookPath">Where Stripe sends its events, from the site's address.</param>
+/// <param name="WebhookUrl">Where Stripe sends its events, when the site's public address is known (a deployment); else null.</param>
 /// <param name="CanStoreSecrets">False without <c>Payments:SettingsKey</c>: keys can then only come from configuration.</param>
+/// <param name="HasStored">Something was set here, so there is something to go back to configuration from.</param>
 public record PaymentSettingsDto(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
     string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
-    string WebhookPath, bool CanStoreSecrets, DateTime? UpdatedAtUtc, string? UpdatedBy);
+    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy);
 
 /// <param name="Provider">Null leaves it as it is; "" sells nothing; else a provider's name.</param>
 /// <param name="StripeSecretKey">Null or empty leaves the stored key as it is.</param>
@@ -39,13 +40,16 @@ public record SavePaymentSettingsRequest(string? Provider, string? StripeSecretK
 /// </summary>
 public static class PaymentSettingsApi
 {
-    private const string WebhookPath = "/api/identity/api/v1/payments/webhooks/stripe";
+    /// <summary>
+    /// Stripe's webhook as the outside world reaches it in a deployment: the site's address, the gateway under /api,
+    /// its identity route, then this service's own (<see cref="PaymentsApi"/>).
+    /// </summary>
+    private const string PublicWebhookPath = "/api/identity/api/v1/payments/webhooks/stripe";
 
     public static void MapPaymentSettingsApi(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api/v1/admin/payments/settings").RequireAuthorization().RequireAppAdmin();
-        api.MapGet("/", (EffectivePaymentOptions options, PaymentProviders providers, SettingsCipher cipher, IdentityContext db, CancellationToken ct) =>
-            DescribeAsync(options, providers, cipher, db, ct));
+        api.MapGet("/", (EffectivePaymentOptions options, PaymentProviders providers, SettingsCipher cipher) => Describe(options, providers, cipher));
         api.MapPut("/", SaveAsync);
         api.MapDelete("/", ClearAsync);
     }
@@ -60,13 +64,15 @@ public static class PaymentSettingsApi
         var portal = request.StripePortalUrl?.Trim();
 
         var row = await db.PaymentSettings.SingleOrDefaultAsync(ct);
+        // What the row will hold: a field the request leaves alone keeps what it has.
+        var newProvider = provider ?? row?.Provider;
+        var newPortal = portal is null ? row?.StripePortalUrl : portal.Length == 0 ? null : portal;
         var problem = Problem(provider, secretKey, webhookSecret, portal, providers, cipher);
         if (problem is null)
         {
             // The settings as they'd be, to see that the chosen provider could sell with them.
-            var after = new StoredPaymentSettings(provider ?? row?.Provider,
-                secretKey ?? options.Stored?.StripeSecretKey, webhookSecret ?? options.Stored?.StripeWebhookSecret,
-                portal is null ? row?.StripePortalUrl : portal.Length == 0 ? null : portal);
+            var after = new StoredPaymentSettings(newProvider, secretKey ?? options.Stored?.StripeSecretKey,
+                webhookSecret ?? options.Stored?.StripeWebhookSecret, newPortal);
             if (PaymentOptionsValidator.Missing(EffectivePaymentOptions.Merge(options.Configured, after)) is { Count: > 0 } missing)
             {
                 problem = $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}";
@@ -82,10 +88,9 @@ public static class PaymentSettingsApi
             row = new PaymentSettings { Id = PaymentSettings.OnlyId };
             db.PaymentSettings.Add(row);
         }
-        row.Provider = provider ?? row.Provider;
+        (row.Provider, row.StripePortalUrl) = (newProvider, newPortal);
         row.StripeSecretKey = secretKey is null ? row.StripeSecretKey : cipher.Protect(secretKey);
         row.StripeWebhookSecret = webhookSecret is null ? row.StripeWebhookSecret : cipher.Protect(webhookSecret);
-        row.StripePortalUrl = portal is null ? row.StripePortalUrl : portal.Length == 0 ? null : portal;
         (row.UpdatedAtUtc, row.UpdatedBy) = (time.GetUtcNow().UtcDateTime, user.FindFirstValue("preferred_username"));
         await db.SaveChangesAsync(ct);
         await options.ReloadAsync(db, ct);
@@ -93,7 +98,7 @@ public static class PaymentSettingsApi
         loggers.CreateLogger(typeof(PaymentSettingsApi)).LogInformation(
             "Payment settings saved by {Admin}: provider {Provider}, secret key {SecretKey}, webhook secret {WebhookSecret}",
             row.UpdatedBy, provider ?? "(unchanged)", secretKey is null ? "unchanged" : "replaced", webhookSecret is null ? "unchanged" : "replaced");
-        return TypedResults.Ok(await DescribeAsync(options, providers, cipher, db, ct));
+        return TypedResults.Ok(Describe(options, providers, cipher));
     }
 
     /// <summary>
@@ -106,7 +111,7 @@ public static class PaymentSettingsApi
         await options.ReloadAsync(db, ct);
         loggers.CreateLogger(typeof(PaymentSettingsApi)).LogInformation("Payment settings cleared by {Admin}; configuration is in force",
             user.FindFirstValue("preferred_username"));
-        return TypedResults.Ok(await DescribeAsync(options, providers, cipher, db, ct));
+        return TypedResults.Ok(Describe(options, providers, cipher));
     }
 
     /// <summary>
@@ -126,11 +131,9 @@ public static class PaymentSettingsApi
             ? "The customer portal link is an https address."
         : null;
 
-    private static async Task<PaymentSettingsDto> DescribeAsync(EffectivePaymentOptions options, PaymentProviders providers, SettingsCipher cipher,
-        IdentityContext db, CancellationToken ct)
+    private static PaymentSettingsDto Describe(EffectivePaymentOptions options, PaymentProviders providers, SettingsCipher cipher)
     {
         var (current, configured, stored) = (options.Value, options.Configured, options.Stored);
-        var row = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct);
         return new PaymentSettingsDto(
             current.Provider ?? "",
             stored?.Provider is null ? From.Configuration : From.Settings,
@@ -141,11 +144,21 @@ public static class PaymentSettingsApi
             Source(stored?.StripePortalUrl, configured.Stripe.PortalUrl),
             current.ReturnUrl,
             PaymentOptionsValidator.Missing(current),
-            WebhookPath,
+            // The site's public address is the one buyers are sent back to, where that is a whole address.
+            PublicWebhookUrl(current.ReturnUrl),
             cipher.Available,
-            row?.UpdatedAtUtc,
-            row?.UpdatedBy);
+            stored is not null,
+            stored?.UpdatedAtUtc,
+            stored?.UpdatedBy);
     }
+
+    /// <summary>
+    /// Null unless <paramref name="returnUrl"/> is a web address: a path alone (development) says nothing of the site's.
+    /// </summary>
+    internal static string? PublicWebhookUrl(string? returnUrl) =>
+        Uri.TryCreate(returnUrl, UriKind.Absolute, out var site) && site.Scheme is "http" or "https"
+            ? site.GetLeftPart(UriPartial.Authority) + PublicWebhookPath
+            : null;
 
     private static string Source(string? stored, string? configured) =>
         !string.IsNullOrEmpty(stored) ? From.Settings : !string.IsNullOrEmpty(configured) ? From.Configuration : "";

@@ -41,21 +41,17 @@ public static class FinancialsApi
     /// <summary>
     /// The fee rate in force: the one an admin set, else the configured one.
     /// </summary>
-    private static async Task<FinancialOptions> FeesInForceAsync(FinancialsContext db, FinancialOptions configured, CancellationToken ct) =>
-        await db.FeeSettings.AsNoTracking().SingleOrDefaultAsync(ct) is { } set
-            ? new FinancialOptions { PaymentFeePercent = set.Percent, PaymentFeeFixed = set.Fixed }
-            : configured;
+    private static async Task<FeeSettingsDto> FeesInForceAsync(FinancialsContext db, FinancialOptions configured, CancellationToken ct) =>
+        Describe(await db.FeeSettings.AsNoTracking().SingleOrDefaultAsync(ct), configured);
 
-    private static async Task<Ok<FeeSettingsDto>> FeesAsync(FinancialsContext db, IOptions<FinancialOptions> options, CancellationToken ct)
-    {
-        var set = await db.FeeSettings.AsNoTracking().SingleOrDefaultAsync(ct);
-        return TypedResults.Ok(set is null
-            ? new FeeSettingsDto(options.Value.PaymentFeePercent, options.Value.PaymentFeeFixed, false)
-            : new FeeSettingsDto(set.Percent, set.Fixed, true));
-    }
+    private static FeeSettingsDto Describe(FeeSettings? set, FinancialOptions configured) =>
+        set is null ? new(configured.PaymentFeePercent, configured.PaymentFeeFixed, false) : new(set.Percent, set.Fixed, true);
+
+    private static async Task<Ok<FeeSettingsDto>> FeesAsync(FinancialsContext db, IOptions<FinancialOptions> options, CancellationToken ct) =>
+        TypedResults.Ok(await FeesInForceAsync(db, options.Value, ct));
 
     private static async Task<Results<Ok<FeeSettingsDto>, ValidationProblem>> SaveFeesAsync(FeeSettingsRequest request, FinancialsContext db,
-        TimeProvider time, CancellationToken ct)
+        IOptions<FinancialOptions> options, TimeProvider time, CancellationToken ct)
     {
         if (FinancialStatement.Problem(request) is { } problem)
         {
@@ -69,7 +65,7 @@ public static class FinancialsApi
         }
         (set.Percent, set.Fixed, set.UpdatedAtUtc) = (request.Percent, request.Fixed, time.GetUtcNow().UtcDateTime);
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(new FeeSettingsDto(set.Percent, set.Fixed, true));
+        return TypedResults.Ok(Describe(set, options.Value));
     }
 
     /// <summary>
@@ -78,7 +74,7 @@ public static class FinancialsApi
     private static async Task<Ok<FeeSettingsDto>> ClearFeesAsync(FinancialsContext db, IOptions<FinancialOptions> options, CancellationToken ct)
     {
         await db.FeeSettings.ExecuteDeleteAsync(ct);
-        return TypedResults.Ok(new FeeSettingsDto(options.Value.PaymentFeePercent, options.Value.PaymentFeeFixed, false));
+        return TypedResults.Ok(Describe(null, options.Value));
     }
 
     private static async Task<Ok<FinancialStatementDto>> StatementAsync(HttpContext http, FinancialsContext db, IncomeSources income,
@@ -90,9 +86,10 @@ public static class FinancialsApi
         var subscriptionsTask = income.SubscriptionsAsync(authorization, window, ct);
         var commissionTask = income.CommissionAsync(authorization, window, ct);
         var costs = await db.CostItems.AsNoTracking().ToListAsync(ct);
+        var fees = await FeesInForceAsync(db, options.Value, ct);
 
         return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, await subscriptionsTask,
-            await commissionTask, costs, await FeesInForceAsync(db, options.Value, ct)));
+            await commissionTask, costs, new FinancialOptions { PaymentFeePercent = fees.Percent, PaymentFeeFixed = fees.Fixed }));
     }
 
     private static async Task<Ok<List<CostItemDto>>> CostsAsync(FinancialsContext db, CancellationToken ct) =>

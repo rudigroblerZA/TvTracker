@@ -732,7 +732,7 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
   link, and the rate the provider charges.
   - **It lies over configuration.** A field left alone keeps the deployment's value (`Payments:*`, `STRIPE_*`);
     "Go back to configuration" deletes what was set here, keys included. A change takes effect at once, and on
-    another instance of the service within 30 seconds.
+    another instance of the service within a minute.
   - **Keys go in and never come back.** They are stored encrypted (AES-GCM) under `Payments:SettingsKey`, the
     AppHost's `payment-settings-key` secret (`PAYMENT_SETTINGS_KEY` in a deployment, made up once by `deploy.sh`).
     The page only says whether each is set and where from. Change that secret and the saved keys can't be read:
