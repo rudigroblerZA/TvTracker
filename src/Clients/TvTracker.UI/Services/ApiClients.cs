@@ -27,6 +27,21 @@ public static class ApiClients
 
 public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
+    /// <summary>
+    /// How payments are set up; null for anyone but an admin.
+    /// </summary>
+    public Task<PaymentSettings?> GetPaymentSettingsAsync(CancellationToken ct = default) =>
+        GetAsync<PaymentSettings>(ApiClients.Identity, "api/v1/admin/payments/settings", ct);
+
+    public Task<PaymentSettings?> SavePaymentSettingsAsync(SavePaymentSettings settings, CancellationToken ct = default) =>
+        SendAsync<PaymentSettings>(ApiClients.Identity, HttpMethod.Put, "api/v1/admin/payments/settings", settings, ct);
+
+    /// <summary>
+    /// Deletes what was set here, keys included: configuration alone is in force again.
+    /// </summary>
+    public Task<PaymentSettings?> ClearPaymentSettingsAsync(CancellationToken ct = default) =>
+        SendAsync<PaymentSettings>(ApiClients.Identity, HttpMethod.Delete, "api/v1/admin/payments/settings", null, ct);
+
     public Task<Profile?> GetProfileAsync(CancellationToken ct = default) =>
         GetAsync<Profile>(ApiClients.Identity, "api/v1/profile", ct, cacheForOffline: true);
 
@@ -1053,6 +1068,18 @@ public sealed class FinancialsClient(IHttpClientFactory f, IAccessTokenProvider 
 
     public Task DeleteCostAsync(Guid id, CancellationToken ct = default) =>
         SendAsync(ApiClients.Financials, HttpMethod.Delete, $"api/v1/financials/costs/{id}", null, ct);
+
+    /// <summary>
+    /// The payment provider's rate behind the fee estimate; null for anyone but an admin.
+    /// </summary>
+    public Task<FeeSettings?> GetFeesAsync(CancellationToken ct = default) =>
+        GetAsync<FeeSettings>(ApiClients.Financials, "api/v1/financials/fees", ct);
+
+    public Task<FeeSettings?> SaveFeesAsync(decimal percent, decimal @fixed, CancellationToken ct = default) =>
+        SendAsync<FeeSettings>(ApiClients.Financials, HttpMethod.Put, "api/v1/financials/fees", new { percent, @fixed }, ct);
+
+    public Task<FeeSettings?> ClearFeesAsync(CancellationToken ct = default) =>
+        SendAsync<FeeSettings>(ApiClients.Financials, HttpMethod.Delete, "api/v1/financials/fees", null, ct);
 }
 
 public sealed class ResearchClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

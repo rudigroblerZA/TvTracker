@@ -202,4 +202,18 @@ public class FinancialStatementTests
 
         Assert.NotNull(FinancialStatement.Problem(request));
     }
+
+    [Theory]
+    [InlineData(2.9, 0.30, null)]
+    [InlineData(0, 0, null)]
+    [InlineData(-1, 0.30, "between 0 and 30")]
+    [InlineData(31, 0.30, "between 0 and 30")]
+    [InlineData(2.9, 11, "between 0 and 10")]
+    [InlineData(2.955, 0.30, "two decimals")]
+    public void A_fee_rate_is_a_sensible_percentage_and_a_small_fixed_part(double percent, double @fixed, string? problem)
+    {
+        var found = FinancialStatement.Problem(new Financials.API.Apis.FeeSettingsRequest((decimal)percent, (decimal)@fixed));
+
+        if (problem is null) { Assert.Null(found); } else { Assert.Contains(problem, found); }
+    }
 }

@@ -170,6 +170,39 @@ namespace Identity.API.Data.Migrations
                     b.ToTable("payment_receipts", (string)null);
                 });
 
+            modelBuilder.Entity("Identity.API.Data.PaymentSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StripePortalUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("StripeSecretKey")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("StripeWebhookSecret")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("payment_settings", (string)null);
+                });
+
             modelBuilder.Entity("Identity.API.Data.ProcessedPaymentEvent", b =>
                 {
                     b.Property<string>("Provider")

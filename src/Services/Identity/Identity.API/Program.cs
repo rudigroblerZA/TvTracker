@@ -31,6 +31,12 @@ if (!builder.Environment.IsDevelopment())
 // signing secret, so it does nothing unconfigured), the test provider only in development.
 builder.Services.AddOptions<PaymentOptions>().Bind(builder.Configuration.GetSection("Payments")).ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<PaymentOptions>, PaymentOptionsValidator>();
+// What an admin sets on the Financials page lies over that configuration; everything that reads the options reads
+// the result. Keys entered there are encrypted under Payments:SettingsKey.
+builder.Services.AddSingleton<SettingsCipher>();
+builder.Services.AddSingleton<EffectivePaymentOptions>();
+builder.Services.AddSingleton<IOptions<PaymentOptions>>(sp => sp.GetRequiredService<EffectivePaymentOptions>());
+builder.Services.AddHostedService<PaymentSettingsRefresher>();
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
@@ -40,7 +46,7 @@ if (builder.Environment.IsDevelopment())
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
 builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
     {
-        client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<PaymentOptions>>().Value.Stripe.ApiBase);
+        client.BaseAddress = new Uri(sp.GetRequiredService<IOptionsMonitor<PaymentOptions>>().CurrentValue.Stripe.ApiBase);
         client.Timeout = TimeSpan.FromSeconds(20);
     })
     .RemoveAllResilienceHandlers();
@@ -78,5 +84,6 @@ app.MapRevenueApi();
 app.MapBrandingApi();
 app.MapFamilyApi();
 app.MapPaymentsApi();
+app.MapPaymentSettingsApi();
 
 app.Run();

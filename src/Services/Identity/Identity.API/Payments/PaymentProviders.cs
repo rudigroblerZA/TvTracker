@@ -73,14 +73,21 @@ public interface IPaymentProvider
 }
 
 /// <summary>
-/// The registered providers by name, and the one selling now (<see cref="PaymentOptions.Provider"/>).
+/// The registered providers by name, and the one selling now (<see cref="PaymentOptions.Provider"/>, as
+/// <see cref="EffectivePaymentOptions"/> has it).
 /// </summary>
 public sealed class PaymentProviders(IEnumerable<IPaymentProvider> providers, Microsoft.Extensions.Options.IOptions<PaymentOptions> options)
 {
     private readonly Dictionary<string, IPaymentProvider> byName = providers.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Null when nothing is sold, the named provider isn't registered, or it still lacks a key.
+    /// </summary>
     public IPaymentProvider? Selling =>
-        options.Value.Provider is { Length: > 0 } name ? byName.GetValueOrDefault(name) : null;
+        options.Value is { Provider: { Length: > 0 } name } current && PaymentOptionsValidator.Missing(current).Count == 0
+            ? byName.GetValueOrDefault(name) : null;
+
+    public IEnumerable<string> Names => byName.Keys;
 
     public IPaymentProvider? Named(string name) => byName.GetValueOrDefault(name);
 }

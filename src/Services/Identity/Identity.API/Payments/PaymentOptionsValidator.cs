@@ -3,8 +3,11 @@ using Microsoft.Extensions.Options;
 namespace Identity.API.Payments;
 
 /// <summary>
-/// Fails startup when the provider that sells plans lacks what it needs, so a missing Stripe key or return address
-/// shows at deploy time rather than when the first buyer checks out. No provider means plans aren't sold, which is valid.
+/// Fails startup on payment configuration that can't be right whatever an admin sets later: an unknown provider, an
+/// address that isn't one, a price without a currency. What the selling provider still lacks (<see cref="Missing"/>:
+/// Stripe's keys, the test provider's secret) doesn't stop the service, since an admin can supply Stripe's on the
+/// Financials page; until then plans aren't sold, and the service says so when it starts. No provider means plans
+/// aren't sold, which is valid.
 /// </summary>
 public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
 {
@@ -17,8 +20,6 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
             case null or "":
                 break;
             case "stripe":
-                Require(errors, options.Stripe.SecretKey, "Payments:Stripe:SecretKey");
-                Require(errors, options.Stripe.WebhookSecret, "Payments:Stripe:WebhookSecret");
                 if (!IsAbsoluteHttp(options.ReturnUrl))
                 {
                     errors.Add("Payments:ReturnUrl must be an absolute http(s) address when Payments:Provider is stripe.");
@@ -29,7 +30,6 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
                 }
                 break;
             case "test":
-                Require(errors, options.Test.WebhookSecret, "Payments:Test:WebhookSecret");
                 break;
             default:
                 errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, test).");
@@ -45,6 +45,29 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
         }
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
+    }
+
+    /// <summary>
+    /// What the provider that sells still needs before it can: empty when it can sell, or when nothing is sold.
+    /// </summary>
+    public static IReadOnlyList<string> Missing(PaymentOptions options)
+    {
+        var missing = new List<string>();
+        switch (options.Provider)
+        {
+            case "stripe":
+                Require(missing, options.Stripe.SecretKey, "Stripe's secret key");
+                Require(missing, options.Stripe.WebhookSecret, "Stripe's webhook signing secret");
+                if (!IsAbsoluteHttp(options.ReturnUrl))
+                {
+                    missing.Add("Payments:ReturnUrl isn't an absolute address.");
+                }
+                break;
+            case "test":
+                Require(missing, options.Test.WebhookSecret, "The test provider's webhook secret (Payments:Test:WebhookSecret)");
+                break;
+        }
+        return missing;
     }
 
     private static void Require(List<string> errors, string? value, string key)

@@ -59,9 +59,33 @@ public class CostItem
     public DateTime UpdatedAtUtc { get; set; }
 }
 
+/// <summary>
+/// The payment provider's rate, as an admin set it on the financials page from the provider's own statement. One row;
+/// without it the configured rate (<c>Financials:PaymentFee*</c>) is used.
+/// </summary>
+public class FeeSettings
+{
+    public const int OnlyId = 1;
+
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Percent of each payment.
+    /// </summary>
+    public decimal Percent { get; set; }
+
+    /// <summary>
+    /// Added per payment, in the payment's own currency.
+    /// </summary>
+    public decimal Fixed { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
 public class FinancialsContext(DbContextOptions<FinancialsContext> options) : DbContext(options)
 {
     public DbSet<CostItem> CostItems => Set<CostItem>();
+    public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +97,14 @@ public class FinancialsContext(DbContextOptions<FinancialsContext> options) : Db
             entity.Property(c => c.Amount).HasPrecision(12, 2);
             entity.Property(c => c.Currency).HasMaxLength(3);
             entity.Property(c => c.Notes).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<FeeSettings>(entity =>
+        {
+            entity.ToTable("fee_settings");
+            entity.Property(f => f.Id).ValueGeneratedNever();
+            entity.Property(f => f.Percent).HasPrecision(5, 2);
+            entity.Property(f => f.Fixed).HasPrecision(8, 2);
         });
     }
 }

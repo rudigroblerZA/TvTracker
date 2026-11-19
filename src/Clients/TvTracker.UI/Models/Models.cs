@@ -48,6 +48,26 @@ public record PersonMatch(Guid Id, string Name, string? PhotoUrl, IReadOnlyList<
 /// </summary>
 public record CatalogNumbers(int Shows, int Episodes, int People);
 
+/// <summary>
+/// How payments are set up (Identity.API's PaymentSettingsApi). Keys are never sent: each says where the one in force
+/// comes from ("settings", "configuration", or "" when not set).
+/// </summary>
+/// <param name="Provider">The provider in force; "" when nothing is sold.</param>
+/// <param name="Missing">What the provider still needs before plans can be bought.</param>
+public record PaymentSettings(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
+    string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
+    string WebhookPath, bool CanStoreSecrets, DateTime? UpdatedAtUtc, string? UpdatedBy);
+
+/// <param name="Provider">Null leaves it; "" sells nothing.</param>
+/// <param name="StripeSecretKey">Null leaves the stored key as it is.</param>
+public record SavePaymentSettings(string? Provider, string? StripeSecretKey, string? StripeWebhookSecret, string? StripePortalUrl);
+
+/// <summary>
+/// The payment provider's rate, for the fee estimate (Financials.API).
+/// </summary>
+/// <param name="Set">True when an admin set it; false when it's the configured rate.</param>
+public record FeeSettings(decimal Percent, decimal Fixed, bool Set);
+
 public record ShowSummary(Guid Id, string Title, string? PosterUrl, int? Year, ShowStatus Status, string? Network, IReadOnlyList<string> Genres);
 
 /// <summary>

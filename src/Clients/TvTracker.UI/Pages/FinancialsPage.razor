@@ -248,6 +248,8 @@
                 </EditForm>
             </section>
 
+            <PaymentProviderSection OnFeesChanged="LoadAsync" />
+
             <p class="muted small">
                 How it's worked out. Subscriptions are the payments received in the month. Affiliate commission is counted in the
                 month the network reported the sale@(statement.Affiliates == Financials.AffiliatesOff ? " (affiliate links are switched off, so there is none)" : "").
