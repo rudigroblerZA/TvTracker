@@ -108,4 +108,11 @@ public class PaymentSettingsTests
     [Fact]
     public void Keys_are_refused_where_they_couldnt_be_encrypted() =>
         Assert.Contains("Payments:SettingsKey", PaymentSettingsApi.Problem("stripe", "sk_live_1", null, null, Providers(Configured()), Cipher(null)));
+
+    [Theory]
+    [InlineData("https://tv.example/settings/plan", "https://tv.example/api/identity/api/v1/payments/webhooks/stripe")]
+    [InlineData("/settings/plan", null)]
+    [InlineData(null, null)]
+    public void The_webhook_address_is_given_only_where_the_sites_address_is_known(string? returnUrl, string? webhook) =>
+        Assert.Equal(webhook, PaymentSettingsApi.PublicWebhookUrl(returnUrl));
 }

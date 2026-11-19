@@ -17,7 +17,7 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
 
         switch (options.Provider)
         {
-            case null or "":
+            case null or "" or "test":
                 break;
             case "stripe":
                 if (!IsAbsoluteHttp(options.ReturnUrl))
@@ -28,8 +28,6 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
                 {
                     errors.Add("Payments:Stripe:ApiBase must be an absolute http(s) address.");
                 }
-                break;
-            case "test":
                 break;
             default:
                 errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, test).");

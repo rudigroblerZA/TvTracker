@@ -60,7 +60,8 @@ public sealed class SettingsCipher(IConfiguration configuration)
 /// What an admin has set for payments, read into plain values.
 /// </summary>
 /// <param name="Provider">Null follows configuration; "" sells nothing; else a provider's name.</param>
-public sealed record StoredPaymentSettings(string? Provider, string? StripeSecretKey, string? StripeWebhookSecret, string? StripePortalUrl);
+public sealed record StoredPaymentSettings(string? Provider, string? StripeSecretKey, string? StripeWebhookSecret, string? StripePortalUrl,
+    DateTime? UpdatedAtUtc = null, string? UpdatedBy = null);
 
 /// <summary>
 /// The payment options in force: configuration (<c>Payments:*</c>), with what an admin set on the Financials page laid
@@ -70,25 +71,40 @@ public sealed record StoredPaymentSettings(string? Provider, string? StripeSecre
 /// <item><b>A field an admin left alone</b> keeps its configured value; clearing the settings returns to configuration.</item>
 /// <item><b>Read from the database</b> at start, after every save, and every <see cref="RefreshEvery"/>, so another
 /// instance of the service follows a change within that time.</item>
+/// <item><b>Merged once</b> for each pair of configuration and stored settings, not on every read.</item>
 /// </list>
 /// </summary>
 public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> configured, SettingsCipher cipher) : IOptions<PaymentOptions>
 {
-    public static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan RefreshEvery = TimeSpan.FromMinutes(1);
 
     private volatile StoredPaymentSettings? stored;
+    private volatile Merged? merged;
+
+    private sealed record Merged(PaymentOptions From, StoredPaymentSettings? With, PaymentOptions Result);
 
     public PaymentOptions Configured => configured.CurrentValue;
 
     public StoredPaymentSettings? Stored => stored;
 
-    public PaymentOptions Value => Merge(configured.CurrentValue, stored);
+    public PaymentOptions Value
+    {
+        get
+        {
+            var (from, with, last) = (configured.CurrentValue, stored, merged);
+            if (last is null || !ReferenceEquals(last.From, from) || !ReferenceEquals(last.With, with))
+            {
+                merged = last = new Merged(from, with, Merge(from, with));
+            }
+            return last.Result;
+        }
+    }
 
     public async Task ReloadAsync(IdentityContext db, CancellationToken ct)
     {
         var row = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct);
         stored = row is null ? null : new StoredPaymentSettings(row.Provider, cipher.Unprotect(row.StripeSecretKey),
-            cipher.Unprotect(row.StripeWebhookSecret), row.StripePortalUrl);
+            cipher.Unprotect(row.StripeWebhookSecret), row.StripePortalUrl, row.UpdatedAtUtc, row.UpdatedBy);
     }
 
     internal static PaymentOptions Merge(PaymentOptions options, StoredPaymentSettings? settings) => settings is null ? options : new PaymentOptions
@@ -115,27 +131,42 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
 public sealed class PaymentSettingsRefresher(IServiceScopeFactory scopes, EffectivePaymentOptions options, TimeProvider time,
     ILogger<PaymentSettingsRefresher> logger) : BackgroundService
 {
+    /// <summary>
+    /// How soon the first read is tried again while the database isn't ready.
+    /// </summary>
+    private static readonly TimeSpan Retry = TimeSpan.FromSeconds(3);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var first = true;
-        while (!stoppingToken.IsCancellationRequested)
+        while (!await ReloadAsync(stoppingToken))
         {
-            try
-            {
-                await using var scope = scopes.CreateAsyncScope();
-                await options.ReloadAsync(scope.ServiceProvider.GetRequiredService<IdentityContext>(), stoppingToken);
-                if (first && PaymentOptionsValidator.Missing(options.Value) is { Count: > 0 } missing)
-                {
-                    logger.LogWarning("Plans can't be bought yet: {Missing} Set it in configuration or on the Financials page.", string.Join(" ", missing));
-                }
-                first = false;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // The database may not be ready at start; configuration alone is in force until it is.
-                logger.LogDebug(ex, "Couldn't read the payment settings; trying again shortly");
-            }
-            await Task.Delay(first ? TimeSpan.FromSeconds(3) : EffectivePaymentOptions.RefreshEvery, time, stoppingToken);
+            await Task.Delay(Retry, time, stoppingToken);
+        }
+        if (PaymentOptionsValidator.Missing(options.Value) is { Count: > 0 } missing)
+        {
+            logger.LogWarning("Plans can't be bought yet: {Missing} Set it in configuration or on the Financials page.", string.Join(" ", missing));
+        }
+
+        using var timer = new PeriodicTimer(EffectivePaymentOptions.RefreshEvery, time);
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            await ReloadAsync(stoppingToken);
+        }
+    }
+
+    private async Task<bool> ReloadAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await options.ReloadAsync(scope.ServiceProvider.GetRequiredService<IdentityContext>(), ct);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The database may not be ready at start, or briefly away later: what was last read stays in force.
+            logger.LogDebug(ex, "Couldn't read the payment settings; trying again shortly");
+            return false;
         }
     }
 }
