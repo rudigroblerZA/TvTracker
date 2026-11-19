@@ -728,6 +728,29 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
   complete, and the page says which income is missing and offers to try again.
 - **Moved from Identity.API:** costs were first kept in Identity's database. That table is dropped and its rows are
   not copied, so costs entered before the move have to be entered again.
+- **Payment provider** (a section of the same page): which provider sells plans, Stripe's keys, the customer portal
+  link, and the rate the provider charges.
+  - **It lies over configuration.** A field left alone keeps the deployment's value (`Payments:*`, `STRIPE_*`);
+    "Go back to configuration" deletes what was set here, keys included. A change takes effect at once, and on
+    another instance of the service within 30 seconds.
+  - **Keys go in and never come back.** They are stored encrypted (AES-GCM) under `Payments:SettingsKey`, the
+    AppHost's `payment-settings-key` secret (`PAYMENT_SETTINGS_KEY` in a deployment, made up once by `deploy.sh`).
+    The page only says whether each is set and where from. Change that secret and the saved keys can't be read:
+    enter them again. Without it, keys can only come from configuration.
+  - **A change that would stop sales is refused:** choosing Stripe without both keys and an absolute return address
+    in force. "None" stops selling on purpose.
+  - **The fee rate** set here is the one the estimate uses; without it, the configured `Financials:PaymentFee*`.
+  - **Identity.API now starts without Stripe's keys.** It used to refuse to start when Stripe was the provider and a
+    key was missing. Now plans simply aren't sold until the keys are there, from configuration or this page, and the
+    service says so in its log when it starts.
+  - **Endpoints:** `GET`, `PUT` and `DELETE /api/v1/admin/payments/settings` (Identity.API) and
+    `/api/v1/financials/fees` (Financials.API). Admins only: anyone else gets 404. Saves are logged with who, never
+    the values.
+  - **Tried** as the admin with the development setup: Stripe without keys and a key of the wrong kind were refused;
+    keys, the portal link and a fee rate were saved, showed as "set here" with the fields empty again, and survived a
+    reload; "None" stopped sales; going back to configuration restored the test provider. Not tried: selling
+    through Stripe with keys entered here (the local setup has no absolute return address, so Stripe can't be
+    chosen), or a real Stripe account.
 - **Tried:** as the admin, three costs were added (monthly, yearly, once), one changed and one deleted, and the months
   and totals followed each time, beside the development data's real payments and commission; `demo` sees neither
   the link nor the figures; the page doesn't scroll sideways on a phone. What a cost may be (its category, amount,

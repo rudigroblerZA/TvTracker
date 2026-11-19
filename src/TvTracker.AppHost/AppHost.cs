@@ -570,6 +570,11 @@ if (!builder.ExecutionContext.IsPublishMode && !string.Equals(builder.Configurat
     webApp.WithEnvironment("Affiliates__TestNetworkKey", testNetworkKey);
 }
 
+// The key Identity.API encrypts with what an admin enters on the Financials page (Stripe's keys): a secret of the
+// deployment's own, made up once and kept, so the database alone doesn't give those keys away. Change it and the keys
+// saved under the old one can no longer be read; they are then entered again.
+identityApi.WithEnvironment("Payments__SettingsKey", Secret("payment-settings-key", "tvtracker-payment-settings-dev-key"));
+
 // Payments. A deployment sells through Stripe: its secret key and webhook
 // signing secret are secret parameters, the customer portal's login link and the plan page's public address plain ones,
 // all required. Running locally, Stripe sells in test mode once its key is given (user secrets:

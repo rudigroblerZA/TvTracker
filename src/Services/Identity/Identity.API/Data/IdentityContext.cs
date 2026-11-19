@@ -4,6 +4,41 @@ using TvTracker.Persistence;
 namespace Identity.API.Data;
 
 /// <summary>
+/// What an admin has set for payments on the Financials page (<see cref="Apis.PaymentSettingsApi"/>): the provider
+/// that sells, and Stripe's keys. One row; a field left null falls back to configuration (<c>Payments:*</c>).
+/// </summary>
+public class PaymentSettings
+{
+    public const int OnlyId = 1;
+
+    public int Id { get; set; }
+
+    /// <summary>
+    /// Null follows configuration; "" sells nothing; else the provider's name.
+    /// </summary>
+    public string? Provider { get; set; }
+
+    /// <summary>
+    /// Encrypted (<see cref="Payments.SettingsCipher"/>); null follows configuration.
+    /// </summary>
+    public string? StripeSecretKey { get; set; }
+
+    /// <summary>
+    /// Encrypted; null follows configuration.
+    /// </summary>
+    public string? StripeWebhookSecret { get; set; }
+
+    public string? StripePortalUrl { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// The admin who last saved them (a username).
+    /// </summary>
+    public string? UpdatedBy { get; set; }
+}
+
+/// <summary>
 /// What admins have set in Settings for the whole site: the app's name and accent colour, and the company behind it.
 /// One row; a field left null falls back to configuration (<see cref="Apis.BrandingApi"/>).
 /// </summary>
@@ -213,6 +248,7 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
     public DbSet<PaymentReceipt> Receipts => Set<PaymentReceipt>();
     public DbSet<ProcessedPaymentEvent> ProcessedPaymentEvents => Set<ProcessedPaymentEvent>();
     public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
+    public DbSet<PaymentSettings> PaymentSettings => Set<PaymentSettings>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
 
@@ -220,6 +256,17 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<PaymentSettings>(entity =>
+        {
+            entity.ToTable("payment_settings");
+            entity.Property(s => s.Id).ValueGeneratedNever();
+            entity.Property(s => s.Provider).HasMaxLength(32);
+            entity.Property(s => s.StripeSecretKey).HasMaxLength(1024);
+            entity.Property(s => s.StripeWebhookSecret).HasMaxLength(1024);
+            entity.Property(s => s.StripePortalUrl).HasMaxLength(512);
+            entity.Property(s => s.UpdatedBy).HasMaxLength(128);
+        });
+
         modelBuilder.Entity<SiteSettings>(entity =>
         {
             entity.ToTable("site_settings");

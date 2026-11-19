@@ -67,6 +67,27 @@ namespace Financials.API.Data.Migrations
 
                     b.ToTable("cost_items", (string)null);
                 });
+
+            modelBuilder.Entity("Financials.API.Data.FeeSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Fixed")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal>("Percent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("fee_settings", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }
