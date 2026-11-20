@@ -32,6 +32,11 @@ public interface IModeratedPost
 
 public class Comment : IModeratedPost
 {
+    /// <summary>
+    /// The most characters a comment's words may run to.
+    /// </summary>
+    public const int MaxLength = 2000;
+
     public Guid Id { get; set; }
     public Guid EpisodeId { get; set; }
     public Guid ShowId { get; set; }
@@ -217,12 +222,6 @@ public class Reaction
 }
 
 /// <summary>
-/// Local copy of watched episodes (from EpisodeWatched), used to decide whether to show comments.
-/// </summary>
-/// <summary>
-/// An episode the user has watched, from Tracking's events and daily snapshot.
-/// </summary>
-/// <summary>
 /// A user's favourite character of an episode: one per user and episode, naming the catalog's cast member.
 /// </summary>
 public class CharacterVote
@@ -234,6 +233,12 @@ public class CharacterVote
     public DateTime CreatedAtUtc { get; set; }
 }
 
+/// <summary>
+/// Local copy of watched episodes (from EpisodeWatched), used to decide whether to show comments.
+/// </summary>
+/// <summary>
+/// An episode the user has watched, from Tracking's events and daily snapshot.
+/// </summary>
 public class WatchedEpisodeCopy
 {
     public required string UserId { get; set; }
@@ -306,7 +311,7 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
             entity.HasIndex(c => c.UserId);
             entity.Property(c => c.UserId).HasMaxLength(64);
             entity.Property(c => c.DisplayName).HasMaxLength(100);
-            entity.Property(c => c.Text).HasMaxLength(2000);
+            entity.Property(c => c.Text).HasMaxLength(Comment.MaxLength);
             entity.Property(c => c.GifId).HasMaxLength(64);
             entity.Property(c => c.HiddenReason).HasMaxLength(16);
         });
@@ -373,8 +378,9 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
         {
             entity.ToTable("character_votes");
             entity.HasKey(v => new { v.UserId, v.EpisodeId });
-            entity.HasIndex(v => v.EpisodeId);
-            entity.HasIndex(v => v.ShowId);
+            // The counts are per person within an episode or a show: with the person in the index, they are read from it alone.
+            entity.HasIndex(v => new { v.EpisodeId, v.PersonId });
+            entity.HasIndex(v => new { v.ShowId, v.PersonId });
             entity.Property(v => v.UserId).HasMaxLength(64);
         });
 

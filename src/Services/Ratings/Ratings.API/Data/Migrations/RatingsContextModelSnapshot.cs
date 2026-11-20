@@ -42,9 +42,9 @@ namespace Ratings.API.Data.Migrations
 
                     b.HasKey("UserId", "EpisodeId");
 
-                    b.HasIndex("EpisodeId");
+                    b.HasIndex("EpisodeId", "PersonId");
 
-                    b.HasIndex("ShowId");
+                    b.HasIndex("ShowId", "PersonId");
 
                     b.ToTable("character_votes", (string)null);
                 });

@@ -1,0 +1,23 @@
+@* One cast member in a favourite-character list: their share of the votes as a bar behind the character's name. The
+   list decides what wraps it: a button to vote with, or a link to the person. *@
+<span class="share" style="width: @Share%"></span>
+<span class="who"><strong>@(Member.Character is { Length: > 0 } character ? character : Member.Name)</strong>
+    @if (Member.Character is { Length: > 0 })
+    {
+        <span class="muted small">@Member.Name</span>
+    }
+</span>
+@if (Votes > 0)
+{
+    <span class="count">@($"{Share}%")<span class="muted small">@($" · {Votes}")</span></span>
+}
+
+@code {
+    [Parameter, EditorRequired] public CastMember Member { get; set; } = default!;
+    [Parameter] public int Votes { get; set; }
+    [Parameter] public int Total { get; set; }
+
+    private int Share => Total > 0 ? (int)Math.Round(100.0 * Votes / Total) : 0;
+
+    public static string Count(int votes) => votes == 1 ? "1 vote" : $"{votes:N0} votes";
+}
