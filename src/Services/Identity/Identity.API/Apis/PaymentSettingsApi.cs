@@ -125,9 +125,9 @@ public static class PaymentSettingsApi
         {
             // The keys go with the row: configuration alone must be able to carry on selling.
             var before = options.Read(await Locked(db).AsNoTracking().SingleOrDefaultAsync(ct));
-            if (Refusal(EffectivePaymentOptions.Merge(options.Configured, before), options.Configured, choosesProvider: false) is { } problem)
+            if (ClearRefusal(EffectivePaymentOptions.Merge(options.Configured, before), options.Configured) is { } problem)
             {
-                return $"{problem} The deployment's configuration doesn't have it. To stop selling on purpose, choose \"None\" first.";
+                return $"{problem} To stop selling on purpose, choose \"None\" first.";
             }
             await db.PaymentSettings.ExecuteDeleteAsync(ct);
             return null;
@@ -187,11 +187,21 @@ public static class PaymentSettingsApi
     /// after, though a provider is still chosen; or the change itself chooses a provider that couldn't sell. Not
     /// refused: choosing none, and adding to a provider that isn't selling yet (its keys arrive one at a time).
     /// </summary>
+    /// <summary>
+    /// Why going back to configuration alone is refused, or null: plans sell now and configuration on its own
+    /// couldn't carry on, for want of a key or of any provider at all.
+    /// </summary>
+    internal static string? ClearRefusal(PaymentOptions before, PaymentOptions configured) =>
+        Refusal(before, configured, choosesProvider: false) is { } missing ? $"{missing} The deployment's configuration doesn't have it."
+        : Sells(before) && !Sells(configured) ? "That would stop plans being sold: the deployment's configuration names no provider."
+        : null;
+
+    private static bool Sells(PaymentOptions options) => options.Provider is { Length: > 0 } && PaymentOptionsValidator.Missing(options).Count == 0;
+
     internal static string? Refusal(PaymentOptions before, PaymentOptions after, bool choosesProvider)
     {
         var missing = PaymentOptionsValidator.Missing(after);
-        var sellsNow = before.Provider is { Length: > 0 } && PaymentOptionsValidator.Missing(before).Count == 0;
-        return missing.Count > 0 && (sellsNow || choosesProvider)
+        return missing.Count > 0 && (Sells(before) || choosesProvider)
             ? $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}"
             : null;
     }

@@ -98,29 +98,20 @@ public static class CharacterVotesApi
         }
 
         var userId = user.GetUserId();
-        if (!await WatchedAsync(db, userId, episodeId, ct))
+        var watched = await db.WatchedEpisodes.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == userId && w.EpisodeId == episodeId, ct);
+        if (watched is null)
         {
             return TypedResults.Conflict("Mark the episode watched before voting on it.");
         }
 
-        var vote = await db.CharacterVotes.FindAsync([userId, episodeId], ct);
-        if (vote is null)
-        {
-            db.CharacterVotes.Add(new CharacterVote
-            {
-                UserId = userId,
-                EpisodeId = episodeId,
-                ShowId = request.ShowId,
-                PersonId = request.PersonId,
-                CreatedAtUtc = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            (vote.ShowId, vote.PersonId, vote.CreatedAtUtc) = (request.ShowId, request.PersonId, DateTime.UtcNow);
-        }
-
-        await db.SaveChangesAsync(ct);
+        // The show is the one Tracking says the episode belongs to, so a vote can't be counted towards another show's
+        // favourites. The request's is used only for a watch from before the copy kept its show.
+        var (showId, personId, now) = (watched.ShowId ?? request.ShowId, request.PersonId, DateTime.UtcNow);
+        // One statement, so two votes at once from the same viewer can't both add the row: the later pick wins.
+        await db.Database.ExecuteSqlAsync($"""
+            insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc") values ({userId}, {episodeId}, {showId}, {personId}, {now})
+            on conflict ("UserId", "EpisodeId") do update set "ShowId" = excluded."ShowId", "PersonId" = excluded."PersonId", "CreatedAtUtc" = excluded."CreatedAtUtc"
+            """, ct);
         return TypedResults.Ok(await VotesAsync(db, userId, episodeId, ct));
     }
 

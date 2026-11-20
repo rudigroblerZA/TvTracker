@@ -49,6 +49,8 @@ public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEve
         }
 
         await db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
+        // A favourite-character vote needs the watch: it goes with it.
+        await db.CharacterVotes.Where(v => v.UserId == e.UserId && v.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
         db.MarkProcessed(e, nameof(EpisodeUnwatchedHandler));
         await db.SaveChangesAsync(ct);
     }
@@ -70,6 +72,7 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
         var watches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId, w => w.ShowId);
         var copies = await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct);
         var takenAt = e.TakenAtUtc.UtcDateTime;
+        var gone = new List<Guid>();
         foreach (var copy in copies)
         {
             if (watches.TryGetValue(copy.EpisodeId, out var showId))
@@ -79,7 +82,13 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
             else if (copy.RecordedAtUtc < takenAt)
             {
                 db.WatchedEpisodes.Remove(copy);
+                gone.Add(copy.EpisodeId);
             }
+        }
+        if (gone.Count > 0)
+        {
+            // As an unwatch does: favourite-character votes go with the watches they needed.
+            db.CharacterVotes.RemoveRange(await db.CharacterVotes.Where(v => v.UserId == e.UserId && gone.Contains(v.EpisodeId)).ToListAsync(ct));
         }
         var known = copies.Select(c => c.EpisodeId).ToHashSet();
         var now = time.GetUtcNow().UtcDateTime;
