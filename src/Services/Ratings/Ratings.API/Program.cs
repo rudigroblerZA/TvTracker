@@ -69,7 +69,7 @@ app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, RatingsContext db, 
         episodeRatings = await db.EpisodeRatings.AsNoTracking().Where(r => r.UserId == userId)
             .Select(r => new { r.ShowId, r.EpisodeId, r.Stars, r.RatedAtUtc }).ToListAsync(ct),
         comments = await db.Comments.AsNoTracking().Where(c => c.UserId == userId)
-            .Select(c => new { c.ShowId, c.EpisodeId, c.Text, c.GifId, c.IsSpoiler, c.CreatedAtUtc }).ToListAsync(ct),
+            .Select(c => new { c.ShowId, c.EpisodeId, c.Text, c.GifId, c.IsSpoiler, c.CreatedAtUtc, c.EditedAtUtc }).ToListAsync(ct),
         reactions = await db.Reactions.AsNoTracking().Where(r => r.UserId == userId)
             .Select(r => new { r.EpisodeId, r.Emoji, r.CreatedAtUtc }).ToListAsync(ct),
         communityInsights = await db.Insights.AsNoTracking().Where(i => i.UserId == userId)
