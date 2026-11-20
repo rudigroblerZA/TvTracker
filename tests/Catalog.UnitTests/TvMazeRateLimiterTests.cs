@@ -1,4 +1,4 @@
-﻿using Catalog.SyncWorker.Providers;
+﻿using Catalog.Worker.Providers;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Catalog.UnitTests;

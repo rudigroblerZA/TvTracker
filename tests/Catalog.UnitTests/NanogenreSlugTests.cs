@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Nanogenres;
+﻿using Catalog.Worker.Nanogenres;
 
 namespace Catalog.UnitTests;
 

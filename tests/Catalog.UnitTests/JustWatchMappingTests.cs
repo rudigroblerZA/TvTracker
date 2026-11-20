@@ -1,7 +1,7 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Catalog.API.Apis;
 using Catalog.Data;
-using Catalog.SyncWorker.JustWatch;
+using Catalog.Worker.JustWatch;
 
 namespace Catalog.UnitTests;
 

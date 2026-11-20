@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Providers;
+﻿using Catalog.Worker.Providers;
 
 namespace Catalog.UnitTests;
 

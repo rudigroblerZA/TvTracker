@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Quotes;
+﻿using Catalog.Worker.Quotes;
 
 namespace Catalog.UnitTests;
 

@@ -1,6 +1,6 @@
-using System.Text.Json;
-using Catalog.SyncWorker.Providers;
-using Catalog.SyncWorker.Providers.Tvdb;
+﻿using System.Text.Json;
+using Catalog.Worker.Providers;
+using Catalog.Worker.Providers.Tvdb;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;

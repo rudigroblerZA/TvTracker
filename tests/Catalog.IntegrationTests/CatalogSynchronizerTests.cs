@@ -1,7 +1,6 @@
-using Catalog.Data;
-using Catalog.SyncWorker;
-using Catalog.SyncWorker.JustWatch;
-using Catalog.SyncWorker.Providers;
+﻿using Catalog.Data;
+using Catalog.Worker.Providers;
+using Catalog.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 using TvTracker.Tests;
+using Catalog.Worker.JustWatch;
 
 namespace Catalog.IntegrationTests;
 

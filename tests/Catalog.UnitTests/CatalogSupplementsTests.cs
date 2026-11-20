@@ -1,6 +1,6 @@
 ﻿using Catalog.Data;
-using Catalog.SyncWorker.Providers;
-using Catalog.SyncWorker.Supplement;
+using Catalog.Worker.Providers;
+using Catalog.Worker.Supplement;
 using Microsoft.Extensions.Time.Testing;
 using TvTracker;
 using TvTracker.IntegrationEvents;

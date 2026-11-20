@@ -1,6 +1,6 @@
-using System.Net;
-using Catalog.SyncWorker.Providers;
-using Catalog.SyncWorker.Providers.Wikidata;
+﻿using System.Net;
+using Catalog.Worker.Providers;
+using Catalog.Worker.Providers.Wikidata;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Catalog.UnitTests;

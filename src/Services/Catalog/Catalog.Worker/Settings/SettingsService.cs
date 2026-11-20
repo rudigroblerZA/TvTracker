@@ -1,0 +1,207 @@
+﻿using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Catalog.Data;
+using Catalog.Worker.Quotes;
+using Catalog.Worker.Supplement;
+using Microsoft.EntityFrameworkCore;
+using TvTracker;
+
+namespace Catalog.Worker.Settings;
+
+/// <summary>
+/// Where shows are set and filmed, for the TV atlas: Wikidata's narrative location (P840) and filming location (P915) of
+/// the item with each show's TVmaze id (P8600, as Research and Memorable lines find shows), kept when the place has
+/// coordinates on Earth (The Expanse's Moon has some too). Both come in one query, each row marked with its kind. One
+/// SPARQL query per <see cref="Batch"/> shows, a batch a round while any are due, most popular first; each show is
+/// looked up again monthly, and its rows are replaced with what Wikidata says then.
+/// <para>
+/// <b>A query Wikidata can answer:</b> the two properties are one triple pattern over a <c>VALUES</c> list, joined to the
+/// shows' items. Written as a UNION, the planner ran the filming-location half across all of Wikidata, and 25 shows timed
+/// out at 60 s (a 504), which then counted against the address and brought 429s; as it is, 25 shows take ~6 s.
+/// </para>
+/// <para>
+/// <b>Gently:</b> Wikidata limits shared addresses hard, so a 429 is waited out as asked (up to <see cref="MaxWait"/>),
+/// and a failed round is simply tried again in the next. A plain client with one try, as Research's sources.
+/// </para>
+/// </summary>
+public sealed class SettingsService(IServiceScopeFactory scopeFactory, TimeProvider time, IConfiguration configuration,
+    [FromKeyedServices(WikidataJobs.Atlas)] JobRun run, ILogger<SettingsService> logger)
+    : BackgroundService
+{
+    /// <summary>
+    /// Shows are found on Wikidata by their TVmaze id (P8600), so only TVmaze's shows are looked up.
+    /// </summary>
+    private const string Provider = CatalogSources.TvMaze;
+    private const int Batch = 25;
+    private const int Attempts = 3;
+    private static readonly TimeSpan FirstDelay = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan Round = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan Idle = TimeSpan.FromHours(6);
+    private static readonly TimeSpan LookupAfter = TimeSpan.FromDays(30);
+    private static readonly TimeSpan MaxWait = TimeSpan.FromMinutes(30);
+
+    private static readonly HttpClient Http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
+    {
+        Timeout = TimeSpan.FromSeconds(60),
+        DefaultRequestHeaders = { { "User-Agent", "TvTracker-atlas/1.0 (+https://github.com/rudigroblerZA/TvTracker)" } }
+    };
+
+    // Q2 is Earth: places on other globes have coordinates too.
+    private const string Sparql = """
+        SELECT ?tvmaze ?kind ?place ?placeLabel ?countryLabel ?lat ?lon WHERE {
+          VALUES ?tvmaze { {IDS} }
+          VALUES (?property ?kind) { (wdt:P840 "set") (wdt:P915 "filmed") }
+          ?item wdt:P8600 ?tvmaze.
+          ?item ?property ?place.
+          ?place p:P625/psv:P625 ?coord.
+          ?coord wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon; wikibase:geoGlobe wd:Q2.
+          ?place rdfs:label ?placeLabel. FILTER(LANG(?placeLabel) = "en")
+          OPTIONAL { ?place wdt:P17 ?country. ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }
+        }
+        """;
+
+    private sealed record Place(string ExternalId, string Kind, string PlaceId, string Name, string? Country, double Latitude, double Longitude);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (CatalogSources.Configured(configuration) != Provider)
+        {
+            run.TurnOff("Off: the catalog isn't from TVmaze, and shows are found by their TVmaze id.");
+            logger.LogInformation("The TV atlas: off, since the catalog isn't from TVmaze and shows are found by their TVmaze id");
+            return;
+        }
+        await run.SleepAsync(FirstDelay, time, stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var next = Idle;
+            run.RoundStarted();
+            try
+            {
+                var (looked, due) = await LookUpAsync(stoppingToken);
+                run.RoundEnded(looked, due, time.GetUtcNow().UtcDateTime);
+                if (looked > 0)
+                {
+                    next = Round;
+                }
+            }
+            // Not only "not an OperationCanceledException": a request that times out is a TaskCanceledException too, and
+            // one escaping here would stop the whole service.
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogWarning(ex, "TV atlas: looking up settings failed; trying again in {Round}", Round);
+                run.RoundEnded(0, null, time.GetUtcNow().UtcDateTime, ex.Message);
+                next = Round;
+            }
+            // Asked to run now (tvtracker-import wikidata run atlas): straight on to the next batch.
+            if (!run.Requested)
+            {
+                await run.SleepAsync(next, time, stoppingToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One batch: how many shows were looked up, and how many are still due after it.
+    /// </summary>
+    private async Task<(int Looked, int Due)> LookUpAsync(CancellationToken ct)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
+        var now = time.GetUtcNow().UtcDateTime;
+        var staleBefore = now - LookupAfter;
+        var waiting = db.Shows.AsNoTracking()
+            .Where(s => s.Source == Provider && !db.SettingLookups.Any(l => l.ShowId == s.Id && l.CheckedAtUtc >= staleBefore));
+        var due = await waiting
+            .OrderByDescending(s => s.Popularity)
+            .Select(s => new { s.Id, s.ExternalId })
+            .Take(Batch)
+            .ToListAsync(ct);
+        if (due.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        var places = (await WithRetryAsync(() => QueryAsync(due.Select(s => s.ExternalId), ct), ct)).ToLookup(p => p.ExternalId);
+        var ids = due.Select(s => s.Id).ToList();
+        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Settings.Where(s => ids.Contains(s.ShowId)).ExecuteDeleteAsync(ct);
+            await db.SettingLookups.Where(l => ids.Contains(l.ShowId)).ExecuteDeleteAsync(ct);
+            foreach (var show in due)
+            {
+                db.Settings.AddRange(places[show.ExternalId].Select(p => new ShowSetting
+                {
+                    ShowId = show.Id,
+                    Kind = p.Kind,
+                    PlaceId = p.PlaceId,
+                    Name = p.Name,
+                    Country = p.Country,
+                    Latitude = p.Latitude,
+                    Longitude = p.Longitude
+                }));
+                db.SettingLookups.Add(new ShowSettingLookup { ShowId = show.Id, CheckedAtUtc = now });
+            }
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        });
+        logger.LogInformation("TV atlas: looked up {Shows} shows, {Set} with a setting, {Filmed} with a filming location",
+            due.Count, due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Set)),
+            due.Count(s => places[s.ExternalId].Any(p => p.Kind == ShowSettingKinds.Filmed)));
+        return (due.Count, await waiting.CountAsync(ct));
+    }
+
+    /// <summary>
+    /// Each show's places, one row per place (its first coordinates and country when Wikidata has several).
+    /// </summary>
+    private static async Task<List<Place>> QueryAsync(IEnumerable<string> tvmazeIds, CancellationToken ct)
+    {
+        var values = string.Join(' ', tvmazeIds.Select(id => $"\"{id}\""));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://query.wikidata.org/sparql")
+        {
+            Content = new FormUrlEncodedContent([new("query", Sparql.Replace("{IDS}", values))])
+        };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/sparql-results+json"));
+        using var response = await Http.SendAsync(request, ct);
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            throw new WikimediaBusyException(response.Headers.RetryAfter?.Delta);
+        }
+        response.EnsureSuccessStatusCode();
+        using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var places = new List<Place>();
+        foreach (var row in json.RootElement.GetProperty("results").GetProperty("bindings").EnumerateArray())
+        {
+            string? Get(string name) => row.TryGetProperty(name, out var v) && v.GetProperty("value").GetString() is { Length: > 0 } s ? s : null;
+            if (Get("tvmaze") is { } id && Get("kind") is ShowSettingKinds.Set or ShowSettingKinds.Filmed && Get("place") is { } place
+                && Get("placeLabel") is { } name
+                && double.TryParse(Get("lat"), CultureInfo.InvariantCulture, out var lat)
+                && double.TryParse(Get("lon"), CultureInfo.InvariantCulture, out var lon))
+            {
+                places.Add(new Place(id, Get("kind")!, place[(place.LastIndexOf('/') + 1)..], name[..Math.Min(name.Length, 256)],
+                    Get("countryLabel") is { } country ? country[..Math.Min(country.Length, 128)] : null, lat, lon));
+            }
+        }
+        return places.DistinctBy(p => (p.ExternalId, p.Kind, p.PlaceId)).ToList();
+    }
+
+    private async Task<T> WithRetryAsync<T>(Func<Task<T>> call, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await call();
+            }
+            catch (WikimediaBusyException busy) when (attempt < Attempts)
+            {
+                var wait = busy.RetryAfter is { } after && after < MaxWait ? after : TimeSpan.FromMinutes(attempt * 2);
+                logger.LogInformation("TV atlas: Wikidata is busy; waiting {Seconds:0} s", wait.TotalSeconds);
+                await Task.Delay(wait, time, ct);
+            }
+        }
+    }
+}

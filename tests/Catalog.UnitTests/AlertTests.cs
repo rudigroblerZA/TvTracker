@@ -1,6 +1,6 @@
-using System.Diagnostics.Metrics;
+﻿using System.Diagnostics.Metrics;
 using Catalog.API.Alerts;
-using Catalog.SyncWorker.Alerts;
+using Catalog.Worker.Alerts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

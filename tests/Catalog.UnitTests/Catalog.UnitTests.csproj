@@ -10,7 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Data\Catalog.Data.csproj" />
     <ProjectReference Include="..\..\src\Services\Catalog\Catalog.API\Catalog.API.csproj" />
-    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Worker\Catalog.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

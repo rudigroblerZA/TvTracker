@@ -10,7 +10,7 @@
     <PackageReference Include="System.Formats.Cbor" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Data\Catalog.Data.csproj" />
-    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
+    <ProjectReference Include="..\..\src\Services\Catalog\Catalog.Worker\Catalog.Worker.csproj" />
   </ItemGroup>
 
 </Project>

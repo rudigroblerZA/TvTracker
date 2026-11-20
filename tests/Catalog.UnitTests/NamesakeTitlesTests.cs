@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Namesakes;
+﻿using Catalog.Worker.Namesakes;
 
 namespace Catalog.UnitTests;
 

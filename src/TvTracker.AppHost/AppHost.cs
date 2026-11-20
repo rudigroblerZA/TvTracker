@@ -278,7 +278,7 @@ identityApi
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.
-var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync")
+var catalogSync = builder.AddProject<Projects.Catalog_Worker>("catalog-worker")
     .WithReference(catalogDb)
     .WithReference(eventBus)
     .WithReference(redis)

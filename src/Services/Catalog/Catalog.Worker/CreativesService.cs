@@ -1,0 +1,175 @@
+﻿using Catalog.Data;
+using Catalog.Worker.Providers;
+using Microsoft.EntityFrameworkCore;
+using TvTracker.Persistence;
+
+namespace Catalog.Worker;
+
+/// <summary>
+/// Keeps "who made it" current, a little at a time so the provider's rate limit stays shared with everything else.
+/// Every minute it:
+/// <list type="bullet">
+/// <item>re-syncs shows without creatives (imported before they were, or whose crew the provider failed to return), and</item>
+/// <item>fetches career figures for the people that matter for the "prolific producer" insight: every creator or
+/// developer, and anyone credited on at least two of the catalog's shows. Figures are refreshed when the provider says the
+/// person changed, else every 120 days.</item>
+/// </list>
+/// </summary>
+public sealed class CreativesService(
+    IServiceScopeFactory scopeFactory, TimeProvider time, ILogger<CreativesService> logger) : BackgroundService
+{
+    private const int ShowsPerRound = 30;
+    private const int PeoplePerRound = 30;
+    private static readonly TimeSpan Round = TimeSpan.FromMinutes(1);
+    /// <summary>
+    /// A safety net: a career is refreshed sooner when the provider's update list says the person changed
+    /// (<see cref="ProviderChanges"/>).
+    /// </summary>
+    private static readonly TimeSpan CareerMaxAge = TimeSpan.FromDays(120);
+    private static readonly TimeSpan BackfillRetry = TimeSpan.FromHours(1);
+
+    // Shows the provider failed, and when to try them again. Only this service's loop touches it.
+    private readonly Dictionary<string, DateTimeOffset> _failed = [];
+    private readonly Dictionary<Guid, DateTimeOffset> _failedCareers = [];
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var shows = await BackfillShowsAsync(stoppingToken);
+                var people = await RefreshCareersAsync(stoppingToken);
+                if (shows + people > 0)
+                {
+                    logger.LogInformation("Creatives: backfilled {Shows} shows, refreshed {People} careers", shows, people);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Updating creatives failed; retrying in {Round}", Round);
+            }
+
+            await Task.Delay(Round, time, stoppingToken);
+        }
+    }
+
+    private async Task<int> BackfillShowsAsync(CancellationToken ct)
+    {
+        using var caller = ProviderCaller.Begin("crew", ProviderLane.Background);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
+        var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
+        var synchronizer = scope.ServiceProvider.GetRequiredService<CatalogSynchronizer>();
+
+        // Synced over an hour ago: a show whose crew the provider failed to return is retried hourly, not every round.
+        var syncedBefore = time.GetUtcNow().UtcDateTime - BackfillRetry;
+        var now = time.GetUtcNow();
+        var skip = _failed.Where(f => f.Value > now).Select(f => f.Key).ToList();
+        var pending = await db.Shows
+            .Where(s => !s.CreativesImported && s.Source == provider.Name && s.LastSyncedAtUtc < syncedBefore && !skip.Contains(s.ExternalId))
+            .OrderByDescending(s => s.Popularity)
+            .Select(s => s.ExternalId)
+            .Take(ShowsPerRound)
+            .ToListAsync(ct);
+
+        foreach (var externalId in pending)
+        {
+            try
+            {
+                if (await provider.GetShowAsync(externalId, ct) is { } show)
+                {
+                    await synchronizer.RefreshAsync(show, ct);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // The provider failing one show shouldn't stop the round, or come first in every round after.
+                _failed[externalId] = now + BackfillRetry;
+                logger.LogWarning(ex, "Couldn't backfill show {ExternalId}; retrying in {Retry}", externalId, BackfillRetry);
+            }
+        }
+
+        return pending.Count;
+    }
+
+    private async Task<int> RefreshCareersAsync(CancellationToken ct)
+    {
+        using var caller = ProviderCaller.Begin("careers", ProviderLane.Background);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<CatalogContext>();
+        var provider = scope.ServiceProvider.GetRequiredService<ICatalogProvider>();
+        var outbox = scope.ServiceProvider.GetRequiredService<IIntegrationEventOutbox>();
+        var staleBefore = time.GetUtcNow().UtcDateTime - CareerMaxAge;
+        var now = time.GetUtcNow();
+        foreach (var expired in _failedCareers.Where(f => f.Value <= now).Select(f => f.Key).ToList())
+        {
+            _failedCareers.Remove(expired);
+        }
+        var skip = _failedCareers.Keys.ToList();
+
+        var due = await db.People
+            .Where(p => p.ExternalId != null && (p.CareerRefreshedAtUtc == null || p.CareerRefreshedAtUtc < staleBefore) && !skip.Contains(p.Id))
+            .Where(p => db.Creatives.Any(c => c.PersonId == p.Id && (c.Roles.Contains("Creator") || c.Roles.Contains("Developer")))
+                || db.Creatives.Count(c => c.PersonId == p.Id) >= 2)
+            .OrderBy(p => p.CareerRefreshedAtUtc != null)
+            .ThenByDescending(p => db.Creatives.Count(c => c.PersonId == p.Id))
+            .Take(PeoplePerRound)
+            .ToListAsync(ct);
+
+        var personIds = due.Select(p => p.Id).ToList();
+        var madeBefore = (await db.MadeShows.Where(m => personIds.Contains(m.PersonId)).ToListAsync(ct)).ToLookup(m => m.PersonId);
+        var refreshed = new List<Person>();
+        foreach (var person in due)
+        {
+            ProviderCareer? career;
+            try
+            {
+                career = await provider.GetCareerAsync(person.ExternalId!, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // One person failing shouldn't lose the round, or come first in every round after.
+                _failedCareers[person.Id] = now + BackfillRetry;
+                logger.LogWarning(ex, "Couldn't refresh the career of person {ExternalId}; retrying in {Retry}", person.ExternalId, BackfillRetry);
+                continue;
+            }
+
+            // The shows they created or developed come with the same call (From the makers); each fetch replaces them.
+            // No career (no credits with their show, or the person gone) keeps what's stored rather than wiping it.
+            if (career is not null)
+            {
+                db.MadeShows.RemoveRange(madeBefore[person.Id]);
+                db.MadeShows.AddRange((career.Made ?? []).Select(m => new PersonMadeShow
+                {
+                    PersonId = person.Id,
+                    ShowExternalId = m.ShowExternalId,
+                    Title = m.Title,
+                    PosterUrl = m.PosterUrl,
+                    Premiered = m.Premiered,
+                    Ended = m.Ended,
+                    Status = m.Status,
+                    Rating = m.Rating,
+                    Popularity = m.Popularity,
+                    Kind = m.Kind,
+                    Roles = m.Roles.ToList()
+                }));
+            }
+            person.CareerShows = career?.Shows;
+            person.CareerCreated = career?.Created;
+            person.CareerExecutiveProduced = career?.ExecutiveProduced;
+            person.CareerNotableShows = career?.NotableShows.ToList() ?? [];
+            person.CareerRefreshedAtUtc = now.UtcDateTime;
+            refreshed.Add(person);
+        }
+
+        // Analytics tags shows from prolific people with these.
+        foreach (var careers in CatalogSynchronizer.CareerEvents(refreshed))
+        {
+            outbox.Add(careers);
+        }
+        await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
+        return refreshed.Count;
+    }
+}

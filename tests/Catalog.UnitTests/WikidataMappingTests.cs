@@ -1,4 +1,4 @@
-using Catalog.SyncWorker.Providers.Wikidata;
+﻿using Catalog.Worker.Providers.Wikidata;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;

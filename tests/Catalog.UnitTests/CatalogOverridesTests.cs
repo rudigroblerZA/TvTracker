@@ -1,6 +1,6 @@
 ﻿using Catalog.Data;
-using Catalog.SyncWorker;
-using Catalog.SyncWorker.Providers;
+using Catalog.Worker;
+using Catalog.Worker.Providers;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.UnitTests;

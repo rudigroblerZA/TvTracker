@@ -1,5 +1,5 @@
-using Catalog.SyncWorker;
-using Catalog.SyncWorker.Providers;
+﻿using Catalog.Worker.Providers;
+using Catalog.Worker;
 using TvTracker.IntegrationEvents;
 using static Catalog.UnitTests.CatalogOverridesTests;
 
