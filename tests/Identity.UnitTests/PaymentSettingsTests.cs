@@ -146,6 +146,16 @@ public class PaymentSettingsTests
     public void Stopping_sales_on_purpose_is_allowed() => Assert.Null(PaymentSettingsApi.Refusal(SellingStripe, Nothing, choosesProvider: false));
 
     [Fact]
+    public void Going_back_to_a_configuration_with_no_provider_is_refused_while_plans_sell() =>
+        Assert.Contains("names no provider", PaymentSettingsApi.ClearRefusal(SellingStripe, Nothing));
+
+    [Fact]
+    public void Going_back_to_a_configuration_that_sells_is_allowed() => Assert.Null(PaymentSettingsApi.ClearRefusal(SellingStripe, SellingStripe));
+
+    [Fact]
+    public void Going_back_is_allowed_when_nothing_sells_now() => Assert.Null(PaymentSettingsApi.ClearRefusal(Nothing, Nothing));
+
+    [Fact]
     public void A_change_that_leaves_the_provider_selling_is_allowed() =>
         Assert.Null(PaymentSettingsApi.Refusal(SellingStripe, Configured(secretKey: "sk_live_2", webhookSecret: "whsec_1"), choosesProvider: true));
 

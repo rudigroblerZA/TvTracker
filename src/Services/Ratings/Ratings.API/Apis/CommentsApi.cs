@@ -196,11 +196,19 @@ public static class CommentsApi
             (comment.Text, comment.EditedAtUtc) = (text, DateTime.UtcNow);
             comment.HiddenReason = HiddenAfterEdit(comment.HiddenReason, moderation.Check(text));
         }
-        comment.IsSpoiler = request.IsSpoiler;
+        // The author can always add the spoiler mark, and take off their own; one that readers' flags put there stays.
+        comment.IsSpoiler = request.IsSpoiler || (comment.IsSpoiler && await MarkedSpoilerByReadersAsync(db, id, ct));
         await db.SaveChangesAsync(ct);
 
         return TypedResults.Ok(Mine(comment, giphy.Value));
     }
+
+    /// <summary>
+    /// Whether enough readers have flagged the comment as a spoiler to mark it one (CommunityApi's flagging does the marking).
+    /// </summary>
+    private static async Task<bool> MarkedSpoilerByReadersAsync(RatingsContext db, Guid id, CancellationToken ct) =>
+        await db.Flags.CountAsync(f => f.TargetKind == CommunityApi.CommentKind && f.TargetId == id && !f.Resolved && f.Reason == "spoiler", ct)
+            >= Moderation.SpoilerAfterFlags;
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
