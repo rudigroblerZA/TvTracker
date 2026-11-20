@@ -643,6 +643,9 @@ program's tracked link with a click id the network reports back with each sale. 
 plain link and is still counted, so the report shows what each service's traffic would bring a deal. On the phone the
 link opens the web app's address in the browser and is counted there, as a signed-out click.
 
+- **Disclosed on the page:** with the flag on, Where to watch says some links are affiliate links and that a commission
+  may be earned, the "Watch on" button carries "We may earn a commission", and the links are marked `rel="sponsored"`.
+  The note doesn't say which link is in a program: the page only learns that at the click.
 - **The report** (`/settings/affiliates`, Settings → Admin, admins only): clicks out, the share through a program, sales
   and their rate, commission per currency and per click, by day, service, link (button or list), the viewer's plan
   (signed out, free, plus, family), and the shows sending the most. Services with clicks and no program are named as
