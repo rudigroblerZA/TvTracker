@@ -686,11 +686,14 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
     public Task<ShowCharacterVotes?> GetShowCharacterVotesAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowCharacterVotes>(ApiClients.Ratings, $"api/v1/shows/{showId}/character-votes", ct);
 
-    public Task VoteCharacterAsync(Guid episodeId, Guid showId, Guid personId, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/character-vote", new { showId, personId }, ct);
+    /// <summary>
+    /// Votes, and returns the episode's votes as they then stand.
+    /// </summary>
+    public Task<EpisodeCharacterVotes?> VoteCharacterAsync(Guid episodeId, Guid showId, Guid personId, CancellationToken ct = default) =>
+        SendAsync<EpisodeCharacterVotes>(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/character-vote", new { showId, personId }, ct);
 
-    public Task RemoveCharacterVoteAsync(Guid episodeId, CancellationToken ct = default) =>
-        SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/character-vote", null, ct);
+    public Task<EpisodeCharacterVotes?> RemoveCharacterVoteAsync(Guid episodeId, CancellationToken ct = default) =>
+        SendAsync<EpisodeCharacterVotes>(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/character-vote", null, ct);
 }
 
 public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

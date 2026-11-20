@@ -1,8 +1,9 @@
+@implements IDisposable
 @inject RatingsClient Ratings
 
 @* Favourite character, on an episode's page: one vote for the cast member who stood out, open once the episode is
    watched. Counts stay hidden until then, since who stood out gives the episode away. *@
-@if (votes is not null && People.Count > 0)
+@if (votes is not null && people.Count > 0)
 {
     <section class="character-vote" aria-labelledby="character-vote-title">
         <h2 id="character-vote-title">Favourite character</h2>
@@ -12,7 +13,7 @@
         }
         else
         {
-            <p class="muted">@(votes.Total == 0 ? "Who stood out in this one? Yours is the first vote." : $"Who stood out in this one? {Votes(votes.Total)} so far.")</p>
+            <p class="muted">@(votes.Total == 0 ? "Who stood out in this one? Yours is the first vote." : $"Who stood out in this one? {CharacterVoteRow.Count(votes.Total)} so far.")</p>
             <ul class="character-votes">
                 @foreach (var member in Shown)
                 {
@@ -21,24 +22,14 @@
                     <li>
                         <button type="button" class="character-choice @(mine ? "mine" : "")" aria-pressed="@(mine ? "true" : "false")" disabled="@busy"
                                 @onclick="() => VoteAsync(member.PersonId)">
-                            <span class="share" style="width: @Share(count)%"></span>
-                            <span class="who"><strong>@(member.Character is { Length: > 0 } character ? character : member.Name)</strong>
-                                @if (member.Character is { Length: > 0 })
-                                {
-                                    <span class="muted small">@member.Name</span>
-                                }
-                            </span>
-                            @if (count > 0)
-                            {
-                                <span class="count">@($"{Share(count)}%")<span class="muted small">@($" · {count}")</span></span>
-                            }
+                            <CharacterVoteRow Member="member" Votes="count" Total="votes.Total" />
                         </button>
                     </li>
                 }
             </ul>
-            @if (People.Count > Few)
+            @if (people.Count > Few)
             {
-                <button type="button" class="btn btn-quiet" @onclick="() => everyone = !everyone">@(everyone ? "Show fewer" : $"Show all {People.Count}")</button>
+                <button type="button" class="btn btn-quiet" @onclick="() => everyone = !everyone">@(everyone ? "Show fewer" : $"Show all {people.Count}")</button>
             }
             @if (votes.Mine is not null)
             {
@@ -65,71 +56,82 @@
     [Parameter] public bool Watched { get; set; }
 
     private EpisodeCharacterVotes? votes;
+
+    /// <summary>
+    /// The cast that can be voted for: one entry per person the catalog knows.
+    /// </summary>
+    private IReadOnlyList<CastMember> people = [];
+    private IReadOnlyList<CastMember>? peopleFrom;
+    private Dictionary<Guid, int> counts = [];
     private (Guid Episode, bool Watched)? loaded;
+    private CancellationTokenSource? waiting;
     private bool busy;
     private bool everyone;
     private string? error;
 
     /// <summary>
-    /// The cast that can be voted for: one entry per person the catalog knows.
+    /// How long to wait before asking again whether Ratings has heard of a watch just marked: it gets the news a
+    /// moment after the page does.
     /// </summary>
-    private IReadOnlyList<CastMember> People => Cast.Where(m => m.PersonId != Guid.Empty).DistinctBy(m => m.PersonId).ToList();
+    private static readonly TimeSpan[] Retries = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
 
     /// <summary>
-    /// The first few as billed, plus anyone further down who has votes or is the reader's pick; most votes first.
+    /// The first few as billed, plus anyone further down who has votes; most votes first.
     /// </summary>
-    private IEnumerable<CastMember> Shown => People
+    private IEnumerable<CastMember> Shown => people
         .Where((m, i) => everyone || i < Few || CountFor(m.PersonId) > 0)
         .OrderByDescending(m => CountFor(m.PersonId));
 
     protected override async Task OnParametersSetAsync()
     {
-        if (loaded == (EpisodeId, Watched))
+        if (!ReferenceEquals(peopleFrom, Cast))
+        {
+            (peopleFrom, people) = (Cast, Cast.Where(m => m.PersonId != Guid.Empty).DistinctBy(m => m.PersonId).ToList());
+        }
+        if (people.Count == 0 || loaded == (EpisodeId, Watched))
         {
             return;
         }
         loaded = (EpisodeId, Watched);
-        await LoadAsync();
-        if (Watched && votes is { Locked: true })
-        {
-            // Just marked watched: Ratings hears of it a moment later.
-            await Task.Delay(TimeSpan.FromSeconds(3));
-            await LoadAsync();
-        }
-    }
-
-    private async Task LoadAsync()
-    {
+        waiting?.Cancel();
+        var stop = (waiting = new CancellationTokenSource()).Token;
         try
         {
-            votes = await Ratings.GetCharacterVotesAsync(EpisodeId);
+            Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
+            foreach (var wait in Retries)
+            {
+                if (!Watched || votes is not { Locked: true })
+                {
+                    break;
+                }
+                await Task.Delay(wait, stop);
+                Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
+            }
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or OperationCanceledException)
         {
             // An extra on the page: without it, the page stands.
         }
     }
 
-    public static string Votes(int count) => count == 1 ? "1 vote" : $"{count:N0} votes";
+    private void Show(EpisodeCharacterVotes? latest)
+    {
+        if (latest is not null)
+        {
+            (votes, counts) = (latest, latest.Counts.ToDictionary(c => c.PersonId, c => c.Votes));
+        }
+    }
 
-    private int CountFor(Guid personId) => votes?.Counts.FirstOrDefault(c => c.PersonId == personId)?.Votes ?? 0;
-
-    private int Share(int count) => votes is { Total: > 0 } ? (int)Math.Round(100.0 * count / votes.Total) : 0;
+    private int CountFor(Guid personId) => counts.GetValueOrDefault(personId);
 
     private async Task VoteAsync(Guid personId)
     {
         (busy, error) = (true, null);
         try
         {
-            if (votes?.Mine == personId)
-            {
-                await Ratings.RemoveCharacterVoteAsync(EpisodeId);
-            }
-            else
-            {
-                await Ratings.VoteCharacterAsync(EpisodeId, ShowId, personId);
-            }
-            votes = await Ratings.GetCharacterVotesAsync(EpisodeId) ?? votes;
+            Show(votes?.Mine == personId
+                ? await Ratings.RemoveCharacterVoteAsync(EpisodeId)
+                : await Ratings.VoteCharacterAsync(EpisodeId, ShowId, personId));
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
@@ -140,4 +142,6 @@
             busy = false;
         }
     }
+
+    public void Dispose() => waiting?.Cancel();
 }

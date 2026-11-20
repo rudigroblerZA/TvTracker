@@ -314,13 +314,15 @@ else
 
             aired = episode.AirsAtUtc <= DateTimeOffset.UtcNow;
             var show = await Catalog.GetShowAsync(episode.ShowId, Session.Region);
-            (showTitle, cast) = (show?.Title, show?.Cast ?? []);
+            showTitle = show?.Title;
             summary = await Ratings.GetEpisodeSummaryAsync(Id);
 
             if (Session.IsSignedIn)
             {
                 var progress = await Tracking.GetProgressAsync(episode.ShowId);
                 watched = progress?.WatchedEpisodeIds.Contains(Id) == true;
+                // Only now, with watched known: the favourite-character section asks for its votes once it has a cast.
+                cast = show?.Cast ?? [];
                 myRating = (await Ratings.GetMyEpisodeRatingAsync(Id))?.Stars;
                 reactions = await Ratings.GetReactionsAsync(Id);
                 await LoadCommentsAsync();

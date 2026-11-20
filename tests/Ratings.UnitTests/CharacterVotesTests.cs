@@ -17,14 +17,6 @@ public class CharacterVotesTests
     }
 
     [Fact]
-    public void A_show_lists_only_its_top_few()
-    {
-        var ranked = CharacterVotesApi.Ranked([new(A, 1), new(B, 3), new(C, 2)], take: 2);
-
-        Assert.Equal([B, C], ranked.Select(r => r.PersonId));
-    }
-
-    [Fact]
     public void Nobody_is_listed_without_a_vote()
     {
         Assert.Empty(CharacterVotesApi.Ranked([new(A, 0)]));

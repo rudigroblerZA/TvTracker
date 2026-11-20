@@ -45,11 +45,8 @@ public static class CharacterVotesApi
     /// <summary>
     /// Most votes first; ties in a fixed order, so a list doesn't reshuffle between two reads.
     /// </summary>
-    public static IReadOnlyList<CharacterVoteCountDto> Ranked(IEnumerable<CharacterVoteCountDto> counts, int? take = null)
-    {
-        var ranked = counts.Where(c => c.Votes > 0).OrderByDescending(c => c.Votes).ThenBy(c => c.PersonId);
-        return (take is { } n ? ranked.Take(n) : ranked).ToList();
-    }
+    public static IEnumerable<CharacterVoteCountDto> Ranked(IEnumerable<CharacterVoteCountDto> counts) =>
+        counts.Where(c => c.Votes > 0).OrderByDescending(c => c.Votes).ThenBy(c => c.PersonId);
 
     private static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CancellationToken ct)
     {
@@ -58,31 +55,38 @@ public static class CharacterVotesApi
             .GroupBy(v => v.PersonId)
             .Select(g => new CharacterVoteCountDto(g.Key, g.Count()))
             .ToListAsync(ct);
-        return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), Ranked(counts, TopOfShow)));
+        return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), Ranked(counts).Take(TopOfShow).ToList()));
     }
 
     private static async Task<Ok<EpisodeCharacterVotesDto>> GetEpisodeVotesAsync(
         Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        if (!await WatchedAsync(db, userId, episodeId, ct))
-        {
-            return TypedResults.Ok(new EpisodeCharacterVotesDto(true, 0, [], null));
-        }
-
-        var counts = await db.CharacterVotes
-            .Where(v => v.EpisodeId == episodeId)
-            .GroupBy(v => v.PersonId)
-            .Select(g => new CharacterVoteCountDto(g.Key, g.Count()))
-            .ToListAsync(ct);
-        var mine = await db.CharacterVotes
-            .Where(v => v.EpisodeId == episodeId && v.UserId == userId)
-            .Select(v => (Guid?)v.PersonId)
-            .SingleOrDefaultAsync(ct);
-        return TypedResults.Ok(new EpisodeCharacterVotesDto(false, counts.Sum(c => c.Votes), Ranked(counts), mine));
+        return TypedResults.Ok(await WatchedAsync(db, userId, episodeId, ct) ? await VotesAsync(db, userId, episodeId, ct) : Locked);
     }
 
-    private static async Task<Results<NoContent, ValidationProblem, Conflict<string>>> VoteAsync(
+    /// <summary>
+    /// What a reader who hasn't watched the episode gets.
+    /// </summary>
+    private static readonly EpisodeCharacterVotesDto Locked = new(true, 0, [], null);
+
+    /// <summary>
+    /// An episode's votes as someone who has watched it sees them, with their own pick. Votes answer with this too,
+    /// so the page needn't ask again.
+    /// </summary>
+    private static async Task<EpisodeCharacterVotesDto> VotesAsync(RatingsContext db, string userId, Guid episodeId, CancellationToken ct)
+    {
+        var people = await db.CharacterVotes
+            .Where(v => v.EpisodeId == episodeId)
+            .GroupBy(v => v.PersonId)
+            .Select(g => new { PersonId = g.Key, Votes = g.Count(), Mine = g.Any(v => v.UserId == userId) })
+            .ToListAsync(ct);
+        return new EpisodeCharacterVotesDto(false, people.Sum(p => p.Votes),
+            Ranked(people.Select(p => new CharacterVoteCountDto(p.PersonId, p.Votes))).ToList(),
+            people.Where(p => p.Mine).Select(p => (Guid?)p.PersonId).FirstOrDefault());
+    }
+
+    private static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
         Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         if (request.ShowId == Guid.Empty || request.PersonId == Guid.Empty)
@@ -117,14 +121,14 @@ public static class CharacterVotesApi
         }
 
         await db.SaveChangesAsync(ct);
-        return TypedResults.NoContent();
+        return TypedResults.Ok(await VotesAsync(db, userId, episodeId, ct));
     }
 
-    private static async Task<NoContent> RemoveVoteAsync(Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
+    private static async Task<Ok<EpisodeCharacterVotesDto>> RemoveVoteAsync(Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         await db.CharacterVotes.Where(v => v.UserId == userId && v.EpisodeId == episodeId).ExecuteDeleteAsync(ct);
-        return TypedResults.NoContent();
+        return TypedResults.Ok(await WatchedAsync(db, userId, episodeId, ct) ? await VotesAsync(db, userId, episodeId, ct) : Locked);
     }
 
     private static Task<bool> WatchedAsync(RatingsContext db, string userId, Guid episodeId, CancellationToken ct) =>

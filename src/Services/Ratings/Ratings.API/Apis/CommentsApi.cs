@@ -119,12 +119,7 @@ public static class CommentsApi
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["gifId"] = ["That GIF can't be posted."] });
         }
-        // Words, emoji, a GIF, or any mix: something, and not too much of it.
-        if (text.Length > 2000 || (text.Length == 0 && gifId is null))
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Write up to 2000 characters, or pick a GIF."] });
-        }
-        if (text.Length > 0 && CommunityApi.CheckPost(text, moderation) is { } refused)
+        if (CheckText(text, gifId is not null, moderation, "Write up to 2000 characters, or pick a GIF.") is { } refused)
         {
             return refused;
         }
@@ -149,9 +144,24 @@ public static class CommentsApi
         db.Comments.Add(comment);
         await db.SaveChangesAsync(ct);
 
-        return TypedResults.Created($"/api/v1/comments/{comment.Id}",
-            new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc, comment.HiddenReason, GifId: comment.GifId));
+        return TypedResults.Created($"/api/v1/comments/{comment.Id}", Mine(comment, giphy.Value));
     }
+
+    /// <summary>
+    /// What a comment's words must be, posted or edited: something (words, emoji, or a GIF alone), not too much of
+    /// it, and nothing the word check rejects.
+    /// </summary>
+    private static ValidationProblem? CheckText(string text, bool hasGif, Moderation moderation, string wrongLength) =>
+        text.Length > Comment.MaxLength || (text.Length == 0 && !hasGif)
+            ? TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = [wrongLength] })
+            : text.Length > 0 ? CommunityApi.CheckPost(text, moderation) : null;
+
+    /// <summary>
+    /// A comment as its author gets it back after posting or editing it.
+    /// </summary>
+    private static CommentDto Mine(Comment comment, GiphyOptions giphy) =>
+        new(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc, comment.HiddenReason,
+            GifId: Gifs.Enabled(giphy) ? comment.GifId : null, EditedAtUtc: comment.EditedAtUtc);
 
     /// <summary>
     /// Why an edited comment is hidden, from why it was and what the word check makes of its new text. New words are
@@ -176,11 +186,7 @@ public static class CommentsApi
         }
 
         var text = request.Text?.Trim() ?? "";
-        if (text.Length > 2000 || (text.Length == 0 && comment.GifId is null))
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Write up to 2000 characters."] });
-        }
-        if (text.Length > 0 && CommunityApi.CheckPost(text, moderation) is { } refused)
+        if (CheckText(text, comment.GifId is not null, moderation, "Write up to 2000 characters.") is { } refused)
         {
             return refused;
         }
@@ -193,8 +199,7 @@ public static class CommentsApi
         comment.IsSpoiler = request.IsSpoiler;
         await db.SaveChangesAsync(ct);
 
-        return TypedResults.Ok(new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc,
-            comment.HiddenReason, GifId: Gifs.Enabled(giphy.Value) ? comment.GifId : null, EditedAtUtc: comment.EditedAtUtc));
+        return TypedResults.Ok(Mine(comment, giphy.Value));
     }
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
