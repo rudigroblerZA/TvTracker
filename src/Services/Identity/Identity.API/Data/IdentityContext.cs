@@ -11,6 +11,9 @@ public class PaymentSettings
 {
     public const int OnlyId = 1;
 
+    public const int UpdatedByLength = 128;
+    public const int PortalUrlLength = 512;
+
     public int Id { get; set; }
 
     /// <summary>
@@ -263,8 +266,8 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(s => s.Provider).HasMaxLength(32);
             entity.Property(s => s.StripeSecretKey).HasMaxLength(1024);
             entity.Property(s => s.StripeWebhookSecret).HasMaxLength(1024);
-            entity.Property(s => s.StripePortalUrl).HasMaxLength(512);
-            entity.Property(s => s.UpdatedBy).HasMaxLength(128);
+            entity.Property(s => s.StripePortalUrl).HasMaxLength(Data.PaymentSettings.PortalUrlLength);
+            entity.Property(s => s.UpdatedBy).HasMaxLength(Data.PaymentSettings.UpdatedByLength);
         });
 
         modelBuilder.Entity<SiteSettings>(entity =>

@@ -14,9 +14,19 @@ namespace Identity.API.Payments;
 public sealed class SettingsCipher(IConfiguration configuration)
 {
     private const string Prefix = "v1:";
-    private readonly byte[]? key = configuration["Payments:SettingsKey"] is { Length: >= 16 } secret
-        ? HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(secret), 32, info: "tvtracker payment settings"u8.ToArray())
-        : null;
+    /// <summary>
+    /// The shortest secret taken: a shorter one is a mistake to put right, not a key to encrypt under.
+    /// </summary>
+    public const int MinSecretLength = 16;
+
+    // No secret at all is a deployment that keeps its keys in configuration. One that's there but too short stops the
+    // service at start: quietly doing without would look, on the page, like keys nobody had entered.
+    private readonly byte[]? key = configuration["Payments:SettingsKey"] switch
+    {
+        null or "" => null,
+        { Length: < MinSecretLength } => throw new InvalidOperationException($"Payments:SettingsKey must be at least {MinSecretLength} characters."),
+        var secret => HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(secret), 32, info: "tvtracker payment settings"u8.ToArray())
+    };
 
     public bool Available => key is not null;
 
@@ -74,8 +84,9 @@ public sealed record StoredPaymentSettings(string? Provider, string? StripeSecre
 /// <item><b>Read from the database</b> at start, after every save, and every <see cref="RefreshEvery"/>, so another
 /// instance of the service follows a change within that time.</item>
 /// <item><b>Merged once</b> for each pair of configuration and stored settings, not on every read.</item>
-/// <item><b>Nothing is sold or believed until the first read</b> (<see cref="Loaded"/>): before it, configuration alone
-/// could be selling through an account an admin switched off, or refusing webhooks signed with the key they set.</item>
+/// <item><b>Read before the service takes a request</b> (<see cref="PaymentSettingsRefresher"/> does the first read as
+/// it starts): configuration alone could otherwise sell through an account an admin switched off, or refuse webhooks
+/// signed with the key they set.</item>
 /// </list>
 /// </summary>
 public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> configured, SettingsCipher cipher, ILogger<EffectivePaymentOptions> logger)
@@ -96,11 +107,6 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
 
     public StoredPaymentSettings? Stored => stored;
 
-    /// <summary>
-    /// Whether the stored settings have been read at least once since the service started.
-    /// </summary>
-    public bool Loaded { get; private set; }
-
     public PaymentOptions Value
     {
         get
@@ -120,12 +126,12 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
         try
         {
             var (was, now) = (stored, Read(await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(ct)));
-            (stored, Loaded) = (now, true);
+            stored = now;
             // Said once, when it starts being so: otherwise the only sign is a key that "isn't set".
             if (now is { KeysUnreadable: true } && was is not { KeysUnreadable: true })
             {
                 logger.LogWarning("Stripe keys saved on the Financials page can't be decrypted: Payments:SettingsKey isn't the one they were saved "
-                    + "under (or is shorter than 16 characters). They count as not set until they are entered again.");
+                    + "under. They count as not set until they are entered again.");
             }
         }
         finally
@@ -167,13 +173,14 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
 
 /// <summary>
 /// Keeps <see cref="EffectivePaymentOptions"/> in step with the database, and says at start what the selling provider
-/// still lacks: plans aren't sold until an admin, or configuration, supplies it.
+/// still lacks: plans aren't sold until an admin, or configuration, supplies it. The first read is part of starting
+/// (the database is up by then: its initializer starts before this), so no request is answered on configuration alone.
 /// </summary>
 public sealed class PaymentSettingsRefresher(IServiceScopeFactory scopes, EffectivePaymentOptions options, TimeProvider time,
     ILogger<PaymentSettingsRefresher> logger) : BackgroundService
 {
     /// <summary>
-    /// How soon the first read is tried again while the database isn't ready.
+    /// How soon the first read is tried again when it fails.
     /// </summary>
     private static readonly TimeSpan Retry = TimeSpan.FromSeconds(3);
 
@@ -184,17 +191,21 @@ public sealed class PaymentSettingsRefresher(IServiceScopeFactory scopes, Effect
 
     private int failures;
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        while (!await ReloadAsync(stoppingToken))
+        while (!await ReloadAsync(cancellationToken))
         {
-            await Task.Delay(Retry, time, stoppingToken);
+            await Task.Delay(Retry, time, cancellationToken);
         }
         if (PaymentOptionsValidator.Missing(options.Value) is { Count: > 0 } missing)
         {
             logger.LogWarning("Plans can't be bought yet: {Missing} Set it in configuration or on the Financials page.", string.Join(" ", missing));
         }
+        await base.StartAsync(cancellationToken);
+    }
 
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
         using var timer = new PeriodicTimer(EffectivePaymentOptions.RefreshEvery, time);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {

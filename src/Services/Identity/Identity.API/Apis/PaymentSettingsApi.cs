@@ -66,6 +66,11 @@ public static class PaymentSettingsApi
         var webhookSecret = string.IsNullOrWhiteSpace(request.StripeWebhookSecret) ? null : request.StripeWebhookSecret.Trim();
         var portal = request.StripePortalUrl?.Trim();
         var admin = Admin(user);
+        // What's wrong with the request on its own needs no lock, and no row made.
+        if (Problem(provider, secretKey, webhookSecret, portal, providers, cipher) is { } malformed)
+        {
+            return Refused(malformed);
+        }
 
         // Read, check and write as one: the row is locked for the length of it, so a save or a clear by someone else
         // at the same moment waits, and is then checked against what this one left.
@@ -75,19 +80,17 @@ public static class PaymentSettingsApi
             var now = time.GetUtcNow().UtcDateTime;
             await db.Database.ExecuteSqlAsync(
                 $"insert into payment_settings (\"Id\", \"UpdatedAtUtc\") values ({PaymentSettings.OnlyId}, {now}) on conflict (\"Id\") do nothing", ct);
-            var row = await db.PaymentSettings.FromSql($"select * from payment_settings for update").SingleAsync(ct);
+            var row = await Locked(db).SingleAsync(ct);
 
             // What the row will hold: a field the request leaves alone keeps what it has.
             var newProvider = provider ?? row.Provider;
             var newPortal = portal is null ? row.StripePortalUrl : portal.Length == 0 ? null : portal;
             // Before and after from the row just read, keys included: the copy in memory can be a minute behind
             // another instance's change.
-            var before = options.Read(row);
-            var after = new StoredPaymentSettings(newProvider, secretKey ?? before?.StripeSecretKey, webhookSecret ?? before?.StripeWebhookSecret, newPortal);
-            var refused = Problem(provider, secretKey, webhookSecret, portal, providers, cipher)
-                ?? Refusal(EffectivePaymentOptions.Merge(options.Configured, before), EffectivePaymentOptions.Merge(options.Configured, after),
-                    choosesProvider: provider is { Length: > 0 });
-            if (refused is not null)
+            var before = options.Read(row)!;
+            var after = new StoredPaymentSettings(newProvider, secretKey ?? before.StripeSecretKey, webhookSecret ?? before.StripeWebhookSecret, newPortal);
+            if (Refusal(EffectivePaymentOptions.Merge(options.Configured, before), EffectivePaymentOptions.Merge(options.Configured, after),
+                    choosesProvider: provider is { Length: > 0 }) is { } refused)
             {
                 return refused;
             }
@@ -101,7 +104,7 @@ public static class PaymentSettingsApi
         }, ct);
         if (problem is not null)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["payments"] = [problem] });
+            return Refused(problem);
         }
 
         await options.ReloadAsync(db, ct);
@@ -121,7 +124,7 @@ public static class PaymentSettingsApi
         var refused = await InTransactionAsync(db, async () =>
         {
             // The keys go with the row: configuration alone must be able to carry on selling.
-            var before = options.Read(await db.PaymentSettings.FromSql($"select * from payment_settings for update").AsNoTracking().SingleOrDefaultAsync(ct));
+            var before = options.Read(await Locked(db).AsNoTracking().SingleOrDefaultAsync(ct));
             if (Refusal(EffectivePaymentOptions.Merge(options.Configured, before), options.Configured, choosesProvider: false) is { } problem)
             {
                 return $"{problem} The deployment's configuration doesn't have it. To stop selling on purpose, choose \"None\" first.";
@@ -131,7 +134,7 @@ public static class PaymentSettingsApi
         }, ct);
         if (refused is not null)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["payments"] = [refused] });
+            return Refused(refused);
         }
 
         await options.ReloadAsync(db, ct);
@@ -157,13 +160,27 @@ public static class PaymentSettingsApi
             return problem;
         });
 
+    private static ValidationProblem Refused(string problem) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["payments"] = [problem] });
+
+    /// <summary>
+    /// The one row, locked until the transaction ends.
+    /// </summary>
+    private static IQueryable<PaymentSettings> Locked(IdentityContext db) => db.PaymentSettings.FromSql($"select * from payment_settings for update");
+
     /// <summary>
     /// The admin's username, cut to what the column holds (Keycloak allows longer ones).
     /// </summary>
     internal static string? Admin(ClaimsPrincipal user) =>
-        user.FindFirstValue("preferred_username") is { } name ? name.Length <= UpdatedByLength ? name : name[..UpdatedByLength] : null;
+        user.FindFirstValue("preferred_username") is { } name
+            ? name.Length <= PaymentSettings.UpdatedByLength ? name : name[..PaymentSettings.UpdatedByLength]
+            : null;
 
-    internal const int UpdatedByLength = 128;
+    /// <summary>
+    /// Stripe's keys are plain letters, digits and underscores, and not long; anything else isn't one, and could outgrow
+    /// its column once encrypted.
+    /// </summary>
+    private static bool LooksLikeKey(string? key) => key is null || (key.Length <= 255 && key.All(c => char.IsAsciiLetterOrDigit(c) || c == '_'));
 
     /// <summary>
     /// Why a change is refused for what it would do to sales, or null. Refused: plans are sold now and wouldn't be
@@ -190,11 +207,10 @@ public static class PaymentSettingsApi
             ? "Keys can't be saved here: this deployment has no Payments:SettingsKey to encrypt them with. Set them in configuration instead."
         : secretKey is not null && !(secretKey.StartsWith("sk_", StringComparison.Ordinal) || secretKey.StartsWith("rk_", StringComparison.Ordinal))
             ? "Stripe's secret key starts with sk_ (or rk_ for a restricted key)."
-        // Stripe's keys are plain letters, digits and underscores; anything else isn't one, and could outgrow its column.
-        : new[] { secretKey, webhookSecret }.Any(k => k is { Length: > 255 } || k?.All(c => char.IsAsciiLetterOrDigit(c) || c == '_') == false)
+        : !LooksLikeKey(secretKey) || !LooksLikeKey(webhookSecret)
             ? "That isn't one of Stripe's keys: they are letters, digits and underscores, at most 255 of them."
         : webhookSecret is not null && !webhookSecret.StartsWith("whsec_", StringComparison.Ordinal) ? "Stripe's webhook signing secret starts with whsec_."
-        : portal is { Length: > 0 } && !(Uri.TryCreate(portal, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && portal.Length <= 512)
+        : portal is { Length: > 0 } && !(Uri.TryCreate(portal, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && portal.Length <= PaymentSettings.PortalUrlLength)
             ? "The customer portal link is an https address."
         : null;
 

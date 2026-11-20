@@ -44,9 +44,13 @@ public class PaymentSettingsTests
     public void Without_a_settings_key_nothing_secret_can_be_saved()
     {
         Assert.False(Cipher(null).Available);
-        Assert.False(Cipher("short").Available);
+        Assert.False(Cipher("").Available);
         Assert.Throws<InvalidOperationException>(() => Cipher(null).Protect("sk_live_123"));
     }
+
+    [Fact]
+    public void A_settings_key_too_short_to_be_one_stops_the_service_instead_of_being_ignored() =>
+        Assert.Contains("at least 16", Assert.Throws<InvalidOperationException>(() => Cipher("short")).Message);
 
     [Fact]
     public void What_an_admin_set_lies_over_configuration_field_by_field()
@@ -162,7 +166,7 @@ public class PaymentSettingsTests
             new(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("preferred_username", name)]));
 
         Assert.Equal("admin", PaymentSettingsApi.Admin(Named("admin")));
-        Assert.Equal(PaymentSettingsApi.UpdatedByLength, PaymentSettingsApi.Admin(Named(new string('a', 255)))!.Length);
+        Assert.Equal(Identity.API.Data.PaymentSettings.UpdatedByLength, PaymentSettingsApi.Admin(Named(new string('a', 255)))!.Length);
         Assert.Null(PaymentSettingsApi.Admin(new System.Security.Claims.ClaimsPrincipal()));
     }
 }

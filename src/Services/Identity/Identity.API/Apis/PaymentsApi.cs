@@ -172,12 +172,6 @@ public static class PaymentsApi
         {
             return TypedResults.NotFound();
         }
-        // Just started, and the keys an admin set aren't read yet: the provider sends it again, where a 400 for a
-        // signature checked against the wrong key would be final.
-        if (!providers.Ready)
-        {
-            return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
-        }
         if (request.ContentLength > MaxWebhookBodyBytes)
         {
             return TypedResults.StatusCode(StatusCodes.Status413PayloadTooLarge);
