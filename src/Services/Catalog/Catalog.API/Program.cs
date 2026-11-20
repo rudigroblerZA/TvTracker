@@ -1,11 +1,11 @@
-using TvTracker;
-using Catalog.API.Alerts;
+﻿using Catalog.API.Alerts;
 using Catalog.API.Apis;
 using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TvTracker;
 
 var builder = WebApplication.CreateBuilder(args);
 

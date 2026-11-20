@@ -1,4 +1,4 @@
-using Analytics.API.Apis;
+﻿using Analytics.API.Apis;
 using Analytics.Data;
 using TvTracker.IntegrationEvents;
 
@@ -24,8 +24,13 @@ public sealed class TimeMachineQueryTests(AnalyticsDatabase database) : IClassFi
         await using var db = database.Context();
         var episode = new EpisodeCopy
         {
-            EpisodeId = Guid.NewGuid(), ShowId = showId, SeasonNumber = season, EpisodeNumber = number, Title = $"Ep {number}",
-            AirsAtUtc = airs, ExternalRating = rating
+            EpisodeId = Guid.NewGuid(),
+            ShowId = showId,
+            SeasonNumber = season,
+            EpisodeNumber = number,
+            Title = $"Ep {number}",
+            AirsAtUtc = airs,
+            ExternalRating = rating
         };
         db.Episodes.Add(episode);
         await db.SaveChangesAsync(Ct);

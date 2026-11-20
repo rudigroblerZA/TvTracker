@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Providers.Tvdb;
@@ -24,18 +24,57 @@ public static class TvdbMapping
 
     private static readonly Dictionary<string, string> Languages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["eng"] = "english", ["jpn"] = "japanese", ["kor"] = "korean", ["spa"] = "spanish", ["fra"] = "french",
-        ["deu"] = "german", ["ita"] = "italian", ["por"] = "portuguese", ["zho"] = "chinese", ["hin"] = "hindi",
-        ["swe"] = "swedish", ["dan"] = "danish", ["nor"] = "norwegian", ["nld"] = "dutch", ["tur"] = "turkish",
-        ["rus"] = "russian", ["pol"] = "polish", ["fin"] = "finnish", ["heb"] = "hebrew", ["ara"] = "arabic"
+        ["eng"] = "english",
+        ["jpn"] = "japanese",
+        ["kor"] = "korean",
+        ["spa"] = "spanish",
+        ["fra"] = "french",
+        ["deu"] = "german",
+        ["ita"] = "italian",
+        ["por"] = "portuguese",
+        ["zho"] = "chinese",
+        ["hin"] = "hindi",
+        ["swe"] = "swedish",
+        ["dan"] = "danish",
+        ["nor"] = "norwegian",
+        ["nld"] = "dutch",
+        ["tur"] = "turkish",
+        ["rus"] = "russian",
+        ["pol"] = "polish",
+        ["fin"] = "finnish",
+        ["heb"] = "hebrew",
+        ["ara"] = "arabic"
     };
 
     private static readonly Dictionary<string, string> Countries = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["usa"] = "US", ["gbr"] = "GB", ["can"] = "CA", ["aus"] = "AU", ["nzl"] = "NZ", ["irl"] = "IE", ["jpn"] = "JP",
-        ["kor"] = "KR", ["deu"] = "DE", ["fra"] = "FR", ["esp"] = "ES", ["ita"] = "IT", ["swe"] = "SE", ["dan"] = "DK",
-        ["dnk"] = "DK", ["nor"] = "NO", ["nld"] = "NL", ["bel"] = "BE", ["ind"] = "IN", ["bra"] = "BR", ["mex"] = "MX",
-        ["zaf"] = "ZA", ["chn"] = "CN", ["tur"] = "TR", ["pol"] = "PL", ["fin"] = "FI", ["isr"] = "IL"
+        ["usa"] = "US",
+        ["gbr"] = "GB",
+        ["can"] = "CA",
+        ["aus"] = "AU",
+        ["nzl"] = "NZ",
+        ["irl"] = "IE",
+        ["jpn"] = "JP",
+        ["kor"] = "KR",
+        ["deu"] = "DE",
+        ["fra"] = "FR",
+        ["esp"] = "ES",
+        ["ita"] = "IT",
+        ["swe"] = "SE",
+        ["dan"] = "DK",
+        ["dnk"] = "DK",
+        ["nor"] = "NO",
+        ["nld"] = "NL",
+        ["bel"] = "BE",
+        ["ind"] = "IN",
+        ["bra"] = "BR",
+        ["mex"] = "MX",
+        ["zaf"] = "ZA",
+        ["chn"] = "CN",
+        ["tur"] = "TR",
+        ["pol"] = "PL",
+        ["fin"] = "FI",
+        ["isr"] = "IL"
     };
 
     /// <summary>
@@ -107,13 +146,32 @@ public static class TvdbMapping
     /// </summary>
     private static readonly Dictionary<string, string> TimeZones = new()
     {
-        ["US"] = "America/New_York", ["CA"] = "America/Toronto", ["GB"] = "Europe/London", ["IE"] = "Europe/Dublin",
-        ["AU"] = "Australia/Sydney", ["NZ"] = "Pacific/Auckland", ["JP"] = "Asia/Tokyo", ["KR"] = "Asia/Seoul",
-        ["CN"] = "Asia/Shanghai", ["IN"] = "Asia/Kolkata", ["DE"] = "Europe/Berlin", ["FR"] = "Europe/Paris",
-        ["ES"] = "Europe/Madrid", ["IT"] = "Europe/Rome", ["NL"] = "Europe/Amsterdam", ["BE"] = "Europe/Brussels",
-        ["SE"] = "Europe/Stockholm", ["DK"] = "Europe/Copenhagen", ["NO"] = "Europe/Oslo", ["FI"] = "Europe/Helsinki",
-        ["PL"] = "Europe/Warsaw", ["TR"] = "Europe/Istanbul", ["IL"] = "Asia/Jerusalem", ["BR"] = "America/Sao_Paulo",
-        ["MX"] = "America/Mexico_City", ["ZA"] = "Africa/Johannesburg"
+        ["US"] = "America/New_York",
+        ["CA"] = "America/Toronto",
+        ["GB"] = "Europe/London",
+        ["IE"] = "Europe/Dublin",
+        ["AU"] = "Australia/Sydney",
+        ["NZ"] = "Pacific/Auckland",
+        ["JP"] = "Asia/Tokyo",
+        ["KR"] = "Asia/Seoul",
+        ["CN"] = "Asia/Shanghai",
+        ["IN"] = "Asia/Kolkata",
+        ["DE"] = "Europe/Berlin",
+        ["FR"] = "Europe/Paris",
+        ["ES"] = "Europe/Madrid",
+        ["IT"] = "Europe/Rome",
+        ["NL"] = "Europe/Amsterdam",
+        ["BE"] = "Europe/Brussels",
+        ["SE"] = "Europe/Stockholm",
+        ["DK"] = "Europe/Copenhagen",
+        ["NO"] = "Europe/Oslo",
+        ["FI"] = "Europe/Helsinki",
+        ["PL"] = "Europe/Warsaw",
+        ["TR"] = "Europe/Istanbul",
+        ["IL"] = "Asia/Jerusalem",
+        ["BR"] = "America/Sao_Paulo",
+        ["MX"] = "America/Mexico_City",
+        ["ZA"] = "Africa/Johannesburg"
     };
 
     /// <summary>

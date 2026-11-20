@@ -1,7 +1,7 @@
-using TvTracker;
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.SyncWorker.Providers.Wikidata;
 using Microsoft.EntityFrameworkCore;
+using TvTracker;
 using static Catalog.SyncWorker.Providers.Wikidata.WikidataMapping;
 
 namespace Catalog.SyncWorker.Supplement;

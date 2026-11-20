@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Ratings.API.Data;
@@ -104,7 +104,11 @@ public static class CharacterVotesApi
         {
             db.CharacterVotes.Add(new CharacterVote
             {
-                UserId = userId, EpisodeId = episodeId, ShowId = request.ShowId, PersonId = request.PersonId, CreatedAtUtc = DateTime.UtcNow
+                UserId = userId,
+                EpisodeId = episodeId,
+                ShowId = request.ShowId,
+                PersonId = request.PersonId,
+                CreatedAtUtc = DateTime.UtcNow
             });
         }
         else

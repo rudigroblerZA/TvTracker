@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Data;
@@ -88,9 +88,9 @@ public static class NotificationsApi
         return app;
     }
 
-    private static async Task<Ok<PreferencesDto>>     GetPreferencesAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Ok<PreferencesDto>> GetPreferencesAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
-            var prefs = await GetOrCreateAsync(user, db, time, ct);
+        var prefs = await GetOrCreateAsync(user, db, time, ct);
         return TypedResults.Ok(ToDto(prefs));
     }
 
@@ -228,26 +228,26 @@ public static class NotificationsApi
         return TypedResults.Ok(new InboxPageDto(items, unread));
     }
 
-    private static async Task<Results<NoContent, NotFound>>     MarkReadAsync(Guid id, ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<Results<NoContent, NotFound>> MarkReadAsync(Guid id, ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-            var now = time.GetUtcNow().UtcDateTime;
-            var updated = await db.Inbox
-                .Where(i => i.Id == id && i.UserId == userId && i.ReadAtUtc == null)
-                .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
+        var now = time.GetUtcNow().UtcDateTime;
+        var updated = await db.Inbox
+            .Where(i => i.Id == id && i.UserId == userId && i.ReadAtUtc == null)
+            .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
 
         return updated > 0 || await db.Inbox.AnyAsync(i => i.Id == id && i.UserId == userId, ct)
             ? TypedResults.NoContent()
             : TypedResults.NotFound();
     }
 
-    private static async Task<NoContent>     MarkAllReadAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
+    private static async Task<NoContent> MarkAllReadAsync(ClaimsPrincipal user, NotificationsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-            var now = time.GetUtcNow().UtcDateTime;
-            await db.Inbox
-                .Where(i => i.UserId == userId && i.ReadAtUtc == null)
-                .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
+        var now = time.GetUtcNow().UtcDateTime;
+        await db.Inbox
+            .Where(i => i.UserId == userId && i.ReadAtUtc == null)
+            .ExecuteUpdateAsync(u => u.SetProperty(i => i.ReadAtUtc, now), ct);
         return TypedResults.NoContent();
     }
 
@@ -290,7 +290,7 @@ public static class NotificationsApi
     private static async Task<Ok<DigestDto>> PreviewDigestAsync(ClaimsPrincipal user, NotificationsContext db, WeeklyDigest digests,
             TimeProvider time, CancellationToken ct)
     {
-            var prefs = await GetOrCreateAsync(user, db, time, ct);
+        var prefs = await GetOrCreateAsync(user, db, time, ct);
         var digest = await digests.BuildAsync(prefs, ct);
         return TypedResults.Ok(new DigestDto(digest.Subject, digest.Sections));
     }

@@ -1,6 +1,5 @@
-using Analytics.Data;
+﻿using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
-using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker;
 

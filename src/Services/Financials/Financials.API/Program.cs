@@ -1,7 +1,6 @@
-using Financials.API.Apis;
+﻿using Financials.API.Apis;
 using Financials.API.Data;
 using Financials.API.Services;
-using TvTracker;
 using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);

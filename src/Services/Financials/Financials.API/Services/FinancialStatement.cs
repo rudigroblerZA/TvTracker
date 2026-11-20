@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Financials.API.Data;
 
 namespace Financials.API.Services;

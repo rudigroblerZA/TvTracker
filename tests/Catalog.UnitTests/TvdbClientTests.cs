@@ -1,8 +1,8 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using Catalog.SyncWorker.Providers.Tvdb;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 

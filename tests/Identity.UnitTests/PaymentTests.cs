@@ -1,10 +1,10 @@
-using Identity.API.Data;
+﻿using Identity.API.Data;
 using Identity.API.Payments;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
-using TvTracker.Payments;
 using TvTracker.IntegrationEvents;
+using TvTracker.Payments;
 
 namespace Identity.UnitTests;
 
@@ -102,8 +102,13 @@ public class PaymentTests
     {
         var subscription = new Subscription
         {
-            UserId = "u", Provider = "test", ProviderSubscriptionId = "sub_1", Plan = Plans.Plus, Interval = PlanPrices.Month,
-            Status = SubscriptionStatus.Active, CurrentPeriodEndUtc = Now.UtcDateTime.AddDays(-2)
+            UserId = "u",
+            Provider = "test",
+            ProviderSubscriptionId = "sub_1",
+            Plan = Plans.Plus,
+            Interval = PlanPrices.Month,
+            Status = SubscriptionStatus.Active,
+            CurrentPeriodEndUtc = Now.UtcDateTime.AddDays(-2)
         };
 
         Assert.False(SubscriptionLapse.Lapsed(subscription, Now.UtcDateTime, graceDays: 3));
@@ -122,7 +127,12 @@ public class PaymentTests
     {
         var session = new CheckoutSession
         {
-            UserId = "u", Provider = "test", Plan = Plans.Plus, Interval = PlanPrices.Month, Amount = 2.99m, Currency = "USD"
+            UserId = "u",
+            Provider = "test",
+            Plan = Plans.Plus,
+            Interval = PlanPrices.Month,
+            Amount = 2.99m,
+            Currency = "USD"
         };
         var subscription = SubscriptionLedger.Start("test", new PaymentEvent("evt_1", PaymentEventKind.Paid, "sub_1"), session, Now);
 

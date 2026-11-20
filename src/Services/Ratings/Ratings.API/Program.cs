@@ -1,10 +1,10 @@
-using TvTracker;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Ratings.API.Apis;
 using Ratings.API.Data;
 using Ratings.API.IntegrationEvents;
 using Ratings.API.Services;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

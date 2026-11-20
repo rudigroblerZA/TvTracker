@@ -1,5 +1,4 @@
-using TvTracker.EventBus;
-using TvTracker.IntegrationEvents;
+﻿using TvTracker.EventBus;
 
 namespace TvTracker.Tests;
 

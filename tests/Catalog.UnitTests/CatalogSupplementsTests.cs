@@ -1,4 +1,4 @@
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.SyncWorker.Providers;
 using Catalog.SyncWorker.Supplement;
 using Microsoft.Extensions.Time.Testing;
@@ -18,7 +18,11 @@ public class CatalogSupplementsTests
 
     private static readonly ShowSupplement Wikidata = new()
     {
-        Item = "Q1", Overview = "From Wikipedia.", Network = "BBC One", FirstAirDate = new DateOnly(2020, 1, 2), PosterUrl = "https://commons/p.jpg"
+        Item = "Q1",
+        Overview = "From Wikipedia.",
+        Network = "BBC One",
+        FirstAirDate = new DateOnly(2020, 1, 2),
+        PosterUrl = "https://commons/p.jpg"
     };
 
     [Fact]

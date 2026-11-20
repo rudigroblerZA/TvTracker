@@ -1,10 +1,9 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
 

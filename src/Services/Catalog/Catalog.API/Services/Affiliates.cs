@@ -1,5 +1,4 @@
-using System.Security.Claims;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Catalog.Data;
 using Microsoft.EntityFrameworkCore;
@@ -199,17 +198,17 @@ public sealed class AffiliatePrograms(CatalogContext db, IOptionsMonitor<Affilia
         var fromSettings = records
             .OrderBy(r => r.Services.Contains(AffiliateLinks.AnyService)).ThenBy(r => r.Name, StringComparer.Ordinal)
             .Select(r => new AffiliateProgram
-        {
-            Name = r.Name,
-            Services = r.Services,
-            Regions = r.Regions,
-            Template = r.Test ? testNetwork?.Template ?? "" : r.Template,
-            PostbackKey = r.Test ? testNetwork?.PostbackKey : r.PostbackKey,
-            Currency = r.Currency,
-            Source = AffiliateSources.Settings,
-            Test = r.Test,
-            Enabled = r.Enabled
-        }).ToList();
+            {
+                Name = r.Name,
+                Services = r.Services,
+                Regions = r.Regions,
+                Template = r.Test ? testNetwork?.Template ?? "" : r.Template,
+                PostbackKey = r.Test ? testNetwork?.PostbackKey : r.PostbackKey,
+                Currency = r.Currency,
+                Source = AffiliateSources.Settings,
+                Test = r.Test,
+                Enabled = r.Enabled
+            }).ToList();
         var named = records.Select(r => r.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var fromConfiguration = configured.Where(p => p.Source == AffiliateSources.Configuration && !named.Contains(p.Name));
         return [.. fromSettings.Where(p => !p.Test), .. fromConfiguration, .. fromSettings.Where(p => p.Test), .. testNetwork is null ? [] : new[] { testNetwork }];
@@ -239,7 +238,13 @@ public static class StarterPrograms
         return All.Where(p => !names.Contains(p.Name) && !covered.Contains(p.Service))
             .Select(p => new AffiliateProgramRecord
             {
-                Name = p.Name, Services = [p.Service], Currency = "USD", Test = true, Enabled = true, CreatedAtUtc = nowUtc, UpdatedAtUtc = nowUtc
+                Name = p.Name,
+                Services = [p.Service],
+                Currency = "USD",
+                Test = true,
+                Enabled = true,
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
             })
             .ToList();
     }

@@ -1,6 +1,6 @@
-using System.Text.Json;
-using Microsoft.Extensions.Caching.Memory;
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Research.API.Apis;
 using Research.API.Data;
 using TvTracker;

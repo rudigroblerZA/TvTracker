@@ -1,6 +1,5 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
-using Catalog.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Providers.Wikidata;

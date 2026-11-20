@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;

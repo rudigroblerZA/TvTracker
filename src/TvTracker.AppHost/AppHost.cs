@@ -706,7 +706,11 @@ if (publishing)
         // The flags folder flagd reads, so the flags page's overrides reach it.
         .PublishAsDockerComposeService((_, service) => service.Volumes.Add(new()
         {
-            Name = "flags", Type = "bind", Source = "${FLAGD_BINDMOUNT_0}", Target = "/flags", ReadOnly = false
+            Name = "flags",
+            Type = "bind",
+            Source = "${FLAGD_BINDMOUNT_0}",
+            Target = "/flags",
+            ReadOnly = false
         }));
     notificationsApi.WithEnvironment("Digest__BaseUrl", publicUrl);
 

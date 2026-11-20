@@ -1,11 +1,11 @@
-﻿using TvTracker;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Catalog.Data;
 using Catalog.SyncWorker.Quotes;
 using Microsoft.EntityFrameworkCore;
+using TvTracker;
 
 namespace Catalog.SyncWorker.Settings;
 

@@ -1,8 +1,8 @@
-using TvTracker;
-using Analytics.Data;
+﻿using Analytics.Data;
 using Analytics.Worker;
 using Analytics.Worker.Insights;
 using Analytics.Worker.IntegrationEvents;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

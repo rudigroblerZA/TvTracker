@@ -1,4 +1,4 @@
-using Catalog.API.Services;
+﻿using Catalog.API.Services;
 using Catalog.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

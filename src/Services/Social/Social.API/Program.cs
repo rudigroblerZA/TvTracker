@@ -1,8 +1,8 @@
-using TvTracker;
-using Social.API.Apis;
+﻿using Social.API.Apis;
 using Social.API.Data;
 using Social.API.IntegrationEvents;
 using Social.API.Services;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

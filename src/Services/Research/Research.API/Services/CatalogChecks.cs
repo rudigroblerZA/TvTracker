@@ -1,9 +1,9 @@
-﻿using TvTracker;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Research.API.Data;
+using TvTracker;
 using TvTracker.IntegrationEvents;
 
 namespace Research.API.Services;

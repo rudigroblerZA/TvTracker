@@ -1,8 +1,8 @@
-using Catalog.SyncWorker.Alerts;
-using Catalog.SyncWorker.JustWatch;
-using Catalog.Data;
+﻿using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.SyncWorker;
+using Catalog.SyncWorker.Alerts;
+using Catalog.SyncWorker.JustWatch;
 using Catalog.SyncWorker.Nanogenres;
 using Catalog.SyncWorker.Providers;
 using Catalog.SyncWorker.Providers.Tvdb;

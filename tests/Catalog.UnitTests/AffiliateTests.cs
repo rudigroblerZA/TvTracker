@@ -162,13 +162,19 @@ public class AffiliateTests
 
     private static IConfiguration WithTestNetwork() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
     {
-        ["Affiliates:TestNetwork:Url"] = "http://localhost:5120", ["Affiliates:TestNetwork:Key"] = "test-network-key"
+        ["Affiliates:TestNetwork:Url"] = "http://localhost:5120",
+        ["Affiliates:TestNetwork:Key"] = "test-network-key"
     }).Build();
 
     private static AffiliateProgramRecord Record(string name, string service, bool test = false, bool enabled = true) => new()
     {
-        Name = name, Services = [service], Currency = "USD", Test = test, Enabled = enabled,
-        Template = test ? "" : "https://network.example/c/9?u={url}&s={click}", PostbackKey = test ? null : "a-long-random-secret"
+        Name = name,
+        Services = [service],
+        Currency = "USD",
+        Test = test,
+        Enabled = enabled,
+        Template = test ? "" : "https://network.example/c/9?u={url}&s={click}",
+        PostbackKey = test ? null : "a-long-random-secret"
     };
 
     [Fact]
