@@ -74,7 +74,11 @@ else
             {
                 <Feature Flag="@FeatureFlags.WatchNow">
                     <p class="watch-now">
-                        <a class="btn" href="@WatchHref(now, "watch-now")" target="_blank" rel="noopener noreferrer nofollow">@WatchLabel(now)</a>
+                        <a class="btn" href="@WatchHref(now, "watch-now")" target="_blank" rel="@WatchRel">@WatchLabel(now)</a>
+                        @if (tracked)
+                        {
+                            <a class="muted small affiliate-note" href="shows/@show.Id#where-to-watch">We may earn a commission</a>
+                        }
                     </p>
                 </Feature>
             }
@@ -250,7 +254,7 @@ else
     @if (show.WatchProviders.Count > 0 || show.JustWatchUrl is not null)
     {
         <section>
-            <h2>Where to watch <span class="muted small">(@show.Region)</span></h2>
+            <h2 id="where-to-watch">Where to watch <span class="muted small">(@show.Region)</span></h2>
             @if (show.WatchProviders.Count == 0)
             {
                 <p class="muted">Not on any service here at the moment.</p>
@@ -261,7 +265,7 @@ else
                     <li>
                         @if (!string.IsNullOrEmpty(provider.Url))
                         {
-                            <a href="@WatchHref(provider, "where-to-watch")" target="_blank" rel="noopener noreferrer nofollow">@WatchLabel(provider)</a>
+                            <a href="@WatchHref(provider, "where-to-watch")" target="_blank" rel="@WatchRel">@WatchLabel(provider)</a>
                         }
                         else
                         {
@@ -271,6 +275,12 @@ else
                     </li>
                 }
             </ul>
+            @if (tracked && show.WatchProviders.Any(p => !string.IsNullOrEmpty(p.Url)))
+            {
+                <p class="muted small affiliate-disclosure">
+                    @($"Some of these are affiliate links: if you sign up or buy through one, {Brand.AppName} may earn a commission, at no extra cost to you. It doesn't change which services are listed or their order. ")<a href="terms">Terms</a>
+                </p>
+            }
             @if (show.JustWatchUrl is { } justWatch)
             {
                 <p class="muted small">
@@ -332,6 +342,11 @@ else
     private string? WatchHref(WatchProvider provider, string surface) =>
         !tracked || show is null ? provider.Url
         : $"{Platform.PublicWebAddress}go/{show.Id}?provider={Uri.EscapeDataString(provider.ProviderName)}&type={(int)provider.Type}&region={Uri.EscapeDataString(show.Region)}&surface={surface}";
+
+    /// <summary>
+    /// How a where-to-watch link is marked for search engines: "sponsored" while clicks can go through an affiliate program.
+    /// </summary>
+    private string WatchRel => tracked ? "noopener noreferrer nofollow sponsored" : "noopener noreferrer nofollow";
 
     private static string WatchLabel(WatchProvider provider) => provider.Link switch
     {
