@@ -56,6 +56,11 @@ public class Comment : IModeratedPost
     public string? HiddenReason { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+
+    /// <summary>
+    /// When its author last changed its words; null if never.
+    /// </summary>
+    public DateTime? EditedAtUtc { get; set; }
 }
 
 /// <summary>

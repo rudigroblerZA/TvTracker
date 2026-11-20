@@ -252,7 +252,7 @@ public record RatingSummary(double Average, int Count, IReadOnlyList<int> Distri
 /// <param name="HiddenReason">Only on the user's own hidden comment: "flags", "held" or "moderator".</param>
 /// <param name="GifId">The GIPHY id of its GIF, if it has one and GIFs are on.</param>
 public record Comment(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc,
-    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null);
+    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null, DateTime? EditedAtUtc = null);
 
 /// <summary>
 /// What the browser needs to search GIPHY and show its GIFs (Ratings.API's comments answer); see gifs.js.

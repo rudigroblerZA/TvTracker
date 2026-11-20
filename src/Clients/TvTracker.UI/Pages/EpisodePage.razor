@@ -165,8 +165,19 @@ else
                         @foreach (var comment in comments.Comments)
                         {
                             <li>
-                                <div class="muted small">@comment.DisplayName · @Format.Relative(comment.CreatedAtUtc)</div>
-                                @if (comment.Text is null)
+                                <div class="muted small">@comment.DisplayName · @Format.Relative(comment.CreatedAtUtc)@if (comment.EditedAtUtc is { } edited) { <span title="@($"Edited {Format.Relative(edited)}")"> · edited</span> }</div>
+                                @if (editing == comment.Id)
+                                {
+                                    <form class="comment-form comment-edit" @onsubmit="SaveEditAsync">
+                                        <textarea @bind="editText" @bind:event="oninput" maxlength="2000" aria-label="Edit your comment"></textarea>
+                                        <label class="inline checkbox"><input type="checkbox" @bind="editIsSpoiler" /> Contains spoilers</label>
+                                        <div class="actions">
+                                            <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(editText) && comment.GifId is null)">Save</button>
+                                            <button class="btn btn-quiet" type="button" @onclick="() => editing = null">Cancel</button>
+                                        </div>
+                                    </form>
+                                }
+                                else if (comment.Text is null)
                                 {
                                     <em class="muted">Spoiler hidden</em>
                                 }
@@ -188,6 +199,10 @@ else
                                     }
                                     @if (comment.IsMine)
                                     {
+                                        @if (comment.HiddenReason != "moderator" && editing != comment.Id)
+                                        {
+                                            <button class="link small" @onclick="() => StartEdit(comment)">Edit</button>
+                                        }
                                         <button class="link small" @onclick="() => DeleteCommentAsync(comment.Id)">Delete</button>
                                     }
                                     else
@@ -232,6 +247,13 @@ else
     private int? myRating;
     private Reactions? reactions;
     private CommentsPage? comments;
+
+    /// <summary>
+    /// The reader's own comment being edited, with its draft: kept apart from the list, which refreshes underneath.
+    /// </summary>
+    private Guid? editing;
+    private string? editText;
+    private bool editIsSpoiler;
 
     /// <summary>
     /// What the page shows, for "Suggest a correction" (the air date as the profile's calendar would show it is
@@ -495,6 +517,19 @@ else
         newComment = null;
         newCommentIsSpoiler = false;
         (pickedGif, gifPickerOpen) = (null, false);
+        await LoadCommentsAsync(reveal: true);
+    });
+
+    private void StartEdit(Comment comment) => (editing, editText, editIsSpoiler) = (comment.Id, comment.Text, comment.IsSpoiler);
+
+    private Task SaveEditAsync() => RunAsync(async () =>
+    {
+        if (editing is not { } id)
+        {
+            return;
+        }
+        await Ratings.EditCommentAsync(id, editText, editIsSpoiler);
+        editing = null;
         await LoadCommentsAsync(reveal: true);
     });
 

@@ -564,6 +564,9 @@ the discovery tools, the plans, and a last call to sign up.
 
 **Comments** (episode pages): words, emoji, a GIF, or any mix, hidden until you've watched the episode as before.
 
+- **You can edit your own.** "Edit" on your comment changes its words and its spoiler mark; its GIF stays as posted.
+  An edited comment says "edited". New words go through the same word check as a new comment, an edit doesn't lift
+  what readers' flags hid, and a comment a moderator removed can't be changed.
 - **They refresh on their own.** While an episode page is open it asks for the comments again every 20 seconds, so
   other people's appear without a reload. What you chose to reveal (unwatched, spoilers) stays revealed.
 - **Emoji:** a row of twelve under the box adds one to what you're writing; any emoji typed in works too.

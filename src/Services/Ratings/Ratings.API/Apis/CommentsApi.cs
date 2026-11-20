@@ -14,8 +14,14 @@ public record PostCommentRequest(Guid ShowId, string? Text, bool IsSpoiler, stri
 /// <param name="HiddenReason">Set only on the reader's own hidden comment: "flags", "held" or "moderator".</param>
 /// <param name="FlaggedByMe">The reader has flagged it.</param>
 /// <param name="GifId">The GIPHY id of its GIF; null without one, for a hidden spoiler, and while GIFs are off.</param>
+/// <param name="EditedAtUtc">When its author last changed it; null if never.</param>
 public record CommentDto(Guid Id, string DisplayName, string? Text, bool IsSpoiler, bool IsMine, DateTime CreatedAtUtc,
-    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null);
+    string? HiddenReason = null, bool FlaggedByMe = false, string? GifId = null, DateTime? EditedAtUtc = null);
+
+/// <summary>
+/// An author's change to their comment: its words and whether it spoils. Its GIF stays as posted.
+/// </summary>
+public record EditCommentRequest(string? Text, bool IsSpoiler);
 
 /// <summary>
 /// What the reader's browser needs to search GIPHY and show its GIFs.
@@ -42,6 +48,7 @@ public static class CommentsApi
 
         api.MapGet("/episodes/{episodeId:guid}/comments", GetCommentsAsync);
         api.MapPost("/episodes/{episodeId:guid}/comments", PostCommentAsync);
+        api.MapPut("/comments/{id:guid}", EditCommentAsync);
         api.MapDelete("/comments/{id:guid}", DeleteCommentAsync);
 
         api.MapGet("/episodes/{episodeId:guid}/reactions", GetReactionsAsync);
@@ -96,7 +103,8 @@ public static class CommentsApi
                     c.CreatedAtUtc,
                     c.UserId == userId ? c.HiddenReason : null,
                     flagged.Contains(c.Id),
-                    hiddenSpoiler || gifs is null ? null : c.GifId);
+                    hiddenSpoiler || gifs is null ? null : c.GifId,
+                    c.EditedAtUtc);
             })
             .ToList(), gifs));
     }
@@ -143,6 +151,50 @@ public static class CommentsApi
 
         return TypedResults.Created($"/api/v1/comments/{comment.Id}",
             new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc, comment.HiddenReason, GifId: comment.GifId));
+    }
+
+    /// <summary>
+    /// Why an edited comment is hidden, from why it was and what the word check makes of its new text. New words are
+    /// checked as a new comment's are; an edit never lifts what readers' flags did.
+    /// </summary>
+    public static string? HiddenAfterEdit(string? was, TextVerdict verdict) =>
+        was == HiddenReasons.Flags ? was : verdict == TextVerdict.Held ? HiddenReasons.Held : null;
+
+    private static async Task<Results<Ok<CommentDto>, NotFound, ValidationProblem, Conflict<string>>> EditCommentAsync(
+        Guid id, EditCommentRequest request, ClaimsPrincipal user, RatingsContext db, Moderation moderation,
+        IOptionsSnapshot<GiphyOptions> giphy, CancellationToken ct)
+    {
+        var userId = user.GetUserId();
+        var comment = await db.Comments.SingleOrDefaultAsync(c => c.Id == id && c.UserId == userId, ct);
+        if (comment is null)
+        {
+            return TypedResults.NotFound();
+        }
+        if (comment.HiddenReason == HiddenReasons.Moderator)
+        {
+            return TypedResults.Conflict("A moderator removed this comment, so it can't be changed.");
+        }
+
+        var text = request.Text?.Trim() ?? "";
+        if (text.Length > 2000 || (text.Length == 0 && comment.GifId is null))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["Write up to 2000 characters."] });
+        }
+        if (text.Length > 0 && CommunityApi.CheckPost(text, moderation) is { } refused)
+        {
+            return refused;
+        }
+
+        if (text != comment.Text)
+        {
+            (comment.Text, comment.EditedAtUtc) = (text, DateTime.UtcNow);
+            comment.HiddenReason = HiddenAfterEdit(comment.HiddenReason, moderation.Check(text));
+        }
+        comment.IsSpoiler = request.IsSpoiler;
+        await db.SaveChangesAsync(ct);
+
+        return TypedResults.Ok(new CommentDto(comment.Id, comment.DisplayName, comment.Text, comment.IsSpoiler, true, comment.CreatedAtUtc,
+            comment.HiddenReason, GifId: Gifs.Enabled(giphy.Value) ? comment.GifId : null, EditedAtUtc: comment.EditedAtUtc));
     }
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)

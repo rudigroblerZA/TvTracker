@@ -63,6 +63,9 @@ namespace Ratings.API.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTime?>("EditedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
 
