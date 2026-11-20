@@ -283,6 +283,7 @@ else
     @if (show.Cast.Count > 0)
     {
         <CastSection ShowId="show.Id" Cast="show.Cast" />
+        <Feature Flag="@FeatureFlags.CharacterVoting"><FanFavouritesSection ShowId="show.Id" Cast="show.Cast" /></Feature>
         <Feature Flag="@FeatureFlags.CastAges"><CastAgesSection ShowId="show.Id" /></Feature>
         <Feature Flag="@FeatureFlags.FarFromHome"><CastOriginsSection ShowId="show.Id" /></Feature>
         <Feature Flag="@FeatureFlags.CastAfterwards"><CastAfterwardsSection ShowId="show.Id" /></Feature>

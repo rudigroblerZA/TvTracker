@@ -271,6 +271,13 @@ public record ReactionCount(string Emoji, int Count);
 
 public record Reactions(IReadOnlyList<ReactionCount> Counts, string? Mine);
 
+public record CharacterVoteCount(Guid PersonId, int Votes);
+
+/// <param name="Locked">The reader hasn't watched the episode, so there are no counts to show.</param>
+public record EpisodeCharacterVotes(bool Locked, int Total, IReadOnlyList<CharacterVoteCount> Counts, Guid? Mine);
+
+public record ShowCharacterVotes(int Total, IReadOnlyList<CharacterVoteCount> Top);
+
 // Recommendations
 
 public record RecommendedShow(Guid ShowId, string Title, string? PosterUrl, double Score, string Reason);

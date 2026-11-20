@@ -74,6 +74,7 @@ public static class FeatureFlags
     public const string NetworkReports = "network-reports";
     public const string YearInTv = "year-in-tv";
     public const string EpisodeDuels = "episode-duels";
+    public const string CharacterVoting = "character-voting";
     public const string WaitingRoom = "waiting-room";
 
     /// <summary>
@@ -96,7 +97,7 @@ public static class FeatureFlags
     {
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
         Plans, Payments, FamilyPlan, Affiliates,
-        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt,
+        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt, CharacterVoting,
     };
 
     /// <summary>

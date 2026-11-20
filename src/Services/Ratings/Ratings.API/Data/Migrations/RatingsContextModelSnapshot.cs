@@ -22,6 +22,33 @@ namespace Ratings.API.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Ratings.API.Data.CharacterVote", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserId", "EpisodeId");
+
+                    b.HasIndex("EpisodeId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("character_votes", (string)null);
+                });
+
             modelBuilder.Entity("Ratings.API.Data.Comment", b =>
                 {
                     b.Property<Guid>("Id")
