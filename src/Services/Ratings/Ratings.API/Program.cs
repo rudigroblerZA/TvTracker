@@ -57,6 +57,7 @@ app.MapCommentsApi();
 app.MapCommunityApi();
 app.MapModerationApi();
 app.MapDuelsApi();
+app.MapCharacterVotesApi();
 
 app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, RatingsContext db, CancellationToken ct) =>
 {
@@ -80,7 +81,9 @@ app.MapGet("/api/v1/me/export", async (ClaimsPrincipal user, RatingsContext db, 
         corrections = await db.Corrections.AsNoTracking().Where(c => c.UserId == userId)
             .Select(c => new { c.ShowId, c.EpisodeId, c.Field, c.SuggestedValue, c.Note, c.Status, c.CreatedAtUtc }).ToListAsync(ct),
         episodeDuels = await db.Duels.AsNoTracking().Where(d => d.UserId == userId)
-            .Select(d => new { d.ShowId, d.WinnerId, d.LoserId, d.DecidedAtUtc }).ToListAsync(ct)
+            .Select(d => new { d.ShowId, d.WinnerId, d.LoserId, d.DecidedAtUtc }).ToListAsync(ct),
+        characterVotes = await db.CharacterVotes.AsNoTracking().Where(v => v.UserId == userId)
+            .Select(v => new { v.ShowId, v.EpisodeId, v.PersonId, v.CreatedAtUtc }).ToListAsync(ct)
     });
 }).RequireAuthorization();
 

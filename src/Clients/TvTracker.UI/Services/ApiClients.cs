@@ -676,6 +676,18 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
 
     public Task RemoveReactionAsync(Guid episodeId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/reaction", null, ct, queueIfOffline: true);
+
+    public Task<EpisodeCharacterVotes?> GetCharacterVotesAsync(Guid episodeId, CancellationToken ct = default) =>
+        GetAsync<EpisodeCharacterVotes>(ApiClients.Ratings, $"api/v1/episodes/{episodeId}/character-votes", ct);
+
+    public Task<ShowCharacterVotes?> GetShowCharacterVotesAsync(Guid showId, CancellationToken ct = default) =>
+        GetAsync<ShowCharacterVotes>(ApiClients.Ratings, $"api/v1/shows/{showId}/character-votes", ct);
+
+    public Task VoteCharacterAsync(Guid episodeId, Guid showId, Guid personId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/character-vote", new { showId, personId }, ct);
+
+    public Task RemoveCharacterVoteAsync(Guid episodeId, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/character-vote", null, ct);
 }
 
 public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)

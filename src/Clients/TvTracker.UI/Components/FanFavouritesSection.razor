@@ -1,0 +1,62 @@
+@inject RatingsClient Ratings
+
+@* A show's fan favourites: the cast with the most "favourite character" votes across its episodes. *@
+@if (Top.Count > 0)
+{
+    <section class="fan-favourites" aria-labelledby="fan-favourites-title">
+        <h2 id="fan-favourites-title">Fan favourites</h2>
+        <p class="muted">@($"Who viewers picked as their favourite character, episode by episode. {CharacterVoteSection.Votes(votes!.Total)} in all.")</p>
+        <ol class="character-votes">
+            @foreach (var (member, count) in Top)
+            {
+                var share = (int)Math.Round(100.0 * count / votes.Total);
+                <li>
+                    <a class="character-choice" href="people/@member.PersonId">
+                        <span class="share" style="width: @share%"></span>
+                        <span class="who"><strong>@(member.Character is { Length: > 0 } character ? character : member.Name)</strong>
+                            @if (member.Character is { Length: > 0 })
+                            {
+                                <span class="muted small">@member.Name</span>
+                            }
+                        </span>
+                        <span class="count">@($"{share}%")<span class="muted small">@($" · {count}")</span></span>
+                    </a>
+                </li>
+            }
+        </ol>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid ShowId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<CastMember> Cast { get; set; } = [];
+
+    private ShowCharacterVotes? votes;
+    private Guid? loaded;
+
+    /// <summary>
+    /// The voted-for people still in the cast, most votes first.
+    /// </summary>
+    private IReadOnlyList<(CastMember Member, int Votes)> Top => votes is null ? [] : votes.Top
+        .Select(c => (Member: Cast.FirstOrDefault(m => m.PersonId == c.PersonId), c.Votes))
+        .Where(t => t.Member is not null)
+        .Select(t => (t.Member!, t.Votes))
+        .ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == ShowId)
+        {
+            return;
+        }
+        loaded = ShowId;
+        try
+        {
+            votes = await Ratings.GetShowCharacterVotesAsync(ShowId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            votes = null;
+        }
+    }
+}

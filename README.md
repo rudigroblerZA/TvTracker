@@ -1165,6 +1165,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `plans` | Plans: Free's limits on lists (3, no sharing), `/settings/plan` and the admins' `/settings/plans`; off, nobody is limited |
 | `worth-it` | "Is it worth it?" on show pages, its highlight, and the Worth your time list on Discover |
 | `episode-duels` | `/shows/{id}/duels`, its show page link, and Ratings.API's duels endpoints |
+| `character-voting` | "Favourite character" on episode pages, "Fan favourites" on show pages, and Ratings.API's character vote endpoints |
 | `waiting-room` | `/waiting`, its Up Next link, and its endpoint |
 | `while-you-wait` | `/while-you-wait`, its Up Next and waiting-room links, and its endpoint (Pro and Family) |
 
@@ -1789,6 +1790,12 @@ How events flow:
     - **Bulk marks:** 8 or more of a show's episodes marked at once ("watched up to S05E10") aren't counted, since when
       you watched them isn't known; the page says how many were left out.
     - **API:** `GET /api/v1/me/year?year=&tz=` on Analytics.API, signed in.
+  - **Favourite character** (episode pages; `character-voting` flag): once you've watched an episode, vote for the cast
+    member who stood out in it. One vote per episode: pick someone else to change it, or yours again to take it back.
+    - **Hidden until watched:** no counts before you've watched the episode, since who stood out gives it away.
+    - **Fan favourites:** a show's page lists the five cast members with the most votes across its episodes.
+    - **What is kept:** your pick per episode, as the catalog's id for the cast member. It is in your data export and
+      goes when your account does.
   - **Episode duels** (`/shows/{id}/duels`, linked from show pages; `episode-duels` flag): rank a show's episodes you've
     watched by picking the better of two, or skipping a pair you can't call. Your ranking builds as you go, with each
     episode's wins and losses; "Start over" forgets them.

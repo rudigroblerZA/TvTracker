@@ -374,6 +374,12 @@
       "defaultVariant": "off",
       "metadata": { "description": "Episode duels: rank a show's episodes you've watched by picking the better of two." }
     },
+    "character-voting": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "on",
+      "metadata": { "description": "Favourite character: vote for who stood out in an episode you've watched; a show's fan favourites." }
+    },
     "waiting-room": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

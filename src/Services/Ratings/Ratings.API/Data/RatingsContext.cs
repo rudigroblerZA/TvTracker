@@ -217,6 +217,18 @@ public class Reaction
 /// <summary>
 /// An episode the user has watched, from Tracking's events and daily snapshot.
 /// </summary>
+/// <summary>
+/// A user's favourite character of an episode: one per user and episode, naming the catalog's cast member.
+/// </summary>
+public class CharacterVote
+{
+    public required string UserId { get; set; }
+    public Guid EpisodeId { get; set; }
+    public Guid ShowId { get; set; }
+    public Guid PersonId { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}
+
 public class WatchedEpisodeCopy
 {
     public required string UserId { get; set; }
@@ -252,6 +264,7 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
     public DbSet<EpisodeRating> EpisodeRatings => Set<EpisodeRating>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
+    public DbSet<CharacterVote> CharacterVotes => Set<CharacterVote>();
     public DbSet<WatchedEpisodeCopy> WatchedEpisodes => Set<WatchedEpisodeCopy>();
     public DbSet<EpisodeDuel> Duels => Set<EpisodeDuel>();
     public DbSet<ContentFlag> Flags => Set<ContentFlag>();
@@ -349,6 +362,15 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
             entity.Property(a => a.Action).HasMaxLength(16);
             entity.Property(a => a.TargetKind).HasMaxLength(16);
             entity.Property(a => a.Summary).HasMaxLength(300);
+        });
+
+        modelBuilder.Entity<CharacterVote>(entity =>
+        {
+            entity.ToTable("character_votes");
+            entity.HasKey(v => new { v.UserId, v.EpisodeId });
+            entity.HasIndex(v => v.EpisodeId);
+            entity.HasIndex(v => v.ShowId);
+            entity.Property(v => v.UserId).HasMaxLength(64);
         });
 
         modelBuilder.Entity<Reaction>(entity =>

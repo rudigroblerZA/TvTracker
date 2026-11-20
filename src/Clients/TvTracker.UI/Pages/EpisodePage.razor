@@ -78,6 +78,10 @@ else
                 </div>
             </section>
 
+            <Feature Flag="@FeatureFlags.CharacterVoting">
+                <CharacterVoteSection EpisodeId="episode.Id" ShowId="episode.ShowId" Cast="cast" Watched="watched" />
+            </Feature>
+
             <section>
                 <h2>Comments</h2>
                 @if (comments is null)
@@ -214,6 +218,7 @@ else
 
     private Episode? episode;
     private string? showTitle;
+    private IReadOnlyList<CastMember> cast = [];
     private bool notFound;
     private bool watched;
 
@@ -286,7 +291,8 @@ else
             }
 
             aired = episode.AirsAtUtc <= DateTimeOffset.UtcNow;
-            showTitle = (await Catalog.GetShowAsync(episode.ShowId, Session.Region))?.Title;
+            var show = await Catalog.GetShowAsync(episode.ShowId, Session.Region);
+            (showTitle, cast) = (show?.Title, show?.Cast ?? []);
             summary = await Ratings.GetEpisodeSummaryAsync(Id);
 
             if (Session.IsSignedIn)

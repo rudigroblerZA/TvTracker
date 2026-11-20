@@ -100,6 +100,7 @@ public sealed class UserDeletedHandler(RatingsContext db) : IIntegrationEventHan
         await db.Flags.Where(f => f.TargetKind == "comment" && comments.Contains(f.TargetId)).ExecuteDeleteAsync(ct);
         await db.Comments.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Reactions.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        await db.CharacterVotes.Where(v => v.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.Duels.Where(d => d.UserId == e.UserId).ExecuteDeleteAsync(ct);
 
