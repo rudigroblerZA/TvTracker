@@ -59,9 +59,9 @@
     <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
     <!-- bundle_green 2.1.11 brings in lib.e_sqlite3 2.1.11, which has a known high-severity vulnerability (GHSA-2m69-gcr7-jv3q). -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.14" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'" />
-    <!-- On Android the pin keeps the fixed version but must not ship its linux (glibc) libs: they'd win over the Android ones in the APK and fail to load. -->
+    <!-- On Android the e_sqlite3 pins only keep the audit clean. They ship no binaries: SourceGear.sqlite3 (via sqlite-net-pcl) is the single native SQLite, and a second libe_sqlite3.so (glibc or Android) collides with it in the APK. -->
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.14" ExcludeAssets="runtime;native;contentFiles" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.14" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.14" ExcludeAssets="all" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
   </ItemGroup>
 
   <ItemGroup>
