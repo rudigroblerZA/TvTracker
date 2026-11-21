@@ -62,6 +62,14 @@ public interface IPlatformServices
     string PublicWebAddress { get; }
 
     /// <summary>
+    /// Whether a plan can be bought here. On the web, yes: the payment provider's checkout is another web page. Not
+    /// in the phone app: the app stores require their own billing for a subscription bought inside an app, and don't
+    /// allow sending people to another checkout, so there the plan page shows the plans and what the person has, and
+    /// offers nothing to buy.
+    /// </summary>
+    bool SellsPlans => true;
+
+    /// <summary>
     /// Shares a link: the share sheet on a phone, else copies it. True when it was shared or copied.
     /// </summary>
     Task<bool> ShareLinkAsync(string title, string url);

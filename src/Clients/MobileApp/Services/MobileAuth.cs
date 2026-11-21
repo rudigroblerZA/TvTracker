@@ -56,8 +56,8 @@ public sealed class MobileAuthService
         RedirectUri = MobileSettings.RedirectUri,
         PostLogoutRedirectUri = MobileSettings.RedirectUri,
         Browser = new MauiAuthBrowser(),
-        // Local Keycloak runs on plain http.
-        Policy = new Policy { Discovery = new DiscoveryPolicy { RequireHttps = false } }
+        // Local Keycloak runs on plain http; a deployment's never does.
+        Policy = new Policy { Discovery = new DiscoveryPolicy { RequireHttps = MobileSettings.IsRelease } }
     });
 
     private readonly SemaphoreSlim _gate = new(1, 1);

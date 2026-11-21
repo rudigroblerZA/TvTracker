@@ -75,6 +75,8 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
 
     public string PublicWebAddress => MobileSettings.WebAddress.ToString();
 
+    public bool SellsPlans => false;
+
     public async Task<bool> ShareLinkAsync(string title, string url)
     {
         await Share.Default.RequestAsync(new ShareTextRequest { Title = title, Uri = url });

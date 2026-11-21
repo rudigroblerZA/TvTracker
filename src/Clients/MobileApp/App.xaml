@@ -5,7 +5,9 @@
              x:Class="TvTracker.Mobile.App">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- The page behind the web view, which shows behind the system bars: the web UI's own background, light and dark. -->
             <Color x:Key="PageBackgroundColor">#FAFAF9</Color>
+            <Color x:Key="PageBackgroundColorDark">#0C0A09</Color>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

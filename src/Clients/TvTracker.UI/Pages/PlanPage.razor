@@ -3,6 +3,7 @@
 @inject IdentityClient Identity
 @inject FeatureFlagStore Flags
 @inject NavigationManager Navigation
+@inject IPlatformServices Platform
 
 <PageTitle>Your plan · @Brand.AppName</PageTitle>
 
@@ -141,7 +142,7 @@
         .Where(f => f.Plans.Contains(key) && (key == Plans.Free || !f.Plans.Contains(key == Plans.Family ? Plans.Plus : Plans.Free)))
         .ToList();
 
-    private bool CanBuy => prices?.Provider is not null && subscription is not { Active: true };
+    private bool CanBuy => Platform.SellsPlans && prices?.Provider is not null && subscription is not { Active: true };
 
     private string Money(decimal amount) => prices!.Currency == "USD"
         ? Format.Usd(amount)

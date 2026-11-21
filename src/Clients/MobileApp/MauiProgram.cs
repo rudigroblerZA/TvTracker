@@ -1,4 +1,8 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
+// For AddDebug, in debug builds only: an analyser that looks at a release build sees it as unused.
+#if DEBUG
+using Microsoft.Extensions.Logging;
+#endif
 using Microsoft.Maui.LifecycleEvents;
 using OpenFeature;
 using OpenFeature.Providers.Ofrep.DependencyInjection;

@@ -1,0 +1,112 @@
+# The Android app (src/Clients/MobileApp), which CI leaves out because it needs the MAUI workload.
+#  - On a pull request that touches the app: a debug build, so a change that breaks it is seen.
+#  - Run by hand (Actions, Android, Run workflow): a signed app bundle for Google Play, kept as the run's artifact.
+#    It needs three repository secrets: ANDROID_KEYSTORE_BASE64 (the upload keystore, base64), ANDROID_KEYSTORE_PASSWORD
+#    (the keystore's and the key's, which keytool makes the same) and ANDROID_KEY_ALIAS. See README, Releasing the Android app.
+name: Android
+
+on:
+  pull_request:
+    paths:
+      - src/Clients/MobileApp/**
+      - .github/workflows/android.yml
+  workflow_dispatch:
+    inputs:
+      public_host:
+        description: The deployment's host name (PUBLIC_HOST), e.g. tv.example.com
+        required: true
+      display_version:
+        description: The version people see, e.g. 1.0
+        required: true
+        default: "1.0"
+      version_code:
+        description: The build number; higher than every earlier upload. Empty uses this run's number.
+        required: false
+      catalog_source:
+        description: The backend's Catalog:Provider (tvmaze, wikidata or tvdb)
+        required: true
+        default: tvmaze
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  PROJECT: src/Clients/MobileApp
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: 17
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-android-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', 'src/Clients/MobileApp/MobileApp.csproj') }}
+          restore-keys: nuget-android-${{ runner.os }}-
+
+      - name: Install the Android workload
+        run: dotnet workload install maui-android
+
+      # The runner has an Android SDK; this adds whatever of the platform and build tools this .NET wants and it lacks.
+      - name: Install Android SDK dependencies
+        run: dotnet build "$PROJECT" -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+
+      - name: Debug build
+        if: github.event_name == 'pull_request'
+        run: dotnet build "$PROJECT" -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"
+
+      - name: Signed app bundle
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PUBLIC_HOST: ${{ inputs.public_host }}
+          DISPLAY_VERSION: ${{ inputs.display_version }}
+          VERSION_CODE: ${{ inputs.version_code || github.run_number }}
+          CATALOG_SOURCE: ${{ inputs.catalog_source }}
+        run: |
+          if [[ -z $KEYSTORE_BASE64 || -z $KEYSTORE_PASSWORD || -z $KEY_ALIAS ]]; then
+            echo "::error::Set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS secrets (README, Releasing the Android app)."
+            exit 1
+          fi
+          # The keystore and its password as files outside the checkout: the build reads the password from a file
+          # (file:), so it never appears on a command line or in the log.
+          keys="$RUNNER_TEMP/signing"
+          mkdir -p "$keys"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$keys/upload.keystore"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$keys/password"
+          dotnet publish "$PROJECT" -c Release -f net10.0-android -o "$RUNNER_TEMP/bundle" \
+            -p:AndroidSdkDirectory="$ANDROID_HOME" \
+            -p:TvTrackerPublicHost="$PUBLIC_HOST" -p:TvTrackerCatalogSource="$CATALOG_SOURCE" \
+            -p:ApplicationDisplayVersion="$DISPLAY_VERSION" -p:ApplicationVersion="$VERSION_CODE" \
+            -p:AndroidSigningKeyStore="$keys/upload.keystore" -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
+            -p:AndroidSigningKeyPass="file:$keys/password" -p:AndroidSigningStorePass="file:$keys/password"
+          rm -rf "$keys"
+          echo "Built $DISPLAY_VERSION ($VERSION_CODE) for $PUBLIC_HOST" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the bundle
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvtracker-android-${{ inputs.display_version }}-${{ inputs.version_code || github.run_number }}
+          path: ${{ runner.temp }}/bundle/*-Signed.aab
+          if-no-files-found: error
+          retention-days: 30

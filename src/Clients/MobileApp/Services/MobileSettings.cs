@@ -1,13 +1,36 @@
+using System.Reflection;
+
 namespace TvTracker.Mobile.Services;
 
 /// <summary>
-/// Local development addresses. The Android emulator reaches the host machine on 10.0.2.2.
-/// For a physical device, replace these with a dev tunnel or your machine's LAN address
-/// (and add that address to the Keycloak client's redirect settings if it changes the issuer).
+/// Where the app finds the backend, fixed when it is built.
+/// <list type="bullet">
+/// <item><b>A release</b> names the deployment's host (<c>-p:TvTrackerPublicHost=tv.example.com</c>, the
+/// <c>PUBLIC_HOST</c> of scripts/deploy.sh): the site is <c>https://HOST/</c>, the gateway <c>https://HOST/api/</c> and
+/// sign-in <c>https://HOST/realms/tvtracker</c>. Nothing goes over plain http.</item>
+/// <item><b>A development build</b> names none and talks to the AppHost on this machine, which the Android emulator
+/// reaches on 10.0.2.2. For a physical device, build with a dev tunnel's host or your machine's LAN address (and add
+/// that address to the Keycloak client's redirect settings if it changes the issuer).</item>
+/// </list>
 /// </summary>
 public static class MobileSettings
 {
-    private static string Host => DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost";
+    private static readonly IReadOnlyDictionary<string, string> Built = typeof(MobileSettings).Assembly
+        .GetCustomAttributes<AssemblyMetadataAttribute>()
+        .Where(a => a.Key.StartsWith("TvTracker.", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(a.Value))
+        .ToDictionary(a => a.Key, a => a.Value!.Trim());
+
+    /// <summary>
+    /// The deployment's host, or null in a development build.
+    /// </summary>
+    private static string? PublicHost => Built.GetValueOrDefault("TvTracker.PublicHost");
+
+    private static string LocalHost => DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost";
+
+    /// <summary>
+    /// Whether this build talks to a deployment (over https) and not to this machine.
+    /// </summary>
+    public static bool IsRelease => PublicHost is not null;
 
     /// <summary>
     /// The app's name in the UI (white label). The home-screen name is ApplicationTitle in MobileApp.csproj.
@@ -17,26 +40,30 @@ public static class MobileSettings
     /// <summary>
     /// Where the backend's catalog comes from (its <c>Catalog:Provider</c>: "tvmaze", "wikidata", "tvdb" or "mock"), for
     /// the credit the source's licence requires in the footer and what the terms and privacy pages name. The web app
-    /// reads it from configuration; a phone build can't, so set it to match the backend before a release.
+    /// reads it from configuration; a phone build can't, so it is built in (<c>-p:TvTrackerCatalogSource=...</c>).
     /// </summary>
-    public const string CatalogSource = "tvmaze";
+    public static string CatalogSource => Built.GetValueOrDefault("TvTracker.CatalogSource") ?? "tvmaze";
 
     /// <summary>
-    /// Mobile BFF ("http" launch profile, port 5110).
+    /// The mobile gateway: the deployment's, or the Mobile BFF's "http" launch profile (port 5110).
     /// </summary>
-    public static Uri BffAddress => new($"http://{Host}:5110/");
+    public static Uri BffAddress => Built.GetValueOrDefault("TvTracker.ApiAddress") is { } api ? new(WithSlash(api))
+        : PublicHost is { } host ? new($"https://{host}/api/")
+        : new($"http://{LocalHost}:5110/");
 
     /// <summary>
-    /// The web app ("http" launch profile, port 5120), for links others open, such as a list's link. In development it's
-    /// this machine's, so a link only opens on it; set it to the public address for a release.
+    /// The web app, for links others open, such as a list's link. In development it's this machine's ("http" launch
+    /// profile, port 5120), so a link only opens on it.
     /// </summary>
-    public static Uri WebAddress => new($"http://{Host}:5120/");
+    public static Uri WebAddress => PublicHost is { } host ? new($"https://{host}/") : new($"http://{LocalHost}:5120/");
 
     /// <summary>
-    /// Keycloak realm (fixed host port 8080 in the AppHost).
+    /// The Keycloak realm: the deployment's, or the AppHost's (fixed host port 8080).
     /// </summary>
-    public static string Authority => $"http://{Host}:8080/realms/tvtracker";
+    public static string Authority => PublicHost is { } host ? $"https://{host}/realms/tvtracker" : $"http://{LocalHost}:8080/realms/tvtracker";
 
     public const string ClientId = "tvtracker-mobile";
     public const string RedirectUri = "tvtracker://callback";
+
+    private static string WithSlash(string address) => address.EndsWith('/') ? address : address + "/";
 }
