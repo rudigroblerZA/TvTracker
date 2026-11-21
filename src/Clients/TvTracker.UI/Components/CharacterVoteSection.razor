@@ -92,6 +92,12 @@
         {
             return;
         }
+        if (loaded is { } last && last.Episode != EpisodeId)
+        {
+            // Another episode in the same place, where the page didn't key the section by episode: nothing of the
+            // last one's is left to show or to vote from.
+            (votes, counts, everyone, error) = (null, [], false, null);
+        }
         loaded = (EpisodeId, Watched);
         waiting?.Cancel();
         var stop = (waiting = new CancellationTokenSource()).Token;
