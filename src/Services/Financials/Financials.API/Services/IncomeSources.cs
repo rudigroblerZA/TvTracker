@@ -28,13 +28,14 @@ public sealed class IncomeSources(IHttpClientFactory clients, ILogger<IncomeSour
     }
 
     /// <summary>
-    /// The commission, and whether affiliate links are on at all. Catalog.API answers 404 while its flag is off (the
-    /// caller is already known to be an admin).
+    /// The commission, and whether affiliate links are on at all. Catalog.API answers with no content while its flag
+    /// is off. Anything else that isn't the months, a 404 included, is a gap: the address may be wrong or Catalog an
+    /// older one, and calling that "off" would hide commission that exists.
     /// </summary>
     public async Task<AffiliateIncome> CommissionAsync(string? authorization, int months, CancellationToken ct)
     {
         var (status, commission) = await GetAsync<List<CommissionMonth>>(Catalog, $"api/v1/affiliates/monthly?months={months}", authorization, ct);
-        return status == HttpStatusCode.NotFound ? AffiliateIncome.Off : commission is null ? AffiliateIncome.Unknown : AffiliateIncome.On(commission);
+        return status == HttpStatusCode.NoContent ? AffiliateIncome.Off : commission is null ? AffiliateIncome.Unknown : AffiliateIncome.On(commission);
     }
 
     private async Task<(HttpStatusCode? Status, T? Body)> GetAsync<T>(string client, string url, string? authorization, CancellationToken ct)
@@ -48,7 +49,7 @@ public sealed class IncomeSources(IHttpClientFactory clients, ILogger<IncomeSour
                 request.Headers.Authorization = header;
             }
             using var response = await clients.CreateClient(client).SendAsync(request, ct);
-            return (response.StatusCode, response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<T>(ct) : null);
+            return (response.StatusCode, response.StatusCode == HttpStatusCode.OK ? await response.Content.ReadFromJsonAsync<T>(ct) : null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested)
         {

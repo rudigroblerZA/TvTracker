@@ -91,7 +91,9 @@ public static partial class AffiliateApi
             .RequireFeature(FeatureFlags.Affiliates);
         api.MapGet("/affiliates/postback/{program}", PostbackAsync);
         api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
-        api.MapGet("/affiliates/monthly", MonthlyAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+        // Not behind RequireFeature: it says itself that affiliate links are off (204), so Financials can tell that from
+        // an address that wasn't found.
+        api.MapGet("/affiliates/monthly", MonthlyAsync).RequireAuthorization();
 
         // Programs, set up by admins in Settings (404 for anyone else).
         var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates)
@@ -321,14 +323,19 @@ public static partial class AffiliateApi
 
     /// <summary>
     /// Commission by month and currency, for Financials.API's statement (which gets subscriptions from Identity.API).
-    /// Counted in the month the network reported the sale, this month included. Admins only.
+    /// Counted in the month the network reported the sale, this month included. Admins only. No content while
+    /// affiliate links are switched off.
     /// </summary>
-    private static async Task<Results<Ok<List<AffiliateMonthDto>>, NotFound>> MonthlyAsync(ClaimsPrincipal user, IConfiguration config,
-        CatalogContext db, TimeProvider time, int months = 12, CancellationToken ct = default)
+    private static async Task<Results<Ok<List<AffiliateMonthDto>>, NoContent, NotFound>> MonthlyAsync(ClaimsPrincipal user, IConfiguration config,
+        CatalogContext db, CachedFlags flags, TimeProvider time, int months = 12, CancellationToken ct = default)
     {
         if (!AppAdmins.Is(user, config))
         {
             return TypedResults.NotFound();
+        }
+        if (!await flags.IsEnabledAsync(FeatureFlags.Affiliates, FeatureFlags.ContextFor(user), ct))
+        {
+            return TypedResults.NoContent();
         }
 
         var today = time.GetUtcNow().UtcDateTime;

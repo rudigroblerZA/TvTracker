@@ -84,9 +84,17 @@ public class IncomeSourcesTests
     }
 
     [Fact]
-    public async Task Commission_is_off_when_catalog_answers_404()
+    public async Task Commission_is_unknown_not_off_when_catalog_answers_404()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        Assert.Equal(FinancialStatement.AffiliatesUnknown, (await Sources(handler).CommissionAsync("Bearer abc", 6, Ct)).State);
+    }
+
+    [Fact]
+    public async Task Commission_is_off_when_catalog_says_so_with_no_content()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
 
         var commission = await Sources(handler).CommissionAsync("Bearer abc", 6, Ct);
 
