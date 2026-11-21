@@ -28,8 +28,18 @@
 
     <ApplicationTitle>TV Tracker</ApplicationTitle>
     <ApplicationId>com.tvtracker.mobile</ApplicationId>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <!-- The version people see, and the build number the stores order uploads by: each upload needs a higher
+         ApplicationVersion than the last. A release passes both (-p:ApplicationDisplayVersion=1.2 -p:ApplicationVersion=17). -->
+    <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
+    <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
+
+    <!-- Where the app finds the backend. Empty, it is a development build that talks to the AppHost on this machine.
+         A release names the deployment's host (PUBLIC_HOST in scripts/deploy.sh): -p:TvTrackerPublicHost=tv.example.com.
+         TvTrackerApiAddress overrides the gateway's address where the deployment gives it its own host (API_HOST). -->
+    <TvTrackerPublicHost Condition="'$(TvTrackerPublicHost)' == ''"></TvTrackerPublicHost>
+    <TvTrackerApiAddress Condition="'$(TvTrackerApiAddress)' == ''"></TvTrackerApiAddress>
+    <!-- The backend's Catalog:Provider (tvmaze, wikidata, tvdb), for the credit its licence requires. -->
+    <TvTrackerCatalogSource Condition="'$(TvTrackerCatalogSource)' == ''">tvmaze</TvTrackerCatalogSource>
 
     <!-- Run as an unpackaged app on Windows -->
     <WindowsPackageType>None</WindowsPackageType>
@@ -40,6 +50,28 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
   </PropertyGroup>
+
+  <!-- A release for the store: an app bundle, which is what Google Play takes, with R8 shrinking the Java side as Play
+       asks. Signed when a keystore is named (-p:AndroidSigningKeyStore=...), which sets AndroidKeyStore; the passwords
+       come from files (file:...), never from this project. See README, Releasing the Android app. -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' and '$(Configuration)' == 'Release'">
+    <AndroidPackageFormats>aab</AndroidPackageFormats>
+    <AndroidLinkTool>r8</AndroidLinkTool>
+    <AndroidR8ObfuscationMode>private-members</AndroidR8ObfuscationMode>
+    <AndroidKeyStore Condition="'$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
+  </PropertyGroup>
+
+  <!-- MobileSettings reads these back at run time. -->
+  <ItemGroup>
+    <AssemblyMetadata Include="TvTracker.PublicHost" Value="$(TvTrackerPublicHost)" />
+    <AssemblyMetadata Include="TvTracker.ApiAddress" Value="$(TvTrackerApiAddress)" />
+    <AssemblyMetadata Include="TvTracker.CatalogSource" Value="$(TvTrackerCatalogSource)" />
+  </ItemGroup>
+
+  <!-- A release that talks to this machine would be useless on anyone's phone, and it would do so over plain http. -->
+  <Target Name="RequirePublicHostForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release' and '$(TvTrackerPublicHost)' == '' and '$(TvTrackerAllowLocalRelease)' != 'true'">
+    <Error Text="A Release build needs the deployment's host: -p:TvTrackerPublicHost=tv.example.com (README, Releasing the Android app). To build a Release against this machine for testing, pass -p:TvTrackerAllowLocalRelease=true." />
+  </Target>
 
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1C1917" />

@@ -4,8 +4,10 @@ A TV Time–style app for tracking shows: what you follow, what you've watched, 
 Built as eShop-style microservices on .NET 10 and Aspire, with a Blazor web app and a MAUI Blazor Hybrid mobile app
 that share one Razor component library. The design behind it is in the "TV Tracker – Service Design" doc.
 
-> **Build status:** everything except the MAUI app builds without errors with `dotnet build` on the .NET 10 SDK.
-> The MAUI app (`src/Clients/MobileApp`) needs the MAUI workload and hasn't been compiled yet.
+> **Build status:** everything builds without errors with `dotnet build` on the .NET 10 SDK. The MAUI app
+> (`src/Clients/MobileApp`) needs the MAUI workload: its Android build compiles, and makes a signed app bundle for
+> Google Play (Mobile app, Releasing the Android app); it has not been run on a device from this repository's CI, and
+> iOS has not been built.
 
 What sets it apart: universes and their timelines, the essential cut, Tonight's plan, the waiting room with forecasts
 of when a show is back, search by meaning and computed show tags. Many more features are built but off by default
@@ -1459,6 +1461,63 @@ VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS 
   ```
 - Offline: show pages, Up Next, lists and progress are cached in SQLite; follows, watched marks, ratings and list changes made offline are queued and sent when the connection is back.
 
+#### Releasing the Android app
+
+A release is a signed app bundle (`.aab`) built for one deployment: its host is built in, and everything goes over https.
+
+- **What a Release build does differently from a debug one:**
+  - It talks to `https://PUBLIC_HOST/` (the site), `https://PUBLIC_HOST/api/` (the gateway) and
+    `https://PUBLIC_HOST/realms/tvtracker` (sign-in), from `-p:TvTrackerPublicHost=PUBLIC_HOST`. Without that property
+    a Release build fails, so one that talks to `10.0.2.2` can't be shipped by mistake. `-p:TvTrackerApiAddress=…`
+    overrides the gateway where it has its own host (`API_HOST`).
+  - Plain http is refused (`usesCleartextTraffic` is on in debug builds only) and sign-in requires https.
+  - It is an app bundle, with R8 shrinking and obfuscating the Java side, as Google Play asks.
+- **Never backed up:** in any build, the app's data is left out of cloud backups and phone-to-phone transfers. The
+  offline cache holds the signed-in person's data, and their tokens can't be restored, so a restore would leave a cache
+  with no owner.
+- **The signing key** (once; keep the file and its password somewhere safe, since Play ties the app to it):
+  ```bash
+  keytool -genkeypair -v -keystore upload.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000
+  ```
+- **Build it by hand:**
+  ```bash
+  printf '%s' 'THE-KEYSTORE-PASSWORD' > /safe/place/password   # read by the build; never on the command line
+  dotnet publish src/Clients/MobileApp -c Release -f net10.0-android -p:AndroidSdkDirectory=$HOME/android-sdk \
+    -p:TvTrackerPublicHost=tv.example.com -p:TvTrackerCatalogSource=tvmaze \
+    -p:ApplicationDisplayVersion=1.0 -p:ApplicationVersion=1 \
+    -p:AndroidSigningKeyStore=/safe/place/upload.keystore -p:AndroidSigningKeyAlias=upload \
+    -p:AndroidSigningKeyPass=file:/safe/place/password -p:AndroidSigningStorePass=file:/safe/place/password
+  ```
+  The bundle is `bin/Release/net10.0-android/publish/com.tvtracker.mobile-Signed.aab`. `ApplicationVersion` is the
+  build number: every upload needs a higher one than the last. `ApplicationDisplayVersion` is what people see.
+- **Or from GitHub** (Actions → Android → Run workflow): it asks for the host and the version, and keeps the signed
+  bundle as the run's artifact. It needs three repository secrets: `ANDROID_KEYSTORE_BASE64`
+  (`base64 -w0 upload.keystore`), `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS`. The same workflow builds the
+  app on any pull request that touches it.
+- **Before the first upload, in the app:**
+  - `ApplicationId` in `MobileApp.csproj` is `com.tvtracker.mobile`. It can never change once the app is on Play, so
+    set it to a name under a domain you own first.
+  - `MobileSettings.AppName` and `ApplicationTitle`, if the app isn't called TV Tracker.
+  - The deployment's Keycloak realm must have the `tvtracker-mobile` client with `tvtracker://callback` as a redirect
+    (the realm the AppHost ships has it).
+- **In Play Console** (none of this is in the repository):
+  - **Privacy policy:** `https://PUBLIC_HOST/privacy`.
+  - **Account deletion:** Play asks for a web address where people can ask for their account to be deleted, as well as
+    a way in the app. Both are Settings → Your data → Delete account; the address is `https://PUBLIC_HOST/settings`.
+  - **Data safety form:** what the app collects is listed in the privacy policy: account details (name, email), what
+    people watch, rate and write, and, with affiliate links on, where-to-watch clicks without who clicked. Nothing is
+    sold; data goes over https; people can export and delete it.
+  - **Sign-in for the reviewer:** a test account's username and password, since the app is of little use signed out.
+  - **Content rating, target audience, store listing** (name, descriptions, icon, phone screenshots, feature graphic).
+  - **GIFs from GIPHY and people's comments** make this an app with user-generated content: say so, and say that
+    comments can be flagged and are moderated.
+  - **Paid plans:** Play requires its own billing for a subscription bought inside an app, and doesn't allow sending
+    people to another checkout. So the app's plan page shows the plans and what the person has, lets them cancel or
+    resume, and offers nothing to buy (`IPlatformServices.SellsPlans` is false on the phone). People buy on the web
+    and the app honours it. Selling in the app would mean adding Play Billing.
+- **Not there yet:** push notifications (no `IPushTokenProvider` is configured, so the app doesn't offer them), and
+  `https://` app links (it opens `tvtracker://` links only).
+
 ## Architecture
 
 | Project | Path | Purpose |
@@ -2284,8 +2343,8 @@ Deploying works (above). This is what still stands between that and charging the
 - **Rate limits by address** should be checked behind Caddy: they key on `X-Forwarded-For`.
 - **Admins by username.** `Admin:Users` and `Moderation:Users` match usernames, and registration is open: create
   those accounts before telling anyone the address.
-- **Mobile.** The app is built for local hosts: remove `usesCleartextTraffic` and `allowBackup` (Android) and
-  `NSAllowsLocalNetworking` (iOS), and point `MobileSettings` at `https://PUBLIC_HOST/api/` (the gateway) and `PUBLIC_HOST`.
+- **Mobile.** Android: build a Release for the deployment's host (Mobile app, Releasing the Android app), which is
+  https-only and names the gateway and sign-in. iOS still needs `NSAllowsLocalNetworking` removed by hand.
 - **Data terms.** TVmaze's data is CC BY-SA and its posters are hot-linked; where-to-watch is inferred from TVmaze's
   network and web-channel fields, not a licensed availability feed. Check TVmaze's terms for commercial use before
   charging for the app, and TMDB's and TheTVDB's before turning those on. JustWatch's data comes under its partner

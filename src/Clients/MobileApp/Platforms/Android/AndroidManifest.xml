@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- usesCleartextTraffic lets the debug app call the local BFF and Keycloak over http. Remove for release builds. -->
-    <application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:usesCleartextTraffic="true"></application>
+    <!-- Plain http (usesCleartextTraffic) is allowed in debug builds only, for the local BFF and Keycloak: MainApplication
+         sets it. Nothing is backed up or carried to a new phone: the offline cache holds the signed-in person's data, and
+         the tokens in secure storage can't be restored anyway (their key stays on the device), so a restore would leave a
+         cache with no owner. -->
+    <application android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true"></application>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
