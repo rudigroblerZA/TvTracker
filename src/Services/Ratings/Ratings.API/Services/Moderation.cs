@@ -29,6 +29,12 @@ public sealed partial class Moderation(IConfiguration config)
     public const int FlagsPerHour = 30;
 
     /// <summary>
+    /// How soon a comment may be edited again. Posting is capped by the hour; without this, one comment could be
+    /// rewritten without end, each version going out to everyone reading the thread.
+    /// </summary>
+    public static readonly TimeSpan EditEvery = TimeSpan.FromSeconds(20);
+
+    /// <summary>
     /// The flag reason that, from enough readers, marks a post a spoiler.
     /// </summary>
     public const string SpoilerReason = "spoiler";

@@ -61,6 +61,12 @@
     <AndroidKeyStore Condition="'$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
   </PropertyGroup>
 
+  <!-- A build with no host talks to this machine over plain http, whatever its configuration: MainApplication allows
+       cleartext for it (and for debug builds), and for nothing else. -->
+  <PropertyGroup Condition="'$(TvTrackerPublicHost)' == ''">
+    <DefineConstants>$(DefineConstants);LOCAL_BACKEND</DefineConstants>
+  </PropertyGroup>
+
   <!-- MobileSettings reads these back at run time. -->
   <ItemGroup>
     <AssemblyMetadata Include="TvTracker.PublicHost" Value="$(TvTrackerPublicHost)" />
@@ -71,6 +77,13 @@
   <!-- A release that talks to this machine would be useless on anyone's phone, and it would do so over plain http. -->
   <Target Name="RequirePublicHostForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release' and '$(TvTrackerPublicHost)' == '' and '$(TvTrackerAllowLocalRelease)' != 'true'">
     <Error Text="A Release build needs the deployment's host: -p:TvTrackerPublicHost=tv.example.com (README, Releasing the Android app). To build a Release against this machine for testing, pass -p:TvTrackerAllowLocalRelease=true." />
+  </Target>
+
+  <!-- The gateway's own address goes with a deployment: on its own, the app would call the deployment and sign in on
+       this machine. And it is used as written, so it has to be a whole https address. -->
+  <Target Name="CheckApiAddress" BeforeTargets="CoreCompile" Condition="'$(TvTrackerApiAddress)' != ''">
+    <Error Condition="'$(TvTrackerPublicHost)' == ''" Text="TvTrackerApiAddress overrides the gateway of a deployment: pass -p:TvTrackerPublicHost=... with it." />
+    <Error Condition="!$(TvTrackerApiAddress.StartsWith('https://'))" Text="TvTrackerApiAddress must be a whole https address, such as https://api.example.com/ (it is '$(TvTrackerApiAddress)')." />
   </Target>
 
   <ItemGroup>

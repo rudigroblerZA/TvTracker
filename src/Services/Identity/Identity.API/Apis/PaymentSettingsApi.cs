@@ -72,6 +72,12 @@ public static class PaymentSettingsApi
             return Refused(malformed);
         }
 
+        // Nothing asked for, nothing recorded: a Save with no change mustn't leave a row that says an admin set something.
+        if (provider is null && secretKey is null && webhookSecret is null && portal is null)
+        {
+            return TypedResults.Ok(Describe(options, providers, cipher));
+        }
+
         // Read, check and write as one: the row is locked for the length of it, so a save or a clear by someone else
         // at the same moment waits, and is then checked against what this one left.
         var problem = await InTransactionAsync(db, async () =>

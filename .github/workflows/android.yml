@@ -1,5 +1,6 @@
 # The Android app (src/Clients/MobileApp), which CI leaves out because it needs the MAUI workload.
-#  - On a pull request that touches the app: a debug build, so a change that breaks it is seen.
+#  - On a pull request that touches the app or the shared UI it is built from: a debug build, so a change that breaks
+#    it is seen.
 #  - Run by hand (Actions, Android, Run workflow): a signed app bundle for Google Play, kept as the run's artifact.
 #    It needs three repository secrets: ANDROID_KEYSTORE_BASE64 (the upload keystore, base64), ANDROID_KEYSTORE_PASSWORD
 #    (the keystore's and the key's, which keytool makes the same) and ANDROID_KEY_ALIAS. See README, Releasing the Android app.
@@ -7,8 +8,15 @@ name: Android
 
 on:
   pull_request:
+    # The app, and what it is compiled from: the shared UI and the package versions.
     paths:
       - src/Clients/MobileApp/**
+      - src/Clients/TvTracker.UI/**
+      - src/TvTracker.ServiceDefaults/FeatureFlags.cs
+      - src/TvTracker.IntegrationEvents/**
+      - Directory.Packages.props
+      - Directory.Build.props
+      - global.json
       - .github/workflows/android.yml
   workflow_dispatch:
     inputs:

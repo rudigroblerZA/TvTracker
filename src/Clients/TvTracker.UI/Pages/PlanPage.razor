@@ -45,7 +45,8 @@
                         {
                             <button class="btn secondary" @onclick="CancelAsync" disabled="@busy">Cancel</button>
                         }
-                        @if (sub.ManageUrl is { } manage)
+                        @* Not in the phone app: the stores don't allow a link to another billing page (IPlatformServices.SellsPlans). *@
+                        @if (Platform.SellsPlans && sub.ManageUrl is { } manage)
                         {
                             @* The test provider's page is in the web app (a relative address); a real provider's is its own site. *@
                             @if (!Uri.IsWellFormedUriString(manage, UriKind.Absolute))
