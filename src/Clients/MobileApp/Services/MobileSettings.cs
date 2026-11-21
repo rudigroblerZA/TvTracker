@@ -28,9 +28,10 @@ public static class MobileSettings
     private static string LocalHost => DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost";
 
     /// <summary>
-    /// Whether this build talks to a deployment (over https) and not to this machine.
+    /// Whether this build talks to a deployment (over https) and not to this machine, whatever its configuration. The
+    /// same question MobileApp.csproj answers with LOCAL_BACKEND, for what has to be decided when it is built.
     /// </summary>
-    public static bool IsRelease => PublicHost is not null;
+    public static bool TalksToDeployment => PublicHost is not null;
 
     /// <summary>
     /// The app's name in the UI (white label). The home-screen name is ApplicationTitle in MobileApp.csproj.
@@ -47,9 +48,7 @@ public static class MobileSettings
     /// <summary>
     /// The mobile gateway: the deployment's, or the Mobile BFF's "http" launch profile (port 5110).
     /// </summary>
-    public static Uri BffAddress => Built.GetValueOrDefault("TvTracker.ApiAddress") is { } api ? new(WithSlash(api))
-        : PublicHost is { } host ? new($"https://{host}/api/")
-        : new($"http://{LocalHost}:5110/");
+    public static Uri BffAddress => PublicHost is { } host ? new($"https://{host}/api/") : new($"http://{LocalHost}:5110/");
 
     /// <summary>
     /// The web app, for links others open, such as a list's link. In development it's this machine's ("http" launch
@@ -64,6 +63,4 @@ public static class MobileSettings
 
     public const string ClientId = "tvtracker-mobile";
     public const string RedirectUri = "tvtracker://callback";
-
-    private static string WithSlash(string address) => address.EndsWith('/') ? address : address + "/";
 }

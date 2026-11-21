@@ -1468,8 +1468,7 @@ A release is a signed app bundle (`.aab`) built for one deployment: its host is 
 - **What a Release build does differently from a debug one:**
   - It talks to `https://PUBLIC_HOST/` (the site), `https://PUBLIC_HOST/api/` (the gateway) and
     `https://PUBLIC_HOST/realms/tvtracker` (sign-in), from `-p:TvTrackerPublicHost=PUBLIC_HOST`. Without that property
-    a Release build fails, so one that talks to `10.0.2.2` can't be shipped by mistake. `-p:TvTrackerApiAddress=…`
-    overrides the gateway where it has its own host (`API_HOST`).
+    a Release build fails, so one that talks to `10.0.2.2` can't be shipped by mistake.
   - Plain http is refused (`usesCleartextTraffic` is on in debug builds only) and sign-in requires https.
   - It is an app bundle, with R8 shrinking and obfuscating the Java side, as Google Play asks.
 - **Never backed up:** in any build, the app's data is left out of cloud backups and phone-to-phone transfers. The

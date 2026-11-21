@@ -7,8 +7,7 @@
 {
     <section class="character-vote" aria-labelledby="character-vote-title">
         <h2 id="character-vote-title">Favourite character</h2>
-        @* Locked here as soon as the page says unwatched: Ratings hears of an unwatch a moment later, and would still answer with the counts. *@
-        @if (votes.Locked || !Watched)
+        @if (votes.Locked)
         {
             <p class="muted">@(Watched ? "Voting opens a moment after you mark the episode watched." : "Watch the episode to vote for who stood out, and to see who everyone else picked.")</p>
         }
@@ -68,9 +67,9 @@
     private CancellationTokenSource? waiting;
 
     /// <summary>
-    /// After a failed load, when the next may be tried.
+    /// Set when the load for <see cref="loaded"/> failed: when it may be tried again.
     /// </summary>
-    private DateTime retryAfter;
+    private DateTime? retryAfter;
     private static readonly TimeSpan RetryFailedAfter = TimeSpan.FromSeconds(20);
     private bool busy;
     private bool everyone;
@@ -95,7 +94,8 @@
         {
             (peopleFrom, people) = (Cast, Cast.Where(m => m.PersonId != Guid.Empty).DistinctBy(m => m.PersonId).ToList());
         }
-        if (people.Count == 0 || loaded == (EpisodeId, Watched) || DateTime.UtcNow < retryAfter)
+        // Nothing to do while this episode and watched state are the ones loaded, unless that load failed and its wait is over.
+        if (people.Count == 0 || (loaded == (EpisodeId, Watched) && !(DateTime.UtcNow >= retryAfter)))
         {
             return;
         }
@@ -105,15 +105,22 @@
             // last one's is left to show or to vote from.
             (votes, counts, everyone, error) = (null, [], false, null);
         }
-        loaded = (EpisodeId, Watched);
+        (loaded, retryAfter) = ((EpisodeId, Watched), null);
         waiting?.Cancel();
+        if (!Watched)
+        {
+            // Locked without asking: Ratings hears of an unwatch a moment after the page does, and would still answer
+            // with the counts.
+            Show(Unwatched);
+            return;
+        }
         var stop = (waiting = new CancellationTokenSource()).Token;
         try
         {
             Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
             foreach (var wait in Retries)
             {
-                if (!Watched || votes is not { Locked: true })
+                if (votes is not { Locked: true })
                 {
                     break;
                 }
@@ -129,9 +136,14 @@
         {
             // An extra on the page: without it, the page stands. Asked for again on a later render, but not at once:
             // the page renders on every keystroke in the comment box.
-            (loaded, retryAfter) = (null, DateTime.UtcNow + RetryFailedAfter);
+            retryAfter = DateTime.UtcNow + RetryFailedAfter;
         }
     }
+
+    /// <summary>
+    /// What the section shows for an episode the page has as unwatched: as Ratings answers for one, with no counts.
+    /// </summary>
+    private static readonly EpisodeCharacterVotes Unwatched = new(Locked: true, Total: 0, Counts: [], Mine: null);
 
     private void Show(EpisodeCharacterVotes? latest)
     {

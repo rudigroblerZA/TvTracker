@@ -1,18 +1,31 @@
 # The Android app (src/Clients/MobileApp), which CI leaves out because it needs the MAUI workload.
-#  - On a pull request that touches the app or the shared UI it is built from: a debug build, so a change that breaks
-#    it is seen.
+#  - On a pull request that touches the app or the shared UI it is built from, and on main after it: a debug build, so
+#    a change that breaks it is seen.
 #  - Run by hand (Actions, Android, Run workflow): a signed app bundle for Google Play, kept as the run's artifact.
 #    It needs three repository secrets: ANDROID_KEYSTORE_BASE64 (the upload keystore, base64), ANDROID_KEYSTORE_PASSWORD
 #    (the keystore's and the key's, which keytool makes the same) and ANDROID_KEY_ALIAS. See README, Releasing the Android app.
 name: Android
 
 on:
+  # The app, and what it is compiled from: the shared UI, the files linked into it and the package versions.
   pull_request:
-    # The app, and what it is compiled from: the shared UI and the package versions.
     paths:
       - src/Clients/MobileApp/**
       - src/Clients/TvTracker.UI/**
-      - src/TvTracker.ServiceDefaults/FeatureFlags.cs
+      - src/TvTracker.ServiceDefaults/**
+      - src/TvTracker.IntegrationEvents/**
+      - Directory.Packages.props
+      - Directory.Build.props
+      - global.json
+      - .github/workflows/android.yml
+  # On main too: a pull request can only use a package cache that main or it made itself.
+  push:
+    branches: [main]
+    # The same list as above.
+    paths:
+      - src/Clients/MobileApp/**
+      - src/Clients/TvTracker.UI/**
+      - src/TvTracker.ServiceDefaults/**
       - src/TvTracker.IntegrationEvents/**
       - Directory.Packages.props
       - Directory.Build.props
@@ -46,6 +59,8 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   PROJECT: src/Clients/MobileApp
+  # The build number: the one asked for, or this run's.
+  VERSION_CODE: ${{ inputs.version_code || github.run_number }}
 
 jobs:
   build:
@@ -76,9 +91,10 @@ jobs:
       - name: Install Android SDK dependencies
         run: dotnet build "$PROJECT" -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
 
+      # One architecture is enough to show that it compiles and packages.
       - name: Debug build
-        if: github.event_name == 'pull_request'
-        run: dotnet build "$PROJECT" -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"
+        if: github.event_name != 'workflow_dispatch'
+        run: dotnet build "$PROJECT" -f net10.0-android -p:RuntimeIdentifier=android-arm64 -p:AndroidSdkDirectory="$ANDROID_HOME"
 
       - name: Signed app bundle
         if: github.event_name == 'workflow_dispatch'
@@ -88,7 +104,6 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           PUBLIC_HOST: ${{ inputs.public_host }}
           DISPLAY_VERSION: ${{ inputs.display_version }}
-          VERSION_CODE: ${{ inputs.version_code || github.run_number }}
           CATALOG_SOURCE: ${{ inputs.catalog_source }}
         run: |
           if [[ -z $KEYSTORE_BASE64 || -z $KEYSTORE_PASSWORD || -z $KEY_ALIAS ]]; then
@@ -114,7 +129,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: tvtracker-android-${{ inputs.display_version }}-${{ inputs.version_code || github.run_number }}
+          name: tvtracker-android-${{ inputs.display_version }}-${{ env.VERSION_CODE }}
           path: ${{ runner.temp }}/bundle/*-Signed.aab
           if-no-files-found: error
           retention-days: 30
