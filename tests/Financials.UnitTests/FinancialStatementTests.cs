@@ -24,6 +24,17 @@ public class FinancialStatementTests
         IReadOnlyList<CommissionMonth>? commission = null, bool affiliatesOff = false, params CostItem[] costs) =>
         FinancialStatement.Build(Today, months, new(subscriptions ?? [], recurring ?? []), affiliatesOff ? AffiliateIncome.Off : AffiliateIncome.On(commission ?? []), costs, Fees);
 
+    [Fact]
+    public void A_month_whose_payments_come_to_nothing_keeps_its_row_and_its_fees()
+    {
+        var statement = Build(subscriptions: [new IncomeMonth(Oct, "USD", 0m, 2)]);
+
+        var row = Assert.Single(Assert.Single(statement.Books).Months);
+        Assert.Equal(Oct, row.Month);
+        Assert.Equal(0m, row.Subscriptions);
+        Assert.Equal(FinancialStatement.Fee(0m, 2, Fees), row.Fees);
+    }
+
     // --- The window and a cost's month ---------------------------------------------------------------------------------
 
     [Theory]

@@ -405,6 +405,8 @@ catalogApi.WithReference(catalogSync);
 
 // Moderators' accepted corrections, and saved research, are applied to the catalog by the sync worker.
 ratingsApi.WithReference(catalogSync);
+// Favourite-character votes are checked against the show's cast.
+ratingsApi.WithReference(catalogApi);
 researchApi.WithReference(catalogSync);
 
 // The ops dashboard (/ops on Catalog.API) includes Analytics' and Research's stats.

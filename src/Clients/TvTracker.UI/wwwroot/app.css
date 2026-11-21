@@ -1404,4 +1404,8 @@ h1:focus, h2:focus { outline: none; }
     .settings-page .flag-row .chip { justify-content: center; text-align: center; }
     .settings-page .table-scroll { margin: 0 -14px; padding: 0 14px; }
     .settings-page th, .settings-page td { white-space: nowrap; }
+    /* A wide table still scrolls sideways, but its first column stays put, so a row keeps its name, and the edge it
+       scrolls under is shaded, so there is visibly more. */
+    .settings-page .table-scroll th:first-child, .settings-page .table-scroll td:first-child { position: sticky; left: 0; z-index: 1; max-width: 9.5rem; white-space: normal; overflow-wrap: anywhere; background: var(--bg); box-shadow: 6px 0 8px -6px rgb(0 0 0 / 0.35); }
+    .settings-page .panel .table-scroll th:first-child, .settings-page .panel .table-scroll td:first-child { background: var(--surface); }
 }

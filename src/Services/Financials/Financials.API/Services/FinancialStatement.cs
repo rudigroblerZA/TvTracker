@@ -135,13 +135,15 @@ public static partial class FinancialStatement
         var books = currencies.Select(currency =>
             {
                 var rows = window
+                    // A month has a row when something happened in it, whatever it came to: payments that add up to
+                    // nothing (refunded, or fully discounted) still happened, and still cost their fixed fees.
+                    .Where(month => paid.ContainsKey((month, currency)) || earned.ContainsKey((month, currency)) || spentIn.ContainsKey((month, currency)))
                     .Select(month =>
                     {
                         var (amount, payments) = paid.GetValueOrDefault((month, currency));
                         return Row(month, amount, earned.GetValueOrDefault((month, currency)), Fee(amount, payments, fees),
                             spentIn.GetValueOrDefault((month, currency)));
                     })
-                    .Where(r => r.Subscriptions != 0 || r.Affiliates != 0 || r.Costs != 0)
                     .ToList();
                 var byCategory = spent.Where(s => s.Currency == currency).GroupBy(s => s.Category)
                     .Select(g => new FinancialCategoryDto(g.Key, g.Sum(s => s.Amount)))

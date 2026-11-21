@@ -727,7 +727,7 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
   `/api/v1/financials`). `GET /api/v1/financials?months=12` answers with the whole statement: the service keeps the
   costs (table `cost_items`) and asks Identity.API for subscription income by month
   (`GET /api/v1/admin/income?months=12`) and Catalog.API for commission in the month the network reported the sale
-  (`GET /api/v1/affiliates/monthly?months=12`; nothing while the `affiliates` flag is off), passing on the admin's own
+  (`GET /api/v1/affiliates/monthly?months=12`; no content while the `affiliates` flag is off; any other failure, a 404 included, shows as "couldn't be fetched"), passing on the admin's own
   sign-in. Costs: `GET`, `POST`, `PUT /{id}` and `DELETE /{id}` under `/api/v1/financials/costs`. Anyone but an admin
   gets 404.
 - **When a source is down:** each is given 5 seconds and isn't retried. The statement still comes, with the costs
@@ -1800,6 +1800,8 @@ How events flow:
     member who stood out in it. One vote per episode: pick someone else to change it, or yours again to take it back.
     - **Hidden until watched:** no counts before you've watched the episode, since who stood out gives it away.
     - **Fan favourites:** a show's page lists the five cast members with the most votes across its episodes.
+    - **Only the show's cast:** a vote names someone in the cast the catalog has for the episode's show (Ratings.API
+      asks Catalog.API, and keeps the answer ten minutes). If the catalog can't be reached, the vote is let through.
     - **What is kept:** your pick per episode, as the catalog's id for the cast member. It is in your data export and
       goes when your account does.
   - **Episode duels** (`/shows/{id}/duels`, linked from show pages; `episode-duels` flag): rank a show's episodes you've

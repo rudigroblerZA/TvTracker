@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Ratings.API.Data;
+using Ratings.API.Services;
 using TvTracker;
 
 namespace Ratings.API.Apis;
@@ -87,7 +88,7 @@ public static class CharacterVotesApi
     }
 
     private static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
-        Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
+        Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CatalogCast cast, CancellationToken ct)
     {
         if (request.ShowId == Guid.Empty || request.PersonId == Guid.Empty)
         {
@@ -107,6 +108,15 @@ public static class CharacterVotesApi
         // The show is the one Tracking says the episode belongs to, so a vote can't be counted towards another show's
         // favourites. The request's is used only for a watch from before the copy kept its show.
         var showId = watched.ShowId ?? request.ShowId;
+        // Only someone in the show's cast, where the catalog can say: an id from anywhere else would count in the show's
+        // total and never be shown.
+        if (await cast.HasAsync(showId, request.PersonId, ct) == false)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["personId"] = ["Pick someone from the show's cast."]
+            });
+        }
         // One statement, so two votes at once from the same viewer can't both add the row: the later pick wins.
         await db.Database.ExecuteSqlAsync($"""
             insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc") values ({userId}, {episodeId}, {showId}, {request.PersonId}, {DateTime.UtcNow})
