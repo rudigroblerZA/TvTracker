@@ -28,7 +28,17 @@ public sealed partial class Moderation(IConfiguration config)
     public const int PostsPerHour = 20;
     public const int FlagsPerHour = 30;
 
-    public static readonly IReadOnlySet<string> FlagReasons = new HashSet<string> { "spoiler", "abuse", "spam", "off-topic", "wrong" };
+    /// <summary>
+    /// The flag reason that, from enough readers, marks a post a spoiler.
+    /// </summary>
+    public const string SpoilerReason = "spoiler";
+
+    public static readonly IReadOnlySet<string> FlagReasons = new HashSet<string> { SpoilerReason, "abuse", "spam", "off-topic", "wrong" };
+
+    /// <summary>
+    /// Whether that many open spoiler flags mark a post a spoiler, whatever its author says.
+    /// </summary>
+    public static bool MarksSpoiler(int openSpoilerFlags) => openSpoilerFlags >= SpoilerAfterFlags;
 
     public bool IsModerator(ClaimsPrincipal user) =>
         user.FindFirstValue("preferred_username") is { } name

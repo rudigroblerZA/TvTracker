@@ -84,8 +84,7 @@ public sealed class PaymentProviders(IEnumerable<IPaymentProvider> providers, Mi
     /// Null when nothing is sold, the named provider isn't registered, or it still lacks a key.
     /// </summary>
     public IPaymentProvider? Selling =>
-        options.Value is { Provider: { Length: > 0 } name } current && PaymentOptionsValidator.Missing(current).Count == 0
-            ? byName.GetValueOrDefault(name) : null;
+        PaymentOptionsValidator.Sells(options.Value) ? byName.GetValueOrDefault(options.Value.Provider!) : null;
 
     public IEnumerable<string> Names => byName.Keys;
 
