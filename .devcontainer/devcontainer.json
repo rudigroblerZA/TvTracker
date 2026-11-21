@@ -10,7 +10,6 @@
 		"ghcr.io/devcontainers/features/python:1": {
 			"version": "os-provided"
 		},
-		"ghcr.io/devcontainers-extra/features/uv:1": {},
 		"ghcr.io/devcontainers/features/dotnet:2": {
 			"version": "10.0"
 		},
@@ -24,6 +23,7 @@
 	"remoteEnv": {
 		"SSL_CERT_DIR": "/usr/lib/ssl/certs:/home/vscode/.aspnet/dev-certs/trust"
 	},
+	"onCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh",
 	"postStartCommand": "aspire certs trust --non-interactive",
 	"customizations": {
 		"vscode": {
