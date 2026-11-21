@@ -1367,3 +1367,41 @@ h1:focus, h2:focus { outline: none; }
 .character-choice .who, .character-choice .count { position: relative; }
 .character-choice .who { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .character-choice .count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Settings and its sub-pages (.settings-page wraps each). The link rows and the flag filter hold at any width; the
+   rest is for a phone: controls a thumb can hit, fields the width of the screen, and a way around a long page. */
+.settings-link { position: relative; display: block; padding: 10px 28px 10px 0; border-bottom: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.settings-link:last-child { border-bottom: 0; padding-bottom: 2px; }
+.settings-link strong { display: block; color: var(--accent); font-weight: 600; }
+.settings-link span { display: block; }
+.settings-link::after { content: "›"; position: absolute; right: 4px; top: 50%; translate: 0 -50%; color: var(--muted); font-size: 1.3rem; }
+.settings-link:hover strong { text-decoration: underline; }
+.settings-jump { display: none; }
+.flag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 12px; }
+.flag-filter input[type=search] { flex: 1 1 220px; min-width: 0; }
+
+@media (max-width: 640px) {
+    .settings-jump { display: flex; gap: 8px; margin: 0 -14px 14px; padding: 2px 14px 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .settings-jump::-webkit-scrollbar { display: none; }
+    .settings-jump a { flex: none; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 0.9rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
+    .settings-page section[id] { scroll-margin-top: 112px; }
+
+    /* 16px keeps iOS from zooming the page when a field is focused. */
+    .settings-page input:not([type=checkbox]):not([type=radio]), .settings-page select, .settings-page textarea { font-size: 16px; min-height: 44px; max-width: 100%; }
+    .settings-page label > input:not([type=checkbox]):not([type=radio]):not([type=time]):not([type=date]):not([type=number]),
+    .settings-page label > select, .settings-page .stack > input, .settings-page .stack > select { width: 100%; }
+    .settings-page input[type=file] { width: 100%; }
+    .settings-page input[type=checkbox], .settings-page input[type=radio] { width: 1.25em; height: 1.25em; flex: none; }
+    .settings-page label.checkbox, .settings-page label.inline { min-height: 40px; align-items: center; }
+    .settings-page .btn, .settings-page .chip { min-height: 44px; }
+    .settings-page .panel { padding: 14px; }
+    .settings-page .panel > .btn, .settings-page form > .btn, .settings-page .actions > .btn { flex: 1 1 auto; }
+    .settings-page .panel > .btn, .settings-page form > .btn { width: 100%; }
+    .settings-link { padding-top: 13px; padding-bottom: 13px; }
+
+    /* A flag's four choices: two by two, each the width of a thumb, in place of a ragged wrap. */
+    .settings-page .flag-row .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+    .settings-page .flag-row .chip { justify-content: center; text-align: center; }
+    .settings-page .table-scroll { margin: 0 -14px; padding: 0 14px; }
+    .settings-page th, .settings-page td { white-space: nowrap; }
+}

@@ -4,6 +4,7 @@
 
 <PageTitle>Feature flags · @Brand.AppName</PageTitle>
 
+<div class="settings-page">
 <p><a href="settings">← Settings</a></p>
 <h1>Feature flags</h1>
 
@@ -24,8 +25,13 @@
                 (a plan change within a minute); other people's open pages within 30 seconds. A flag you haven't set follows
                 flagd.json, including any targeting and plans there.
             </p>
+            <div class="flag-filter">
+                <input type="search" @bind="filter" @bind:event="oninput" placeholder="Find a flag" aria-label="Find a flag by name or what it does" />
+                <label class="inline checkbox"><input type="checkbox" @bind="onlySet" /> Only the ones set here</label>
+                <span class="muted small" role="status">@($"{Shown.Count} of {flags.Count}")</span>
+            </div>
             <ul class="flag-list">
-                @foreach (var flag in flags)
+                @foreach (var flag in Shown)
                 {
                     <li class="panel flag-row" @key="flag.Key">
                         <div class="flag-body">
@@ -63,9 +69,25 @@
     </NotAuthorized>
 </AuthorizeView>
 
+</div>
+
 @code {
     private List<FeatureFlagSetting>? flags;
     private bool notAdmin;
+
+    /// <summary>
+    /// What the list is narrowed by: words in a flag's key, name or description, and whether it has been set here.
+    /// </summary>
+    private string? filter;
+    private bool onlySet;
+
+    private IReadOnlyList<FeatureFlagSetting> Shown => (flags ?? [])
+        .Where(f => !onlySet || f.Override is not null)
+        .Where(f => string.IsNullOrWhiteSpace(filter) || filter.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(word =>
+            f.Key.Contains(word, StringComparison.OrdinalIgnoreCase)
+            || f.Name?.Contains(word, StringComparison.OrdinalIgnoreCase) == true
+            || f.Description?.Contains(word, StringComparison.OrdinalIgnoreCase) == true))
+        .ToList();
     private bool busy;
     private string? error;
 

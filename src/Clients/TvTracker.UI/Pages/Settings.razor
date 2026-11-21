@@ -12,9 +12,30 @@
 
 <PageTitle>Settings · @Brand.AppName</PageTitle>
 
+<div class="settings-page">
 <h1>Settings</h1>
 
-<section class="panel">
+@* Where the page's sections are, for a phone: the page is long, and this is its only way around. *@
+<nav class="settings-jump" aria-label="Settings sections">
+    <a href="settings#theme">Theme</a>
+    <AuthorizeView>
+        <Authorized>
+            <a href="settings#profile">Profile</a>
+            <a href="settings#notifications">Notifications</a>
+            <Feature Flag="@FeatureFlags.Social"><a href="settings#social">Social</a></Feature>
+            <Feature Flag="@FeatureFlags.SpoilerShield"><a href="settings#spoilers">Spoiler shield</a></Feature>
+            <Feature Flag="@FeatureFlags.HistoryImport"><a href="settings#history">History</a></Feature>
+            <Feature Flag="@FeatureFlags.Plans"><a href="settings#plan">Plan</a></Feature>
+            @if (isAdmin || isModerator)
+            {
+                <a href="settings#admin">Admin</a>
+            }
+            <a href="settings#data">Your data</a>
+        </Authorized>
+    </AuthorizeView>
+</nav>
+
+<section id="theme" class="panel">
     <h2>Theme</h2>
     <div class="chips" role="radiogroup" aria-label="Theme">
         @foreach (var (value, label) in ThemeStore.Choices)
@@ -168,7 +189,7 @@
         </section>
 
         <Feature Flag="@FeatureFlags.Social">
-            <section class="panel">
+            <section id="social" class="panel">
                 <h2>Social</h2>
                 <label class="checkbox">
                     <input type="checkbox" checked="@shareActivity" disabled="@(shareActivity is null)" @onchange="e => SetSocialAsync(e.Value is true, null)" />
@@ -184,7 +205,7 @@
         </Feature>
 
         <Feature Flag="@FeatureFlags.SpoilerShield">
-            <section class="panel">
+            <section id="spoilers" class="panel">
                 <h2>Spoiler shield</h2>
                 <label class="checkbox">
                     <input type="checkbox" checked="@spoilerShield" @onchange="e => SetSpoilerShieldAsync(e.Value is true)" />
@@ -195,50 +216,50 @@
         </Feature>
 
         <Feature Flag="@FeatureFlags.HistoryImport">
-            <section class="panel">
+            <section id="history" class="panel">
                 <h2>Your history</h2>
-                <p><a href="settings/import">Bring your history</a><span class="muted small"> · import a TV Time, TV Time Out or Trakt export, dates included</span></p>
+                <a class="settings-link" href="settings/import"><strong>Bring your history</strong><span class="muted small">import a TV Time, TV Time Out or Trakt export, dates included</span></a>
             </section>
         </Feature>
 
         <Feature Flag="@FeatureFlags.Plans">
-            <section class="panel">
+            <section id="plan" class="panel">
                 <h2>Plan</h2>
-                <p><a href="settings/plan">Your plan</a><span class="muted small"> · what each plan includes</span></p>
+                <a class="settings-link" href="settings/plan"><strong>Your plan</strong><span class="muted small">what each plan includes</span></a>
                 <Feature Flag="@FeatureFlags.FamilyPlan">
-                    <p><a href="settings/family">Your family</a><span class="muted small"> · share one plan with up to @Plans.FamilyMembers people</span></p>
+                    <a class="settings-link" href="settings/family"><strong>Your family</strong><span class="muted small">share one plan with up to @Plans.FamilyMembers people</span></a>
                 </Feature>
             </section>
         </Feature>
 
         @if (isAdmin || isModerator)
         {
-            <section class="panel">
+            <section id="admin" class="panel">
                 <h2>Admin</h2>
                 @if (isModerator)
                 {
-                    <p><a href="moderation">Moderation</a><span class="muted small"> · flagged posts and suggested corrections</span></p>
+                    <a class="settings-link" href="moderation"><strong>Moderation</strong><span class="muted small">flagged posts and suggested corrections</span></a>
                     <Feature Flag="@FeatureFlags.Research">
-                        <p><a href="research">Research</a><span class="muted small"> · shows being researched, and their saved versions</span></p>
+                        <a class="settings-link" href="research"><strong>Research</strong><span class="muted small">shows being researched, and their saved versions</span></a>
                     </Feature>
                 }
                 @if (isAdmin)
                 {
-                    <p><a href="settings/branding">Name and company</a><span class="muted small"> · the app's name and colour, and who runs it, for the privacy policy and terms</span></p>
-                    <p><a href="settings/flags">Feature flags</a><span class="muted small"> · turn features on or off for everyone</span></p>
+                    <a class="settings-link" href="settings/branding"><strong>Name and company</strong><span class="muted small">the app's name and colour, and who runs it, for the privacy policy and terms</span></a>
+                    <a class="settings-link" href="settings/flags"><strong>Feature flags</strong><span class="muted small">turn features on or off for everyone</span></a>
                     <Feature Flag="@FeatureFlags.Plans">
-                        <p><a href="settings/plans">Plans</a><span class="muted small"> · set people's plans</span></p>
+                        <a class="settings-link" href="settings/plans"><strong>Plans</strong><span class="muted small">set people's plans</span></a>
                     </Feature>
-                    <p><a href="settings/revenue">Revenue</a><span class="muted small"> · subscriptions, free accounts becoming paying ones, and affiliate commission</span></p>
-                    <p><a href="settings/financials">Financials</a><span class="muted small"> · income, costs and what's left, month by month</span></p>
+                    <a class="settings-link" href="settings/revenue"><strong>Revenue</strong><span class="muted small">subscriptions, free accounts becoming paying ones, and affiliate commission</span></a>
+                    <a class="settings-link" href="settings/financials"><strong>Financials</strong><span class="muted small">income, costs and what's left, month by month</span></a>
                     <Feature Flag="@FeatureFlags.Affiliates">
-                        <p><a href="settings/affiliates">Affiliate links</a><span class="muted small"> · where-to-watch clicks, sales, commission and the programs</span></p>
+                        <a class="settings-link" href="settings/affiliates"><strong>Affiliate links</strong><span class="muted small">where-to-watch clicks, sales, commission and the programs</span></a>
                     </Feature>
                 }
             </section>
         }
 
-        <section class="panel">
+        <section id="data" class="panel">
             <h2>Your data</h2>
             <div class="actions">
                 <button class="btn btn-quiet" @onclick="ExportAsync">Export my data</button>
@@ -265,6 +286,8 @@
         <SignInPrompt />
     </NotAuthorized>
 </AuthorizeView>
+
+</div>
 
 @code {
     private bool spoilerShield;

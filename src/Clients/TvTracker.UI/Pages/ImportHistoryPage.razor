@@ -7,6 +7,7 @@
 
 <PageTitle>Bring your history · @Brand.AppName</PageTitle>
 
+<div class="settings-page">
 <p><a href="settings">← Settings</a></p>
 <h1>Bring your history</h1>
 
@@ -141,6 +142,8 @@
         <SignInPrompt Message="Sign in to import your history." />
     </NotAuthorized>
 </AuthorizeView>
+
+</div>
 
 @code {
     private const long MaxBytes = 64L * 1024 * 1024;
