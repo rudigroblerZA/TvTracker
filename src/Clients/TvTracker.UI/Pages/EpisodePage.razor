@@ -173,7 +173,8 @@ else
                                         <textarea @bind="editText" @bind:event="oninput" maxlength="2000" aria-label="Edit your comment"></textarea>
                                         <label class="inline checkbox"><input type="checkbox" @bind="editIsSpoiler" /> Contains spoilers</label>
                                         <div class="actions">
-                                            <button class="btn" type="submit" disabled="@(string.IsNullOrWhiteSpace(editText) && comment.GifId is null)">Save</button>
+                                            @* Never disabled for empty words: a comment may be a GIF alone, which isn't sent while GIFs are off, so the service decides. *@
+                                            <button class="btn" type="submit">Save</button>
                                             <button class="btn btn-quiet" type="button" @onclick="() => editing = null">Cancel</button>
                                         </div>
                                     </form>

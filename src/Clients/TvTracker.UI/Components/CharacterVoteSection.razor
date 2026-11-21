@@ -65,6 +65,12 @@
     private Dictionary<Guid, int> counts = [];
     private (Guid Episode, bool Watched)? loaded;
     private CancellationTokenSource? waiting;
+
+    /// <summary>
+    /// Set when the load for <see cref="loaded"/> failed: when it may be tried again.
+    /// </summary>
+    private DateTime? retryAfter;
+    private static readonly TimeSpan RetryFailedAfter = TimeSpan.FromSeconds(20);
     private bool busy;
     private bool everyone;
     private string? error;
@@ -88,7 +94,8 @@
         {
             (peopleFrom, people) = (Cast, Cast.Where(m => m.PersonId != Guid.Empty).DistinctBy(m => m.PersonId).ToList());
         }
-        if (people.Count == 0 || loaded == (EpisodeId, Watched))
+        // Nothing to do while this episode and watched state are the ones loaded, unless that load failed and its wait is over.
+        if (people.Count == 0 || (loaded == (EpisodeId, Watched) && !(DateTime.UtcNow >= retryAfter)))
         {
             return;
         }
@@ -98,15 +105,22 @@
             // last one's is left to show or to vote from.
             (votes, counts, everyone, error) = (null, [], false, null);
         }
-        loaded = (EpisodeId, Watched);
+        (loaded, retryAfter) = ((EpisodeId, Watched), null);
         waiting?.Cancel();
+        if (!Watched)
+        {
+            // Locked without asking: Ratings hears of an unwatch a moment after the page does, and would still answer
+            // with the counts.
+            Show(Unwatched);
+            return;
+        }
         var stop = (waiting = new CancellationTokenSource()).Token;
         try
         {
             Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
             foreach (var wait in Retries)
             {
-                if (!Watched || votes is not { Locked: true })
+                if (votes is not { Locked: true })
                 {
                     break;
                 }
@@ -114,11 +128,22 @@
                 Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or OperationCanceledException)
+        catch (OperationCanceledException)
         {
-            // An extra on the page: without it, the page stands.
+            // Overtaken by a newer load, or the page was left.
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // An extra on the page: without it, the page stands. Asked for again on a later render, but not at once:
+            // the page renders on every keystroke in the comment box.
+            retryAfter = DateTime.UtcNow + RetryFailedAfter;
         }
     }
+
+    /// <summary>
+    /// What the section shows for an episode the page has as unwatched: as Ratings answers for one, with no counts.
+    /// </summary>
+    private static readonly EpisodeCharacterVotes Unwatched = new(Locked: true, Total: 0, Counts: [], Mine: null);
 
     private void Show(EpisodeCharacterVotes? latest)
     {

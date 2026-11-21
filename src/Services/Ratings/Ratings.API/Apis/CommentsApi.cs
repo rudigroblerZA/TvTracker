@@ -170,7 +170,7 @@ public static class CommentsApi
     public static string? HiddenAfterEdit(string? was, TextVerdict verdict) =>
         was == HiddenReasons.Flags ? was : verdict == TextVerdict.Held ? HiddenReasons.Held : null;
 
-    private static async Task<Results<Ok<CommentDto>, NotFound, ValidationProblem, Conflict<string>>> EditCommentAsync(
+    private static async Task<Results<Ok<CommentDto>, NotFound, ValidationProblem, Conflict<string>, ProblemHttpResult>> EditCommentAsync(
         Guid id, EditCommentRequest request, ClaimsPrincipal user, RatingsContext db, Moderation moderation,
         IOptionsSnapshot<GiphyOptions> giphy, CancellationToken ct)
     {
@@ -193,6 +193,11 @@ public static class CommentsApi
 
         if (text != comment.Text)
         {
+            if (comment.EditedAtUtc is { } edited && DateTime.UtcNow - edited < Moderation.EditEvery)
+            {
+                return TypedResults.Problem("That comment was edited a moment ago. Wait a few seconds and try again.",
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
             (comment.Text, comment.EditedAtUtc) = (text, DateTime.UtcNow);
             comment.HiddenReason = HiddenAfterEdit(comment.HiddenReason, moderation.Check(text));
         }

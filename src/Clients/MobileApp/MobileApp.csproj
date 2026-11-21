@@ -33,11 +33,8 @@
     <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0</ApplicationDisplayVersion>
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
 
-    <!-- Where the app finds the backend. Empty, it is a development build that talks to the AppHost on this machine.
-         A release names the deployment's host (PUBLIC_HOST in scripts/deploy.sh): -p:TvTrackerPublicHost=tv.example.com.
-         TvTrackerApiAddress overrides the gateway's address where the deployment gives it its own host (API_HOST). -->
-    <TvTrackerPublicHost Condition="'$(TvTrackerPublicHost)' == ''"></TvTrackerPublicHost>
-    <TvTrackerApiAddress Condition="'$(TvTrackerApiAddress)' == ''"></TvTrackerApiAddress>
+    <!-- Where the app finds the backend: TvTrackerPublicHost, the deployment's host (PUBLIC_HOST in scripts/deploy.sh),
+         as in -p:TvTrackerPublicHost=tv.example.com. Left out, it is a build that talks to the AppHost on this machine. -->
     <!-- The backend's Catalog:Provider (tvmaze, wikidata, tvdb), for the credit its licence requires. -->
     <TvTrackerCatalogSource Condition="'$(TvTrackerCatalogSource)' == ''">tvmaze</TvTrackerCatalogSource>
 
@@ -61,15 +58,20 @@
     <AndroidKeyStore Condition="'$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
   </PropertyGroup>
 
+  <!-- A build with no host talks to this machine over plain http, whatever its configuration: MainApplication allows
+       cleartext for it (and for debug builds), and for nothing else. -->
+  <PropertyGroup Condition="'$(TvTrackerPublicHost.Trim())' == ''">
+    <DefineConstants>$(DefineConstants);LOCAL_BACKEND</DefineConstants>
+  </PropertyGroup>
+
   <!-- MobileSettings reads these back at run time. -->
   <ItemGroup>
     <AssemblyMetadata Include="TvTracker.PublicHost" Value="$(TvTrackerPublicHost)" />
-    <AssemblyMetadata Include="TvTracker.ApiAddress" Value="$(TvTrackerApiAddress)" />
     <AssemblyMetadata Include="TvTracker.CatalogSource" Value="$(TvTrackerCatalogSource)" />
   </ItemGroup>
 
   <!-- A release that talks to this machine would be useless on anyone's phone, and it would do so over plain http. -->
-  <Target Name="RequirePublicHostForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release' and '$(TvTrackerPublicHost)' == '' and '$(TvTrackerAllowLocalRelease)' != 'true'">
+  <Target Name="RequirePublicHostForRelease" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release' and '$(TvTrackerPublicHost.Trim())' == '' and '$(TvTrackerAllowLocalRelease)' != 'true'">
     <Error Text="A Release build needs the deployment's host: -p:TvTrackerPublicHost=tv.example.com (README, Releasing the Android app). To build a Release against this machine for testing, pass -p:TvTrackerAllowLocalRelease=true." />
   </Target>
 

@@ -3,8 +3,9 @@ using Android.Runtime;
 
 namespace TvTracker.Mobile;
 
-// Plain http only in a debug build, which talks to the AppHost on this machine; a release is https throughout.
-#if DEBUG
+// Plain http only where the app talks to the AppHost on this machine: a debug build, or one built with no host
+// (LOCAL_BACKEND, from MobileApp.csproj). A release for a deployment is https throughout.
+#if DEBUG || LOCAL_BACKEND
 [Application(UsesCleartextTraffic = true)]
 #else
 [Application(UsesCleartextTraffic = false)]
