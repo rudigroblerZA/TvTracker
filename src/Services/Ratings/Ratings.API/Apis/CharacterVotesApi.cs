@@ -106,10 +106,10 @@ public static class CharacterVotesApi
 
         // The show is the one Tracking says the episode belongs to, so a vote can't be counted towards another show's
         // favourites. The request's is used only for a watch from before the copy kept its show.
-        var (showId, personId, now) = (watched.ShowId ?? request.ShowId, request.PersonId, DateTime.UtcNow);
+        var showId = watched.ShowId ?? request.ShowId;
         // One statement, so two votes at once from the same viewer can't both add the row: the later pick wins.
         await db.Database.ExecuteSqlAsync($"""
-            insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc") values ({userId}, {episodeId}, {showId}, {personId}, {now})
+            insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc") values ({userId}, {episodeId}, {showId}, {request.PersonId}, {DateTime.UtcNow})
             on conflict ("UserId", "EpisodeId") do update set "ShowId" = excluded."ShowId", "PersonId" = excluded."PersonId", "CreatedAtUtc" = excluded."CreatedAtUtc"
             """, ct);
         return TypedResults.Ok(await VotesAsync(db, userId, episodeId, ct));

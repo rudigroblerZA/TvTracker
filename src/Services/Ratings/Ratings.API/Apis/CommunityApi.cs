@@ -122,7 +122,7 @@ public static class CommunityApi
         // Only flags a moderator hasn't dealt with count, so a restored post needs fresh ones to be hidden again.
         var open = await db.Flags.Where(f => f.TargetKind == kind && f.TargetId == id && !f.Resolved).Select(f => f.Reason).ToListAsync(ct);
         var markedSpoiler = false;
-        if (!post.IsSpoiler && open.Count(r => r == "spoiler") >= Moderation.SpoilerAfterFlags)
+        if (!post.IsSpoiler && Moderation.MarksSpoiler(open.Count(r => r == Moderation.SpoilerReason)))
         {
             post.IsSpoiler = markedSpoiler = true;
         }

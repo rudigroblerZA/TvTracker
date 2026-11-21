@@ -207,8 +207,8 @@ public static class CommentsApi
     /// Whether enough readers have flagged the comment as a spoiler to mark it one (CommunityApi's flagging does the marking).
     /// </summary>
     private static async Task<bool> MarkedSpoilerByReadersAsync(RatingsContext db, Guid id, CancellationToken ct) =>
-        await db.Flags.CountAsync(f => f.TargetKind == CommunityApi.CommentKind && f.TargetId == id && !f.Resolved && f.Reason == "spoiler", ct)
-            >= Moderation.SpoilerAfterFlags;
+        Moderation.MarksSpoiler(await db.Flags.CountAsync(
+            f => f.TargetKind == CommunityApi.CommentKind && f.TargetId == id && !f.Resolved && f.Reason == Moderation.SpoilerReason, ct));
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {

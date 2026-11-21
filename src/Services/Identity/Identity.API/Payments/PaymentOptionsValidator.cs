@@ -46,6 +46,11 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
     }
 
     /// <summary>
+    /// Whether these options sell plans: a provider is named and has all it needs.
+    /// </summary>
+    public static bool Sells(PaymentOptions options) => options.Provider is { Length: > 0 } && Missing(options).Count == 0;
+
+    /// <summary>
     /// What the provider that sells still needs before it can: empty when it can sell, or when nothing is sold.
     /// </summary>
     public static IReadOnlyList<string> Missing(PaymentOptions options)

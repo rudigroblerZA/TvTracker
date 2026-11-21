@@ -187,24 +187,23 @@ public static class PaymentSettingsApi
     /// after, though a provider is still chosen; or the change itself chooses a provider that couldn't sell. Not
     /// refused: choosing none, and adding to a provider that isn't selling yet (its keys arrive one at a time).
     /// </summary>
+    internal static string? Refusal(PaymentOptions before, PaymentOptions after, bool choosesProvider)
+    {
+        var missing = PaymentOptionsValidator.Missing(after);
+        return missing.Count > 0 && (PaymentOptionsValidator.Sells(before) || choosesProvider)
+            ? $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}"
+            : null;
+    }
+
     /// <summary>
     /// Why going back to configuration alone is refused, or null: plans sell now and configuration on its own
     /// couldn't carry on, for want of a key or of any provider at all.
     /// </summary>
     internal static string? ClearRefusal(PaymentOptions before, PaymentOptions configured) =>
         Refusal(before, configured, choosesProvider: false) is { } missing ? $"{missing} The deployment's configuration doesn't have it."
-        : Sells(before) && !Sells(configured) ? "That would stop plans being sold: the deployment's configuration names no provider."
+        : PaymentOptionsValidator.Sells(before) && configured.Provider is not { Length: > 0 }
+            ? "That would stop plans being sold: the deployment's configuration names no provider."
         : null;
-
-    private static bool Sells(PaymentOptions options) => options.Provider is { Length: > 0 } && PaymentOptionsValidator.Missing(options).Count == 0;
-
-    internal static string? Refusal(PaymentOptions before, PaymentOptions after, bool choosesProvider)
-    {
-        var missing = PaymentOptionsValidator.Missing(after);
-        return missing.Count > 0 && (Sells(before) || choosesProvider)
-            ? $"That would stop plans being sold. Still needed: {string.Join(" ", missing)}"
-            : null;
-    }
 
     /// <summary>
     /// What's wrong with a request on its own, or null.
