@@ -25,10 +25,9 @@ public record ShowCharacterVotesDto(int Total, IReadOnlyList<CharacterVoteCountD
 public static class CharacterVotesApi
 {
     /// <summary>
-    /// How many of a show's most voted-for people its totals send. More than a page lists (five): the page leaves out
-    /// anyone no longer in the cast, and needs others to take their places.
+    /// How many of a show's cast its totals list.
     /// </summary>
-    public const int TopOfShow = 20;
+    public const int TopOfShow = 5;
 
     public static IEndpointRouteBuilder MapCharacterVotesApi(this IEndpointRouteBuilder app)
     {
@@ -50,14 +49,18 @@ public static class CharacterVotesApi
     public static IEnumerable<CharacterVoteCountDto> Ranked(IEnumerable<CharacterVoteCountDto> counts) =>
         counts.Where(c => c.Votes > 0).OrderByDescending(c => c.Votes).ThenBy(c => c.PersonId);
 
-    private static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CancellationToken ct)
+    private static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CatalogCast cast, CancellationToken ct)
     {
         var counts = await db.CharacterVotes
             .Where(v => v.ShowId == showId)
             .GroupBy(v => v.PersonId)
             .Select(g => new CharacterVoteCountDto(g.Key, g.Count()))
             .ToListAsync(ct);
-        return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), Ranked(counts).Take(TopOfShow).ToList()));
+        // The places go to people in the cast as it is now, where the catalog can say: someone who has left it, or an
+        // id let through while the catalog couldn't be asked, would be dropped by the page and leave a gap.
+        var inCast = await cast.OfAsync(showId, ct);
+        var top = Ranked(counts).Where(c => inCast is null || inCast.Contains(c.PersonId)).Take(TopOfShow).ToList();
+        return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), top));
     }
 
     private static async Task<Ok<EpisodeCharacterVotesDto>> GetEpisodeVotesAsync(

@@ -21,11 +21,17 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
     /// <summary>
     /// Whether <paramref name="personId"/> is in the cast of <paramref name="showId"/>; null when the catalog couldn't say.
     /// </summary>
-    public async Task<bool?> HasAsync(Guid showId, Guid personId, CancellationToken ct)
+    public async Task<bool?> HasAsync(Guid showId, Guid personId, CancellationToken ct) =>
+        (await OfAsync(showId, ct))?.Contains(personId);
+
+    /// <summary>
+    /// The people in the cast of <paramref name="showId"/>; null when the catalog couldn't say.
+    /// </summary>
+    public async Task<IReadOnlyCollection<Guid>?> OfAsync(Guid showId, CancellationToken ct)
     {
         try
         {
-            var cast = await cache.GetOrCreateAsync($"cast:{showId}", async token =>
+            return await cache.GetOrCreateAsync($"cast:{showId}", async token =>
             {
                 using var response = await http.GetAsync($"api/v1/shows/{showId}", token);
                 if (response.StatusCode == HttpStatusCode.NotFound)
@@ -37,11 +43,10 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
                 var show = await response.Content.ReadFromJsonAsync<ShowCast>(token);
                 return show?.Cast.Select(member => member.PersonId).ToArray() ?? [];
             }, Kept, cancellationToken: ct);
-            return cast.Contains(personId);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Couldn't ask the catalog for the cast of {ShowId}; the vote goes unchecked", showId);
+            logger.LogWarning(ex, "Couldn't ask the catalog for the cast of {ShowId}; it goes unchecked", showId);
             return null;
         }
     }
