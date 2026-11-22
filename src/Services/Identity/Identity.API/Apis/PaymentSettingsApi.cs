@@ -20,9 +20,11 @@ namespace Identity.API.Apis;
 /// <param name="CanStoreSecrets">False without <c>Payments:SettingsKey</c>: keys can then only come from configuration.</param>
 /// <param name="HasStored">Something was set here, so there is something to go back to configuration from.</param>
 /// <param name="KeysUnreadable">A key saved here can't be decrypted (the deployment's settings key changed): enter it again.</param>
+/// <param name="PolarWebhookUrl">Where Polar sends its events, as <paramref name="WebhookUrl"/> is for Stripe.</param>
 public record PaymentSettingsDto(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
     string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
-    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false);
+    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false,
+    string? PolarWebhookUrl = null);
 
 /// <param name="Provider">Null leaves it as it is; "" sells nothing; else a provider's name.</param>
 /// <param name="StripeSecretKey">Null or empty leaves the stored key as it is.</param>
@@ -44,10 +46,10 @@ public record SavePaymentSettingsRequest(string? Provider, string? StripeSecretK
 public static class PaymentSettingsApi
 {
     /// <summary>
-    /// Stripe's webhook as the outside world reaches it in a deployment: the site's address, the gateway under /api,
-    /// its identity route, then this service's own (<see cref="PaymentsApi"/>).
+    /// A provider's webhook as the outside world reaches it in a deployment: the site's address, the gateway under
+    /// /api, its identity route, then this service's own (<see cref="PaymentsApi"/>), which ends in the provider's name.
     /// </summary>
-    private const string PublicWebhookPath = "/api/identity/api/v1/payments/webhooks/stripe";
+    private const string PublicWebhookPath = "/api/identity/api/v1/payments/webhooks/";
 
     public static void MapPaymentSettingsApi(this IEndpointRouteBuilder app)
     {
@@ -248,15 +250,16 @@ public static class PaymentSettingsApi
             stored is not null,
             stored?.UpdatedAtUtc,
             stored?.UpdatedBy,
-            stored?.KeysUnreadable == true);
+            stored?.KeysUnreadable == true,
+            PublicWebhookUrl(current.ReturnUrl, PolarPaymentProvider.ProviderName));
     }
 
     /// <summary>
     /// Null unless <paramref name="returnUrl"/> is a web address: a path alone (development) says nothing of the site's.
     /// </summary>
-    internal static string? PublicWebhookUrl(string? returnUrl) =>
+    internal static string? PublicWebhookUrl(string? returnUrl, string provider = StripePaymentProvider.ProviderName) =>
         Uri.TryCreate(returnUrl, UriKind.Absolute, out var site) && site.Scheme is "http" or "https"
-            ? site.GetLeftPart(UriPartial.Authority) + PublicWebhookPath
+            ? site.GetLeftPart(UriPartial.Authority) + PublicWebhookPath + provider
             : null;
 
     private static string Source(string? stored, string? configured) =>

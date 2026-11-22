@@ -52,6 +52,17 @@ builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
     .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
+// Polar the same way, and always registered for the same reason: its webhooks carry on for subscriptions bought
+// through it, whichever provider sells now.
+#pragma warning disable EXTEXP0001
+builder.Services.AddHttpClient<PolarPaymentProvider>((sp, client) =>
+    {
+        client.BaseAddress = new Uri(sp.GetRequiredService<IOptionsMonitor<PaymentOptions>>().CurrentValue.Polar.ApiBase);
+        client.Timeout = TimeSpan.FromSeconds(20);
+    })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<PolarPaymentProvider>());
 builder.Services.AddScoped<PaymentProviders>();
 builder.Services.AddScoped<SubscriptionLedger>();
 builder.Services.AddHostedService<SubscriptionLapse>();

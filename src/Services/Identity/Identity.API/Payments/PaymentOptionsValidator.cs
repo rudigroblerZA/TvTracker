@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using TvTracker.IntegrationEvents;
 
 namespace Identity.API.Payments;
 
@@ -29,8 +30,14 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
                     errors.Add("Payments:Stripe:ApiBase must be an absolute http(s) address.");
                 }
                 break;
+            case "polar":
+                if (!IsAbsoluteHttp(options.Polar.ApiBase))
+                {
+                    errors.Add("Payments:Polar:ApiBase must be an absolute http(s) address.");
+                }
+                break;
             default:
-                errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, test).");
+                errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, polar, test).");
                 break;
         }
 
@@ -61,6 +68,24 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
             case "stripe":
                 Require(missing, options.Stripe.SecretKey, "Stripe's secret key");
                 Require(missing, options.Stripe.WebhookSecret, "Stripe's webhook signing secret");
+                if (!IsAbsoluteHttp(options.ReturnUrl))
+                {
+                    missing.Add("Payments:ReturnUrl isn't an absolute address.");
+                }
+                break;
+            case "polar":
+                Require(missing, options.Polar.AccessToken, "Polar's access token (Payments:Polar:AccessToken)");
+                Require(missing, options.Polar.WebhookSecret, "Polar's webhook signing secret (Payments:Polar:WebhookSecret)");
+                foreach (var plan in new[] { Plans.Plus, Plans.Family })
+                {
+                    foreach (var interval in PlanPrices.Intervals)
+                    {
+                        if (options.Polar.Products.For(plan, interval) is null)
+                        {
+                            missing.Add($"Polar's product for {Plans.Name(plan)} by the {interval} (Payments:Polar:Products) isn't set.");
+                        }
+                    }
+                }
                 if (!IsAbsoluteHttp(options.ReturnUrl))
                 {
                     missing.Add("Payments:ReturnUrl isn't an absolute address.");
