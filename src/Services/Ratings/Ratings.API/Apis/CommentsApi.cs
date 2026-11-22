@@ -175,7 +175,8 @@ public static class CommentsApi
         IOptionsSnapshot<GiphyOptions> giphy, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var comment = await db.Comments.SingleOrDefaultAsync(c => c.Id == id && c.UserId == userId, ct);
+        // Read without tracking: the write below is one guarded statement, not a save of this copy.
+        var comment = await db.Comments.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id && c.UserId == userId, ct);
         if (comment is null)
         {
             return TypedResults.NotFound();
@@ -191,6 +192,7 @@ public static class CommentsApi
             return refused;
         }
 
+        var was = comment.HiddenReason;
         if (text != comment.Text)
         {
             if (comment.EditedAtUtc is { } edited && DateTime.UtcNow - edited < Moderation.EditEvery)
@@ -199,21 +201,33 @@ public static class CommentsApi
                     statusCode: StatusCodes.Status429TooManyRequests);
             }
             (comment.Text, comment.EditedAtUtc) = (text, DateTime.UtcNow);
-            comment.HiddenReason = HiddenAfterEdit(comment.HiddenReason, moderation.Check(text));
+            comment.HiddenReason = HiddenAfterEdit(was, moderation.Check(text));
         }
         // The author can always add the spoiler mark, and take off their own; one that readers' flags put there stays.
         comment.IsSpoiler = request.IsSpoiler || (comment.IsSpoiler && await MarkedSpoilerByReadersAsync(db, id, ct));
-        await db.SaveChangesAsync(ct);
 
-        return TypedResults.Ok(Mine(comment, giphy.Value));
+        // Written only if the comment is hidden (or not) for the reason just read: a moderator's removal, or readers'
+        // flags, landing meanwhile mustn't be undone by an edit that was decided without them.
+        var (newText, editedAt, hidden, spoiler) = (comment.Text, comment.EditedAtUtc, comment.HiddenReason, comment.IsSpoiler);
+        var written = await db.Comments
+            .Where(c => c.Id == id && c.UserId == userId && c.HiddenReason == was)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(c => c.Text, newText)
+                .SetProperty(c => c.EditedAtUtc, editedAt)
+                .SetProperty(c => c.HiddenReason, hidden)
+                .SetProperty(c => c.IsSpoiler, spoiler), ct);
+        return written == 0
+            ? TypedResults.Conflict("This comment changed while you were editing it. Reload and try again.")
+            : TypedResults.Ok(Mine(comment, giphy.Value));
     }
 
     /// <summary>
-    /// Whether enough readers have flagged the comment as a spoiler to mark it one (CommunityApi's flagging does the marking).
+    /// Whether readers' flags marked the comment a spoiler (CommunityApi's flagging does the marking). Flags a
+    /// moderator has since dealt with count too: restoring a comment leaves the mark on, so it is still the readers'.
     /// </summary>
     private static async Task<bool> MarkedSpoilerByReadersAsync(RatingsContext db, Guid id, CancellationToken ct) =>
         Moderation.MarksSpoiler(await db.Flags.CountAsync(
-            f => f.TargetKind == CommunityApi.CommentKind && f.TargetId == id && !f.Resolved && f.Reason == Moderation.SpoilerReason, ct));
+            f => f.TargetKind == CommunityApi.CommentKind && f.TargetId == id && f.Reason == Moderation.SpoilerReason, ct));
 
     private static async Task<Results<NoContent, NotFound>> DeleteCommentAsync(Guid id, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {

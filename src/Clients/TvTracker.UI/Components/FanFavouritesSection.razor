@@ -23,6 +23,11 @@
     [Parameter, EditorRequired] public Guid ShowId { get; set; }
     [Parameter, EditorRequired] public IReadOnlyList<CastMember> Cast { get; set; } = [];
 
+    /// <summary>
+    /// How many of the cast the section lists.
+    /// </summary>
+    private const int Shown = 5;
+
     private ShowCharacterVotes? votes;
     private Guid? loaded;
 
@@ -50,6 +55,8 @@
             .Select(c => (Member: Cast.FirstOrDefault(m => m.PersonId == c.PersonId), c.Votes))
             .Where(t => t.Member is not null)
             .Select(t => (t.Member!, t.Votes))
+            // The service sends more than are shown, so that people who have left the cast don't use up the places.
+            .Take(Shown)
             .ToList();
     }
 }

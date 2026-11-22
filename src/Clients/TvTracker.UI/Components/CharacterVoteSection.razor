@@ -67,7 +67,7 @@
     private CancellationTokenSource? waiting;
 
     /// <summary>
-    /// Set when the load for <see cref="loaded"/> failed: when it may be tried again.
+    /// Set when the load for <see cref="loaded"/> failed, or left a watched episode locked: when it may be tried again.
     /// </summary>
     private DateTime? retryAfter;
     private static readonly TimeSpan RetryFailedAfter = TimeSpan.FromSeconds(20);
@@ -117,16 +117,23 @@
         var stop = (waiting = new CancellationTokenSource()).Token;
         try
         {
-            Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
-            foreach (var wait in Retries)
+            foreach (var wait in Retries.Prepend(TimeSpan.Zero))
             {
+                await Task.Delay(wait, stop);
+                var latest = await Ratings.GetCharacterVotesAsync(EpisodeId, stop);
+                if (stop.IsCancellationRequested)
+                {
+                    // Answered just as a newer load took over (the episode was unmarked, say): its answer is out of date.
+                    return;
+                }
+                Show(latest);
                 if (votes is not { Locked: true })
                 {
-                    break;
+                    return;
                 }
-                await Task.Delay(wait, stop);
-                Show(await Ratings.GetCharacterVotesAsync(EpisodeId, stop));
             }
+            // Still locked: the news of the watch is late. Asked again in a while, on a later render, as after a failure.
+            retryAfter = DateTime.UtcNow + RetryFailedAfter;
         }
         catch (OperationCanceledException)
         {

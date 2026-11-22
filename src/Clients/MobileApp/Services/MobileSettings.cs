@@ -9,8 +9,10 @@ namespace TvTracker.Mobile.Services;
 /// <c>PUBLIC_HOST</c> of scripts/deploy.sh): the site is <c>https://HOST/</c>, the gateway <c>https://HOST/api/</c> and
 /// sign-in <c>https://HOST/realms/tvtracker</c>. Nothing goes over plain http.</item>
 /// <item><b>A development build</b> names none and talks to the AppHost on this machine, which the Android emulator
-/// reaches on 10.0.2.2. For a physical device, build with a dev tunnel's host or your machine's LAN address (and add
-/// that address to the Keycloak client's redirect settings if it changes the issuer).</item>
+/// reaches on 10.0.2.2. A physical phone on the same network reaches it by the machine's LAN address:
+/// <c>-p:TvTrackerLocalHost=192.168.1.20</c> (and add that address to the Keycloak client's redirect settings if it
+/// changes the issuer). That is still plain http on the AppHost's ports; TvTrackerPublicHost is only for a
+/// deployment, which serves https and the gateway under /api.</item>
 /// </list>
 /// </summary>
 public static class MobileSettings
@@ -25,7 +27,11 @@ public static class MobileSettings
     /// </summary>
     private static string? PublicHost => Built.GetValueOrDefault("TvTracker.PublicHost");
 
-    private static string LocalHost => DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost";
+    /// <summary>
+    /// This machine, as the device reaches it: the address built in for a physical phone, or the emulator's.
+    /// </summary>
+    private static string LocalHost => Built.GetValueOrDefault("TvTracker.LocalHost")
+        ?? (DeviceInfo.Platform == DevicePlatform.Android ? "10.0.2.2" : "localhost");
 
     /// <summary>
     /// Whether this build talks to a deployment (over https) and not to this machine, whatever its configuration. The
