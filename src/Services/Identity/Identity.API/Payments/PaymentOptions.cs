@@ -34,6 +34,8 @@ public sealed class PaymentOptions
     public TestProviderOptions Test { get; set; } = new();
 
     public StripeOptions Stripe { get; set; } = new();
+
+    public PolarOptions Polar { get; set; } = new();
 }
 
 /// <summary>

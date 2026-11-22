@@ -167,7 +167,9 @@ public sealed class EffectivePaymentOptions(IOptionsMonitor<PaymentOptions> conf
             WebhookSecret = settings.StripeWebhookSecret ?? options.Stripe.WebhookSecret,
             PortalUrl = settings.StripePortalUrl ?? options.Stripe.PortalUrl,
             ApiBase = options.Stripe.ApiBase
-        }
+        },
+        // Polar's settings come from configuration alone: the Financials page chooses it, and doesn't hold its keys.
+        Polar = options.Polar
     };
 }
 

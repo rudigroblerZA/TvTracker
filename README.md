@@ -1226,7 +1226,7 @@ without an account gets:
 - **With `plans` off,** nothing is limited by plan and Pro's features are open to every account.
 
 Pro and Family are bought on `/settings/plan` through a payment
-provider: Stripe in a deployment (and locally once its test key is given), else, in development, a test provider.
+provider: Stripe or Polar in a deployment (and locally once either's test key is given), else, in development, a test provider.
 
 - **Insights by plan:** 17 features carry the Pro rule (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, spoiler watch, Your TV life, Your TV
@@ -1275,6 +1275,28 @@ provider: Stripe in a deployment (and locally once its test key is given), else,
       (Stripe's CLI), and optionally `Parameters:stripe-portal-url`. With the key set, Stripe sells instead of the test
       provider; the checkout comes back to the web app's own address (https when it has one). Card `4242 4242 4242 4242` pays in test mode.
     - Prices: the checkout is made for `Payments:Prices`' amount, so nothing needs creating in Stripe's product list.
+  - **Polar** (polar.sh), for where Stripe opens no accounts (South Africa among them). Polar is a merchant of record:
+    it is the seller, so it charges and pays the sales tax and VAT wherever the buyer is, and takes more for it (5%
+    plus $0.50 a payment on its starter plan, about 22% of $2.99). "Buy" goes to Polar's hosted checkout and comes
+    back to `/settings/plan`. To set it up:
+    - In Polar (its sandbox first, which has tokens and products of its own):
+      - four recurring products, one for each plan and interval (Pro monthly, Pro yearly, Family monthly, Family
+        yearly). At Polar the product says how often it renews and carries the name the buyer sees; its price there
+        doesn't matter, since every checkout sets the amount from `Payments:Prices`.
+      - an organization access token that may write checkouts and subscriptions;
+      - a webhook endpoint at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/polar` for `order.paid`,
+        `subscription.canceled`, `subscription.uncanceled` and `subscription.revoked`, and its signing secret.
+    - A deployment's `.env`: `PAYMENT_PROVIDER=polar`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`,
+      `POLAR_PRODUCT_PLUS_MONTH`, `POLAR_PRODUCT_PLUS_YEAR`, `POLAR_PRODUCT_FAMILY_MONTH`, `POLAR_PRODUCT_FAMILY_YEAR`
+      (the products' ids), and optionally `POLAR_PORTAL_URL` (the customer portal, shown as "Manage billing").
+    - Locally, in the AppHost's user secrets: `Parameters:polar-access-token` and `Parameters:polar-webhook-secret`
+      (with both, Polar sells, against `https://sandbox-api.polar.sh/` unless `Polar:ApiBase` says otherwise), and
+      `Parameters:polar-product-plus-month` and the other three. Polar's webhooks need a public address to reach
+      Identity: a tunnel to `http://localhost:5101/api/v1/payments/webhooks/polar`.
+    - The Financials page can choose Polar as the provider and says what it still lacks, but doesn't hold its keys:
+      those come from configuration. Set the fee rate there to Polar's, for the statement's estimate.
+    - **Not tried against Polar:** the provider is written to Polar's published API (version 2026-10) and covered by
+      unit tests of its webhooks, signatures and checkout request; no checkout has been made in its sandbox yet.
   - **Admins** can still set anyone's plan on `/settings/plans`; a subscription ending moves back only the plan it paid
     for.
   - **API** (Identity): `GET /api/v1/plans/prices`, `GET /api/v1/me/subscription` (204 without one),
@@ -2294,6 +2316,7 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 | Setting | For |
 | --- | --- |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `PAYMENT_PROVIDER`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `POLAR_PRODUCT_*`, `POLAR_PORTAL_URL` | Selling through Polar instead (`PAYMENT_PROVIDER=polar`; `stripe` when left empty). Point Polar's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/polar`. See Payments. |
 | `PROXY_PORT` | The local port your own reverse proxy sends the site to, when you run one in front (see Behind your own reverse proxy, above) |
 | `OFFSITE_BUCKET` and the other `OFFSITE_*` | Copies of the backups off the machine, encrypted (see Backups, above) |
 | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |

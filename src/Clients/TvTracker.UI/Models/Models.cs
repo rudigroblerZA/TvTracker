@@ -58,7 +58,8 @@ public record CatalogNumbers(int Shows, int Episodes, int People);
 /// <param name="HasStored">Something was set on the page, so there is something to go back to configuration from.</param>
 public record PaymentSettings(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
     string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
-    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false);
+    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false,
+    string? PolarWebhookUrl = null);
 
 /// <param name="Provider">Null leaves it; "" sells nothing.</param>
 /// <param name="StripeSecretKey">Null leaves the stored key as it is.</param>
