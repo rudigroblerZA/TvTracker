@@ -51,9 +51,11 @@ on:
 permissions:
   contents: read
 
+# A newer push replaces the check it makes stale. A release run by hand is in a group of its own and is never
+# cancelled: a merge to main while it builds mustn't take the bundle with it.
 concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 env:
   DOTNET_NOLOGO: true

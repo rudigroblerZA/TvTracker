@@ -1450,6 +1450,7 @@ The mobile app isn't started by the AppHost. With the AppHost running, run `src/
 VS Code (C# Dev Kit + .NET MAUI extension) or Rider on an Android emulator, iOS simulator, Mac or Windows.
 
 - It talks to the Mobile BFF and Keycloak on `localhost` (`10.0.2.2` from the Android emulator); see `Services/MobileSettings.cs`.
+  On a physical phone on the same network, build with this machine's LAN address: `-p:TvTrackerLocalHost=192.168.1.20`.
 - Sign-in opens Keycloak in the system browser and returns via `tvtracker://callback`.
 - Deep links: `tvtracker://shows/{id}` opens a show.
 - **Building on Linux** (Android only; iOS and Mac Catalyst need a Mac):

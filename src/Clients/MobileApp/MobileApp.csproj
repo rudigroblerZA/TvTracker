@@ -68,6 +68,8 @@
   <ItemGroup>
     <AssemblyMetadata Include="TvTracker.PublicHost" Value="$(TvTrackerPublicHost)" />
     <AssemblyMetadata Include="TvTracker.CatalogSource" Value="$(TvTrackerCatalogSource)" />
+    <!-- For a build with no host, on a physical phone: this machine's LAN address, in place of the emulator's 10.0.2.2. -->
+    <AssemblyMetadata Include="TvTracker.LocalHost" Value="$(TvTrackerLocalHost)" />
   </ItemGroup>
 
   <!-- A release that talks to this machine would be useless on anyone's phone, and it would do so over plain http. -->

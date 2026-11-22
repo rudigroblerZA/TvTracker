@@ -25,9 +25,10 @@ public record ShowCharacterVotesDto(int Total, IReadOnlyList<CharacterVoteCountD
 public static class CharacterVotesApi
 {
     /// <summary>
-    /// How many of a show's cast its totals list.
+    /// How many of a show's most voted-for people its totals send. More than a page lists (five): the page leaves out
+    /// anyone no longer in the cast, and needs others to take their places.
     /// </summary>
-    public const int TopOfShow = 5;
+    public const int TopOfShow = 20;
 
     public static IEndpointRouteBuilder MapCharacterVotesApi(this IEndpointRouteBuilder app)
     {
