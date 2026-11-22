@@ -66,11 +66,6 @@
     private (Guid Episode, bool Watched)? loaded;
     private CancellationTokenSource? waiting;
 
-    /// <summary>
-    /// Set when the load for <see cref="loaded"/> failed, or left a watched episode locked: when it may be tried again.
-    /// </summary>
-    private DateTime? retryAfter;
-    private static readonly TimeSpan RetryFailedAfter = TimeSpan.FromSeconds(20);
     private bool busy;
     private bool everyone;
     private string? error;
@@ -80,6 +75,11 @@
     /// moment after the page does.
     /// </summary>
     private static readonly TimeSpan[] Retries = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
+
+    /// <summary>
+    /// How often it asks after that.
+    /// </summary>
+    private static readonly TimeSpan Later = TimeSpan.FromSeconds(20);
 
     /// <summary>
     /// The first few as billed, plus anyone further down who has votes; most votes first.
@@ -94,8 +94,7 @@
         {
             (peopleFrom, people) = (Cast, Cast.Where(m => m.PersonId != Guid.Empty).DistinctBy(m => m.PersonId).ToList());
         }
-        // Nothing to do while this episode and watched state are the ones loaded, unless that load failed and its wait is over.
-        if (people.Count == 0 || (loaded == (EpisodeId, Watched) && !(DateTime.UtcNow >= retryAfter)))
+        if (people.Count == 0 || loaded == (EpisodeId, Watched))
         {
             return;
         }
@@ -105,7 +104,7 @@
             // last one's is left to show or to vote from.
             (votes, counts, everyone, error) = (null, [], false, null);
         }
-        (loaded, retryAfter) = ((EpisodeId, Watched), null);
+        loaded = (EpisodeId, Watched);
         waiting?.Cancel();
         if (!Watched)
         {
@@ -114,36 +113,45 @@
             Show(Unwatched);
             return;
         }
-        var stop = (waiting = new CancellationTokenSource()).Token;
+        waiting = new CancellationTokenSource();
+        await LoadUntilOpenAsync(waiting.Token);
+    }
+
+    /// <summary>
+    /// Asks for a watched episode's votes until they come unlocked: Ratings hears of a watch a moment after the page
+    /// does, so soon again at first (<see cref="Retries"/>), then every <see cref="Later"/> for news that is late or
+    /// a service that isn't answering. Ends when <paramref name="stop"/> is cancelled: a newer load, or the page left.
+    /// </summary>
+    private async Task LoadUntilOpenAsync(CancellationToken stop)
+    {
         try
         {
-            foreach (var wait in Retries.Prepend(TimeSpan.Zero))
+            for (var asked = 0; ; asked++)
             {
-                await Task.Delay(wait, stop);
-                var latest = await Ratings.GetCharacterVotesAsync(EpisodeId, stop);
-                if (stop.IsCancellationRequested)
+                try
                 {
-                    // Answered just as a newer load took over (the episode was unmarked, say): its answer is out of date.
-                    return;
+                    var latest = await Ratings.GetCharacterVotesAsync(EpisodeId, stop);
+                    // An answer that arrives as a newer load takes over (the episode was unmarked, say) is out of date.
+                    stop.ThrowIfCancellationRequested();
+                    Show(latest);
+                    if (latest is not { Locked: true })
+                    {
+                        // Open, or no such thing here (the feature is off).
+                        return;
+                    }
                 }
-                Show(latest);
-                if (votes is not { Locked: true })
+                catch (HttpRequestException)
                 {
-                    return;
+                    // An extra on the page: without it, the page stands, and it is asked for again.
                 }
+                // Shown now: this method goes on waiting, so the page wouldn't draw it otherwise.
+                StateHasChanged();
+                await Task.Delay(asked < Retries.Length ? Retries[asked] : Later, stop);
             }
-            // Still locked: the news of the watch is late. Asked again in a while, on a later render, as after a failure.
-            retryAfter = DateTime.UtcNow + RetryFailedAfter;
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is OperationCanceledException or SignInRequiredException)
         {
-            // Overtaken by a newer load, or the page was left.
-        }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
-        {
-            // An extra on the page: without it, the page stands. Asked for again on a later render, but not at once:
-            // the page renders on every keystroke in the comment box.
-            retryAfter = DateTime.UtcNow + RetryFailedAfter;
+            // Overtaken or left; or signed out, when there is nothing to ask for.
         }
     }
 

@@ -192,8 +192,8 @@ public static class CommentsApi
             return refused;
         }
 
-        var was = comment.HiddenReason;
-        if (text != comment.Text)
+        var (was, wasSpoiler, rewritten) = (comment.HiddenReason, comment.IsSpoiler, text != comment.Text);
+        if (rewritten)
         {
             if (comment.EditedAtUtc is { } edited && DateTime.UtcNow - edited < Moderation.EditEvery)
             {
@@ -205,17 +205,21 @@ public static class CommentsApi
         }
         // The author can always add the spoiler mark, and take off their own; one that readers' flags put there stays.
         comment.IsSpoiler = request.IsSpoiler || (comment.IsSpoiler && await MarkedSpoilerByReadersAsync(db, id, ct));
+        if (!rewritten && comment.IsSpoiler == wasSpoiler)
+        {
+            // Nothing asked for: nothing written.
+            return TypedResults.Ok(Mine(comment, giphy.Value));
+        }
 
         // Written only if the comment is hidden (or not) for the reason just read: a moderator's removal, or readers'
         // flags, landing meanwhile mustn't be undone by an edit that was decided without them.
-        var (newText, editedAt, hidden, spoiler) = (comment.Text, comment.EditedAtUtc, comment.HiddenReason, comment.IsSpoiler);
         var written = await db.Comments
             .Where(c => c.Id == id && c.UserId == userId && c.HiddenReason == was)
             .ExecuteUpdateAsync(set => set
-                .SetProperty(c => c.Text, newText)
-                .SetProperty(c => c.EditedAtUtc, editedAt)
-                .SetProperty(c => c.HiddenReason, hidden)
-                .SetProperty(c => c.IsSpoiler, spoiler), ct);
+                .SetProperty(c => c.Text, comment.Text)
+                .SetProperty(c => c.EditedAtUtc, comment.EditedAtUtc)
+                .SetProperty(c => c.HiddenReason, comment.HiddenReason)
+                .SetProperty(c => c.IsSpoiler, comment.IsSpoiler), ct);
         return written == 0
             ? TypedResults.Conflict("This comment changed while you were editing it. Reload and try again.")
             : TypedResults.Ok(Mine(comment, giphy.Value));
