@@ -44,6 +44,9 @@ current() {
 echo "Publishing the compose file..."
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+# Restored first: the AppHost is an AppHost (IsAspireHost) by its Aspire.Hosting.AppHost package, so until that's
+# restored `aspire publish` finds no AppHost and stops, printing nothing.
+dotnet restore "$apphost" --nologo -v quiet > "$work/restore.log" 2>&1 || { cat "$work/restore.log" >&2; exit 1; }
 (cd "$apphost" && aspire publish -o "$work" --non-interactive --nologo > "$work/publish.log" 2>&1) || { cat "$work/publish.log" >&2; exit 1; }
 cp "$work/docker-compose.yaml" "$home/docker-compose.yaml"
 
