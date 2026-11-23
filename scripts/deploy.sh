@@ -151,16 +151,15 @@ build_image() {
     --nologo -v quiet > "$work/build-$name.log" 2>&1 || { tail -30 "$work/build-$name.log" >&2; exit 1; }
 }
 
-# One image per service in the compose file: each *_IMAGE key the publish asked for is an AppHost project.
-grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d = | while read -r key; do
-  resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
-  # The project the AppHost runs as this resource: Project("catalog-api", "../Services/Catalog/Catalog.API/Catalog.API.csproj"),
-  # its path being from the AppHost's folder.
-  csproj=$(grep -o "Project(\"$resource\", \"[^\"]*\")" "$apphost/AppHost.cs" | head -1 | sed 's/.*, "\(.*\)")/\1/')
-  [[ -n $csproj ]] && csproj=$apphost/$csproj
-  [[ -f $csproj ]] || { echo "No project for $resource." >&2; exit 1; }
-  build_image "$resource" "$csproj" "$(current "$key")"
-done
+# One image per service of ours in the compose file. The AppHost labels each with its project file (from the AppHost's
+# folder), and the compose file read with this deployment's .env gives the image name each is to have.
+services=$(docker compose --project-name tvtracker --project-directory "$home" config --format json \
+  | jq -r '.services | to_entries[] | select(.value.labels["tvtracker.project"]) | [.key, .value.image, .value.labels["tvtracker.project"]] | @tsv')
+[[ -n $services ]] || { echo "The compose file names no project to build." >&2; exit 1; }
+while IFS=$'\t' read -r resource image csproj; do
+  [[ -f $apphost/$csproj ]] || { echo "No project for $resource: $csproj." >&2; exit 1; }
+  build_image "$resource" "$apphost/$csproj" "$image"
+done <<< "$services"
 # And the import tool's, which isn't a service: scripts/deploy-import.sh runs it on demand.
 build_image import-cli "$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" "$(current IMPORT_CLI_IMAGE)"
 

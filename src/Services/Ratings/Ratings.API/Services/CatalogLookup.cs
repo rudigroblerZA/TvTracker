@@ -4,7 +4,8 @@ using Microsoft.Extensions.Caching.Hybrid;
 namespace Ratings.API.Services;
 
 /// <summary>
-/// Who is in a show's cast, asked of Catalog.API, so a favourite-character vote can only name someone in it.
+/// What Ratings asks Catalog.API about a favourite-character vote: who is in a show's cast, so a vote can only name
+/// someone in it, and which show an episode belongs to, for a watch that doesn't say.
 /// <list type="bullet">
 /// <item><b>Kept for a while:</b> a cast is asked for once per show per <see cref="KeptFor"/>, not once per vote. A
 /// new cast member can't be voted for until then.</item>
@@ -12,7 +13,7 @@ namespace Ratings.API.Services;
 /// let through, as it was before there was a check. A show's page lists only its cast, so a stray id never shows.</item>
 /// </list>
 /// </summary>
-public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<CatalogCast> logger)
+public sealed class CatalogLookup(HttpClient http, HybridCache cache, ILogger<CatalogLookup> logger)
 {
     public static readonly TimeSpan KeptFor = TimeSpan.FromMinutes(10);
 
@@ -21,13 +22,13 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
     /// <summary>
     /// Whether <paramref name="personId"/> is in the cast of <paramref name="showId"/>; null when the catalog couldn't say.
     /// </summary>
-    public async Task<bool?> HasAsync(Guid showId, Guid personId, CancellationToken ct) =>
-        (await OfAsync(showId, ct))?.Contains(personId);
+    public async Task<bool?> InCastAsync(Guid showId, Guid personId, CancellationToken ct) =>
+        (await CastOfAsync(showId, ct))?.Contains(personId);
 
     /// <summary>
     /// The people in the cast of <paramref name="showId"/>; null when the catalog couldn't say.
     /// </summary>
-    public async Task<IReadOnlyCollection<Guid>?> OfAsync(Guid showId, CancellationToken ct)
+    public async Task<IReadOnlyCollection<Guid>?> CastOfAsync(Guid showId, CancellationToken ct)
     {
         try
         {
