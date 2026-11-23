@@ -37,15 +37,25 @@
         {
             return;
         }
-        loaded = ShowId;
+        // The page keeps this section when it moves to another show: the last show's favourites go at once, and an
+        // answer that comes back after the show has changed again is for a show no longer on the page.
+        var asked = ShowId;
+        loaded = asked;
+        (votes, top) = (null, []);
+        ShowCharacterVotes? answer = null;
         try
         {
-            votes = await Ratings.GetShowCharacterVotesAsync(ShowId);
+            answer = await Ratings.GetShowCharacterVotesAsync(asked);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
-            votes = null;
+            // An extra on the page: without it, the page stands.
         }
+        if (loaded != asked)
+        {
+            return;
+        }
+        votes = answer;
         top = votes is null ? [] : votes.Top
             .Select(c => (Member: Cast.FirstOrDefault(m => m.PersonId == c.PersonId), c.Votes))
             .Where(t => t.Member is not null)

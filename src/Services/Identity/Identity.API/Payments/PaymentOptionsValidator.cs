@@ -25,20 +25,23 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
                 {
                     errors.Add("Payments:ReturnUrl must be an absolute http(s) address when Payments:Provider is stripe.");
                 }
-                if (!IsAbsoluteHttp(options.Stripe.ApiBase))
-                {
-                    errors.Add("Payments:Stripe:ApiBase must be an absolute http(s) address.");
-                }
                 break;
             case "polar":
-                if (!IsAbsoluteHttp(options.Polar.ApiBase))
-                {
-                    errors.Add("Payments:Polar:ApiBase must be an absolute http(s) address.");
-                }
                 break;
             default:
                 errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, polar, test).");
                 break;
+        }
+
+        // Both, whichever sells: every provider is built for each request that touches payments (their webhooks carry
+        // on after a switch), and one with an address that isn't one would fail them all.
+        if (!IsAbsoluteHttp(options.Stripe.ApiBase))
+        {
+            errors.Add("Payments:Stripe:ApiBase must be an absolute http(s) address.");
+        }
+        if (!IsAbsoluteHttp(options.Polar.ApiBase))
+        {
+            errors.Add("Payments:Polar:ApiBase must be an absolute http(s) address.");
         }
 
         foreach (var price in options.Prices)

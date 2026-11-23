@@ -77,6 +77,12 @@
     <Error Text="A Release build needs the deployment's host: -p:TvTrackerPublicHost=tv.example.com (README, Releasing the Android app). To build a Release against this machine for testing, pass -p:TvTrackerAllowLocalRelease=true." />
   </Target>
 
+  <!-- The host is put into addresses as given (https://HOST/api/), so it has to be a host name and nothing more. -->
+  <Target Name="CheckPublicHost" BeforeTargets="CoreCompile" Condition="'$(TvTrackerPublicHost.Trim())' != ''">
+    <Error Condition="$(TvTrackerPublicHost.Contains('/')) or $(TvTrackerPublicHost.Contains(':')) or $(TvTrackerPublicHost.Trim().Contains(' '))"
+           Text="TvTrackerPublicHost is the host name alone, such as tv.example.com: no https://, no path and no port (it is '$(TvTrackerPublicHost)')." />
+  </Target>
+
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1C1917" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#1C1917" BaseSize="128,128" />
