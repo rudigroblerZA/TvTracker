@@ -11,7 +11,7 @@
     <AspireVersion>13.6.5</AspireVersion>
     <AspNetCoreVersion>10.0.15</AspNetCoreVersion>
     <!-- dotnet/runtime packages (Microsoft.Extensions.*), which service on their own numbers; MobileApp uses it too. -->
-    <RuntimeVersion>10.0.14</RuntimeVersion>
+    <RuntimeVersion>10.0.15</RuntimeVersion>
     <!-- dotnet/extensions packages (resilience, service discovery, hybrid cache, AI abstractions, test time). -->
     <ExtensionsVersion>10.11.0</ExtensionsVersion>
     <EfCoreVersion>10.0.15</EfCoreVersion>
