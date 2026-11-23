@@ -91,14 +91,16 @@ public static class CharacterVotesApi
             people.Where(p => p.Mine).Select(p => (Guid?)p.PersonId).FirstOrDefault());
     }
 
+    private const string NotWatched = "Mark the episode watched before voting on it.";
+
     internal static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
         Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CatalogCast cast, CancellationToken ct)
     {
-        if (request.ShowId == Guid.Empty || request.PersonId == Guid.Empty)
+        if (request.PersonId == Guid.Empty)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["personId"] = ["Say which show and which cast member."]
+                ["personId"] = ["Say which cast member."]
             });
         }
 
@@ -106,12 +108,15 @@ public static class CharacterVotesApi
         var watched = await db.WatchedEpisodes.AsNoTracking().FirstOrDefaultAsync(w => w.UserId == userId && w.EpisodeId == episodeId, ct);
         if (watched is null)
         {
-            return TypedResults.Conflict("Mark the episode watched before voting on it.");
+            return TypedResults.Conflict(NotWatched);
         }
 
-        // The show is the one Tracking says the episode belongs to, so a vote can't be counted towards another show's
-        // favourites. The request's is used only for a watch from before the copy kept its show.
-        var showId = watched.ShowId ?? request.ShowId;
+        // The show is the one Tracking says the episode belongs to, or the catalog for a watch from before the copy
+        // kept its show; never the one the request names, so a vote can't be counted towards another show's favourites.
+        if ((watched.ShowId ?? await cast.ShowOfAsync(episodeId, ct)) is not { } showId)
+        {
+            return TypedResults.Conflict("Couldn't tell which show the episode belongs to. Try again in a moment.");
+        }
         // Only someone in the show's cast, where the catalog can say: an id from anywhere else would count in the show's
         // total and never be shown.
         if (await cast.HasAsync(showId, request.PersonId, ct) == false)
@@ -121,11 +126,19 @@ public static class CharacterVotesApi
                 ["personId"] = ["Pick someone from the show's cast."]
             });
         }
-        // One statement, so two votes at once from the same viewer can't both add the row: the later pick wins.
-        await db.Database.ExecuteSqlAsync($"""
-            insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc") values ({userId}, {episodeId}, {showId}, {request.PersonId}, {DateTime.UtcNow})
+        // One statement, so two votes at once from the same viewer can't both add the row: the later pick wins. It
+        // adds nothing without the watch, and holds the watch until the vote is in, so an unwatch arriving meanwhile
+        // either waits and takes the vote with it, or comes first and leaves nothing to vote on.
+        var voted = await db.Database.ExecuteSqlAsync($"""
+            with watch as (select 1 from watched_episodes where "UserId" = {userId} and "EpisodeId" = {episodeId} for share)
+            insert into character_votes ("UserId", "EpisodeId", "ShowId", "PersonId", "CreatedAtUtc")
+            select {userId}, {episodeId}, {showId}, {request.PersonId}, {DateTime.UtcNow} from watch
             on conflict ("UserId", "EpisodeId") do update set "ShowId" = excluded."ShowId", "PersonId" = excluded."PersonId", "CreatedAtUtc" = excluded."CreatedAtUtc"
             """, ct);
+        if (voted == 0)
+        {
+            return TypedResults.Conflict(NotWatched);
+        }
         return TypedResults.Ok(await VotesAsync(db, userId, episodeId, ct));
     }
 

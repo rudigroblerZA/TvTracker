@@ -72,7 +72,6 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
         var watches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId, w => w.ShowId);
         var copies = await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct);
         var takenAt = e.TakenAtUtc.UtcDateTime;
-        var gone = new List<Guid>();
         foreach (var copy in copies)
         {
             if (watches.TryGetValue(copy.EpisodeId, out var showId))
@@ -82,13 +81,7 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
             else if (copy.RecordedAtUtc < takenAt)
             {
                 db.WatchedEpisodes.Remove(copy);
-                gone.Add(copy.EpisodeId);
             }
-        }
-        if (gone.Count > 0)
-        {
-            // As an unwatch does: favourite-character votes go with the watches they needed.
-            db.CharacterVotes.RemoveRange(await db.CharacterVotes.Where(v => v.UserId == e.UserId && gone.Contains(v.EpisodeId)).ToListAsync(ct));
         }
         var known = copies.Select(c => c.EpisodeId).ToHashSet();
         var now = time.GetUtcNow().UtcDateTime;
@@ -96,6 +89,11 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
             .Select(w => new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = w.Key, ShowId = w.Value, RecordedAtUtc = now }));
         db.MarkProcessed(e, nameof(TrackingSnapshotHandler));
         await db.SaveChangesAsync(ct);
+        // As an unwatch does: favourite-character votes go with the watches they needed. After the watches are gone,
+        // so a vote that got in while they were going is taken too, and any left by an earlier run that stopped here.
+        await db.CharacterVotes
+            .Where(v => v.UserId == e.UserId && !db.WatchedEpisodes.Any(w => w.UserId == v.UserId && w.EpisodeId == v.EpisodeId))
+            .ExecuteDeleteAsync(ct);
     }
 }
 

@@ -52,9 +52,34 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
     }
 
     /// <summary>
+    /// The show <paramref name="episodeId"/> belongs to; null when the catalog doesn't have the episode or couldn't say.
+    /// Asked only for a watch that doesn't name its show, so it isn't kept.
+    /// </summary>
+    public async Task<Guid?> ShowOfAsync(Guid episodeId, CancellationToken ct)
+    {
+        try
+        {
+            using var response = await http.GetAsync($"api/v1/episodes/{episodeId}", ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<EpisodeShow>(ct))?.ShowId is { } showId && showId != Guid.Empty ? showId : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Couldn't ask the catalog which show episode {EpisodeId} belongs to", episodeId);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// The part of Catalog.API's show that is read here.
     /// </summary>
     private sealed record ShowCast(IReadOnlyList<CastMember> Cast);
 
     private sealed record CastMember(Guid PersonId);
+
+    private sealed record EpisodeShow(Guid ShowId);
 }

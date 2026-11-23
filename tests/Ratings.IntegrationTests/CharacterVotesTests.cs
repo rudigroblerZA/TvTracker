@@ -19,7 +19,7 @@ namespace Ratings.IntegrationTests;
 /// come from one grouped query, a vote needs a watch and goes with it, and the show it counts towards is the one the
 /// watch names.
 /// </summary>
-public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixture<RatingsDatabase>
+public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixture<RatingsDatabase>, IDisposable
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -33,24 +33,35 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
 
     private static ClaimsPrincipal As(string userId) => new(new ClaimsIdentity([new Claim("sub", userId)], "test"));
 
+    private readonly List<ServiceProvider> caches = [];
+
+    public void Dispose() => caches.ForEach(cache => cache.Dispose());
+
     /// <summary>
-    /// The catalog, as far as votes ask it: the show's cast is the three people above, unless it says otherwise.
+    /// The catalog, as far as votes ask it: it has the one show, whose cast is the three people above unless
+    /// <paramref name="cast"/> says otherwise, and the one episode unless <paramref name="knowsEpisode"/> is false.
+    /// Anything else it is asked for isn't there. Each has its own cache, so one catalog's answers don't reach the next.
     /// </summary>
-    private CatalogCast Catalog(HttpStatusCode status = HttpStatusCode.OK, params Guid[] cast)
+    private CatalogCast Catalog(HttpStatusCode status = HttpStatusCode.OK, Guid[]? cast = null, bool knowsEpisode = true)
     {
-        var people = cast.Length > 0 ? cast : [athena, hen, buck];
-        var handler = new Stub(() => new HttpResponseMessage(status)
-        {
-            Content = JsonContent.Create(new { cast = people.Select(id => new { personId = id }) })
-        });
+        var people = cast ?? [athena, hen, buck];
+        var handler = new Stub(path =>
+            status != HttpStatusCode.OK ? new HttpResponseMessage(status)
+            : path == $"/api/v1/shows/{show}" ? Json(new { cast = people.Select(id => new { personId = id }) })
+            : path == $"/api/v1/episodes/{episode}" && knowsEpisode ? Json(new { id = episode, showId = show })
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        var cache = new ServiceCollection().AddHybridCache().Services.BuildServiceProvider();
+        caches.Add(cache);
         return new CatalogCast(new HttpClient(handler) { BaseAddress = new Uri("http://catalog/") },
-            new ServiceCollection().AddHybridCache().Services.BuildServiceProvider().GetRequiredService<HybridCache>(),
-            NullLogger<CatalogCast>.Instance);
+            cache.GetRequiredService<HybridCache>(), NullLogger<CatalogCast>.Instance);
     }
 
-    private sealed class Stub(Func<HttpResponseMessage> respond) : HttpMessageHandler
+    private static HttpResponseMessage Json(object body) => new(HttpStatusCode.OK) { Content = JsonContent.Create(body) };
+
+    private sealed class Stub(Func<string, HttpResponseMessage> respond) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => Task.FromResult(respond());
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(respond(request.RequestUri!.AbsolutePath));
     }
 
     private async Task<string> WatcherAsync(Guid? ofEpisode = null, Guid? inShow = null, bool showKnown = true)
@@ -135,6 +146,57 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     }
 
     [Fact]
+    public async Task A_watch_that_does_not_name_its_show_takes_it_from_the_catalog_not_the_request()
+    {
+        var me = await WatcherAsync(showKnown: false);
+
+        await VoteAsync(me, athena, claimedShow: Guid.NewGuid());
+
+        await using var db = database.Context();
+        Assert.Equal(show, (await db.CharacterVotes.SingleAsync(v => v.UserId == me, Ct)).ShowId);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task A_watch_that_does_not_name_its_show_cannot_be_voted_on_when_the_catalog_cannot_name_it_either(HttpStatusCode catalog)
+    {
+        var me = await WatcherAsync(showKnown: false);
+
+        Assert.IsType<Conflict<string>>(await VoteAsync(me, athena, catalog: Catalog(catalog, knowsEpisode: false)));
+
+        await using var db = database.Context();
+        Assert.False(await db.CharacterVotes.AnyAsync(v => v.UserId == me, Ct));
+    }
+
+    [Fact]
+    public async Task A_show_with_nobody_in_its_cast_takes_no_votes()
+    {
+        var me = await WatcherAsync();
+
+        Assert.IsType<ValidationProblem>(await VoteAsync(me, athena, catalog: Catalog(cast: [])));
+    }
+
+    [Fact]
+    public async Task A_vote_made_while_the_episode_is_being_unwatched_does_not_outlive_the_watch()
+    {
+        var me = await WatcherAsync();
+        await using var unwatching = database.Context();
+        await using var unwatch = await unwatching.Database.BeginTransactionAsync(Ct);
+        await unwatching.WatchedEpisodes.Where(w => w.UserId == me).ExecuteDeleteAsync(Ct);
+
+        // The vote has read the watch, and waits on it; the unwatch then goes through.
+        var vote = VoteAsync(me, athena);
+        await Task.Delay(TimeSpan.FromMilliseconds(500), Ct);
+        Assert.False(vote.IsCompleted);
+        await unwatch.CommitAsync(Ct);
+
+        Assert.IsType<Conflict<string>>(await vote);
+        await using var db = database.Context();
+        Assert.False(await db.CharacterVotes.AnyAsync(v => v.UserId == me, Ct));
+    }
+
+    [Fact]
     public async Task Someone_outside_the_shows_cast_cannot_be_voted_for_unless_the_catalog_cannot_say()
     {
         var me = await WatcherAsync();
@@ -173,6 +235,46 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
         await using var check = database.Context();
         Assert.False(await check.CharacterVotes.AnyAsync(v => v.UserId == me, Ct));
         Assert.False(await check.WatchedEpisodes.AnyAsync(w => w.UserId == me, Ct));
+    }
+
+    private async Task SnapshotAsync(string user, DateTimeOffset takenAt, params Guid[] watched)
+    {
+        await using var db = database.Context();
+        await new TrackingSnapshotHandler(db, TimeProvider.System).HandleAsync(
+            new TrackingSnapshotIntegrationEvent(user, takenAt, [], [.. watched.Select(id => new SnapshotWatch(show, id, takenAt))]), Ct);
+    }
+
+    [Fact]
+    public async Task A_snapshot_without_the_watch_takes_the_vote_with_it_and_keeps_the_rest()
+    {
+        var kept = Guid.NewGuid();
+        var me = await WatcherAsync();
+        await using (var db = database.Context())
+        {
+            db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = me, EpisodeId = kept, ShowId = show, RecordedAtUtc = DateTime.UtcNow });
+            await db.SaveChangesAsync(Ct);
+        }
+        await VoteAsync(me, athena);
+        await VoteAsync(me, hen, ofEpisode: kept);
+
+        await SnapshotAsync(me, DateTimeOffset.UtcNow.AddMinutes(1), kept);
+
+        await using var check = database.Context();
+        Assert.Equal(kept, Assert.Single(await check.WatchedEpisodes.Where(w => w.UserId == me).ToListAsync(Ct)).EpisodeId);
+        Assert.Equal(kept, Assert.Single(await check.CharacterVotes.Where(v => v.UserId == me).ToListAsync(Ct)).EpisodeId);
+    }
+
+    [Fact]
+    public async Task A_snapshot_read_before_the_watch_was_recorded_keeps_the_watch_and_its_vote()
+    {
+        var me = await WatcherAsync();
+        await VoteAsync(me, athena);
+
+        await SnapshotAsync(me, DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        await using var check = database.Context();
+        Assert.True(await check.WatchedEpisodes.AnyAsync(w => w.UserId == me, Ct));
+        Assert.True(await check.CharacterVotes.AnyAsync(v => v.UserId == me, Ct));
     }
 
     [Fact]
