@@ -20,6 +20,7 @@
   </PropertyGroup>
   <ItemGroup Label="Aspire hosting (AppHost)">
     <PackageVersion Include="Aspire.Hosting.Docker" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="17.0.0" />

@@ -1,4 +1,5 @@
 ﻿using System.Net.Http.Json;
+using Aspire.Hosting.Dotnet;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -20,6 +21,12 @@ IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
     }
     return builder.AddParameter(name, secret: true);
 }
+
+// A service of ours, run from its project file (the path is from this folder). scripts/deploy.sh reads these calls to
+// find the project behind each resource. The API is new in Aspire 17 and marked experimental, hence the pragma.
+#pragma warning disable ASPIREDOTNETPROJECT001
+IResourceBuilder<DotnetProjectResource> Project(string name, string path) => builder.AddDotnetProject(name, path);
+#pragma warning restore ASPIREDOTNETPROJECT001
 
 // Where a publish goes: one machine running Docker Compose. `aspire publish` writes a compose file and an .env of the
 // parameters it needs (README, Deploying). Running locally, this does nothing.
@@ -115,7 +122,7 @@ var internalClientSecret = Secret("internal-client-secret", "tvtracker-internal-
 // Services
 // ---------------------------------------------------------------------------
 
-var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
+var identityApi = Project("identity-api", "../Services/Identity/Identity.API/Identity.API.csproj")
     .WithReference(identityDb).WaitFor(identityDb)
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -133,7 +140,7 @@ var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WaitFor(keycloak)
     .WithHttpHealthCheck("/health");
 
-var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
+var catalogApi = Project("catalog-api", "../Services/Catalog/Catalog.API/Catalog.API.csproj")
     .WithEnvironment("Branding__AppName", appName)
     .WithReference(catalogDb).WaitFor(catalogDb)
     .WithReference(flagd).WithReference(identityApi)
@@ -142,7 +149,7 @@ var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-var trackingApi = builder.AddProject<Projects.Tracking_API>("tracking-api")
+var trackingApi = Project("tracking-api", "../Services/Tracking/Tracking.API/Tracking.API.csproj")
     .WithReference(trackingDb).WaitFor(trackingDb)
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -150,7 +157,7 @@ var trackingApi = builder.AddProject<Projects.Tracking_API>("tracking-api")
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-var ratingsApi = builder.AddProject<Projects.Ratings_API>("ratings-api")
+var ratingsApi = Project("ratings-api", "../Services/Ratings/Ratings.API/Ratings.API.csproj")
     .WithReference(ratingsDb).WaitFor(ratingsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(redis).WaitFor(redis)
@@ -158,7 +165,7 @@ var ratingsApi = builder.AddProject<Projects.Ratings_API>("ratings-api")
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recommendations-api")
+var recommendationsApi = Project("recommendations-api", "../Services/Recommendations/Recommendations.API/Recommendations.API.csproj")
     .WithReference(recommendationsDb).WaitFor(recommendationsDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(redis).WaitFor(redis)
@@ -166,7 +173,7 @@ var recommendationsApi = builder.AddProject<Projects.Recommendations_API>("recom
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-var notificationsApi = builder.AddProject<Projects.Notifications_API>("notifications-api")
+var notificationsApi = Project("notifications-api", "../Services/Notifications/Notifications.API/Notifications.API.csproj")
     // For the app's name as an admin set it in Settings (BrandingRefresher).
     .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
@@ -178,13 +185,13 @@ var notificationsApi = builder.AddProject<Projects.Notifications_API>("notificat
     .WithHttpHealthCheck("/health");
 
 // Analytics.API owns analyticsdb; the worker consumes catalog and rating events and computes insights hourly.
-var analyticsApi = builder.AddProject<Projects.Analytics_API>("analytics-api")
+var analyticsApi = Project("analytics-api", "../Services/Analytics/Analytics.API/Analytics.API.csproj")
     .WithReference(analyticsDb).WaitFor(analyticsDb)
     .WithReference(flagd)
     .WithEnvironment("Identity__Url", keycloakUrl)
     .WithHttpHealthCheck("/health");
 
-var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-worker")
+var analyticsWorker = Project("analytics-worker", "../Services/Analytics/Analytics.Worker/Analytics.Worker.csproj")
     // For the app's name as an admin set it in Settings (BrandingRefresher).
     .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
@@ -195,7 +202,7 @@ var analyticsWorker = builder.AddProject<Projects.Analytics_Worker>("analytics-w
     .WithHttpHealthCheck("/health");
 
 // Social.API: who follows whom, and the feed of their activity, built from tracking and rating events.
-var socialApi = builder.AddProject<Projects.Social_API>("social-api")
+var socialApi = Project("social-api", "../Services/Social/Social.API/Social.API.csproj")
     // For the app's name as an admin set it in Settings (BrandingRefresher).
     .WithReference(identityApi)
     .WithEnvironment("Branding__AppName", appName)
@@ -208,7 +215,7 @@ var socialApi = builder.AddProject<Projects.Social_API>("social-api")
 // Research: moderators enrich a show from Wikidata, Wikipedia, TMDB (Research:TmdbApiKey) and pages they add, with an
 // insight drafted by Model Runner's chat model; saved research is the show's trusted record, and its catalog fields
 // (summary, network, premiere date) override the provider's through the sync worker.
-var researchApi = builder.AddProject<Projects.Research_API>("research-api")
+var researchApi = Project("research-api", "../Services/Research/Research.API/Research.API.csproj")
     .WithReference(researchDb).WaitFor(researchDb)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(flagd).WithReference(identityApi)
@@ -229,7 +236,7 @@ else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Resea
 // Financials: the business's own books, for admins. It keeps the costs an admin enters and asks Identity.API (subscription
 // payments) and Catalog.API (affiliate commission) for the income, with the admin's own token. Nothing about any user,
 // so it takes no part in the data export or account deletion, and it sends and hears no events.
-var financialsApi = builder.AddProject<Projects.Financials_API>("financials-api")
+var financialsApi = Project("financials-api", "../Services/Financials/Financials.API/Financials.API.csproj")
     .WithReference(financialsDb).WaitFor(financialsDb)
     .WithReference(identityApi)
     .WithReference(catalogApi)
@@ -278,7 +285,7 @@ identityApi
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.
-var catalogSync = builder.AddProject<Projects.Catalog_SyncWorker>("catalog-sync")
+var catalogSync = Project("catalog-sync", "../Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj")
     .WithReference(catalogDb)
     .WithReference(eventBus)
     .WithReference(redis)
@@ -422,7 +429,7 @@ socialApi.WithReference(catalogSync);
 // ---------------------------------------------------------------------------
 
 // The MAUI app talks to the services only through this gateway (http://localhost:5110, or 10.0.2.2:5110 from the Android emulator).
-var mobileBff = builder.AddProject<Projects.Mobile_Bff>("mobile-bff")
+var mobileBff = Project("mobile-bff", "../ApiGateways/Mobile.Bff/Mobile.Bff.csproj")
     .WithReference(flagd.GetEndpoint("ofrep"))
     .WithReference(identityApi)
     .WithReference(catalogApi)
@@ -534,7 +541,7 @@ if ((builder.Configuration["Digest:BaseUrl"] ?? webPublicUrl) is { Length: > 0 }
     notificationsApi.WithEnvironment("Digest__BaseUrl", digestBaseUrl);
 }
 
-var webApp = builder.AddProject<Projects.WebApp>("webapp")
+var webApp = Project("webapp", "../Clients/WebApp/WebApp.csproj")
     .WithExternalHttpEndpoints()
     .WithEnvironment("Branding__AppName", appName)
     // Who runs the app and how to reach them, for the privacy policy and terms (README, Privacy and terms).
@@ -762,7 +769,9 @@ if (publishing)
 
     // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
     // site names the public address as its issuer.
-    foreach (var project in builder.Resources.OfType<ProjectResource>().ToList())
+    #pragma warning disable ASPIREDOTNETPROJECT001
+    foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
+#pragma warning restore ASPIREDOTNETPROJECT001
     {
         builder.CreateResourceBuilder(project)
             .WithEnvironment("Identity__RequireHttpsMetadata", "false")
