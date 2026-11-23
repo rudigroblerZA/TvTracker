@@ -1263,6 +1263,8 @@ h1:focus, h2:focus { outline: none; }
 .lp-plans h2 { font-size: 1.25rem; }
 .lp-plans p { color: var(--muted); }
 .lp-plans strong { color: var(--text); }
+.lp-plan-insights { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.lp-plan-insights .lp-chip { font-size: 0.82rem; font-weight: 550; padding: 3px 10px; text-transform: none; letter-spacing: 0; }
 .lp-final { margin-top: clamp(44px, 7vw, 92px); display: grid; gap: 22px; justify-items: center; text-align: center; }
 .lp-final h2 { max-width: 20ch; }
 

@@ -38,13 +38,13 @@
             {
                 <div class="stat-tiles">
                     <div class="stat"><div class="stat-value">@Format.Hours(recap.Minutes)</div><div class="muted">watched</div></div>
-                    <div class="stat"><div class="stat-value">@recap.Episodes</div><div class="muted">episodes</div></div>
-                    <div class="stat"><div class="stat-value">@recap.Shows</div><div class="muted">@($"shows, {recap.NewShows} new to you")</div></div>
-                    <div class="stat"><div class="stat-value">@recap.DaysWatched</div><div class="muted">@($"days with TV · longest run {recap.LongestStreak} {(recap.LongestStreak == 1 ? "day" : "days")}")</div></div>
+                    <div class="stat"><div class="stat-value">@recap.Episodes</div><div class="muted">@(recap.Episodes == 1 ? "episode" : "episodes")</div></div>
+                    <div class="stat"><div class="stat-value">@recap.Shows</div><div class="muted">@($"{(recap.Shows == 1 ? "show" : "shows")}, {recap.NewShows} new to you")</div></div>
+                    <div class="stat"><div class="stat-value">@recap.DaysWatched</div><div class="muted">@($"{(recap.DaysWatched == 1 ? "day" : "days")} with TV · longest run {recap.LongestStreak} {(recap.LongestStreak == 1 ? "day" : "days")}")</div></div>
                 </div>
                 @if (recap.Bulk > 0)
                 {
-                    <p class="muted small">@($"{recap.Bulk} episodes marked many at once aren't counted, since when you watched them isn't known.")</p>
+                    <p class="muted small">@($"{recap.Bulk} {(recap.Bulk == 1 ? "episode" : "episodes")} marked many at once {(recap.Bulk == 1 ? "isn't" : "aren't")} counted, since when you watched {(recap.Bulk == 1 ? "it" : "them")} isn't known.")</p>
                 }
 
                 <section>
@@ -68,7 +68,7 @@
                     <ul class="plain-list">
                         @if (recap.BusiestMonth is { } month)
                         {
-                            <li>@($"Busiest month: {month.Name}, {Format.Duration(month.Minutes)} over {month.Episodes} episodes")</li>
+                            <li>@($"Busiest month: {month.Name}, {Format.Duration(month.Minutes)} over {month.Episodes} {(month.Episodes == 1 ? "episode" : "episodes")}")</li>
                         }
                         @if (recap.BusiestDay is { } day)
                         {

@@ -22,7 +22,7 @@
         {
             @if (radar.ActorsPending > 0)
             {
-                <p class="notice small">Still looking up what @radar.ActorsPending of your shows' actors have been in. More reunions will turn up as they're found.</p>
+                <p class="notice small">@(radar.ActorsPending == 1 ? "Still looking up what one of your shows' actors has been in." : $"Still looking up what {radar.ActorsPending} of your shows' actors have been in.") More reunions will turn up as they're found.</p>
             }
 
             @if (radar.LovedShows == 0)
@@ -31,7 +31,7 @@
             }
             else if (radar.Reunions.Count == 0)
             {
-                <p class="muted">No reunions among the actors of your @radar.LovedShows favourite shows yet.</p>
+                <p class="muted">@(radar.LovedShows == 1 ? "No reunions among the actors of your favourite show yet." : $"No reunions among the actors of your {radar.LovedShows} favourite shows yet.")</p>
             }
             else
             {
