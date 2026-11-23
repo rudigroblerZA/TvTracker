@@ -30,10 +30,10 @@
     <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
     <Project Path="src/Services/Ratings/Ratings.Data/Ratings.Data.csproj" />
     <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
-    <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" Id="42806abf-1bc6-442c-b382-512d94c72a0a" />
+    <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" />
     <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
     <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
-    <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" Id="f37f43f3-f7e6-4603-ab19-3fc3171e8b54" />
+    <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" />
     <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
     <Project Path="src/Services/Tracking/Tracking.Data/Tracking.Data.csproj" />
   </Folder>

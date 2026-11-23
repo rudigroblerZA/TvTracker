@@ -1,4 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Recommendations model, DbContext and migrations (taste signals and the stored recommendations), used by Recommendations.API, which owns the schema. -->
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -8,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- For the show statuses the model stores. -->
     <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
   </ItemGroup>
