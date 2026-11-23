@@ -22,11 +22,10 @@ IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
     return builder.AddParameter(name, secret: true);
 }
 
-// A service of ours, run from its project file (the path is from this folder). scripts/deploy.sh reads these calls to
-// find the project behind each resource. The API is new in Aspire 17 and marked experimental, hence the pragma.
-#pragma warning disable ASPIREDOTNETPROJECT001
+// A service of ours, run from its project file (the path is from this folder; the project file lists the same ones, so
+// that building the AppHost builds them). scripts/deploy.sh reads these calls to find the project behind each
+// resource: keep each on one line, with both arguments written out.
 IResourceBuilder<DotnetProjectResource> Project(string name, string path) => builder.AddDotnetProject(name, path);
-#pragma warning restore ASPIREDOTNETPROJECT001
 
 // Where a publish goes: one machine running Docker Compose. `aspire publish` writes a compose file and an .env of the
 // parameters it needs (README, Deploying). Running locally, this does nothing.
@@ -769,9 +768,7 @@ if (publishing)
 
     // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
     // site names the public address as its issuer.
-    #pragma warning disable ASPIREDOTNETPROJECT001
-    foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
-#pragma warning restore ASPIREDOTNETPROJECT001
+        foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
     {
         builder.CreateResourceBuilder(project)
             .WithEnvironment("Identity__RequireHttpsMetadata", "false")

@@ -3,10 +3,11 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>7f3c2a51-9d4e-4b8a-a6f1-2c5e8b9d0a17</UserSecretsId>
-    <!-- The services aren't referenced: AppHost.cs names each one's project file (Project(...)), and Aspire builds
-         them when the app starts. -->
     <!-- Use the Aspire CLI bundle for the dashboard and orchestrator; this also clears the ASPIRE010 build warning. -->
     <AspireUseCliBundle>true</AspireUseCliBundle>
+    <!-- AddDotnetProject and DotnetProjectResource, which run the services (AppHost.cs), are new in Aspire 17 and
+         marked experimental. -->
+    <NoWarn>$(NoWarn);ASPIREDOTNETPROJECT001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +18,25 @@
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Flagd" />
+  </ItemGroup>
+
+  <!-- The services and the web app, so that building the AppHost builds them. Build order only: AppHost.cs names the
+       project file each resource runs (Project("name", "path")); keep the two lists the same. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Services\Identity\Identity.API\Identity.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Catalog\Catalog.API\Catalog.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Notifications\Notifications.API\Notifications.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Analytics\Analytics.API\Analytics.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Social\Social.API\Social.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Research\Research.API\Research.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Financials\Financials.API\Financials.API.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\ApiGateways\Mobile.Bff\Mobile.Bff.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\Clients\WebApp\WebApp.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
 </Project>

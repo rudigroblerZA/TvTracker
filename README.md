@@ -2384,8 +2384,10 @@ Deploying works (above). This is what still stands between that and charging the
 ## Package versions
 
 Versions live in `Directory.Packages.props` (the MAUI app pins its own in its project file). Aspire is on 17.0.0
-(`AspireVersion` and the `Aspire.Hosting.*` entries there; the AppHost is a plain `Microsoft.NET.Sdk` project that
-references `Aspire.Hosting.AppHost`, and names each service's project file in `AppHost.cs` instead of referencing it).
+for hosting (`AspireVersion` there, which the `Aspire.Hosting.*` entries use); the services' client integrations
+and the flagd hosting package carry their own versions. The AppHost is a plain `Microsoft.NET.Sdk` project that
+references `Aspire.Hosting.AppHost`. `AppHost.cs` names the project file each service runs from, and the project file
+references the same ones for build order only, so building the AppHost still builds them.
 Run `aspire update` (or `dotnet list package --outdated`) to bring them up to date.
 
 ## Not built yet
