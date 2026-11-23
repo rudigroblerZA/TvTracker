@@ -149,10 +149,11 @@ build_image() {
 # One image per service in the compose file: each *_IMAGE key the publish asked for is an AppHost project.
 grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d = | while read -r key; do
   resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
-  # The project the AppHost runs as this resource: AddProject<Projects.Catalog_API>("catalog-api").
-  project=$(grep -o "AddProject<Projects\.[A-Za-z_]*>(\"$resource\")" "$apphost/AppHost.cs" | sed 's/.*Projects\.\([A-Za-z_]*\)>.*/\1/' | tr _ .)
-  csproj=$(find "$repo/src" -name "$project.csproj" | head -1)
-  [[ -n $csproj ]] || { echo "No project for $resource." >&2; exit 1; }
+  # The project the AppHost runs as this resource: Project("catalog-api", "../Services/Catalog/Catalog.API/Catalog.API.csproj"),
+  # its path being from the AppHost's folder.
+  csproj=$(grep -o "Project(\"$resource\", \"[^\"]*\")" "$apphost/AppHost.cs" | head -1 | sed 's/.*, "\(.*\)")/\1/')
+  [[ -n $csproj ]] && csproj=$apphost/$csproj
+  [[ -f $csproj ]] || { echo "No project for $resource." >&2; exit 1; }
   build_image "$resource" "$csproj" "$(current "$key")"
 done
 # And the import tool's, which isn't a service: scripts/deploy-import.sh runs it on demand.
