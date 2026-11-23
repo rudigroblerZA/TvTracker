@@ -23,7 +23,7 @@ public class CatalogLookupTests
         }
     }
 
-    private static CatalogLookup Cast(Stub handler) => new(
+    private static CatalogLookup Lookup(Stub handler) => new(
         new HttpClient(handler) { BaseAddress = new Uri("http://catalog/") },
         new ServiceCollection().AddHybridCache().Services.BuildServiceProvider().GetRequiredService<HybridCache>(),
         NullLogger<CatalogLookup>.Instance);
@@ -40,26 +40,73 @@ public class CatalogLookupTests
     public async Task Someone_in_the_cast_is_and_someone_else_is_not()
     {
         var handler = new Stub(TheShow);
-        var cast = Cast(handler);
+        var catalog = Lookup(handler);
 
-        Assert.True(await cast.InCastAsync(Show, InCast, Ct));
-        Assert.False(await cast.InCastAsync(Show, Guid.NewGuid(), Ct));
+        Assert.True(await catalog.InCastAsync(Show, InCast, Ct));
+        Assert.False(await catalog.InCastAsync(Show, Guid.NewGuid(), Ct));
         // The cast was asked for once, not once per vote.
         Assert.Equal(1, handler.Calls);
     }
 
     [Fact]
     public async Task Nobody_is_in_the_cast_of_a_show_the_catalog_does_not_have() =>
-        Assert.False(await Cast(new Stub(() => new HttpResponseMessage(HttpStatusCode.NotFound))).InCastAsync(Show, InCast, Ct));
+        Assert.False(await Lookup(new Stub(() => new HttpResponseMessage(HttpStatusCode.NotFound))).InCastAsync(Show, InCast, Ct));
 
     [Fact]
     public async Task A_catalog_that_fails_gives_no_answer_and_is_asked_again_next_time()
     {
         var handler = new Stub(() => new HttpResponseMessage(HttpStatusCode.InternalServerError));
-        var cast = Cast(handler);
+        var catalog = Lookup(handler);
 
-        Assert.Null(await cast.InCastAsync(Show, InCast, Ct));
-        Assert.Null(await cast.InCastAsync(Show, InCast, Ct));
+        Assert.Null(await catalog.InCastAsync(Show, InCast, Ct));
+        Assert.Null(await catalog.InCastAsync(Show, InCast, Ct));
         Assert.Equal(2, handler.Calls);
+    }
+
+    [Fact]
+    public async Task A_show_with_nobody_in_its_cast_is_asked_about_again_next_time()
+    {
+        // A show whose cast hasn't arrived yet: not kept, so the cast counts as soon as it does.
+        var handler = new Stub(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { id = Show, cast = Array.Empty<object>() }) });
+        var catalog = Lookup(handler);
+
+        Assert.False(await catalog.InCastAsync(Show, InCast, Ct));
+        Assert.False(await catalog.InCastAsync(Show, InCast, Ct));
+        Assert.Equal(2, handler.Calls);
+    }
+
+    [Fact]
+    public async Task A_show_sent_without_a_cast_has_nobody_in_it() =>
+        Assert.False(await Lookup(new Stub(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { id = Show }) }))
+            .InCastAsync(Show, InCast, Ct));
+
+    [Fact]
+    public async Task An_episodes_show_is_the_one_the_catalog_names()
+    {
+        var episode = Guid.NewGuid();
+        var catalog = Lookup(new Stub(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { id = episode, showId = Show }) }));
+
+        Assert.Equal(Show, await catalog.ShowOfAsync(episode, Ct));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task An_episode_the_catalog_does_not_have_or_cannot_be_asked_about_has_no_show(HttpStatusCode status) =>
+        Assert.Null(await Lookup(new Stub(() => new HttpResponseMessage(status))).ShowOfAsync(Guid.NewGuid(), Ct));
+
+    [Fact]
+    public async Task An_episode_sent_without_a_show_has_none() =>
+        Assert.Null(await Lookup(new Stub(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { id = Guid.NewGuid(), showId = Guid.Empty }) }))
+            .ShowOfAsync(Guid.NewGuid(), Ct));
+
+    [Fact]
+    public async Task A_request_that_is_cancelled_by_someone_else_gives_no_answer_rather_than_failing()
+    {
+        // As when another caller of the same cached cast goes away mid-request: not this caller's cancellation.
+        var catalog = Lookup(new Stub(() => throw new OperationCanceledException()));
+
+        Assert.Null(await catalog.InCastAsync(Show, InCast, Ct));
+        Assert.Null(await catalog.ShowOfAsync(Guid.NewGuid(), Ct));
     }
 }

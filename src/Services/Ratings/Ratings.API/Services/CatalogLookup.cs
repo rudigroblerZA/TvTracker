@@ -8,7 +8,7 @@ namespace Ratings.API.Services;
 /// someone in it, and which show an episode belongs to, for a watch that doesn't say.
 /// <list type="bullet">
 /// <item><b>Kept for a while:</b> a cast is asked for once per show per <see cref="KeptFor"/>, not once per vote. A
-/// new cast member can't be voted for until then.</item>
+/// new cast member can't be voted for until then. An empty cast isn't kept.</item>
 /// <item><b>A catalog that can't be reached is a gap, not a refusal:</b> the answer is "don't know" and the vote is
 /// let through, as it was before there was a check. A show's page lists only its cast, so a stray id never shows.</item>
 /// </list>
@@ -33,9 +33,17 @@ public sealed class CatalogLookup(HttpClient http, HybridCache cache, ILogger<Ca
         try
         {
             // Not a show the catalog has: nobody is in its cast.
-            return await cache.GetOrCreateAsync($"cast:{showId}", async token =>
-                (await GetAsync<ShowCast>($"api/v1/shows/{showId}", token))?.Cast.Select(member => member.PersonId).ToArray() ?? [],
+            var key = $"cast:{showId}";
+            var cast = await cache.GetOrCreateAsync(key, async token =>
+                (await GetAsync<ShowCast>($"api/v1/shows/{showId}", token))?.Cast?.Select(member => member.PersonId).ToArray() ?? [],
                 Kept, cancellationToken: ct);
+            if (cast.Length == 0)
+            {
+                // Nobody, which is also what a show whose cast hasn't arrived yet looks like: not kept, so votes
+                // aren't refused for the next ten minutes on the strength of it.
+                await cache.RemoveAsync(key, ct);
+            }
+            return cast;
         }
         catch (Exception ex) when (CouldNotSay(ex, ct))
         {
@@ -77,15 +85,16 @@ public sealed class CatalogLookup(HttpClient http, HybridCache cache, ILogger<Ca
     }
 
     /// <summary>
-    /// Whether <paramref name="ex"/> is the catalog failing to answer, and not the caller giving up.
+    /// Whether <paramref name="ex"/> is the catalog failing to answer, and not the caller giving up. A cancellation
+    /// that isn't the caller's counts: a timeout, or another caller of the same cached answer going away mid-request.
     /// </summary>
     private static bool CouldNotSay(Exception ex, CancellationToken ct) =>
-        ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested;
+        ex is HttpRequestException or OperationCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested;
 
     /// <summary>
     /// The part of Catalog.API's show that is read here.
     /// </summary>
-    private sealed record ShowCast(IReadOnlyList<CastMember> Cast);
+    private sealed record ShowCast(IReadOnlyList<CastMember>? Cast);
 
     private sealed record CastMember(Guid PersonId);
 
