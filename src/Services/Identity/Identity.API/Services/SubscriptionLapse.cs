@@ -1,4 +1,4 @@
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

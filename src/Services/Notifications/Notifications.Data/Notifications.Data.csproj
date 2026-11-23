@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Notifications model, DbContext and migrations (devices, preferences, what was sent and the copies it sends from), used by Notifications.API, which owns the schema. -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- For `dotnet ef migrations add`; not shipped. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

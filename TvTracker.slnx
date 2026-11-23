@@ -25,13 +25,17 @@
     <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
     <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
     <Project Path="src/Services/Financials/Financials.API/Financials.API.csproj" />
+    <Project Path="src/Services/Financials/Financials.Data/Financials.Data.csproj" />
     <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="src/Services/Identity/Identity.Data/Identity.Data.csproj" />
     <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
+    <Project Path="src/Services/Notifications/Notifications.Data/Notifications.Data.csproj" />
     <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
     <Project Path="src/Services/Ratings/Ratings.Data/Ratings.Data.csproj" />
     <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
     <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" />
     <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
+    <Project Path="src/Services/Research/Research.Data/Research.Data.csproj" />
     <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
     <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" />
     <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />

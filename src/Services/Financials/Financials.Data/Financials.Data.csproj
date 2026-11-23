@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Financials model, DbContext and migrations (the ledger and its statements), used by Financials.API, which owns the schema. -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- For `dotnet ef migrations add`; not shipped. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

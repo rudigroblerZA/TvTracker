@@ -5,14 +5,12 @@
        holds nothing about any user. -->
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
-    <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+    <ProjectReference Include="..\Financials.Data\Financials.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>

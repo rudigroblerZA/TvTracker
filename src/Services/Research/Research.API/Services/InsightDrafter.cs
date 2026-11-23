@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Research.API.Data;
+using Research.Data;
 
 namespace Research.API.Services;
 

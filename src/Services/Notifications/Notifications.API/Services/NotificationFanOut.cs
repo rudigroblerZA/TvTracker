@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
-using Notifications.API.Data;
+using Notifications.Data;
 using TvTracker;
 using TvTracker.EventBus;
 using TvTracker.Persistence;

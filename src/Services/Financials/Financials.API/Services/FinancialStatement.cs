@@ -1,5 +1,5 @@
 ﻿using System.Text.RegularExpressions;
-using Financials.API.Data;
+using Financials.Data;
 
 namespace Financials.API.Services;
 

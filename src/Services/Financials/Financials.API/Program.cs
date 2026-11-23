@@ -1,5 +1,5 @@
 ﻿using Financials.API.Apis;
-using Financials.API.Data;
+using Financials.Data;
 using Financials.API.Services;
 using TvTracker.Persistence;
 

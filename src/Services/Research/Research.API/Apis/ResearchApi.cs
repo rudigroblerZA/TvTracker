@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Research.API.Data;
+using Research.Data;
 using Research.API.Services;
 using TvTracker;
 

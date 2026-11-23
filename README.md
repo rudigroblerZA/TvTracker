@@ -2118,13 +2118,17 @@ How events flow:
 ## Database schema
 
 Catalog, Analytics, Financials, Identity, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations
-(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.API/Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
-`Ratings.Data/Migrations`, `Recommendations.Data/Migrations`, `Research.API/Data/Migrations`, `Social.Data/Migrations`,
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.Data/Migrations`, `Identity.Data/Migrations`, `Notifications.Data/Migrations`,
+`Ratings.Data/Migrations`, `Recommendations.Data/Migrations`, `Research.Data/Migrations`, `Social.Data/Migrations`,
 `Tracking.Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
 marked as having it and upgraded in place.
 
-After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
+Every service with a database keeps its model, `DbContext`, design-time factory and migrations in its own `X.Data`
+project beside `X.API` (`src/Services/X/X.Data`, namespace `X.Data`); the API references it and applies the
+migrations. Only a service's own API and workers reference its Data project.
+
+After changing a model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
 ```bash
 dotnet tool restore
@@ -2136,9 +2140,13 @@ dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.Data --ou
 # or, for Recommendations:
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.Data --output-dir Migrations
 # or, for Research:
-dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Research/Research.Data --output-dir Migrations
+# or, for Financials:
+dotnet ef migrations add <Name> --project src/Services/Financials/Financials.Data --output-dir Migrations
+# or, for Identity:
+dotnet ef migrations add <Name> --project src/Services/Identity/Identity.Data --output-dir Migrations
 # or, for Notifications:
-dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.Data --output-dir Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.Data --output-dir Migrations
 # or, for Tracking:

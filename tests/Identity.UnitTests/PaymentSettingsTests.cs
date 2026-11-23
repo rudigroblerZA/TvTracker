@@ -176,7 +176,7 @@ public class PaymentSettingsTests
             new(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("preferred_username", name)]));
 
         Assert.Equal("admin", PaymentSettingsApi.Admin(Named("admin")));
-        Assert.Equal(Identity.API.Data.PaymentSettings.UpdatedByLength, PaymentSettingsApi.Admin(Named(new string('a', 255)))!.Length);
+        Assert.Equal(Identity.Data.PaymentSettings.UpdatedByLength, PaymentSettingsApi.Admin(Named(new string('a', 255)))!.Length);
         Assert.Null(PaymentSettingsApi.Admin(new System.Security.Claims.ClaimsPrincipal()));
     }
 }
