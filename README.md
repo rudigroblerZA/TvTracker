@@ -2117,10 +2117,10 @@ How events flow:
 
 ## Database schema
 
-Catalog, Analytics, Financials, Identity, Notifications, Recommendations, Research, Social and Tracking use EF Core migrations
+Catalog, Analytics, Financials, Identity, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations
 (`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.API/Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
-`Recommendations.API/Data/Migrations`, `Research.API/Data/Migrations`, `Social.API/Data/Migrations`,
-`Tracking.API/Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
+`Ratings.Data/Migrations`, `Recommendations.Data/Migrations`, `Research.API/Data/Migrations`, `Social.Data/Migrations`,
+`Tracking.Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
 marked as having it and upgraded in place.
 
@@ -2131,16 +2131,18 @@ dotnet tool restore
 dotnet ef migrations add <Name> --project src/Services/Catalog/Catalog.Data --output-dir Migrations
 # or, for Analytics:
 dotnet ef migrations add <Name> --project src/Services/Analytics/Analytics.Data --output-dir Migrations
+# or, for Ratings:
+dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.Data --output-dir Migrations
 # or, for Recommendations:
-dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.Data --output-dir Migrations
 # or, for Research:
 dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
 # or, for Notifications:
 dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.API --output-dir Data/Migrations
 # or, for Social:
-dotnet ef migrations add <Name> --project src/Services/Social/Social.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Social/Social.Data --output-dir Migrations
 # or, for Tracking:
-dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Tracking/Tracking.Data --output-dir Migrations
 ```
 
 **Upgrading a local database created before migrations:** Catalog.API stops with a message saying the database
