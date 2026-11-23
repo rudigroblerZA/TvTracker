@@ -689,8 +689,8 @@ public sealed class RatingsClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// <summary>
     /// Votes, and returns the episode's votes as they then stand.
     /// </summary>
-    public Task<EpisodeCharacterVotes?> VoteCharacterAsync(Guid episodeId, Guid showId, Guid personId, CancellationToken ct = default) =>
-        SendAsync<EpisodeCharacterVotes>(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/character-vote", new { showId, personId }, ct);
+    public Task<EpisodeCharacterVotes?> VoteCharacterAsync(Guid episodeId, Guid personId, CancellationToken ct = default) =>
+        SendAsync<EpisodeCharacterVotes>(ApiClients.Ratings, HttpMethod.Put, $"api/v1/episodes/{episodeId}/character-vote", new { personId }, ct);
 
     public Task<EpisodeCharacterVotes?> RemoveCharacterVoteAsync(Guid episodeId, CancellationToken ct = default) =>
         SendAsync<EpisodeCharacterVotes>(ApiClients.Ratings, HttpMethod.Delete, $"api/v1/episodes/{episodeId}/character-vote", null, ct);

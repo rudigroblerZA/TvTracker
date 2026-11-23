@@ -47,7 +47,6 @@
     private const int Few = 8;
 
     [Parameter, EditorRequired] public Guid EpisodeId { get; set; }
-    [Parameter, EditorRequired] public Guid ShowId { get; set; }
     [Parameter, EditorRequired] public IReadOnlyList<CastMember> Cast { get; set; } = [];
 
     /// <summary>
@@ -178,7 +177,7 @@
         {
             var answer = votes?.Mine == personId
                 ? await Ratings.RemoveCharacterVoteAsync(EpisodeId)
-                : await Ratings.VoteCharacterAsync(EpisodeId, ShowId, personId);
+                : await Ratings.VoteCharacterAsync(EpisodeId, personId);
             Show(answer);
             if (answer is null)
             {

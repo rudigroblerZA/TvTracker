@@ -80,7 +80,7 @@ else
 
             <Feature Flag="@FeatureFlags.CharacterVoting">
                 @* Keyed by episode: on another one the section starts afresh, with nothing of the last one's to show or vote from. *@
-                <CharacterVoteSection @key="episode.Id" EpisodeId="episode.Id" ShowId="episode.ShowId" Cast="cast" Watched="watched" />
+                <CharacterVoteSection @key="episode.Id" EpisodeId="episode.Id" Cast="cast" Watched="watched" />
             </Feature>
 
             <section>

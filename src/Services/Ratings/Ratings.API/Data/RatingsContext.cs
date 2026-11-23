@@ -378,6 +378,9 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
         {
             entity.ToTable("character_votes");
             entity.HasKey(v => new { v.UserId, v.EpisodeId });
+            // A vote needs the watch and goes with it, however the watch goes: the database refuses a vote without
+            // one and removes the vote when the watch is removed, so nothing that removes watches has to remember to.
+            entity.HasOne<WatchedEpisodeCopy>().WithMany().HasForeignKey(v => new { v.UserId, v.EpisodeId }).OnDelete(DeleteBehavior.Cascade);
             // The counts are per person within an episode or a show: with the person in the index, they are read from it alone.
             entity.HasIndex(v => new { v.EpisodeId, v.PersonId });
             entity.HasIndex(v => new { v.ShowId, v.PersonId });
