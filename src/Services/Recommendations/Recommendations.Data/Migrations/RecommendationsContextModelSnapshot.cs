@@ -18,12 +18,12 @@ namespace Recommendations.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Recommendations.API.Data.DirtyUser", b =>
+            modelBuilder.Entity("Recommendations.Data.DirtyUser", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -37,7 +37,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("dirty_users", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.Dismissal", b =>
+            modelBuilder.Entity("Recommendations.Data.Dismissal", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -54,7 +54,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("dismissals", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.ShowDna", b =>
+            modelBuilder.Entity("Recommendations.Data.ShowDna", b =>
                 {
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
@@ -71,7 +71,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("show_dna", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.ShowFeatures", b =>
+            modelBuilder.Entity("Recommendations.Data.ShowFeatures", b =>
                 {
                     b.Property<Guid>("ShowId")
                         .ValueGeneratedOnAdd()
@@ -115,7 +115,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.ShowNanogenres", b =>
+            modelBuilder.Entity("Recommendations.Data.ShowNanogenres", b =>
                 {
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
@@ -129,7 +129,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("show_nanogenres", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.UserPlanCopy", b =>
+            modelBuilder.Entity("Recommendations.Data.UserPlanCopy", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -148,7 +148,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("user_plans", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.UserRecommendation", b =>
+            modelBuilder.Entity("Recommendations.Data.UserRecommendation", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -178,7 +178,7 @@ namespace Recommendations.Data.Migrations
                     b.ToTable("user_recommendations", (string)null);
                 });
 
-            modelBuilder.Entity("Recommendations.API.Data.UserShowSignal", b =>
+            modelBuilder.Entity("Recommendations.Data.UserShowSignal", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)

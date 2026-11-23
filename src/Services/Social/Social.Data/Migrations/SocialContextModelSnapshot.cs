@@ -18,12 +18,12 @@ namespace Social.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Social.API.Data.Activity", b =>
+            modelBuilder.Entity("Social.Data.Activity", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -58,7 +58,7 @@ namespace Social.Data.Migrations
                     b.ToTable("activities", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.EpisodeCopy", b =>
+            modelBuilder.Entity("Social.Data.EpisodeCopy", b =>
                 {
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
@@ -85,7 +85,7 @@ namespace Social.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.Profile", b =>
+            modelBuilder.Entity("Social.Data.Profile", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -112,7 +112,7 @@ namespace Social.Data.Migrations
                     b.ToTable("profiles", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.SharedList", b =>
+            modelBuilder.Entity("Social.Data.SharedList", b =>
                 {
                     b.Property<Guid>("ListId")
                         .HasColumnType("uuid");
@@ -145,7 +145,7 @@ namespace Social.Data.Migrations
                     b.ToTable("shared_lists", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.ShowCopy", b =>
+            modelBuilder.Entity("Social.Data.ShowCopy", b =>
                 {
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
@@ -163,7 +163,7 @@ namespace Social.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.UserBlock", b =>
+            modelBuilder.Entity("Social.Data.UserBlock", b =>
                 {
                     b.Property<string>("BlockerId")
                         .HasMaxLength(64)
@@ -183,7 +183,7 @@ namespace Social.Data.Migrations
                     b.ToTable("blocks", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.UserFollow", b =>
+            modelBuilder.Entity("Social.Data.UserFollow", b =>
                 {
                     b.Property<string>("FollowerId")
                         .HasMaxLength(64)
@@ -208,7 +208,7 @@ namespace Social.Data.Migrations
                     b.ToTable("follows", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.UserPlanCopy", b =>
+            modelBuilder.Entity("Social.Data.UserPlanCopy", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -227,7 +227,7 @@ namespace Social.Data.Migrations
                     b.ToTable("user_plans", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.UserShow", b =>
+            modelBuilder.Entity("Social.Data.UserShow", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -252,7 +252,7 @@ namespace Social.Data.Migrations
                     b.ToTable("user_shows", (string)null);
                 });
 
-            modelBuilder.Entity("Social.API.Data.UserWatch", b =>
+            modelBuilder.Entity("Social.Data.UserWatch", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
