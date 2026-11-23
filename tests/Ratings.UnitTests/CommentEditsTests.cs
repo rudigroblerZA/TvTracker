@@ -1,5 +1,5 @@
 using Ratings.API.Apis;
-using Ratings.API.Data;
+using Ratings.Data;
 using Ratings.API.Services;
 
 namespace Ratings.UnitTests;

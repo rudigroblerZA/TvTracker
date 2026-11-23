@@ -22,7 +22,7 @@ namespace Ratings.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Ratings.API.Data.CharacterVote", b =>
+            modelBuilder.Entity("Ratings.Data.CharacterVote", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -49,7 +49,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("character_votes", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.Comment", b =>
+            modelBuilder.Entity("Ratings.Data.Comment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -102,7 +102,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("comments", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.CommunityInsight", b =>
+            modelBuilder.Entity("Ratings.Data.CommunityInsight", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -148,7 +148,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("community_insights", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.ContentFlag", b =>
+            modelBuilder.Entity("Ratings.Data.ContentFlag", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -194,7 +194,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("content_flags", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.Correction", b =>
+            modelBuilder.Entity("Ratings.Data.Correction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -262,7 +262,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("corrections", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.EpisodeDuel", b =>
+            modelBuilder.Entity("Ratings.Data.EpisodeDuel", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -291,7 +291,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("episode_duels", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.EpisodeRating", b =>
+            modelBuilder.Entity("Ratings.Data.EpisodeRating", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -316,7 +316,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("episode_ratings", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.InsightVote", b =>
+            modelBuilder.Entity("Ratings.Data.InsightVote", b =>
                 {
                     b.Property<Guid>("InsightId")
                         .HasColumnType("uuid");
@@ -335,7 +335,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("insight_votes", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.ModerationAction", b =>
+            modelBuilder.Entity("Ratings.Data.ModerationAction", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -378,7 +378,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("moderation_actions", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.Reaction", b =>
+            modelBuilder.Entity("Ratings.Data.Reaction", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -402,7 +402,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("reactions", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.ShowRating", b =>
+            modelBuilder.Entity("Ratings.Data.ShowRating", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -424,7 +424,7 @@ namespace Ratings.Data.Migrations
                     b.ToTable("show_ratings", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.WatchedEpisodeCopy", b =>
+            modelBuilder.Entity("Ratings.Data.WatchedEpisodeCopy", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -494,9 +494,9 @@ namespace Ratings.Data.Migrations
                     b.ToTable("processed_integration_events", (string)null);
                 });
 
-            modelBuilder.Entity("Ratings.API.Data.CharacterVote", b =>
+            modelBuilder.Entity("Ratings.Data.CharacterVote", b =>
                 {
-                    b.HasOne("Ratings.API.Data.WatchedEpisodeCopy", null)
+                    b.HasOne("Ratings.Data.WatchedEpisodeCopy", null)
                         .WithMany()
                         .HasForeignKey("UserId", "EpisodeId")
                         .OnDelete(DeleteBehavior.Cascade)

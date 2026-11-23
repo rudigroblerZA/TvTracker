@@ -18,12 +18,12 @@ namespace Tracking.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Tracking.API.Data.EpisodeCopy", b =>
+            modelBuilder.Entity("Tracking.Data.EpisodeCopy", b =>
                 {
                     b.Property<Guid>("EpisodeId")
                         .ValueGeneratedOnAdd()
@@ -58,7 +58,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.Follow", b =>
+            modelBuilder.Entity("Tracking.Data.Follow", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -83,7 +83,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("follows", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.ShowCopy", b =>
+            modelBuilder.Entity("Tracking.Data.ShowCopy", b =>
                 {
                     b.Property<Guid>("ShowId")
                         .ValueGeneratedOnAdd()
@@ -112,7 +112,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("shows", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.UserList", b =>
+            modelBuilder.Entity("Tracking.Data.UserList", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -156,7 +156,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("lists", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.UserListItem", b =>
+            modelBuilder.Entity("Tracking.Data.UserListItem", b =>
                 {
                     b.Property<Guid>("ListId")
                         .HasColumnType("uuid");
@@ -175,7 +175,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("list_items", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.UserPlanCopy", b =>
+            modelBuilder.Entity("Tracking.Data.UserPlanCopy", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -194,7 +194,7 @@ namespace Tracking.Data.Migrations
                     b.ToTable("user_plans", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.WatchedEpisode", b =>
+            modelBuilder.Entity("Tracking.Data.WatchedEpisode", b =>
                 {
                     b.Property<string>("UserId")
                         .HasMaxLength(64)
@@ -264,16 +264,16 @@ namespace Tracking.Data.Migrations
                     b.ToTable("processed_integration_events", (string)null);
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.UserListItem", b =>
+            modelBuilder.Entity("Tracking.Data.UserListItem", b =>
                 {
-                    b.HasOne("Tracking.API.Data.UserList", null)
+                    b.HasOne("Tracking.Data.UserList", null)
                         .WithMany("Items")
                         .HasForeignKey("ListId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Tracking.API.Data.UserList", b =>
+            modelBuilder.Entity("Tracking.Data.UserList", b =>
                 {
                     b.Navigation("Items");
                 });
