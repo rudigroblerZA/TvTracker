@@ -5,7 +5,7 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.Azure.NotificationHubs;
 using Microsoft.EntityFrameworkCore;
-using Notifications.API.Data;
+using Notifications.Data;
 using WebPush;
 
 namespace Notifications.API.Services;

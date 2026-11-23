@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

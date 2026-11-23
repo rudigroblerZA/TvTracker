@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Payments;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

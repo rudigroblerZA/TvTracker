@@ -1,4 +1,4 @@
-using Financials.API.Data;
+using Financials.Data;
 using Financials.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

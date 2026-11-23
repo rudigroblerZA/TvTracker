@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Research.API.Data;
+using Research.Data;
 using TvTracker;
 
 namespace Research.API.Apis;

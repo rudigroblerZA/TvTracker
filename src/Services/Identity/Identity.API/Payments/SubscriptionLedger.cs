@@ -1,4 +1,4 @@
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Services;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

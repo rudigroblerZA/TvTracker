@@ -2,7 +2,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Research.API.Data;
+using Research.Data;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 

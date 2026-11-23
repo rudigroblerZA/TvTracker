@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using Notifications.API.Data;
+using Notifications.Data;
 using TvTracker.Persistence;
 
 namespace Notifications.API.Services;

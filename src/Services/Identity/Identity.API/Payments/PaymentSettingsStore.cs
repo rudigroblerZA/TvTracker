@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Identity.API.Data;
+using Identity.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

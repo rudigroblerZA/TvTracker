@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
-using Notifications.API.Data;
+using Notifications.Data;
 using Notifications.API.Services;
 using TvTracker;
 using TvTracker.EventBus;

@@ -1,4 +1,4 @@
-﻿using Identity.API.Data;
+﻿using Identity.Data;
 
 namespace Identity.API.Payments;
 

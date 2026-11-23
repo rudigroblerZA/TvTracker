@@ -1,6 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Payments;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;

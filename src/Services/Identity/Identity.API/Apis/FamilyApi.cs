@@ -1,7 +1,7 @@
 using System.Buffers.Text;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using Identity.API.Data;
+using Identity.Data;
 using Identity.API.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;

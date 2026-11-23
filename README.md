@@ -1235,8 +1235,8 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
 
 - **Insights by plan:** 17 features carry the Pro rule (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, spoiler watch, Your TV life, Your TV
-  clock, Your services, forecasts, From the makers you love, While you wait); the three that are turned on are what
-  Pro adds today, and `/settings/plan` lists only those. Each of those flags has a
+  clock, Your services, forecasts, From the makers you love, While you wait), and all 17 are turned on: they are what
+  Pro adds, and `/settings/plan` lists them. Each of those flags has a
   plan rule in `Flags/flagd.json` (`"plans": "plus,family"` in its metadata), and an admin can put any feature into the
   paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Pro tag and its page says what
   Pro adds; `/settings/plan` lists each plan's insights from the flags. The services refuse a locked insight (404).
@@ -2118,13 +2118,17 @@ How events flow:
 ## Database schema
 
 Catalog, Analytics, Financials, Identity, Notifications, Ratings, Recommendations, Research, Social and Tracking use EF Core migrations
-(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.API/Data/Migrations`, `Identity.API/Data/Migrations`, `Notifications.API/Data/Migrations`,
-`Ratings.Data/Migrations`, `Recommendations.Data/Migrations`, `Research.API/Data/Migrations`, `Social.Data/Migrations`,
+(`Catalog.Data/Migrations`, `Analytics.Data/Migrations`, `Financials.Data/Migrations`, `Identity.Data/Migrations`, `Notifications.Data/Migrations`,
+`Ratings.Data/Migrations`, `Recommendations.Data/Migrations`, `Research.Data/Migrations`, `Social.Data/Migrations`,
 `Tracking.Data/Migrations`); each service's API applies its own at startup. Identity's, Notifications',
 Recommendations' and Tracking's first migrations (`InitialCreate`) are their `EnsureCreated` schemas, so a database made before they moved to migrations is
 marked as having it and upgraded in place.
 
-After changing either model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
+Every service with a database keeps its model, `DbContext`, design-time factory and migrations in its own `X.Data`
+project beside `X.API` (`src/Services/X/X.Data`, namespace `X.Data`); the API references it and applies the
+migrations. Only a service's own API and workers reference its Data project.
+
+After changing a model, add a migration (the `dotnet-ef` version is pinned in `dotnet-tools.json`):
 
 ```bash
 dotnet tool restore
@@ -2136,9 +2140,13 @@ dotnet ef migrations add <Name> --project src/Services/Ratings/Ratings.Data --ou
 # or, for Recommendations:
 dotnet ef migrations add <Name> --project src/Services/Recommendations/Recommendations.Data --output-dir Migrations
 # or, for Research:
-dotnet ef migrations add <Name> --project src/Services/Research/Research.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Research/Research.Data --output-dir Migrations
+# or, for Financials:
+dotnet ef migrations add <Name> --project src/Services/Financials/Financials.Data --output-dir Migrations
+# or, for Identity:
+dotnet ef migrations add <Name> --project src/Services/Identity/Identity.Data --output-dir Migrations
 # or, for Notifications:
-dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.API --output-dir Data/Migrations
+dotnet ef migrations add <Name> --project src/Services/Notifications/Notifications.Data --output-dir Migrations
 # or, for Social:
 dotnet ef migrations add <Name> --project src/Services/Social/Social.Data --output-dir Migrations
 # or, for Tracking:

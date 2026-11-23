@@ -1,4 +1,4 @@
-using Identity.API.Data;
+using Identity.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using TvTracker.Tests;

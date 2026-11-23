@@ -1,5 +1,5 @@
 ﻿using Research.API.Apis;
-using Research.API.Data;
+using Research.Data;
 using Research.API.IntegrationEvents;
 using Research.API.Services;
 using TvTracker;

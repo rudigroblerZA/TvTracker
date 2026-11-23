@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Research.API.Apis;
-using Research.API.Data;
+using Research.Data;
 using TvTracker;
 
 namespace Research.API.Services;

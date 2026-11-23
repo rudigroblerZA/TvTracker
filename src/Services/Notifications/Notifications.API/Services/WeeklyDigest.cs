@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using Notifications.API.Data;
+using Notifications.Data;
 using TvTracker;
 
 namespace Notifications.API.Services;

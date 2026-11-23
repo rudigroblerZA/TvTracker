@@ -2,7 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Identity.API.Data;
+using Identity.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 using TvTracker.Payments;

@@ -1,4 +1,4 @@
-using Notifications.API.Data;
+using Notifications.Data;
 
 namespace Notifications.API.Services;
 

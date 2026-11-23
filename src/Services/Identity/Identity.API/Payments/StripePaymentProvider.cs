@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
-using Identity.API.Data;
+using Identity.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 using TvTracker.Payments;

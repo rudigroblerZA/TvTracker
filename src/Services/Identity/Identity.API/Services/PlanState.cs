@@ -1,4 +1,4 @@
-using Identity.API.Data;
+using Identity.Data;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

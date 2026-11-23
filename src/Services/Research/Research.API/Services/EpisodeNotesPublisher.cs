@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Research.API.Apis;
-using Research.API.Data;
+using Research.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
