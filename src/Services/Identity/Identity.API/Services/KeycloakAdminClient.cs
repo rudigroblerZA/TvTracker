@@ -152,6 +152,21 @@ public sealed class KeycloakAdminClient(HttpClient httpClient, IConfiguration co
     }
 
     /// <summary>
+    /// Makes the realm's sign-in pages use <paramref name="theme"/> (a folder the AppHost mounts into Keycloak); false
+    /// when they already do. The realm file names it, but a realm imported before the theme existed keeps Keycloak's own.
+    /// </summary>
+    public async Task<bool> SetLoginThemeAsync(string token, string theme, CancellationToken cancellationToken)
+    {
+        var realm = await GetRealmAsync(token, cancellationToken);
+        if (realm is null || realm["loginTheme"]?.GetValue<string>() == theme)
+        {
+            return false;
+        }
+        await SendAsync<JsonNode>(HttpMethod.Put, RealmUrl, token, new JsonObject { ["loginTheme"] = theme }, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
     /// Brings the realm's mail account in line with configuration (<see cref="MailAccount.FromConfiguration"/>),
     /// on start: set when the app has one, taken away when it had one and no longer does. Mail comes from the
     /// app's name, <paramref name="nameInSettings"/> when an admin has set one. Nothing happens when this service

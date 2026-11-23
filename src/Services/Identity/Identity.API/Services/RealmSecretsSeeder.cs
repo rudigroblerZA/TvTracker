@@ -30,6 +30,7 @@ namespace Identity.API.Services;
 /// <item><b>Sign in with Google</b> (<c>Keycloak:Google:ClientId</c> and <c>:ClientSecret</c>): the realm's Google
 /// identity provider is created or brought up to date, so the sign-in page offers it. Without them nothing is touched,
 /// and one already in the realm stays as it is.</item>
+/// <item><b>The sign-in pages' theme</b> is set on a realm that doesn't have it: one imported before the theme existed.</item>
 /// <item><b>Outside development</b> the realm is also set to require HTTPS from outside addresses and to lock an
 /// account for a while after repeated wrong passwords, which the realm file leaves off.</item>
 /// <item><b>Retried</b> as <see cref="KeycloakRetry"/> says; when it gives up, every service using a changed secret gets
@@ -40,6 +41,11 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
     IServiceScopeFactory scopes, ILogger<RealmSecretsSeeder> logger) : BackgroundService
 {
     private const string WebClientId = "tvtracker-web";
+
+    /// <summary>
+    /// The sign-in pages' theme: the folder of this name under the AppHost's Themes, mounted into Keycloak.
+    /// </summary>
+    private const string LoginTheme = "tvtracker";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -82,6 +88,10 @@ public sealed class RealmSecretsSeeder(KeycloakAdminClient keycloak, IConfigurat
             if (!environment.IsDevelopment() && await keycloak.HardenRealmAsync(token, stoppingToken))
             {
                 logger.LogInformation("Set the Keycloak realm to require HTTPS and to lock accounts after repeated wrong passwords");
+            }
+            if (await keycloak.SetLoginThemeAsync(token, LoginTheme, stoppingToken))
+            {
+                logger.LogInformation("Set the Keycloak realm's sign-in pages to the {Theme} theme", LoginTheme);
             }
             // Sign in with Google, when the app has been given its Google client (Keycloak:Google:ClientId and
             // :ClientSecret, from the AppHost's google-client-id and google-client-secret).

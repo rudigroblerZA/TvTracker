@@ -71,6 +71,8 @@ for key in $(grep -o '^[A-Z0-9_]*=' "$work/.env" | tr -d =); do
     CADDY_BINDMOUNT_0) value=$home/Caddyfile ;;
     FLAGD_BINDMOUNT_0) value=$home/flags ;;
     KEYCLOAK_BINDMOUNT_0) value=$home/keycloak ;;
+    # The sign-in pages' theme, straight from the checkout.
+    KEYCLOAK_BINDMOUNT_1) value=$apphost/Themes ;;
     BACKUP_BINDMOUNT_0) value=$apphost/Deploy/backup.sh ;;
     BACKUP_BINDMOUNT_1 | OFFSITE_BINDMOUNT_1) value=$home/backups ;;
     OFFSITE_BINDMOUNT_0) value=$apphost/Deploy/offsite.sh ;;
