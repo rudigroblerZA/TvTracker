@@ -98,6 +98,9 @@ public static class FeatureFlags
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
         Plans, Payments, FamilyPlan, Affiliates,
         AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt, CharacterVoting,
+        // The rest of what Pro and Family add (each has the plan rule in flagd.json, as Forecasts, TonightPlan and EssentialCut do).
+        CatchUp, DnaTwins, MakersForYou, Mixtape, Refresher, ReunionRadar, SpoilerWatch, TasteTwins, TonightTogether, TvClock, TvLife,
+        WhileYouWait, YearInTv, YourServices,
     };
 
     /// <summary>

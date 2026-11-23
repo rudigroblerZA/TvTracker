@@ -36,14 +36,14 @@
     "makers-for-you": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "From the makers you love: the creators behind the shows you love, and their other shows you haven't seen (/makers, and its link on For you).", "name": "From the makers you love", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "reunion-radar": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Reunion radar: shows where actors from shows you love work together again (/reunions, and its link on For you).", "name": "Reunion radar", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -69,7 +69,7 @@
     "dna-twins": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "DNA twins: shows made like this one but about something else, on show pages.", "name": "DNA twins", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -100,14 +100,14 @@
     "refresher": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Previously on…: a rewatch refresher on the show page after a long break, and the Back after a break list on Up Next.", "name": "Previously on…", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "catch-up": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Catch-up planner: a week-by-week plan to be caught up before a followed show's new season, on the show page and Up Next.", "name": "Catch-up planner", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -144,7 +144,7 @@
     "tonight-together": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Tonight for two: plan an evening with someone you follow (/tonight?with=…) from the shows you share.", "name": "Tonight for two", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -259,7 +259,7 @@
     "tv-clock": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Your TV clock: when you watch, what kind of viewer that makes you, and your sittings.", "name": "Your TV clock", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -278,7 +278,7 @@
     "spoiler-watch": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Spoiler watch: how exposed you are to spoilers for your shows right now, and when it calms down.", "name": "Spoiler watch", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -291,7 +291,7 @@
     "tv-life": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Your TV life: every year of your life with the biggest premieres and finales, and what you watched.", "name": "Your TV life", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -352,7 +352,7 @@
     "taste-twins": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Taste twins: anonymous people whose ratings track yours, and what they loved that you haven't seen (5-user rule).", "name": "Taste twins", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -389,21 +389,21 @@
     "while-you-wait": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "While you wait: for each show you're caught up on, a finished show you can watch whole before it's back, chosen for how alike they are (/while-you-wait).", "name": "While you wait", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "mixtape": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Mixtape: pick three shows and get the shows that fit all of them.", "name": "Mixtape", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "your-services": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Your services (Pro and Family): pick the streaming services you pay for and see each one's cost per hour watched; also the logos and prices on network report cards.", "name": "Your services", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
@@ -440,7 +440,7 @@
     "year-in-tv": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Year in TV: a personal recap of a year's viewing, from your own watches, ratings and follows.", "name": "Year in TV", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },

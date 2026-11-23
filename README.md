@@ -1235,8 +1235,8 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
 
 - **Insights by plan:** 17 features carry the Pro rule (essential cut, Tonight's plan and Tonight for two, catch-up,
   Previously on…, Year in TV, taste twins, reunion radar, DNA twins, Mixtape, spoiler watch, Your TV life, Your TV
-  clock, Your services, forecasts, From the makers you love, While you wait); the three that are turned on are what
-  Pro adds today, and `/settings/plan` lists only those. Each of those flags has a
+  clock, Your services, forecasts, From the makers you love, While you wait), and all 17 are turned on: they are what
+  Pro adds, and `/settings/plan` lists them. Each of those flags has a
   plan rule in `Flags/flagd.json` (`"plans": "plus,family"` in its metadata), and an admin can put any feature into the
   paid plans, or take it out, on `/settings/flags`. On Free, a paid tool's card shows a Pro tag and its page says what
   Pro adds; `/settings/plan` lists each plan's insights from the flags. The services refuse a locked insight (404).
