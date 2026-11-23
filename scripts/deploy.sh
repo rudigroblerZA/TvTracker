@@ -151,16 +151,20 @@ build_image() {
     --nologo -v quiet > "$work/build-$name.log" 2>&1 || { tail -30 "$work/build-$name.log" >&2; exit 1; }
 }
 
-# One image per service of ours in the compose file: each *_IMAGE key the publish asked for. The AppHost labels each
-# such service with its project file (from the AppHost's folder), read here as lines of resource=path; the image's
-# name is the one .env was given above. A key with no labelled service stops the deploy here, not at the pull.
-projects=$(docker compose --project-name tvtracker --project-directory "$home" config --format json \
-  | jq -r '.services | to_entries[] | select(.value.labels["tvtracker.project"]) | "\(.key)=\(.value.labels["tvtracker.project"])"')
-grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d = | while read -r key; do
-  resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
-  csproj=$(grep -m1 "^$resource=" <<< "$projects" | cut -d= -f2- || true)
-  [[ -n $csproj && -f $apphost/$csproj ]] || { echo "No project for $resource (the compose file says: ${csproj:-nothing})." >&2; exit 1; }
-  build_image "$resource" "$apphost/$csproj" "$(current "$key")"
+# One image per service of ours in the compose file. The AppHost labels each with its project file (from the AppHost's
+# folder); the compose file, read as `up` below reads it, gives the image each is to run. One line per service:
+# name|image|project.
+services=$(docker compose --project-name tvtracker --project-directory "$home" config --format json \
+  | jq -r '.services | to_entries[] | select(.value.labels["tvtracker.project"]) | "\(.key)|\(.value.image // "")|\(.value.labels["tvtracker.project"])"')
+[[ -n $services ]] || { echo "The compose file names no project to build." >&2; exit 1; }
+while IFS='|' read -r resource image csproj; do
+  [[ -n $image && -f $apphost/$csproj ]] || { echo "Can't build $resource: its image is '$image' and its project '$csproj'." >&2; exit 1; }
+  build_image "$resource" "$apphost/$csproj" "$image"
+done <<< "$services"
+# Every image the publish asked for has to be one of those, or `up` would go looking for it on Docker Hub.
+for key in $(grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d =); do
+  cut -d'|' -f2 <<< "$services" | grep -qxF "$(current "$key")" \
+    || { echo "Nothing builds $key ($(current "$key")): no service with a project has that image. Is $key also set in this shell?" >&2; exit 1; }
 done
 # And the import tool's, which isn't a service: scripts/deploy-import.sh runs it on demand.
 build_image import-cli "$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" "$(current IMPORT_CLI_IMAGE)"

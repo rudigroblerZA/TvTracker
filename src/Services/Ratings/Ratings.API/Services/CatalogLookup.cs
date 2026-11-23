@@ -8,7 +8,7 @@ namespace Ratings.API.Services;
 /// someone in it, and which show an episode belongs to, for a watch that doesn't say.
 /// <list type="bullet">
 /// <item><b>Kept for a while:</b> a cast is asked for once per show per <see cref="KeptFor"/>, not once per vote. A
-/// new cast member can't be voted for until then. An empty cast isn't kept.</item>
+/// new cast member can't be voted for until then. An empty cast is kept for <see cref="EmptyKeptFor"/> only.</item>
 /// <item><b>A catalog that can't be reached is a gap, not a refusal:</b> the answer is "don't know" and the vote is
 /// let through, as it was before there was a check. A show's page lists only its cast, so a stray id never shows.</item>
 /// </list>
@@ -17,7 +17,15 @@ public sealed class CatalogLookup(HttpClient http, HybridCache cache, ILogger<Ca
 {
     public static readonly TimeSpan KeptFor = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// How long an empty cast is kept: long enough that a run of votes asks once, short enough that a cast which
+    /// arrives counts soon.
+    /// </summary>
+    public static readonly TimeSpan EmptyKeptFor = TimeSpan.FromSeconds(30);
+
     private static readonly HybridCacheEntryOptions Kept = new() { Expiration = KeptFor, LocalCacheExpiration = KeptFor };
+
+    private static readonly HybridCacheEntryOptions KeptBriefly = new() { Expiration = EmptyKeptFor, LocalCacheExpiration = EmptyKeptFor };
 
     /// <summary>
     /// Whether <paramref name="personId"/> is in the cast of <paramref name="showId"/>; null when the catalog couldn't say.
@@ -32,16 +40,16 @@ public sealed class CatalogLookup(HttpClient http, HybridCache cache, ILogger<Ca
     {
         try
         {
-            // Not a show the catalog has: nobody is in its cast.
             var key = $"cast:{showId}";
+            // Not a show the catalog has, or one sent without a cast: nobody is in it.
             var cast = await cache.GetOrCreateAsync(key, async token =>
                 (await GetAsync<ShowCast>($"api/v1/shows/{showId}", token))?.Cast?.Select(member => member.PersonId).ToArray() ?? [],
                 Kept, cancellationToken: ct);
             if (cast.Length == 0)
             {
-                // Nobody, which is also what a show whose cast hasn't arrived yet looks like: not kept, so votes
-                // aren't refused for the next ten minutes on the strength of it.
-                await cache.RemoveAsync(key, ct);
+                // Nobody, which is also what a show whose cast hasn't arrived yet looks like: kept only briefly, so
+                // votes aren't refused for the next ten minutes on the strength of it.
+                await cache.SetAsync(key, cast, KeptBriefly, cancellationToken: ct);
             }
             return cast;
         }
