@@ -303,11 +303,23 @@
     <Feature Flag="@FeatureFlags.Plans">
         <section class="lp-plans lp-glass lp-reveal">
             <h2>@($"Free, with {Plans.Name(Plans.Plus)} when you want more")</h2>
-            <p>
-                Browse the catalog without an account. A free account has @(Plans.FreeIncludes.ToLowerInvariant()).
-                <strong>@Plans.Name(Plans.Plus)</strong> adds every insight@(plusNames is { Count: > 0 } ? ": " + string.Join(", ", plusNames) : "").
-                <strong>@Plans.Name(Plans.Family)</strong> is @Plans.Name(Plans.Plus) for you and up to @Plans.FamilyMembers people you invite.
-            </p>
+            <p>Browse the catalog without an account. A free account has @(Plans.FreeIncludes.ToLowerInvariant()).</p>
+            @if (plusNames is { Count: > 0 })
+            {
+                @* The insights by name, as the plan page lists them: a long sentence of them was hard to read. *@
+                <p><strong>@Plans.Name(Plans.Plus)</strong> @($"adds {plusNames.Count} more {(plusNames.Count == 1 ? "insight" : "insights")}:")</p>
+                <ul class="lp-plan-insights">
+                    @foreach (var name in plusNames)
+                    {
+                        <li class="lp-chip lp-chip-plus">@name</li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p><strong>@Plans.Name(Plans.Plus)</strong> adds every insight.</p>
+            }
+            <p><strong>@Plans.Name(Plans.Family)</strong> is @Plans.Name(Plans.Plus) for you and up to @Plans.FamilyMembers people you invite.</p>
         </section>
     </Feature>
 
