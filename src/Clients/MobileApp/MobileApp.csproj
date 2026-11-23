@@ -79,7 +79,7 @@
 
   <!-- The host is put into addresses as given (https://HOST/api/), so it has to be a host name and nothing more. -->
   <Target Name="CheckPublicHost" BeforeTargets="CoreCompile" Condition="'$(TvTrackerPublicHost.Trim())' != ''">
-    <Error Condition="$(TvTrackerPublicHost.Contains('/')) or $(TvTrackerPublicHost.Contains(':')) or $(TvTrackerPublicHost.Trim().Contains(' '))"
+    <Error Condition="$(TvTrackerPublicHost.Contains('/')) or $(TvTrackerPublicHost.Contains(':')) or $(TvTrackerPublicHost.Contains(' '))"
            Text="TvTrackerPublicHost is the host name alone, such as tv.example.com: no https://, no path and no port (it is '$(TvTrackerPublicHost)')." />
   </Target>
 

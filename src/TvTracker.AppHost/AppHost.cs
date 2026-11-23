@@ -584,20 +584,22 @@ identityApi.WithEnvironment("Payments__SettingsKey", Secret("payment-settings-ke
 // provider does, its checkout being the web app's /dev/payments page, which signs the webhooks it sends Identity with a
 // secret the two share.
 // Both values, locally: a webhook secret left unset would be a parameter with no value, which Identity waits on for ever.
-var stripeLocally = !builder.ExecutionContext.IsPublishMode
-    && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"])
+var stripeLocally = !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"])
     && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-webhook-secret"]);
 // Polar (a merchant of record, for where Stripe opens no accounts) the same way: locally once its token and webhook
 // secret are given, against its sandbox unless Polar:ApiBase says otherwise. With both providers' keys given, Polar sells.
-var polarLocally = !builder.ExecutionContext.IsPublishMode
-    && !string.IsNullOrEmpty(builder.Configuration["Parameters:polar-access-token"])
+var polarLocally = !string.IsNullOrEmpty(builder.Configuration["Parameters:polar-access-token"])
     && !string.IsNullOrEmpty(builder.Configuration["Parameters:polar-webhook-secret"]);
-if (builder.ExecutionContext.IsPublishMode)
+if (publishing)
 {
     // A deployment names its provider (PAYMENT_PROVIDER: stripe or polar; scripts/deploy.sh fills in stripe), and
-    // carries Polar's settings, empty until there is an account: its webhooks are checked whichever provider sells.
+    // carries both providers' settings, empty until there is an account: each one's webhooks are checked whichever
+    // sells. The address the buyer is sent back to is the plan page at the site's public address (Deployment below).
     identityApi
         .WithEnvironment("Payments__Provider", builder.AddParameter("payment-provider", "stripe"))
+        .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
+        .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true))
+        .WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"))
         .WithEnvironment("Payments__Polar__AccessToken", builder.AddParameter("polar-access-token", "", secret: true))
         .WithEnvironment("Payments__Polar__WebhookSecret", builder.AddParameter("polar-webhook-secret", "", secret: true))
         .WithEnvironment("Payments__Polar__PortalUrl", builder.AddParameter("polar-portal-url", ""))
@@ -606,52 +608,40 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Payments__Polar__Products__FamilyMonth", builder.AddParameter("polar-product-family-month", ""))
         .WithEnvironment("Payments__Polar__Products__FamilyYear", builder.AddParameter("polar-product-family-year", ""));
 }
-else if (polarLocally)
+else if (polarLocally || stripeLocally)
 {
+    // A real provider needs an absolute address to send the buyer back to: the web app's own, here, https when its
+    // launch profile has it (an endpoint that doesn't exist never resolves, and Identity would wait on it for ever).
     var webScheme = webApp.Resource.Annotations.OfType<EndpointAnnotation>().Any(e => e.Name == "https") ? "https" : "http";
-    identityApi
-        .WithEnvironment("Payments__Provider", "polar")
-        .WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"))
-        .WithEnvironment("Payments__Polar__ApiBase", builder.Configuration["Polar:ApiBase"] is { Length: > 0 } polarApi ? polarApi : "https://sandbox-api.polar.sh/")
-        .WithEnvironment("Payments__Polar__AccessToken", builder.AddParameter("polar-access-token", secret: true))
-        .WithEnvironment("Payments__Polar__WebhookSecret", builder.AddParameter("polar-webhook-secret", secret: true));
-    foreach (var (key, parameter) in new[]
+    identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"));
+    // The optional settings, only where given: a parameter with no value is one Identity waits on for ever.
+    void Optional(string setting, string parameter)
     {
-        ("PlusMonth", "polar-product-plus-month"), ("PlusYear", "polar-product-plus-year"),
-        ("FamilyMonth", "polar-product-family-month"), ("FamilyYear", "polar-product-family-year"), ("PortalUrl", "polar-portal-url")
-    })
-    {
-        // Only the ones given: a parameter with no value is one Identity waits on for ever.
         if (builder.Configuration[$"Parameters:{parameter}"] is { Length: > 0 })
         {
-            identityApi.WithEnvironment(key == "PortalUrl" ? "Payments__Polar__PortalUrl" : $"Payments__Polar__Products__{key}", builder.AddParameter(parameter));
+            identityApi.WithEnvironment(setting, builder.AddParameter(parameter));
         }
     }
-}
-if (builder.ExecutionContext.IsPublishMode || (stripeLocally && !polarLocally))
-{
-    if (!builder.ExecutionContext.IsPublishMode)
+    if (polarLocally)
     {
-        identityApi.WithEnvironment("Payments__Provider", "stripe");
-    }
-    identityApi
-        .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
-        .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true));
-    if (builder.ExecutionContext.IsPublishMode)
-    {
-        // The address Stripe sends the buyer back to is the plan page at the site's public address (Deployment below).
-        identityApi.WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"));
+        identityApi
+            .WithEnvironment("Payments__Provider", "polar")
+            .WithEnvironment("Payments__Polar__ApiBase", builder.Configuration["Polar:ApiBase"] is { Length: > 0 } polarApi ? polarApi : "https://sandbox-api.polar.sh/")
+            .WithEnvironment("Payments__Polar__AccessToken", builder.AddParameter("polar-access-token", secret: true))
+            .WithEnvironment("Payments__Polar__WebhookSecret", builder.AddParameter("polar-webhook-secret", secret: true));
+        Optional("Payments__Polar__PortalUrl", "polar-portal-url");
+        Optional("Payments__Polar__Products__PlusMonth", "polar-product-plus-month");
+        Optional("Payments__Polar__Products__PlusYear", "polar-product-plus-year");
+        Optional("Payments__Polar__Products__FamilyMonth", "polar-product-family-month");
+        Optional("Payments__Polar__Products__FamilyYear", "polar-product-family-year");
     }
     else
     {
-        // Stripe needs an absolute address to send the buyer back to: the web app's own, here, https when its launch
-        // profile has it (an endpoint that doesn't exist never resolves, and Identity would wait on it for ever).
-        var webScheme = webApp.Resource.Annotations.OfType<EndpointAnnotation>().Any(e => e.Name == "https") ? "https" : "http";
-        identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"));
-        if (builder.Configuration["Parameters:stripe-portal-url"] is { Length: > 0 })
-        {
-            identityApi.WithEnvironment("Payments__Stripe__PortalUrl", builder.AddParameter("stripe-portal-url"));
-        }
+        identityApi
+            .WithEnvironment("Payments__Provider", "stripe")
+            .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
+            .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true));
+        Optional("Payments__Stripe__PortalUrl", "stripe-portal-url");
         // A stand-in for Stripe's API (Stripe's stripe-mock, or a recorder) when testing without an account.
         if (builder.Configuration["Stripe:ApiBase"] is { Length: > 0 } apiBase)
         {
@@ -659,7 +649,7 @@ if (builder.ExecutionContext.IsPublishMode || (stripeLocally && !polarLocally))
         }
     }
 }
-else if (!polarLocally)
+else
 {
     // The test pages are linked relative to the page the buyer is on, so the browser keeps the origin (http or https)
     // it signed in on and its sign-in cookie.

@@ -41,28 +41,10 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
 }
-// No automatic retries for Stripe: a repeated cancel, or a delete Stripe already carried out, comes back as an error, and
-// a checkout shouldn't keep the buyer waiting 30 s; one try within 20 s, and the caller answers 502.
-#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
-builder.Services.AddHttpClient<StripePaymentProvider>((sp, client) =>
-    {
-        client.BaseAddress = new Uri(sp.GetRequiredService<IOptionsMonitor<PaymentOptions>>().CurrentValue.Stripe.ApiBase);
-        client.Timeout = TimeSpan.FromSeconds(20);
-    })
-    .RemoveAllResilienceHandlers();
-#pragma warning restore EXTEXP0001
-builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<StripePaymentProvider>());
-// Polar the same way, and always registered for the same reason: its webhooks carry on for subscriptions bought
-// through it, whichever provider sells now.
-#pragma warning disable EXTEXP0001
-builder.Services.AddHttpClient<PolarPaymentProvider>((sp, client) =>
-    {
-        client.BaseAddress = new Uri(sp.GetRequiredService<IOptionsMonitor<PaymentOptions>>().CurrentValue.Polar.ApiBase);
-        client.Timeout = TimeSpan.FromSeconds(20);
-    })
-    .RemoveAllResilienceHandlers();
-#pragma warning restore EXTEXP0001
-builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<PolarPaymentProvider>());
+// Stripe and Polar are both always registered: each one's webhooks carry on for subscriptions bought through it,
+// whichever sells now, and neither does anything unconfigured.
+AddPaymentProvider<StripePaymentProvider>(options => options.Stripe.ApiBase);
+AddPaymentProvider<PolarPaymentProvider>(options => options.Polar.ApiBase);
 builder.Services.AddScoped<PaymentProviders>();
 builder.Services.AddScoped<SubscriptionLedger>();
 builder.Services.AddHostedService<SubscriptionLapse>();
@@ -98,3 +80,19 @@ app.MapPaymentsApi();
 app.MapPaymentSettingsApi();
 
 app.Run();
+
+// A provider that calls its API over a typed HttpClient. No automatic retries: a repeated cancel, or a delete the
+// provider already carried out, comes back as an error, and a checkout shouldn't keep the buyer waiting 30 s; one try
+// within 20 s, and the caller answers 502.
+void AddPaymentProvider<T>(Func<PaymentOptions, string> apiBase) where T : class, IPaymentProvider
+{
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it undoes the ServiceDefaults handler for this client.
+    builder.Services.AddHttpClient<T>((sp, client) =>
+        {
+            client.BaseAddress = new Uri(apiBase(sp.GetRequiredService<IOptionsMonitor<PaymentOptions>>().CurrentValue));
+            client.Timeout = TimeSpan.FromSeconds(20);
+        })
+        .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+    builder.Services.AddTransient<IPaymentProvider>(sp => sp.GetRequiredService<T>());
+}

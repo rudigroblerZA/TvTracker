@@ -4,6 +4,7 @@ using Identity.API.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 using TvTracker.Payments;
+using static Identity.API.Payments.ProviderWire;
 
 namespace Identity.API.Payments;
 
@@ -34,14 +35,7 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
     /// <summary>
     /// The subscription metadata key that carries the app's checkout session id.
     /// </summary>
-    public const string SessionKey = "checkout_session";
-
-    /// <summary>
-    /// Currencies Stripe counts in whole units, not hundredths (its "zero-decimal" list). HUF, TWD and ISK have rules of
-    /// their own at Stripe (whole units in some places, hundredths in others); price them in whole amounts.
-    /// </summary>
-    private static readonly HashSet<string> ZeroDecimal =
-        ["bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"];
+    public const string SessionKey = ProviderWire.SessionKey;
 
     private StripeOptions Stripe => options.Value.Stripe;
 
@@ -124,8 +118,6 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
         }
     }
 
-    private static PaymentEvent Ignored(string id) => new(id, PaymentEventKind.Ignored, "");
-
     /// <summary>
     /// A paid invoice. One not for a subscription (none are made here) is ignored.
     /// </summary>
@@ -174,48 +166,15 @@ public sealed class StripePaymentProvider(HttpClient http, IOptions<PaymentOptio
         return new PaymentEvent(id, cancelling ? PaymentEventKind.CancelScheduled : PaymentEventKind.Resumed, subscription.GetProperty("id").GetString()!);
     }
 
-    private static string? Text(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    /// <summary>
-    /// Currencies Stripe counts in thousandths, whose amounts must end in 0 (its "three-decimal" list).
-    /// </summary>
-    private static readonly HashSet<string> ThreeDecimal = ["bhd", "jod", "kwd", "omr", "tnd"];
-
-    private static decimal Scale(string currency) =>
-        ZeroDecimal.Contains(currency.ToLowerInvariant()) ? 1m : ThreeDecimal.Contains(currency.ToLowerInvariant()) ? 1000m : 100m;
-
-    internal static long MinorUnits(decimal amount, string currency)
-    {
-        var units = (long)Math.Round(amount * Scale(currency), MidpointRounding.AwayFromZero);
-        return ThreeDecimal.Contains(currency.ToLowerInvariant()) ? (long)Math.Round(units / 10m, MidpointRounding.AwayFromZero) * 10 : units;
-    }
-
-    internal static decimal FromMinorUnits(long amount, string currency) => amount / Scale(currency);
-
-    private static string AddQuery(Uri uri, string query) =>
-        new UriBuilder(uri) { Query = string.IsNullOrEmpty(uri.Query) ? query : $"{uri.Query.TrimStart('?')}&{query}" }.Uri.ToString();
-
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, Dictionary<string, string>? form, string? idempotencyKey,
         CancellationToken ct)
     {
         using var request = new HttpRequestMessage(method, path) { Content = form is null ? null : new FormUrlEncodedContent(form) };
-        request.Headers.Authorization = new("Bearer", Stripe.SecretKey
-            ?? throw new InvalidOperationException("Payments:Stripe:SecretKey isn't set."));
         if (idempotencyKey is not null)
         {
             request.Headers.Add("Idempotency-Key", idempotencyKey);
         }
-        var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync(ct);
-            response.Dispose();
-            throw new HttpRequestException($"Stripe answered {(int)response.StatusCode} to {method} {path}: {error}", null, response.StatusCode);
-        }
-        return response;
+        return await ProviderWire.SendAsync(http, request, Stripe.SecretKey, "Stripe", "Payments:Stripe:SecretKey", ct);
     }
 }
 

@@ -18,15 +18,13 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
 
         switch (options.Provider)
         {
-            case null or "" or "test":
+            case null or "" or "test" or "polar":
                 break;
             case "stripe":
                 if (!IsAbsoluteHttp(options.ReturnUrl))
                 {
                     errors.Add("Payments:ReturnUrl must be an absolute http(s) address when Payments:Provider is stripe.");
                 }
-                break;
-            case "polar":
                 break;
             default:
                 errors.Add($"Payments:Provider '{options.Provider}' isn't a known provider (stripe, polar, test).");
@@ -71,10 +69,6 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
             case "stripe":
                 Require(missing, options.Stripe.SecretKey, "Stripe's secret key");
                 Require(missing, options.Stripe.WebhookSecret, "Stripe's webhook signing secret");
-                if (!IsAbsoluteHttp(options.ReturnUrl))
-                {
-                    missing.Add("Payments:ReturnUrl isn't an absolute address.");
-                }
                 break;
             case "polar":
                 Require(missing, options.Polar.AccessToken, "Polar's access token (Payments:Polar:AccessToken)");
@@ -89,14 +83,15 @@ public sealed class PaymentOptionsValidator : IValidateOptions<PaymentOptions>
                         }
                     }
                 }
-                if (!IsAbsoluteHttp(options.ReturnUrl))
-                {
-                    missing.Add("Payments:ReturnUrl isn't an absolute address.");
-                }
                 break;
             case "test":
                 Require(missing, options.Test.WebhookSecret, "The test provider's webhook secret (Payments:Test:WebhookSecret)");
                 break;
+        }
+        // A real provider sends the buyer back to a whole address; the test provider's is a path of the site's own.
+        if (options.Provider is "stripe" or "polar" && !IsAbsoluteHttp(options.ReturnUrl))
+        {
+            missing.Add("Payments:ReturnUrl isn't an absolute address.");
         }
         return missing;
     }

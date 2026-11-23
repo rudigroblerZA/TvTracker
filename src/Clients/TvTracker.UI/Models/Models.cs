@@ -54,12 +54,12 @@ public record CatalogNumbers(int Shows, int Episodes, int People);
 /// </summary>
 /// <param name="Provider">The provider in force; "" when nothing is sold.</param>
 /// <param name="Missing">What the provider still needs before plans can be bought.</param>
-/// <param name="WebhookUrl">Where Stripe sends its events, when the site's public address is known; else null.</param>
+/// <param name="WebhookUrls">Where each provider sends its events, by provider name, when the site's public address is known; else empty.</param>
 /// <param name="HasStored">Something was set on the page, so there is something to go back to configuration from.</param>
 public record PaymentSettings(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
     string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
-    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false,
-    string? PolarWebhookUrl = null);
+    IReadOnlyDictionary<string, string> WebhookUrls, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy,
+    bool KeysUnreadable = false);
 
 /// <param name="Provider">Null leaves it; "" sells nothing.</param>
 /// <param name="StripeSecretKey">Null leaves the stored key as it is.</param>

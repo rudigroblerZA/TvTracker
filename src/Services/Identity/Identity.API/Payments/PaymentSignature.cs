@@ -32,9 +32,7 @@ public static class PaymentSignature
     {
         var parts = header.Split(',').Select(p => p.Split('=', 2)).Where(p => p.Length == 2).Select(p => (Key: p[0].Trim(), Value: p[1].Trim())).ToList();
         var stamps = parts.Where(p => p.Key == "t").ToList();
-        if (stamps.Count != 1 || !long.TryParse(stamps[0].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            || seconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds()
-            || (now - DateTimeOffset.FromUnixTimeSeconds(seconds)).Duration() > Tolerance)
+        if (stamps.Count != 1 || !Fresh(stamps[0].Value, now))
         {
             return false;
         }
@@ -42,6 +40,14 @@ public static class PaymentSignature
         return parts.Where(p => p.Key == "v1")
             .Any(p => CryptographicOperations.FixedTimeEquals(expected, Encoding.ASCII.GetBytes(p.Value.ToLowerInvariant())));
     }
+
+    /// <summary>
+    /// Whether <paramref name="timestamp"/> is unix seconds within <see cref="Tolerance"/> of <paramref name="now"/>.
+    /// </summary>
+    public static bool Fresh(string timestamp, DateTimeOffset now) =>
+        long.TryParse(timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+        && seconds <= DateTimeOffset.MaxValue.ToUnixTimeSeconds()
+        && (now - DateTimeOffset.FromUnixTimeSeconds(seconds)).Duration() <= Tolerance;
 
     private static string Hmac(string secret, string text) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(text)));
