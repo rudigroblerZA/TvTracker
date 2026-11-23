@@ -49,7 +49,7 @@ public static class CharacterVotesApi
     public static IEnumerable<CharacterVoteCountDto> Ranked(IEnumerable<CharacterVoteCountDto> counts) =>
         counts.Where(c => c.Votes > 0).OrderByDescending(c => c.Votes).ThenBy(c => c.PersonId);
 
-    private static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CatalogCast cast, CancellationToken ct)
+    internal static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CatalogCast cast, CancellationToken ct)
     {
         var counts = await db.CharacterVotes
             .Where(v => v.ShowId == showId)
@@ -63,7 +63,7 @@ public static class CharacterVotesApi
         return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), top));
     }
 
-    private static async Task<Ok<EpisodeCharacterVotesDto>> GetEpisodeVotesAsync(
+    internal static async Task<Ok<EpisodeCharacterVotesDto>> GetEpisodeVotesAsync(
         Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -91,7 +91,7 @@ public static class CharacterVotesApi
             people.Where(p => p.Mine).Select(p => (Guid?)p.PersonId).FirstOrDefault());
     }
 
-    private static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
+    internal static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
         Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CatalogCast cast, CancellationToken ct)
     {
         if (request.ShowId == Guid.Empty || request.PersonId == Guid.Empty)
@@ -129,7 +129,7 @@ public static class CharacterVotesApi
         return TypedResults.Ok(await VotesAsync(db, userId, episodeId, ct));
     }
 
-    private static async Task<Ok<EpisodeCharacterVotesDto>> RemoveVoteAsync(Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
+    internal static async Task<Ok<EpisodeCharacterVotesDto>> RemoveVoteAsync(Guid episodeId, ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         await db.CharacterVotes.Where(v => v.UserId == userId && v.EpisodeId == episodeId).ExecuteDeleteAsync(ct);
