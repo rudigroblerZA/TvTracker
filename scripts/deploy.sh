@@ -151,15 +151,17 @@ build_image() {
     --nologo -v quiet > "$work/build-$name.log" 2>&1 || { tail -30 "$work/build-$name.log" >&2; exit 1; }
 }
 
-# One image per service of ours in the compose file. The AppHost labels each with its project file (from the AppHost's
-# folder), and the compose file read with this deployment's .env gives the image name each is to have.
-services=$(docker compose --project-name tvtracker --project-directory "$home" config --format json \
-  | jq -r '.services | to_entries[] | select(.value.labels["tvtracker.project"]) | [.key, .value.image, .value.labels["tvtracker.project"]] | @tsv')
-[[ -n $services ]] || { echo "The compose file names no project to build." >&2; exit 1; }
-while IFS=$'\t' read -r resource image csproj; do
-  [[ -f $apphost/$csproj ]] || { echo "No project for $resource: $csproj." >&2; exit 1; }
-  build_image "$resource" "$apphost/$csproj" "$image"
-done <<< "$services"
+# One image per service of ours in the compose file: each *_IMAGE key the publish asked for. The AppHost labels each
+# such service with its project file (from the AppHost's folder), read here as lines of resource=path; the image's
+# name is the one .env was given above. A key with no labelled service stops the deploy here, not at the pull.
+projects=$(docker compose --project-name tvtracker --project-directory "$home" config --format json \
+  | jq -r '.services | to_entries[] | select(.value.labels["tvtracker.project"]) | "\(.key)=\(.value.labels["tvtracker.project"])"')
+grep -o '^[A-Z0-9_]*_IMAGE=' "$work/.env" | tr -d = | while read -r key; do
+  resource=$(echo "${key%_IMAGE}" | tr 'A-Z_' 'a-z-')
+  csproj=$(grep -m1 "^$resource=" <<< "$projects" | cut -d= -f2- || true)
+  [[ -n $csproj && -f $apphost/$csproj ]] || { echo "No project for $resource (the compose file says: ${csproj:-nothing})." >&2; exit 1; }
+  build_image "$resource" "$apphost/$csproj" "$(current "$key")"
+done
 # And the import tool's, which isn't a service: scripts/deploy-import.sh runs it on demand.
 build_image import-cli "$repo/src/Tools/Catalog.ImportCli/Catalog.ImportCli.csproj" "$(current IMPORT_CLI_IMAGE)"
 

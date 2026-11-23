@@ -57,6 +57,11 @@ public static class CharacterVotesApi
             .GroupBy(v => v.PersonId)
             .Select(g => new CharacterVoteCountDto(g.Key, g.Count()))
             .ToListAsync(ct);
+        if (counts.Count == 0)
+        {
+            // Nothing to place, so nothing to ask the catalog: this is open to anyone, with any id.
+            return TypedResults.Ok(new ShowCharacterVotesDto(0, []));
+        }
         // The places go to people in the cast as it is now, where the catalog can say: someone who has left it, or an
         // id let through while the catalog couldn't be asked, would be dropped by the page and leave a gap.
         var inCast = await catalog.CastOfAsync(showId, ct);
