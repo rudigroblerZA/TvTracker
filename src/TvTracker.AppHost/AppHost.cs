@@ -23,8 +23,7 @@ IResourceBuilder<ParameterResource> Secret(string name, string developmentValue)
 }
 
 // A service of ours, run from its project file (the path is from this folder; the project file lists the same ones, so
-// that building the AppHost builds them). scripts/deploy.sh reads these calls to find the project behind each
-// resource: keep each on one line, with both arguments written out.
+// that building the AppHost builds them).
 IResourceBuilder<DotnetProjectResource> Project(string name, string path) => builder.AddDotnetProject(name, path);
 
 // Where a publish goes: one machine running Docker Compose. `aspire publish` writes a compose file and an .env of the
@@ -773,9 +772,13 @@ if (publishing)
     // site names the public address as its issuer.
         foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
     {
+        // Where its project file is, from this folder, as a label on its service in the compose file:
+        // scripts/deploy.sh builds each service's image from the project named there.
+        var projectFile = Path.GetRelativePath(builder.AppHostDirectory, project.GetProjectMetadata().ProjectPath).Replace('\\', '/');
         builder.CreateResourceBuilder(project)
             .WithEnvironment("Identity__RequireHttpsMetadata", "false")
-            .WithEnvironment("Identity__PublicUrl", publicUrl);
+            .WithEnvironment("Identity__PublicUrl", publicUrl)
+            .PublishAsDockerComposeService((_, service) => service.Labels["tvtracker.project"] = projectFile);
     }
 
     compose.ConfigureComposeFile(file =>

@@ -50,7 +50,7 @@ public static class CharacterVotesApi
     public static IEnumerable<CharacterVoteCountDto> Ranked(IEnumerable<CharacterVoteCountDto> counts) =>
         counts.Where(c => c.Votes > 0).OrderByDescending(c => c.Votes).ThenBy(c => c.PersonId);
 
-    internal static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CatalogCast cast, CancellationToken ct)
+    internal static async Task<Ok<ShowCharacterVotesDto>> GetShowVotesAsync(Guid showId, RatingsContext db, CatalogLookup catalog, CancellationToken ct)
     {
         var counts = await db.CharacterVotes
             .Where(v => v.ShowId == showId)
@@ -59,7 +59,7 @@ public static class CharacterVotesApi
             .ToListAsync(ct);
         // The places go to people in the cast as it is now, where the catalog can say: someone who has left it, or an
         // id let through while the catalog couldn't be asked, would be dropped by the page and leave a gap.
-        var inCast = await cast.OfAsync(showId, ct);
+        var inCast = await catalog.CastOfAsync(showId, ct);
         var top = Ranked(counts).Where(c => inCast is null || inCast.Contains(c.PersonId)).Take(TopOfShow).ToList();
         return TypedResults.Ok(new ShowCharacterVotesDto(counts.Sum(c => c.Votes), top));
     }
@@ -95,7 +95,7 @@ public static class CharacterVotesApi
     private const string NotWatched = "Mark the episode watched before voting on it.";
 
     internal static async Task<Results<Ok<EpisodeCharacterVotesDto>, ValidationProblem, Conflict<string>>> VoteAsync(
-        Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CatalogCast cast, CancellationToken ct)
+        Guid episodeId, CharacterVoteRequest request, ClaimsPrincipal user, RatingsContext db, CatalogLookup catalog, CancellationToken ct)
     {
         if (request.PersonId == Guid.Empty)
         {
@@ -114,14 +114,14 @@ public static class CharacterVotesApi
 
         // The show is the one Tracking says the episode belongs to, or the catalog for a watch from before the copy
         // kept its show; never one the request names, so a vote can't be counted towards another show's favourites.
-        var showId = watched.ShowId ?? await cast.ShowOfAsync(episodeId, ct);
+        var showId = watched.ShowId ?? await catalog.ShowOfAsync(episodeId, ct);
         if (showId is null)
         {
             return TypedResults.Conflict("Couldn't tell which show the episode belongs to. Try again in a moment.");
         }
         // Only someone in the show's cast, where the catalog can say: an id from anywhere else would count in the show's
         // total and never be shown.
-        if (await cast.HasAsync(showId.Value, request.PersonId, ct) == false)
+        if (await catalog.InCastAsync(showId.Value, request.PersonId, ct) == false)
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {

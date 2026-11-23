@@ -35,7 +35,7 @@ builder.Services.Configure<GiphyOptions>(builder.Configuration.GetSection("Giphy
 // Accepted corrections are applied by the catalog sync worker.
 builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
 // Favourite-character votes are checked against the show's cast, which the catalog has.
-builder.Services.AddHttpClient<CatalogCast>(http =>
+builder.Services.AddHttpClient<CatalogLookup>(http =>
 {
     http.BaseAddress = new Uri("https+http://catalog-api/");
     // A vote waits on this: a slow catalog gives way to an unchecked vote.

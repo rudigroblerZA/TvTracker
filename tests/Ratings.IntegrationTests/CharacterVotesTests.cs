@@ -42,7 +42,7 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     /// <paramref name="cast"/> says otherwise, and the one episode unless <paramref name="knowsEpisode"/> is false.
     /// Anything else it is asked for isn't there. Each has its own cache, so one catalog's answers don't reach the next.
     /// </summary>
-    private CatalogCast Catalog(HttpStatusCode status = HttpStatusCode.OK, Guid[]? cast = null, bool knowsEpisode = true)
+    private CatalogLookup Catalog(HttpStatusCode status = HttpStatusCode.OK, Guid[]? cast = null, bool knowsEpisode = true)
     {
         var people = cast ?? [athena, hen, buck];
         var (theShow, theEpisode) = ($"/api/v1/shows/{show}", $"/api/v1/episodes/{episode}");
@@ -55,8 +55,8 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
         });
         var cache = new ServiceCollection().AddHybridCache().Services.BuildServiceProvider();
         caches.Add(cache);
-        return new CatalogCast(new HttpClient(handler) { BaseAddress = new Uri("http://catalog/") },
-            cache.GetRequiredService<HybridCache>(), NullLogger<CatalogCast>.Instance);
+        return new CatalogLookup(new HttpClient(handler) { BaseAddress = new Uri("http://catalog/") },
+            cache.GetRequiredService<HybridCache>(), NullLogger<CatalogLookup>.Instance);
     }
 
     private static HttpResponseMessage Json(object body) => new(HttpStatusCode.OK) { Content = JsonContent.Create(body) };
@@ -81,7 +81,7 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
         await db.SaveChangesAsync(Ct);
     }
 
-    private async Task<object> VoteAsync(string user, Guid person, Guid? ofEpisode = null, CatalogCast? catalog = null)
+    private async Task<object> VoteAsync(string user, Guid person, Guid? ofEpisode = null, CatalogLookup? catalog = null)
     {
         await using var db = database.Context();
         var result = await CharacterVotesApi.VoteAsync(ofEpisode ?? episode, new CharacterVoteRequest(person), As(user), db, catalog ?? Catalog(), Ct);
