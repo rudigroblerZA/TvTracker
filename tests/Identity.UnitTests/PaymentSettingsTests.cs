@@ -118,7 +118,7 @@ public class PaymentSettingsTests
     [InlineData("/settings/plan", null)]
     [InlineData(null, null)]
     public void The_webhook_address_is_given_only_where_the_sites_address_is_known(string? returnUrl, string? webhook) =>
-        Assert.Equal(webhook, PaymentSettingsApi.PublicWebhookUrl(returnUrl));
+        Assert.Equal(webhook, PaymentSettingsApi.PublicWebhookUrl(returnUrl, "stripe"));
 
     private static readonly PaymentOptions SellingStripe = Configured(secretKey: "sk_live_1", webhookSecret: "whsec_1");
     private static readonly PaymentOptions StripeNoKeys = Configured();

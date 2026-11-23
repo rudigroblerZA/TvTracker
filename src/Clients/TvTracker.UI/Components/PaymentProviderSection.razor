@@ -69,7 +69,7 @@
                     <input id="stripe-portal" type="url" @bind="form.PortalUrl" maxlength="512" placeholder="https://billing.stripe.com/p/login/…" />
                 </label>
                 <p class="muted small">
-                    @if (settings.WebhookUrl is { } webhook)
+                    @if (settings.WebhookUrls.GetValueOrDefault("stripe") is { } webhook)
                     {
                         <span>In Stripe, send webhooks to <code>@webhook</code>.</span>
                     }
@@ -91,7 +91,7 @@
                     Polar is the seller of record: it charges and pays the sales tax, and pays out where Stripe has no accounts.
                     Its access token, webhook secret and the four products' ids come from the deployment's configuration
                     (<code>POLAR_*</code>; README, Payments), not from this page.
-                    @if (settings.PolarWebhookUrl is { } polarWebhook)
+                    @if (settings.WebhookUrls.GetValueOrDefault("polar") is { } polarWebhook)
                     {
                         <span>In Polar, send webhooks to <code>@polarWebhook</code>.</span>
                     }

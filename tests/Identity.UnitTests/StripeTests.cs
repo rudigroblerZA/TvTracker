@@ -116,8 +116,8 @@ public class StripeTests
     [InlineData(0.9, "KWD", 900)]
     public void Amounts_go_to_Stripe_in_its_minor_units(decimal amount, string currency, long minor)
     {
-        Assert.Equal(minor, StripePaymentProvider.MinorUnits(amount, currency));
-        Assert.Equal(0, StripePaymentProvider.MinorUnits(amount, currency) % (currency == "KWD" ? 10 : 1));
-        Assert.Equal(amount, StripePaymentProvider.FromMinorUnits(minor, currency));
+        Assert.Equal(minor, ProviderWire.MinorUnits(amount, currency));
+        Assert.Equal(0, ProviderWire.MinorUnits(amount, currency) % (currency == "KWD" ? 10 : 1));
+        Assert.Equal(amount, ProviderWire.FromMinorUnits(minor, currency));
     }
 }

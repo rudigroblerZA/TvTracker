@@ -16,15 +16,15 @@ namespace Identity.API.Apis;
 /// <param name="StripeSecretKey">"settings", "configuration" or "" (not set): where the key in force comes from.</param>
 /// <param name="StripeWebhookSecret">Likewise.</param>
 /// <param name="Missing">What the provider still needs before plans can be bought; empty when it can sell.</param>
-/// <param name="WebhookUrl">Where Stripe sends its events, when the site's public address is known (a deployment); else null.</param>
+/// <param name="WebhookUrls">Where each provider sends its events, by provider name, when the site's public address is known
+/// (a deployment); else empty.</param>
 /// <param name="CanStoreSecrets">False without <c>Payments:SettingsKey</c>: keys can then only come from configuration.</param>
 /// <param name="HasStored">Something was set here, so there is something to go back to configuration from.</param>
 /// <param name="KeysUnreadable">A key saved here can't be decrypted (the deployment's settings key changed): enter it again.</param>
-/// <param name="PolarWebhookUrl">Where Polar sends its events, as <paramref name="WebhookUrl"/> is for Stripe.</param>
 public record PaymentSettingsDto(string Provider, string ProviderFrom, IReadOnlyList<string> Providers, string StripeSecretKey,
     string StripeWebhookSecret, string? StripePortalUrl, string StripePortalUrlFrom, string? ReturnUrl, IReadOnlyList<string> Missing,
-    string? WebhookUrl, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy, bool KeysUnreadable = false,
-    string? PolarWebhookUrl = null);
+    IReadOnlyDictionary<string, string> WebhookUrls, bool CanStoreSecrets, bool HasStored, DateTime? UpdatedAtUtc, string? UpdatedBy,
+    bool KeysUnreadable = false);
 
 /// <param name="Provider">Null leaves it as it is; "" sells nothing; else a provider's name.</param>
 /// <param name="StripeSecretKey">Null or empty leaves the stored key as it is.</param>
@@ -245,19 +245,19 @@ public static class PaymentSettingsApi
             current.ReturnUrl,
             PaymentOptionsValidator.Missing(current),
             // The site's public address is the one buyers are sent back to, where that is a whole address.
-            PublicWebhookUrl(current.ReturnUrl),
+            providers.Names.Select(name => (Name: name.ToLowerInvariant(), Url: PublicWebhookUrl(current.ReturnUrl, name.ToLowerInvariant())))
+                .Where(p => p.Url is not null).ToDictionary(p => p.Name, p => p.Url!),
             cipher.Available,
             stored is not null,
             stored?.UpdatedAtUtc,
             stored?.UpdatedBy,
-            stored?.KeysUnreadable == true,
-            PublicWebhookUrl(current.ReturnUrl, PolarPaymentProvider.ProviderName));
+            stored?.KeysUnreadable == true);
     }
 
     /// <summary>
     /// Null unless <paramref name="returnUrl"/> is a web address: a path alone (development) says nothing of the site's.
     /// </summary>
-    internal static string? PublicWebhookUrl(string? returnUrl, string provider = StripePaymentProvider.ProviderName) =>
+    internal static string? PublicWebhookUrl(string? returnUrl, string provider) =>
         Uri.TryCreate(returnUrl, UriKind.Absolute, out var site) && site.Scheme is "http" or "https"
             ? site.GetLeftPart(UriPartial.Authority) + PublicWebhookPath + provider
             : null;

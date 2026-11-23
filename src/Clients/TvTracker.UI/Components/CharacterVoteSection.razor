@@ -140,9 +140,10 @@
                         return;
                     }
                 }
-                catch (HttpRequestException)
+                catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
                 {
-                    // An extra on the page: without it, the page stands, and it is asked for again.
+                    // An extra on the page: without it (unreachable, or an answer that isn't the votes), the page
+                    // stands, and it is asked for again.
                 }
                 // Shown now: this method goes on waiting, so the page wouldn't draw it otherwise.
                 StateHasChanged();
@@ -175,11 +176,17 @@
         (busy, error) = (true, null);
         try
         {
-            Show(votes?.Mine == personId
+            var answer = votes?.Mine == personId
                 ? await Ratings.RemoveCharacterVoteAsync(EpisodeId)
-                : await Ratings.VoteCharacterAsync(EpisodeId, ShowId, personId));
+                : await Ratings.VoteCharacterAsync(EpisodeId, ShowId, personId);
+            Show(answer);
+            if (answer is null)
+            {
+                // No such thing any more (voting was switched off while the page was open): say so, not nothing.
+                error = "Voting isn't available right now.";
+            }
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException or System.Text.Json.JsonException)
         {
             error = ErrorNotice.Describe(ex);
         }

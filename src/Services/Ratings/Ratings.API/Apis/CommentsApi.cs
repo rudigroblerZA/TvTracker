@@ -192,7 +192,7 @@ public static class CommentsApi
             return refused;
         }
 
-        var (was, wasSpoiler, rewritten) = (comment.HiddenReason, comment.IsSpoiler, text != comment.Text);
+        var (was, wasSpoiler, wasEdited, rewritten) = (comment.HiddenReason, comment.IsSpoiler, comment.EditedAtUtc, text != comment.Text);
         if (rewritten)
         {
             if (comment.EditedAtUtc is { } edited && DateTime.UtcNow - edited < Moderation.EditEvery)
@@ -214,7 +214,8 @@ public static class CommentsApi
         // Written only if the comment is hidden (or not) for the reason just read: a moderator's removal, or readers'
         // flags, landing meanwhile mustn't be undone by an edit that was decided without them.
         var written = await db.Comments
-            .Where(c => c.Id == id && c.UserId == userId && c.HiddenReason == was)
+            // And only if nobody edited it meanwhile: several edits sent at once would otherwise all pass the wait above.
+            .Where(c => c.Id == id && c.UserId == userId && c.HiddenReason == was && c.EditedAtUtc == wasEdited)
             .ExecuteUpdateAsync(set => set
                 .SetProperty(c => c.Text, comment.Text)
                 .SetProperty(c => c.EditedAtUtc, comment.EditedAtUtc)

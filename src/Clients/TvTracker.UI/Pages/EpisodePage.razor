@@ -304,6 +304,13 @@ else
     private async Task LoadAsync()
     {
         error = null;
+        if (episode is not null && episode.Id != Id)
+        {
+            // Another episode on the same page: what belonged to the last one goes before anything is awaited, since
+            // the comments' timer can redraw the page while this loads, and would show the new episode with the old
+            // one's watched mark, cast and half-edited comment.
+            (watched, cast, editing) = (false, [], null);
+        }
         try
         {
             await Session.EnsureLoadedAsync();

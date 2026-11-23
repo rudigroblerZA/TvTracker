@@ -7,6 +7,7 @@ using Identity.API.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;
 using TvTracker.Payments;
+using static Identity.API.Payments.ProviderWire;
 
 namespace Identity.API.Payments;
 
@@ -40,9 +41,9 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
     public const string SignatureHeader = "webhook-signature";
 
     /// <summary>
-    /// The metadata key that carries the app's checkout session id, the same as Stripe's.
+    /// The metadata key that carries the app's checkout session id.
     /// </summary>
-    public const string SessionKey = StripePaymentProvider.SessionKey;
+    public const string SessionKey = ProviderWire.SessionKey;
 
     private PolarOptions Polar => options.Value.Polar;
 
@@ -74,7 +75,7 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
                 new Dictionary<string, object>
                 {
                     ["amount_type"] = "fixed",
-                    ["price_amount"] = StripePaymentProvider.MinorUnits(session.Amount, session.Currency),
+                    ["price_amount"] = MinorUnits(session.Amount, session.Currency),
                     ["price_currency"] = session.Currency.ToLowerInvariant()
                 }
             }
@@ -88,17 +89,24 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
 
     public async Task CancelAsync(Subscription subscription, bool now, CancellationToken ct)
     {
-        var path = $"v1/subscriptions/{Uri.EscapeDataString(subscription.ProviderSubscriptionId)}";
-        using var _ = now
-            ? await SendAsync(HttpMethod.Delete, path, null, ct)
-            : await SendAsync(HttpMethod.Patch, path, new Dictionary<string, object> { ["cancel_at_period_end"] = true }, ct);
+        if (now)
+        {
+            using var _ = await SendAsync(HttpMethod.Delete, Path(subscription), null, ct);
+        }
+        else
+        {
+            await SetCancelAtPeriodEndAsync(subscription, true, ct);
+        }
     }
 
-    public async Task ResumeAsync(Subscription subscription, CancellationToken ct)
+    public Task ResumeAsync(Subscription subscription, CancellationToken ct) => SetCancelAtPeriodEndAsync(subscription, false, ct);
+
+    private async Task SetCancelAtPeriodEndAsync(Subscription subscription, bool cancel, CancellationToken ct)
     {
-        using var _ = await SendAsync(HttpMethod.Patch, $"v1/subscriptions/{Uri.EscapeDataString(subscription.ProviderSubscriptionId)}",
-            new Dictionary<string, object> { ["cancel_at_period_end"] = false }, ct);
+        using var _ = await SendAsync(HttpMethod.Patch, Path(subscription), new Dictionary<string, object> { ["cancel_at_period_end"] = cancel }, ct);
     }
+
+    private static string Path(Subscription subscription) => $"v1/subscriptions/{Uri.EscapeDataString(subscription.ProviderSubscriptionId)}";
 
     public string? ManageUrl(Subscription subscription) => Polar.PortalUrl is { Length: > 0 } url ? url : null;
 
@@ -119,29 +127,26 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
     /// </summary>
     internal static bool Verify(string body, string id, string timestamp, string signatures, string secret, DateTimeOffset now)
     {
-        if (id.Length == 0 || !long.TryParse(timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            || seconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds()
-            || (now - DateTimeOffset.FromUnixTimeSeconds(seconds)).Duration() > PaymentSignature.Tolerance)
+        if (id.Length == 0 || !PaymentSignature.Fresh(timestamp, now))
         {
             return false;
         }
-        var given = signatures.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(s => s.StartsWith("v1,", StringComparison.Ordinal))
-            .Select(s => s[3..])
-            .ToList();
-        var signed = Encoding.UTF8.GetBytes($"{id}.{timestamp}.{body}");
+        var given = signatures.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Encoding.ASCII.GetBytes).ToList();
         return Keys(secret).Any(key =>
         {
-            var expected = Encoding.ASCII.GetBytes(Convert.ToBase64String(HMACSHA256.HashData(key, signed)));
-            return given.Any(g => CryptographicOperations.FixedTimeEquals(expected, Encoding.ASCII.GetBytes(g)));
+            var expected = Encoding.ASCII.GetBytes(Signature(body, id, timestamp, key));
+            return given.Any(g => CryptographicOperations.FixedTimeEquals(expected, g));
         });
     }
 
-    internal static string Sign(string body, string id, DateTimeOffset at, byte[] key)
-    {
-        var t = at.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
-        return "v1," + Convert.ToBase64String(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"{id}.{t}.{body}")));
-    }
+    internal static string Sign(string body, string id, DateTimeOffset at, byte[] key) =>
+        Signature(body, id, at.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), key);
+
+    /// <summary>
+    /// One signature as the header carries it: <c>v1,</c> and the base64 HMAC-SHA256 of <c>{id}.{timestamp}.{body}</c>.
+    /// </summary>
+    private static string Signature(string body, string id, string timestamp, byte[] key) =>
+        "v1," + Convert.ToBase64String(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes($"{id}.{timestamp}.{body}")));
 
     private static IEnumerable<byte[]> Keys(string secret)
     {
@@ -189,8 +194,6 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
         }
     }
 
-    private static PaymentEvent Ignored(string id) => new(id, PaymentEventKind.Ignored, "");
-
     /// <summary>
     /// A paid order. One that isn't for a subscription (none are sold here) is ignored.
     /// </summary>
@@ -206,7 +209,7 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
         var currency = Text(order, "currency");
         // What the buyer paid, tax included, in the currency's smallest unit.
         decimal? amount = order.TryGetProperty("total_amount", out var total) && total.ValueKind == JsonValueKind.Number && currency is not null
-            ? StripePaymentProvider.FromMinorUnits(total.GetInt64(), currency)
+            ? FromMinorUnits(total.GetInt64(), currency)
             : null;
         DateTime? periodEnd = Text(of, "current_period_end") is { } end
             && DateTimeOffset.TryParse(end, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
@@ -218,27 +221,10 @@ public sealed class PolarPaymentProvider(HttpClient http, IOptions<PaymentOption
     private static string? Metadata(JsonElement element) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty("metadata", out var metadata) ? Text(metadata, SessionKey) : null;
 
-    private static string? Text(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    private static string AddQuery(Uri uri, string query) =>
-        new UriBuilder(uri) { Query = string.IsNullOrEmpty(uri.Query) ? query : $"{uri.Query.TrimStart('?')}&{query}" }.Uri.ToString();
-
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
-        request.Headers.Authorization = new("Bearer", Polar.AccessToken
-            ?? throw new InvalidOperationException("Payments:Polar:AccessToken isn't set."));
-        var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync(ct);
-            response.Dispose();
-            throw new HttpRequestException($"Polar answered {(int)response.StatusCode} to {method} {path}: {error}", null, response.StatusCode);
-        }
-        return response;
+        return await ProviderWire.SendAsync(http, request, Polar.AccessToken, "Polar", "Payments:Polar:AccessToken", ct);
     }
 }
 
