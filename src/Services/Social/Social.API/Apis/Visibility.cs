@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Social.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Social.Data;
 
 namespace Social.API.Apis;
 

@@ -1,9 +1,9 @@
-using System.Buffers.Text;
+﻿using System.Buffers.Text;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Tracking.API.Data;
+using Tracking.Data;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

@@ -1,5 +1,5 @@
-using Recommendations.API.Data;
-using Recommendations.API.Services;
+﻿using Recommendations.API.Services;
+using Recommendations.Data;
 
 namespace Recommendations.UnitTests;
 

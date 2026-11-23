@@ -6,46 +6,50 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/Aspire/">
-    <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />
     <Project Path="src/TvTracker.Alerts/TvTracker.Alerts.csproj" />
+    <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />
     <Project Path="src/TvTracker.ServiceDefaults/TvTracker.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/BuildingBlocks/">
-    <Project Path="src/TvTracker.EventBus/TvTracker.EventBus.csproj" />
     <Project Path="src/TvTracker.EventBus.RabbitMQ/TvTracker.EventBus.RabbitMQ.csproj" />
+    <Project Path="src/TvTracker.EventBus/TvTracker.EventBus.csproj" />
     <Project Path="src/TvTracker.IntegrationEvents/TvTracker.IntegrationEvents.csproj" />
     <Project Path="src/TvTracker.Persistence/TvTracker.Persistence.csproj" />
   </Folder>
   <Folder Name="/Services/">
-    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
-    <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
-    <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
-    <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
-    <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
-    <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
+    <Project Path="src/Services/Analytics/Analytics.API/Analytics.API.csproj" />
     <Project Path="src/Services/Analytics/Analytics.Data/Analytics.Data.csproj" />
     <Project Path="src/Services/Analytics/Analytics.Worker/Analytics.Worker.csproj" />
-    <Project Path="src/Services/Analytics/Analytics.API/Analytics.API.csproj" />
-    <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
     <Project Path="src/Services/Financials/Financials.API/Financials.API.csproj" />
+    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
+    <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
+    <Project Path="src/Services/Ratings/Ratings.Data/Ratings.Data.csproj" />
+    <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
+    <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" Id="42806abf-1bc6-442c-b382-512d94c72a0a" />
+    <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
+    <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
+    <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" Id="f37f43f3-f7e6-4603-ab19-3fc3171e8b54" />
+    <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
+    <Project Path="src/Services/Tracking/Tracking.Data/Tracking.Data.csproj" />
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
-    <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
-    <Project Path="tests/Identity.IntegrationTests/Identity.IntegrationTests.csproj" />
-    <Project Path="tests/Catalog.IntegrationTests/Catalog.IntegrationTests.csproj" />
+    <Project Path="tests/Analytics.IntegrationTests/Analytics.IntegrationTests.csproj" />
     <Project Path="tests/Analytics.UnitTests/Analytics.UnitTests.csproj" />
+    <Project Path="tests/Catalog.IntegrationTests/Catalog.IntegrationTests.csproj" />
+    <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
+    <Project Path="tests/Financials.UnitTests/Financials.UnitTests.csproj" />
+    <Project Path="tests/Identity.IntegrationTests/Identity.IntegrationTests.csproj" />
+    <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/Notifications.UnitTests/Notifications.UnitTests.csproj" />
+    <Project Path="tests/Ratings.IntegrationTests/Ratings.IntegrationTests.csproj" />
     <Project Path="tests/Recommendations.UnitTests/Recommendations.UnitTests.csproj" />
     <Project Path="tests/Research.UnitTests/Research.UnitTests.csproj" />
-    <Project Path="tests/Financials.UnitTests/Financials.UnitTests.csproj" />
-    <Project Path="tests/Ratings.IntegrationTests/Ratings.IntegrationTests.csproj" />
     <Project Path="tests/Social.IntegrationTests/Social.IntegrationTests.csproj" />
-    <Project Path="tests/Analytics.IntegrationTests/Analytics.IntegrationTests.csproj" />
     <Project Path="tests/Tracking.IntegrationTests/Tracking.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tools/">
@@ -56,8 +60,8 @@
     <Project Path="src/ApiGateways/Mobile.Bff/Mobile.Bff.csproj" />
   </Folder>
   <Folder Name="/Clients/">
+    <Project Path="src/Clients/MobileApp/MobileApp.csproj" />
     <Project Path="src/Clients/TvTracker.UI/TvTracker.UI.csproj" />
     <Project Path="src/Clients/WebApp/WebApp.csproj" />
-    <Project Path="src/Clients/MobileApp/MobileApp.csproj" />
   </Folder>
 </Solution>

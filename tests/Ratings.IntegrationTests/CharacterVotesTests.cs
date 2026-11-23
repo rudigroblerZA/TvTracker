@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -7,9 +7,9 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Ratings.API.Apis;
-using Ratings.API.Data;
 using Ratings.API.IntegrationEvents;
 using Ratings.API.Services;
+using Ratings.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Ratings.IntegrationTests;

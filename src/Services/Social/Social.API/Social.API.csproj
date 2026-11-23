@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+    <ProjectReference Include="..\Social.Data\Social.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>

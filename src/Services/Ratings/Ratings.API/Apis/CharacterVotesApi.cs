@@ -1,9 +1,9 @@
-﻿using Npgsql;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Ratings.API.Data;
+using Npgsql;
 using Ratings.API.Services;
+using Ratings.Data;
 using TvTracker;
 
 namespace Ratings.API.Apis;

@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using Tracking.API.Data;
 using Tracking.API.Services;
+using Tracking.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 using TvTracker.Tests;

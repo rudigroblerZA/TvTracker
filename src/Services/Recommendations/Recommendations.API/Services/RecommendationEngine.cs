@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Recommendations.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Recommendations.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Recommendations.API.Services;

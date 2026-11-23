@@ -1,9 +1,9 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Ratings.API.Data;
 using Ratings.API.Services;
+using Ratings.Data;
 
 namespace Ratings.API.Apis;
 

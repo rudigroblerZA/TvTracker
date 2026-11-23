@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using Recommendations.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
 using Recommendations.API.Services;
+using Recommendations.Data;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

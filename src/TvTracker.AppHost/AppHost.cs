@@ -770,7 +770,7 @@ if (publishing)
 
     // Every service: Keycloak is reached by plain HTTP on the private network, and a token someone got through the
     // site names the public address as its issuer.
-        foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
+    foreach (var project in builder.Resources.OfType<DotnetProjectResource>().ToList())
     {
         // Where its project file is, from this folder, as a label on its service in the compose file:
         // scripts/deploy.sh builds each service's image from the project named there.

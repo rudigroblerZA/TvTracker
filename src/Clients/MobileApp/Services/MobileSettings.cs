@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 
 namespace TvTracker.Mobile.Services;
 
@@ -25,7 +25,8 @@ public static class MobileSettings
     /// <summary>
     /// The deployment's host, or null in a development build.
     /// </summary>
-    private static string? PublicHost => Built.GetValueOrDefault("TvTracker.PublicHost");
+    //private static string? PublicHost => Built.GetValueOrDefault("TvTracker.PublicHost");
+    private static string? PublicHost => "dev-tvtracker-za.southafricanorth.cloudapp.azure.com";
 
     /// <summary>
     /// This machine, as the device reaches it: the address built in for a physical phone, or the emulator's.

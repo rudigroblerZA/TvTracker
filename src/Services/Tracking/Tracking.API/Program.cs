@@ -1,7 +1,7 @@
-using Tracking.API.Apis;
-using Tracking.API.Data;
+﻿using Tracking.API.Apis;
 using Tracking.API.IntegrationEvents;
 using Tracking.API.Services;
+using Tracking.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

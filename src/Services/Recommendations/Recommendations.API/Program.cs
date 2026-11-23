@@ -1,7 +1,7 @@
-using Recommendations.API.Apis;
-using Recommendations.API.Data;
+﻿using Recommendations.API.Apis;
 using Recommendations.API.IntegrationEvents;
 using Recommendations.API.Services;
+using Recommendations.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

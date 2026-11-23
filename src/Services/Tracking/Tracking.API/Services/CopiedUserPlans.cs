@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
-using Tracking.API.Data;
+using Tracking.Data;
 using TvTracker;
 
 namespace Tracking.API.Services;

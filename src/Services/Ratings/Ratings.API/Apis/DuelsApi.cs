@@ -1,7 +1,7 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Ratings.API.Data;
+using Ratings.Data;
 using TvTracker;
 
 namespace Ratings.API.Apis;

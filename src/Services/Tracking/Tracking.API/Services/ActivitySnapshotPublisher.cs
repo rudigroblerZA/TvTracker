@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Tracking.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Tracking.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

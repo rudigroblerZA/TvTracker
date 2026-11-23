@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Ratings.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Ratings.Data;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Social.API.Apis;
-using Social.API.Data;
+using Social.Data;
 
 namespace Social.IntegrationTests;
 

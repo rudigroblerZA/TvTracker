@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Ratings.API.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Ratings.Data;
 using TvTracker.Tests;
 
 [assembly: AssemblyFixture(typeof(PostgresServer))]

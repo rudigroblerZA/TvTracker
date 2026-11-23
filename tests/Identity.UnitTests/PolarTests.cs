@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using Identity.API.Data;
 using Identity.API.Payments;
@@ -154,7 +154,13 @@ public class PolarTests
     {
         var session = new CheckoutSession
         {
-            Id = Guid.Parse(Session), UserId = "user-1", Provider = "polar", Plan = Plans.Family, Interval = PlanPrices.Year, Amount = 49.99m, Currency = "ZAR"
+            Id = Guid.Parse(Session),
+            UserId = "user-1",
+            Provider = "polar",
+            Plan = Plans.Family,
+            Interval = PlanPrices.Year,
+            Amount = 49.99m,
+            Currency = "ZAR"
         };
 
         var body = JsonSerializer.SerializeToElement(
@@ -178,7 +184,8 @@ public class PolarTests
 
         options.Polar = new PolarOptions
         {
-            AccessToken = "polar_oat_x", WebhookSecret = Secret,
+            AccessToken = "polar_oat_x",
+            WebhookSecret = Secret,
             Products = new PolarProducts { PlusMonth = "a", PlusYear = "b", FamilyMonth = "c", FamilyYear = " " }
         };
         Assert.Contains("Family by the year", Assert.Single(PaymentOptionsValidator.Missing(options)));

@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Social.API.Data;
+using Social.Data;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
