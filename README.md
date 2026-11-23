@@ -1466,6 +1466,15 @@ and (already confirmed) email address Google gives.
     in `ApplicationTitle` in `MobileApp.csproj`.
   - **Not covered:** the Keycloak sign-in page, whose title is the realm's `displayName` in
     `Realms/tvtracker-realm.json` (imported once, so change an existing realm in the Keycloak admin console).
+- **Sign-in pages:** Keycloak's sign in, register, forgotten-password and related pages wear the app's look (its
+  colours, type, brand mark and buttons) through a Keycloak login theme, `src/TvTracker.AppHost/Themes/tvtracker/login`:
+  a stylesheet over Keycloak's own theme (`keycloak.v2`), so the pages themselves stay Keycloak's.
+  - **Where it's set:** the realm file names it (`loginTheme`), and Identity.API sets it on a realm imported before
+    the theme existed. The AppHost mounts `Themes` into Keycloak; a deployment mounts it from the checkout.
+  - **What it doesn't follow:** the accent colour and theme chosen in the app. It uses the default colours, and
+    light or dark as the device says. Change the colours at the top of `resources/css/tvtracker.css`.
+  - **After changing it in a deployment,** restart Keycloak (`docker compose -p tvtracker restart keycloak`): in
+    production mode it caches themes.
 - **Theme:** the ☀/☾ button in the header switches between light and dark. Settings → Theme also offers Same as
   device (the default). On a phone-width screen the header drops its Sign out button to fit one row; Sign out is in
   Settings. Kept per device or browser, and applied before the page

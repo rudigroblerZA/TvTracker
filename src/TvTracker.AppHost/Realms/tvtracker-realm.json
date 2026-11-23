@@ -1,6 +1,7 @@
 {
   "realm": "tvtracker",
   "displayName": "TV Tracker",
+  "loginTheme": "tvtracker",
   "enabled": true,
   "registrationAllowed": true,
   "registrationEmailAsUsername": false,

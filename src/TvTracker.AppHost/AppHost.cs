@@ -87,6 +87,9 @@ var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26
     .WithEnvironment("KC_PROXY_HEADERS", "xforwarded")
     .WithVolume("tvtracker-keycloak-data", "/opt/keycloak/data")
     .WithBindMount("./Realms", "/opt/keycloak/data/import", isReadOnly: true)
+    // The sign-in pages in the app's colours (Themes/tvtracker/login): the realm's login theme, which the realm file
+    // names and Identity.API sets on a realm imported before there was one (RealmSecretsSeeder).
+    .WithBindMount("./Themes", "/opt/keycloak/themes", isReadOnly: true)
     .WithHttpEndpoint(port: 8080, targetPort: 8080, name: "http")
     .WithHttpEndpoint(targetPort: 9000, name: "management")
     .WithHttpHealthCheck("/health/ready", endpointName: "management")

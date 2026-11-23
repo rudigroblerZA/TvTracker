@@ -1,0 +1,199 @@
+/* The sign-in pages (sign in, register, forgotten password and the rest of Keycloak's login theme), dressed as the
+   app: its colours, type, brand mark and buttons, from the tokens in the web app's app.css. Keycloak's own theme
+   (keycloak.v2, on PatternFly 5) stays underneath; this only restyles it, so its pages keep working as it changes.
+   Colours are light-dark(light, dark) and follow the device, as the app does before a theme is chosen in Settings. */
+:root {
+    color-scheme: light dark;
+    --bg: light-dark(#fafaf9, #0c0a09);
+    --surface: light-dark(#ffffff, #1c1917);
+    --text: light-dark(#1c1917, #f5f5f4);
+    --muted: light-dark(#57534e, #a8a29e);
+    --border: light-dark(#e7e5e4, #292524);
+    --field-border: light-dark(#a8a29e, #57534e);
+    --accent: light-dark(#2563eb, #7cb0ff);
+    --accent-text: light-dark(#ffffff, #0c0a09);
+    --accent-2: light-dark(#4f46e5, #a5b4fc);
+    --tint: color-mix(in srgb, var(--text) 6%, transparent);
+    --danger: light-dark(#b91c1c, #f87171);
+    --good: light-dark(#166534, #4ade80);
+    --warn: light-dark(#92400e, #fbbf24);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow-sm: 0 1px 2px light-dark(rgb(28 25 23 / 0.06), rgb(0 0 0 / 0.5)), 0 1px 3px light-dark(rgb(28 25 23 / 0.05), rgb(0 0 0 / 0.4));
+    --shadow-md: 0 6px 16px light-dark(rgb(28 25 23 / 0.12), rgb(0 0 0 / 0.55)), 0 2px 4px light-dark(rgb(28 25 23 / 0.06), rgb(0 0 0 / 0.4));
+    --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* PatternFly reads its colours from these; set on both of its modes, since light-dark() already picks the side. */
+:root, :root.pf-v5-theme-dark, .pf-v5-theme-dark {
+    --pf-v5-global--FontFamily--text: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --pf-v5-global--FontFamily--heading: var(--pf-v5-global--FontFamily--text);
+    --pf-v5-global--BackgroundColor--100: var(--surface);
+    --pf-v5-global--BackgroundColor--200: var(--bg);
+    --pf-v5-global--Color--100: var(--text);
+    --pf-v5-global--Color--200: var(--muted);
+    --pf-v5-global--BorderColor--100: var(--border);
+    --pf-v5-global--primary-color--100: var(--accent);
+    --pf-v5-global--primary-color--200: var(--accent-2);
+    --pf-v5-global--link--Color: var(--accent);
+    --pf-v5-global--link--Color--hover: var(--accent);
+    --pf-v5-global--danger-color--100: var(--danger);
+    --pf-v5-global--success-color--100: var(--good);
+    --pf-v5-global--warning-color--100: var(--warn);
+}
+
+html, body, .pf-v5-c-login {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--pf-v5-global--FontFamily--text);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The app's soft glow of the accent behind the top of the page, in place of Keycloak's background picture. */
+body, body#keycloak-bg {
+    min-height: 100vh;
+    background-image: radial-gradient(1200px 420px at 50% -160px, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%);
+    background-repeat: no-repeat;
+}
+.pf-v5-c-login { background: transparent; min-height: 100vh; padding: clamp(20px, 6vh, 64px) 16px; }
+.pf-v5-c-login__container { display: block; width: 100%; max-width: 420px; margin-inline: auto; padding: 0; }
+
+/* The app's name with its mark: the gradient tile and the play triangle from the app's header. */
+.pf-v5-c-login__header { padding: 0 0 22px; display: flex; justify-content: center; }
+#kc-header-wrapper {
+    position: relative; display: inline-flex; align-items: center; gap: 11px;
+    font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; line-height: 1.2; color: var(--text) !important;
+    text-transform: none; white-space: normal; padding: 0;
+}
+#kc-header-wrapper::before, #kc-header-wrapper::after { content: ""; width: 32px; height: 32px; flex: none; }
+#kc-header-wrapper::before { border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.2); }
+#kc-header-wrapper::after { position: absolute; left: 0; top: 50%; transform: translateY(-50%); background: var(--accent-text); clip-path: polygon(38% 28%, 38% 72%, 74% 50%); }
+
+/* The card. */
+.pf-v5-c-login__main {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md);
+    margin: 0; overflow: hidden;
+}
+.pf-v5-c-login__main-header { padding: 26px 28px 6px; border: 0; }
+.pf-v5-c-login__main-body { padding: 14px 28px 26px; }
+.pf-v5-c-login__main-header .pf-v5-c-title, #kc-page-title {
+    font-size: 1.35rem; font-weight: 750; letter-spacing: -0.018em; line-height: 1.25; color: var(--text); text-wrap: balance;
+}
+/* "New user? Register", "Back to login" and the like: a quiet line under a rule at the foot of the card. Keycloak puts
+   it in different places on different pages (after the form, or inside it), so it isn't made to reach the card's edges. */
+.pf-v5-c-login__main-footer { display: block; background: transparent; padding: 0; margin: 0; }
+.pf-v5-c-login__main-footer:not(:has(*)) { display: none; }
+.pf-v5-c-login__main-footer-band {
+    display: block; background: transparent; border: 0; border-top: 1px solid var(--border);
+    margin-top: 22px; padding: 16px 0 0; color: var(--muted); font-size: 0.95rem; text-align: center;
+}
+.pf-v5-c-login__main-footer-band-item { color: var(--muted); padding: 0; }
+
+a, .pf-v5-c-button.pf-m-link { color: var(--accent); text-decoration: none; text-underline-offset: 0.18em; font-weight: 550; }
+a:hover, .pf-v5-c-button.pf-m-link:hover { color: var(--accent); text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* Fields. */
+.pf-v5-c-form { gap: 16px; }
+.pf-v5-c-form__label-text { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.pf-v5-c-form__label-required { color: var(--danger); }
+.pf-v5-c-form-control {
+    --pf-v5-c-form-control--BackgroundColor: var(--bg);
+    --pf-v5-c-form-control--Color: var(--text);
+    --pf-v5-c-form-control--BorderRadius: var(--radius-sm);
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--field-border); border-radius: var(--radius-sm);
+    transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.pf-v5-c-form-control::before, .pf-v5-c-form-control::after { display: none; }
+.pf-v5-c-form-control > :is(input, select, textarea) {
+    background: transparent; color: var(--text); font: inherit; font-size: 1rem;
+    padding: 10px 12px; min-height: 44px; border-radius: var(--radius-sm); outline: none;
+}
+.pf-v5-c-form-control > :is(input, textarea)::placeholder { color: var(--muted); }
+.pf-v5-c-form-control:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+.pf-v5-c-form-control.pf-m-error, .pf-v5-c-form-control:has([aria-invalid="true"]) { border-color: var(--danger); }
+/* A saved password filled in by the browser keeps the field's own colours. */
+.pf-v5-c-form-control > input:-webkit-autofill { -webkit-text-fill-color: var(--text); box-shadow: 0 0 0 100px var(--bg) inset; caret-color: var(--text); }
+
+/* The password field and its show/hide button read as one field. */
+.pf-v5-c-input-group { gap: 0; }
+.pf-v5-c-input-group__item.pf-m-fill .pf-v5-c-form-control { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+    background: var(--bg); color: var(--muted);
+    border: 1px solid var(--field-border); border-left: 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0; min-width: 44px; min-height: 44px;
+}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after { display: none; }
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover { color: var(--text); background: var(--tint); }
+
+.pf-v5-c-check { align-items: center; gap: 8px; }
+.pf-v5-c-check__input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.pf-v5-c-check__label { color: var(--text); font-size: 0.95rem; }
+.pf-v5-c-helper-text { align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 4px; font-size: 0.95rem; }
+.pf-v5-c-helper-text__item-text { color: var(--muted); font-size: inherit; }
+.pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text, .pf-v5-c-form__helper-text .pf-m-error { color: var(--danger); }
+
+/* Buttons: the app's main button for the action, its quiet one for the rest. */
+.pf-v5-c-button {
+    font: inherit; font-weight: 650; font-size: 1rem; border-radius: 999px; min-height: 44px; padding: 10px 20px;
+    transition: filter 0.15s var(--ease), box-shadow 0.15s var(--ease), transform 0.1s var(--ease);
+}
+.pf-v5-c-button::after { display: none; }
+.pf-v5-c-button.pf-m-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-text);
+    border: 0; box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+.pf-v5-c-button.pf-m-primary:hover:not(:disabled) { filter: brightness(1.07); box-shadow: var(--shadow-md), inset 0 1px 0 rgb(255 255 255 / 0.18); color: var(--accent-text); text-decoration: none; }
+.pf-v5-c-button.pf-m-primary:active:not(:disabled) { transform: scale(0.98); }
+.pf-v5-c-button:focus-visible { outline: none; box-shadow: var(--ring); }
+.pf-v5-c-button:disabled, .pf-v5-c-button.pf-m-disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.pf-v5-c-button.pf-m-secondary, .pf-v5-c-button.pf-m-tertiary {
+    background: var(--surface); color: var(--accent); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+}
+.pf-v5-c-button.pf-m-secondary:hover, .pf-v5-c-button.pf-m-tertiary:hover { border-color: var(--accent); text-decoration: none; }
+.pf-v5-c-form__actions { gap: 10px; margin: 0; }
+.pf-v5-c-form__actions > * { margin: 0; }
+
+/* Messages: a wrong password, a link sent, a session that ran out. */
+.pf-v5-c-alert {
+    --tone: var(--accent);
+    background: color-mix(in srgb, var(--tone) 10%, var(--surface)); color: var(--text);
+    border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent); border-radius: var(--radius-sm);
+    box-shadow: none; padding: 12px 14px; margin-bottom: 16px;
+}
+.pf-v5-c-alert::before { display: none; }
+.pf-v5-c-alert.pf-m-danger { --tone: var(--danger); }
+.pf-v5-c-alert.pf-m-success { --tone: var(--good); }
+.pf-v5-c-alert.pf-m-warning { --tone: var(--warn); }
+.pf-v5-c-alert__icon { color: var(--tone); }
+.pf-v5-c-alert__title { color: var(--text); font-weight: 600; }
+
+/* Sign in with Google and any other provider: quiet buttons under an "or" rule. */
+#kc-social-providers, .kc-social-section { margin-top: 20px; }
+#kc-social-providers hr, .pf-v5-c-divider { border-color: var(--border); background-color: var(--border); }
+#kc-social-providers h2, .kc-social-section h2 { color: var(--muted); font-size: 0.9rem; font-weight: 500; text-align: center; margin: 14px 0 12px; }
+#kc-social-providers ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+#kc-social-providers a {
+    display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 16px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 999px;
+    box-shadow: var(--shadow-sm); font-weight: 600;
+}
+#kc-social-providers a:hover { border-color: var(--accent); text-decoration: none; }
+
+/* Longer text on some pages (terms, an instruction after a mail is sent). */
+#kc-info-message, .instruction, #kc-terms-text { color: var(--muted); }
+.pf-v5-c-login__main-body p { text-wrap: pretty; }
+
+@media (max-width: 480px) {
+    .pf-v5-c-login { padding: 20px 12px; }
+    .pf-v5-c-login__main-header { padding: 22px 20px 4px; }
+    .pf-v5-c-login__main-body { padding: 12px 20px 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+}
