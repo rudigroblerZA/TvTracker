@@ -840,6 +840,7 @@ running:
 ```bash
 dotnet test tests/Identity.IntegrationTests   # the subscription ledger: events in; subscriptions, receipts, plan and published events out
 dotnet test tests/Catalog.IntegrationTests    # show sync: a scripted provider in; catalog rows and published events out
+dotnet test tests/Ratings.IntegrationTests    # favourite-character votes: the upsert, the counts, and a vote going with its watch
 ```
 
 - **The subscription ledger** (`SubscriptionLedger.ApplyAsync`): a first payment, the same event again, a checkout
@@ -847,6 +848,10 @@ dotnet test tests/Catalog.IntegrationTests    # show sync: a scripted provider i
   cancel and resume, an ending (and an admin's change in between), a lapsed subscription paid again. Two races are
   made to happen rather than hoped for, by putting the other writer between the ledger's check and its save: two
   checkouts paid at once (the database's one-running index refuses the second) and one event delivered twice at once.
+- **Favourite-character votes** (`CharacterVotesApi`): a vote is one upsert, so voting again changes it; the counts
+  and the reader's own pick from one grouped query; nothing shown and no vote without a watch; the show taken from
+  the watch, not the request; someone outside the cast refused unless the catalog can't say; a vote removed when its
+  episode is unwatched; a show's favourites limited to its cast.
 - **Show sync** (`CatalogSynchronizer`): importing and refreshing through a scripted provider at the
   `ICatalogProvider` seam. What is stored, which events go out and in what order, a moved episode, a new season, a
   show ending, corrections surviving a refresh, the Wikidata supplement filling only what's empty, and one person
@@ -2399,3 +2404,7 @@ Run `aspire update` (or `dotnet list package --outdated`) to bring them up to da
   `ModelRunner:Url`).
 - **Docker Hub's anonymous pull limit** (429) blocked the `ai/` pull in the sandbox, which is why the Hugging Face copy
   was used there.
+
+## Licence
+
+Proprietary: all rights reserved (see `LICENSE`). Third-party components and data keep their own licences and terms.
