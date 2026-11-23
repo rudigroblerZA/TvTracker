@@ -4,7 +4,7 @@ using TvTracker.Persistence;
 namespace Identity.Data;
 
 /// <summary>
-/// What an admin has set for payments on the Financials page (<see cref="Apis.PaymentSettingsApi"/>): the provider
+/// What an admin has set for payments on the Financials page (<c>PaymentSettingsApi</c>): the provider
 /// that sells, and Stripe's keys. One row; a field left null falls back to configuration (<c>Payments:*</c>).
 /// </summary>
 public class PaymentSettings
@@ -22,7 +22,7 @@ public class PaymentSettings
     public string? Provider { get; set; }
 
     /// <summary>
-    /// Encrypted (<see cref="Payments.SettingsCipher"/>); null follows configuration.
+    /// Encrypted (<c>SettingsCipher</c>); null follows configuration.
     /// </summary>
     public string? StripeSecretKey { get; set; }
 
@@ -43,7 +43,7 @@ public class PaymentSettings
 
 /// <summary>
 /// What admins have set in Settings for the whole site: the app's name and accent colour, and the company behind it.
-/// One row; a field left null falls back to configuration (<see cref="Apis.BrandingApi"/>).
+/// One row; a field left null falls back to configuration (<c>BrandingApi</c>).
 /// </summary>
 public class SiteSettings
 {
@@ -108,7 +108,7 @@ public class UserProfile
 
     /// <summary>
     /// The plan they get: their own, or "family" while they're in an active family; what other services are sent
-    /// (<see cref="Services.PlanState"/>).
+    /// (<c>PlanState</c>).
     /// </summary>
     public string EffectivePlan { get; set; } = TvTracker.IntegrationEvents.Plans.Free;
 
@@ -166,7 +166,7 @@ public class CheckoutSession
 
 /// <summary>
 /// A paid plan at a provider. Active until the period it's paid for ends: renewed by a payment, ended by the provider
-/// or, when no word comes, by <see cref="Services.SubscriptionLapse"/> after a grace period.
+/// or, when no word comes, by <c>SubscriptionLapse</c> after a grace period.
 /// </summary>
 public class Subscription
 {

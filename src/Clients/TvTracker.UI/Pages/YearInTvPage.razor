@@ -44,7 +44,9 @@
                 </div>
                 @if (recap.Bulk > 0)
                 {
-                    <p class="muted small">@($"{recap.Bulk} {(recap.Bulk == 1 ? "episode" : "episodes")} marked many at once {(recap.Bulk == 1 ? "isn't" : "aren't")} counted, since when you watched {(recap.Bulk == 1 ? "it" : "them")} isn't known.")</p>
+                    <p class="muted small">@(recap.Bulk == 1
+                        ? "1 episode marked in bulk isn't counted, since when you watched it isn't known."
+                        : $"{recap.Bulk} episodes marked many at once aren't counted, since when you watched them isn't known.")</p>
                 }
 
                 <section>
@@ -56,7 +58,7 @@
                                 <a href="shows/@show.ShowId"><Poster Title="@show.Title" Url="@show.PosterUrl" Size="small" /></a>
                                 <div>
                                     <a href="shows/@show.ShowId"><strong>@show.Title</strong></a>
-                                    <div class="muted small">@($"{show.Episodes} {(show.Episodes == 1 ? "episode" : "episodes")} · {Format.Duration(show.Minutes)}")</div>
+                                    <div class="muted small">@($"{Format.Count(show.Episodes, "episode")} · {Format.Duration(show.Minutes)}")</div>
                                 </div>
                             </li>
                         }
@@ -68,11 +70,11 @@
                     <ul class="plain-list">
                         @if (recap.BusiestMonth is { } month)
                         {
-                            <li>@($"Busiest month: {month.Name}, {Format.Duration(month.Minutes)} over {month.Episodes} {(month.Episodes == 1 ? "episode" : "episodes")}")</li>
+                            <li>@($"Busiest month: {month.Name}, {Format.Duration(month.Minutes)} over {Format.Count(month.Episodes, "episode")}")</li>
                         }
                         @if (recap.BusiestDay is { } day)
                         {
-                            <li>@($"Biggest day: {day.Date:d MMMM}, {day.Episodes} {(day.Episodes == 1 ? "episode" : "episodes")} ({Format.Duration(day.Minutes)})")</li>
+                            <li>@($"Biggest day: {day.Date:d MMMM}, {Format.Count(day.Episodes, "episode")} ({Format.Duration(day.Minutes)})")</li>
                         }
                         @if (recap.TopNetwork is { } network)
                         {

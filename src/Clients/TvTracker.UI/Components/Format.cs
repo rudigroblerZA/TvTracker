@@ -7,6 +7,11 @@ public static class Format
     public static string EpisodeCode(int season, int episode) => $"S{season:00}E{episode:00}";
 
     /// <summary>
+    /// A count with its noun: "1 episode", "3 episodes". <paramref name="many"/> is for a plural that isn't the noun plus s.
+    /// </summary>
+    public static string Count(int count, string one, string? many = null) => count == 1 ? $"1 {one}" : $"{count} {many ?? one + "s"}";
+
+    /// <summary>
     /// Names as a sentence lists them: "A", "A and B", "A, B and C". Empty for none.
     /// </summary>
     public static string List(IReadOnlyList<string> names) => names.Count switch

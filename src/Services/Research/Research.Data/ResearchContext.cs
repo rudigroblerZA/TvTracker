@@ -32,13 +32,13 @@ public class Dossier
     public DateTime UpdatedAtUtc { get; set; }
 
     /// <summary>
-    /// When the research assistant (<see cref="Services.ResearchAssistant"/>) last gathered and queued a draft for it; a
+    /// When the research assistant (<c>ResearchAssistant</c>) last gathered and queued a draft for it; a
     /// moderator still reviews and saves.
     /// </summary>
     public DateTime? AssistantPreparedAtUtc { get; set; }
 
     /// <summary>
-    /// Why the assistant picked it (<see cref="Services.RefreshReasons"/>, or "unresearched").
+    /// Why the assistant picked it (<c>RefreshReasons</c>, or "unresearched").
     /// </summary>
     public string? AssistantReason { get; set; }
 }
@@ -180,7 +180,7 @@ public class EpisodeNote
 }
 
 /// <summary>
-/// Where Wikidata disagrees with the catalog about a popular show (<see cref="Services.CatalogChecks"/>), one row per
+/// Where Wikidata disagrees with the catalog about a popular show (<c>CatalogChecks</c>), one row per
 /// show and field. The whole table is replaced by each check.
 /// </summary>
 public class CatalogCheck
@@ -213,7 +213,7 @@ public class CatalogCheck
 
 /// <summary>
 /// A popular show's award wins on Wikidata (P166, one statement per win), from the daily check
-/// (<see cref="Services.CatalogChecks"/>): the awards shelf and Prestige picks. Replaced by each check; saved research's
+/// (<c>CatalogChecks</c>): the awards shelf and Prestige picks. Replaced by each check; saved research's
 /// awards fact, checked by a moderator, is shown instead where there is one.
 /// </summary>
 public class ShowAward

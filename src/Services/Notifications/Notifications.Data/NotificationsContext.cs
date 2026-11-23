@@ -40,7 +40,7 @@ public class NotificationPreferences
     public string TimeZone { get; set; } = "UTC";
 
     /// <summary>
-    /// One email a week (<see cref="Services.WeeklyDigest"/>) instead of an email per alert; push alerts carry on.
+    /// One email a week (<c>WeeklyDigest</c>) instead of an email per alert; push alerts carry on.
     /// Needs an email address, and is off until the user turns it on.
     /// </summary>
     public bool WeeklyDigest { get; set; }
