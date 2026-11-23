@@ -19,6 +19,7 @@
     <OpenTelemetryInstrumentationVersion>1.21.0</OpenTelemetryInstrumentationVersion>
   </PropertyGroup>
   <ItemGroup Label="Aspire hosting (AppHost)">
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.Docker" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="17.0.0" />
