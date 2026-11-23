@@ -1,36 +1,22 @@
-<Project Sdk="Aspire.AppHost.Sdk/17.0.0">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>7f3c2a51-9d4e-4b8a-a6f1-2c5e8b9d0a17</UserSecretsId>
+    <!-- The services aren't referenced: AppHost.cs names each one's project file (Project(...)), and Aspire builds
+         them when the app starts. -->
     <!-- Use the Aspire CLI bundle for the dashboard and orchestrator; this also clears the ASPIRE010 build warning. -->
     <AspireUseCliBundle>true</AspireUseCliBundle>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.Docker" />
     <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Flagd" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Services\Identity\Identity.API\Identity.API.csproj" />
-    <ProjectReference Include="..\Services\Catalog\Catalog.API\Catalog.API.csproj" />
-    <ProjectReference Include="..\Services\Research\Research.API\Research.API.csproj" />
-    <ProjectReference Include="..\Services\Financials\Financials.API\Financials.API.csproj" />
-    <ProjectReference Include="..\Services\Catalog\Catalog.SyncWorker\Catalog.SyncWorker.csproj" />
-    <ProjectReference Include="..\Services\Tracking\Tracking.API\Tracking.API.csproj" />
-    <ProjectReference Include="..\Services\Ratings\Ratings.API\Ratings.API.csproj" />
-    <ProjectReference Include="..\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
-    <ProjectReference Include="..\Services\Social\Social.API\Social.API.csproj" />
-    <ProjectReference Include="..\Services\Notifications\Notifications.API\Notifications.API.csproj" />
-    <ProjectReference Include="..\Services\Analytics\Analytics.API\Analytics.API.csproj" />
-    <ProjectReference Include="..\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
-    <ProjectReference Include="..\ApiGateways\Mobile.Bff\Mobile.Bff.csproj" />
-    <ProjectReference Include="..\Clients\WebApp\WebApp.csproj" />
   </ItemGroup>
 
 </Project>
