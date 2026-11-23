@@ -49,8 +49,7 @@ public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEve
         }
 
         await db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
-        // A favourite-character vote needs the watch: it goes with it.
-        await db.CharacterVotes.Where(v => v.UserId == e.UserId && v.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
+        // A favourite-character vote on the episode goes with the watch (see RatingsContext).
         db.MarkProcessed(e, nameof(EpisodeUnwatchedHandler));
         await db.SaveChangesAsync(ct);
     }
@@ -89,11 +88,6 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
             .Select(w => new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = w.Key, ShowId = w.Value, RecordedAtUtc = now }));
         db.MarkProcessed(e, nameof(TrackingSnapshotHandler));
         await db.SaveChangesAsync(ct);
-        // As an unwatch does: favourite-character votes go with the watches they needed. After the watches are gone,
-        // so a vote that got in while they were going is taken too, and any left by an earlier run that stopped here.
-        await db.CharacterVotes
-            .Where(v => v.UserId == e.UserId && !db.WatchedEpisodes.Any(w => w.UserId == v.UserId && w.EpisodeId == v.EpisodeId))
-            .ExecuteDeleteAsync(ct);
     }
 }
 

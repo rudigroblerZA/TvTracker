@@ -31,20 +31,12 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
     {
         try
         {
+            // Not a show the catalog has: nobody is in its cast.
             return await cache.GetOrCreateAsync($"cast:{showId}", async token =>
-            {
-                using var response = await http.GetAsync($"api/v1/shows/{showId}", token);
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    // Not a show the catalog has: nobody is in its cast.
-                    return [];
-                }
-                response.EnsureSuccessStatusCode();
-                var show = await response.Content.ReadFromJsonAsync<ShowCast>(token);
-                return show?.Cast.Select(member => member.PersonId).ToArray() ?? [];
-            }, Kept, cancellationToken: ct);
+                (await GetAsync<ShowCast>($"api/v1/shows/{showId}", token))?.Cast.Select(member => member.PersonId).ToArray() ?? [],
+                Kept, cancellationToken: ct);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested)
+        catch (Exception ex) when (CouldNotSay(ex, ct))
         {
             logger.LogWarning(ex, "Couldn't ask the catalog for the cast of {ShowId}; it goes unchecked", showId);
             return null;
@@ -59,20 +51,35 @@ public sealed class CatalogCast(HttpClient http, HybridCache cache, ILogger<Cata
     {
         try
         {
-            using var response = await http.GetAsync($"api/v1/episodes/{episodeId}", ct);
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-            response.EnsureSuccessStatusCode();
-            return (await response.Content.ReadFromJsonAsync<EpisodeShow>(ct))?.ShowId is { } showId && showId != Guid.Empty ? showId : null;
+            var showId = (await GetAsync<EpisodeShow>($"api/v1/episodes/{episodeId}", ct))?.ShowId;
+            return showId == Guid.Empty ? null : showId;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested)
+        catch (Exception ex) when (CouldNotSay(ex, ct))
         {
             logger.LogWarning(ex, "Couldn't ask the catalog which show episode {EpisodeId} belongs to", episodeId);
             return null;
         }
     }
+
+    /// <summary>
+    /// What the catalog has at <paramref name="path"/>; null when it has nothing there. Throws when it can't be asked.
+    /// </summary>
+    private async Task<T?> GetAsync<T>(string path, CancellationToken ct) where T : class
+    {
+        using var response = await http.GetAsync(path, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<T>(ct);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="ex"/> is the catalog failing to answer, and not the caller giving up.
+    /// </summary>
+    private static bool CouldNotSay(Exception ex, CancellationToken ct) =>
+        ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException && !ct.IsCancellationRequested;
 
     /// <summary>
     /// The part of Catalog.API's show that is read here.

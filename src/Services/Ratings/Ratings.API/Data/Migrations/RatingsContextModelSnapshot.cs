@@ -493,6 +493,15 @@ namespace Ratings.API.Data.Migrations
 
                     b.ToTable("processed_integration_events", (string)null);
                 });
+
+            modelBuilder.Entity("Ratings.API.Data.CharacterVote", b =>
+                {
+                    b.HasOne("Ratings.API.Data.WatchedEpisodeCopy", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "EpisodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }

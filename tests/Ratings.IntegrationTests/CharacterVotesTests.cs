@@ -45,11 +45,14 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     private CatalogCast Catalog(HttpStatusCode status = HttpStatusCode.OK, Guid[]? cast = null, bool knowsEpisode = true)
     {
         var people = cast ?? [athena, hen, buck];
-        var handler = new Stub(path =>
-            status != HttpStatusCode.OK ? new HttpResponseMessage(status)
-            : path == $"/api/v1/shows/{show}" ? Json(new { cast = people.Select(id => new { personId = id }) })
-            : path == $"/api/v1/episodes/{episode}" && knowsEpisode ? Json(new { id = episode, showId = show })
-            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        var (theShow, theEpisode) = ($"/api/v1/shows/{show}", $"/api/v1/episodes/{episode}");
+        var handler = new Stub(path => path switch
+        {
+            _ when status != HttpStatusCode.OK => new HttpResponseMessage(status),
+            _ when path == theShow => Json(new { cast = people.Select(id => new { personId = id }) }),
+            _ when path == theEpisode && knowsEpisode => Json(new { id = episode, showId = show }),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+        });
         var cache = new ServiceCollection().AddHybridCache().Services.BuildServiceProvider();
         caches.Add(cache);
         return new CatalogCast(new HttpClient(handler) { BaseAddress = new Uri("http://catalog/") },
@@ -67,20 +70,21 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     private async Task<string> WatcherAsync(Guid? ofEpisode = null, Guid? inShow = null, bool showKnown = true)
     {
         var user = NewUser();
-        await using var db = database.Context();
-        db.WatchedEpisodes.Add(new WatchedEpisodeCopy
-        {
-            UserId = user, EpisodeId = ofEpisode ?? episode, ShowId = showKnown ? inShow ?? show : null, RecordedAtUtc = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync(Ct);
+        await WatchAsync(user, ofEpisode ?? episode, showKnown ? inShow ?? show : null);
         return user;
     }
 
-    private async Task<object> VoteAsync(string user, Guid person, Guid? ofEpisode = null, Guid? claimedShow = null, CatalogCast? catalog = null)
+    private async Task WatchAsync(string user, Guid ofEpisode, Guid? inShow)
     {
         await using var db = database.Context();
-        var result = await CharacterVotesApi.VoteAsync(ofEpisode ?? episode, new CharacterVoteRequest(claimedShow ?? show, person), As(user), db,
-            catalog ?? Catalog(), Ct);
+        db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = user, EpisodeId = ofEpisode, ShowId = inShow, RecordedAtUtc = DateTime.UtcNow });
+        await db.SaveChangesAsync(Ct);
+    }
+
+    private async Task<object> VoteAsync(string user, Guid person, Guid? ofEpisode = null, CatalogCast? catalog = null)
+    {
+        await using var db = database.Context();
+        var result = await CharacterVotesApi.VoteAsync(ofEpisode ?? episode, new CharacterVoteRequest(person), As(user), db, catalog ?? Catalog(), Ct);
         return result.Result;
     }
 
@@ -135,22 +139,22 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     }
 
     [Fact]
-    public async Task A_vote_counts_towards_the_show_the_watch_names_not_the_one_the_request_claims()
+    public async Task A_vote_counts_towards_the_show_the_watch_names()
     {
         var me = await WatcherAsync();
 
-        await VoteAsync(me, athena, claimedShow: Guid.NewGuid());
+        await VoteAsync(me, athena);
 
         await using var db = database.Context();
         Assert.Equal(show, (await db.CharacterVotes.SingleAsync(v => v.UserId == me, Ct)).ShowId);
     }
 
     [Fact]
-    public async Task A_watch_that_does_not_name_its_show_takes_it_from_the_catalog_not_the_request()
+    public async Task A_watch_that_does_not_name_its_show_takes_it_from_the_catalog()
     {
         var me = await WatcherAsync(showKnown: false);
 
-        await VoteAsync(me, athena, claimedShow: Guid.NewGuid());
+        await VoteAsync(me, athena);
 
         await using var db = database.Context();
         Assert.Equal(show, (await db.CharacterVotes.SingleAsync(v => v.UserId == me, Ct)).ShowId);
@@ -187,8 +191,11 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
 
         // The vote has read the watch, and waits on it; the unwatch then goes through.
         var vote = VoteAsync(me, athena);
-        await Task.Delay(TimeSpan.FromMilliseconds(500), Ct);
-        Assert.False(vote.IsCompleted);
+        while (await unwatching.Database.SqlQuery<int>($"select count(*)::int as \"Value\" from pg_locks where not granted").SingleAsync(Ct) == 0)
+        {
+            Assert.False(vote.IsCompleted);
+            await Task.Delay(TimeSpan.FromMilliseconds(20), Ct);
+        }
         await unwatch.CommitAsync(Ct);
 
         Assert.IsType<Conflict<string>>(await vote);
@@ -249,11 +256,7 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     {
         var kept = Guid.NewGuid();
         var me = await WatcherAsync();
-        await using (var db = database.Context())
-        {
-            db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = me, EpisodeId = kept, ShowId = show, RecordedAtUtc = DateTime.UtcNow });
-            await db.SaveChangesAsync(Ct);
-        }
+        await WatchAsync(me, kept, show);
         await VoteAsync(me, athena);
         await VoteAsync(me, hen, ofEpisode: kept);
 
