@@ -19,12 +19,12 @@
     <OpenTelemetryInstrumentationVersion>1.21.0</OpenTelemetryInstrumentationVersion>
   </PropertyGroup>
   <ItemGroup Label="Aspire hosting (AppHost)">
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Docker" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Docker" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
     <!-- Community Toolkit: flagd, the OpenFeature flag server. -->
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="13.6.1" />
   </ItemGroup>

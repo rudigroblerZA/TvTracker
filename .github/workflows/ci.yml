@@ -38,14 +38,9 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      # The AppHost names each service's and the web app's project file (Project("name", "path") in AppHost.cs) and
-      # doesn't reference them, so building it builds none of them: each is built here.
-      - name: Build AppHost, services and web app
-        run: |
-          dotnet build src/TvTracker.AppHost -c Release
-          grep -o 'Project("[^"]*", "[^"]*")' src/TvTracker.AppHost/AppHost.cs | sed 's/.*, "\(.*\)")/\1/' | while read -r project; do
-            dotnet build "src/TvTracker.AppHost/$project" -c Release
-          done
+      # The AppHost references every service and the web app.
+      - name: Build services and web app
+        run: dotnet build src/TvTracker.AppHost -c Release
 
       - name: Build tools
         run: |
