@@ -77,6 +77,11 @@ public sealed class MobilePlatformServices(IPushTokenProvider pushTokens, Notifi
 
     public bool SellsPlans => false;
 
+    /// <summary>
+    /// Uploaded pictures come from Identity.API through the gateway, which needs no sign-in for them.
+    /// </summary>
+    public string AvatarBase { get; } = new Uri(MobileSettings.BffAddress, "identity/api/v1/").AbsoluteUri;
+
     public async Task<bool> ShareLinkAsync(string title, string url)
     {
         await Share.Default.RequestAsync(new ShareTextRequest { Title = title, Uri = url });

@@ -25,7 +25,7 @@
                     @foreach (var person in requests)
                     {
                         <li class="person-row" @key="person.UserId">
-                            <a class="avatar" href="users/@person.UserId" aria-hidden="true" tabindex="-1">@FeedItemRow.Initial(person.DisplayName)</a>
+                            <Avatar Name="@person.DisplayName" Src="@person.Avatar" UserId="@person.UserId" />
                             <div class="feed-body"><a class="strong" href="users/@person.UserId">@person.DisplayName</a></div>
                             <button class="btn" @onclick="() => ApproveAsync(person)" aria-label="Approve @person.DisplayName">Approve</button>
                             <button class="btn btn-quiet" @onclick="() => DeclineAsync(person)" aria-label="Decline @person.DisplayName">Decline</button>
@@ -97,7 +97,7 @@
                     @foreach (var person in blocked)
                     {
                         <li class="person-row" @key="person.UserId">
-                            <span class="avatar" aria-hidden="true">@FeedItemRow.Initial(person.DisplayName)</span>
+                            <Avatar Name="@person.DisplayName" Src="@person.Avatar" />
                             <div class="feed-body"><span class="strong">@person.DisplayName</span></div>
                             <button class="btn btn-quiet" @onclick="() => UnblockAsync(person)" aria-label="Unblock @person.DisplayName">Unblock</button>
                         </li>

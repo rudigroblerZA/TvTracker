@@ -1,0 +1,49 @@
+﻿@* A person's picture in a circle, or their initial when they have none or it won't load.
+   - Src is the avatar as the services send it: an https address, or for an uploaded picture a path the host knows
+     where to find (IPlatformServices.AvatarBase).
+   - Decorative: the name is always beside it, so it is hidden from screen readers and skipped by the keyboard. *@
+@inject IPlatformServices Platform
+
+@if (UserId is null)
+{
+    <span class="avatar @(Large ? "large" : null)" aria-hidden="true">@Content</span>
+}
+else
+{
+    <a class="avatar @(Large ? "large" : null)" href="users/@UserId" aria-hidden="true" tabindex="-1">@Content</a>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+
+    [Parameter] public string? Src { get; set; }
+
+    /// <summary>
+    /// Whose profile the picture links to; null for one that isn't a link.
+    /// </summary>
+    [Parameter] public string? UserId { get; set; }
+
+    [Parameter] public bool Large { get; set; }
+
+    private RenderFragment Content => @<text>
+        @Initial(Name)
+        @if (Address(Src, Platform.AvatarBase) is { } address)
+        {
+            @* Over the initial, which shows through until the picture arrives and stays if it never does. No referrer:
+               a picture kept elsewhere shouldn't tell that site which page it was shown on. *@
+            <img src="@address" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()" />
+        }
+    </text>;
+
+    public static string Initial(string name) => name.Length == 0 ? "?" : char.ToUpperInvariant(name[0]).ToString();
+
+    /// <summary>
+    /// Where a browser finds <paramref name="avatar"/>: an https address as it is, an uploaded picture's path under
+    /// <paramref name="avatarBase"/>; null for none, or for anything else (an address that isn't https is never loaded).
+    /// </summary>
+    public static string? Address(string? avatar, string avatarBase) =>
+        string.IsNullOrWhiteSpace(avatar) ? null
+        : avatar.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? avatar
+        : avatar.StartsWith("avatars/", StringComparison.Ordinal) ? avatarBase + avatar
+        : null;
+}

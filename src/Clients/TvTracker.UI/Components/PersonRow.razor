@@ -1,6 +1,6 @@
 @* A person in a list (search results, followers, following) with a follow button. *@
 <li class="person-row">
-    <a class="avatar" href="users/@Person.UserId" aria-hidden="true" tabindex="-1">@FeedItemRow.Initial(Person.DisplayName)</a>
+    <Avatar Name="@Person.DisplayName" Src="@Person.Avatar" UserId="@Person.UserId" />
     <div class="feed-body">
         <a class="strong" href="users/@Person.UserId">@Person.DisplayName</a>
         <div class="muted small">

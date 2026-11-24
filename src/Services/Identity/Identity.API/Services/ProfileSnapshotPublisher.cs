@@ -54,7 +54,7 @@ public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimePr
                 .Where(p => after == null || string.Compare(p.UserId, after) > 0)
                 .OrderBy(p => p.UserId)
                 .Take(ProfilesPerBatch)
-                .Select(p => new { p.UserId, p.DisplayName, Plan = p.EffectivePlan, PlanChangedAtUtc = p.EffectivePlanChangedAtUtc })
+                .Select(p => new { p.UserId, p.DisplayName, Plan = p.EffectivePlan, PlanChangedAtUtc = p.EffectivePlanChangedAtUtc, p.AvatarVersion, p.AvatarUrl })
                 .ToListAsync(ct);
             if (batch.Count == 0)
             {
@@ -64,7 +64,8 @@ public sealed class ProfileSnapshotPublisher(IServiceScopeFactory scopes, TimePr
             foreach (var profile in batch)
             {
                 outbox.Add(new UserProfileSnapshotIntegrationEvent(profile.UserId, profile.DisplayName, profile.Plan,
-                    profile.PlanChangedAtUtc is { } changed ? new DateTimeOffset(changed, TimeSpan.Zero) : null));
+                    profile.PlanChangedAtUtc is { } changed ? new DateTimeOffset(changed, TimeSpan.Zero) : null,
+                    UserProfile.AvatarOf(profile.UserId, profile.AvatarVersion, profile.AvatarUrl)));
             }
             await db.SaveChangesAsync(ct);
             await outbox.PublishAddedAsync(ct);

@@ -11,7 +11,7 @@ namespace Social.API.Apis;
 /// <param name="Requested">The caller asked to follow this private profile and is waiting for approval.</param>
 /// <param name="BlockedByYou">The caller blocked them (only ever true on the caller's block list).</param>
 public record PersonDto(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou,
-    bool Private = false, bool Requested = false, bool BlockedByYou = false);
+    bool Private = false, bool Requested = false, bool BlockedByYou = false, string? Avatar = null);
 
 /// <param name="Requests">Follow requests waiting for the caller's approval.</param>
 public record MySocialDto(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following, bool Private = false,
@@ -40,7 +40,7 @@ public record FeedDto(IReadOnlyList<FeedItemDto> Items, DateTime? NextBefore);
 /// <param name="First">For "watched": the earliest of them; null when the catalog copy doesn't know it yet.</param>
 /// <param name="Last">For "watched": the latest of them, when more than one.</param>
 public record FeedItemDto(Guid Id, string UserId, string DisplayName, string Kind, Guid ShowId, string? ShowTitle, string? PosterUrl,
-    int Episodes, EpisodeCodeDto? First, EpisodeCodeDto? Last, int? Stars, DateTime OccurredAtUtc);
+    int Episodes, EpisodeCodeDto? First, EpisodeCodeDto? Last, int? Stars, DateTime OccurredAtUtc, string? Avatar = null);
 
 /// <summary>
 /// Numbers only: a follower may not have seen the episode, so titles stay out of the feed.
@@ -374,7 +374,7 @@ public static class SocialApi
         return ids.Where(id => profiles.ContainsKey(id) && (includeBlocked || !blocked.Contains(id)))
             .Select(id => new PersonDto(id, profiles[id].DisplayName, followers.GetValueOrDefault(id), following.GetValueOrDefault(id),
                 mine.TryGetValue(id, out var ok) && ok, followMe.Contains(id), id == me,
-                profiles[id].Private, mine.TryGetValue(id, out var pending) && !pending, blockedByMe.Contains(id)))
+                profiles[id].Private, mine.TryGetValue(id, out var pending) && !pending, blockedByMe.Contains(id), profiles[id].Avatar))
             .ToList();
     }
 
@@ -383,7 +383,8 @@ public static class SocialApi
         var userIds = items.Select(a => a.UserId).Distinct().ToList();
         var showIds = items.Select(a => a.ShowId).Distinct().ToList();
         var episodeIds = items.SelectMany(a => a.EpisodeIds).Distinct().ToList();
-        var names = await db.Profiles.AsNoTracking().Where(p => userIds.Contains(p.UserId)).ToDictionaryAsync(p => p.UserId, p => p.DisplayName, ct);
+        var people = await db.Profiles.AsNoTracking().Where(p => userIds.Contains(p.UserId))
+            .ToDictionaryAsync(p => p.UserId, p => new { p.DisplayName, p.Avatar }, ct);
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
         var episodes = await db.Episodes.AsNoTracking().Where(e => episodeIds.Contains(e.EpisodeId)).ToDictionaryAsync(e => e.EpisodeId, ct);
 
@@ -392,11 +393,12 @@ public static class SocialApi
                 var known = a.EpisodeIds.Where(episodes.ContainsKey).Select(id => episodes[id])
                     .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber).ToList();
                 var show = shows.GetValueOrDefault(a.ShowId);
-                return new FeedItemDto(a.Id, a.UserId, names.GetValueOrDefault(a.UserId) ?? "Someone", a.Kind, a.ShowId, show?.Title, show?.PosterUrl,
+                var person = people.GetValueOrDefault(a.UserId);
+                return new FeedItemDto(a.Id, a.UserId, person?.DisplayName ?? "Someone", a.Kind, a.ShowId, show?.Title, show?.PosterUrl,
                     a.EpisodeIds.Count,
                     known.Count > 0 ? new EpisodeCodeDto(known[0].SeasonNumber, known[0].EpisodeNumber) : null,
                     known.Count > 1 ? new EpisodeCodeDto(known[^1].SeasonNumber, known[^1].EpisodeNumber) : null,
-                    a.Stars, a.OccurredAtUtc);
+                    a.Stars, a.OccurredAtUtc, person?.Avatar);
             })
             .ToList();
     }

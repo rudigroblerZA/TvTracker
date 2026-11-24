@@ -1323,6 +1323,23 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
   - `GET /api/v1/lists/limits` (Tracking) gives what the lists endpoints enforce.
   - Past a limit, Tracking answers 403 with a problem of type `plan-limit` naming the plan that allows it.
 
+### Profile pictures
+
+People set a picture in Settings → Profile; it shows beside their name on their profile, in people lists, in the feed,
+among friends on a show, and (their own) in the header. Without one, their initial shows.
+
+- **Two ways:** upload a picture, or give the https address of one elsewhere. An upload wins while there is one.
+- **Uploads** are cropped to a square and shrunk to 256 pixels in the browser (`wwwroot/avatar.js`), then kept by
+  Identity.API in its database (`profile_avatars`), so they are backed up and deleted with the account. Identity
+  takes JPEG, PNG and WebP up to 256 KB, going by the file's first bytes; SVG is refused.
+- **Serving:** `GET /api/v1/avatars/{userId}` on Identity.API needs no sign-in. A profile's `avatar` is that path with
+  a `v` that changes on each upload, so browsers keep a picture for good. The web app passes pictures on at
+  `/avatars/{userId}`; the phone loads them through the gateway.
+- **A picture elsewhere** is loaded from that site by everyone who sees it, without a referrer. Only https is taken.
+- **How the rest know:** Identity's profile events carry the avatar, and Social keeps it with the name.
+- **API:** `PUT /api/v1/me/avatar` (`{ "image": "<base64>" }`) and `DELETE /api/v1/me/avatar`, signed in.
+- **Not there yet:** comments and community notes show names only, and the data export doesn't include the picture.
+
 ### List links
 
 A list's page has **Get a link** (behind the `list-links` flag): anyone with the link (`/l/{token}`) sees the list,

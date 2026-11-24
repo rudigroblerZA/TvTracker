@@ -71,6 +71,38 @@ public class SiteSettings
     public DateTime UpdatedAtUtc { get; set; }
 }
 
+/// <summary>
+/// A picture a user uploaded for their profile: small (the client shrinks it to a square first), kept here in the
+/// database so it is backed up and deleted with everything else of theirs.
+/// </summary>
+public class ProfileAvatar
+{
+    public required string UserId { get; set; }
+
+    /// <summary>
+    /// One of <see cref="ContentTypes"/>, as worked out from the bytes when they were uploaded.
+    /// </summary>
+    public required string ContentType { get; set; }
+
+    public required byte[] Bytes { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// The most an uploaded picture may weigh. A 256-pixel square JPEG is a tenth of this.
+    /// </summary>
+    public const int MaxBytes = 256 * 1024;
+
+    /// <summary>
+    /// The kinds of picture taken, by how their files begin; null for anything else (SVG among them, which can carry script).
+    /// </summary>
+    public static string? ContentTypeOf(ReadOnlySpan<byte> bytes) =>
+        bytes.StartsWith<byte>([0xFF, 0xD8, 0xFF]) ? "image/jpeg"
+        : bytes.StartsWith<byte>([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) ? "image/png"
+        : bytes.Length >= 12 && bytes[..4].SequenceEqual("RIFF"u8) && bytes.Slice(8, 4).SequenceEqual("WEBP"u8) ? "image/webp"
+        : null;
+}
+
 public class UserProfile
 {
     /// <summary>
@@ -82,7 +114,27 @@ public class UserProfile
 
     public string? Email { get; set; }
 
+    /// <summary>
+    /// A picture elsewhere on the web, by its https address. Used when no picture has been uploaded.
+    /// </summary>
     public string? AvatarUrl { get; set; }
+
+    /// <summary>
+    /// Set while the user has an uploaded picture (<see cref="ProfileAvatar"/>), and different after each upload: it
+    /// goes into the picture's address, so browsers keep a picture for good and still see a new one at once.
+    /// </summary>
+    public long? AvatarVersion { get; set; }
+
+    /// <summary>
+    /// The picture to show for this user, as the profile events carry it: the uploaded one's path under
+    /// <c>api/v1/</c>, else <see cref="AvatarUrl"/>, else null.
+    /// </summary>
+    public string? Avatar => AvatarOf(UserId, AvatarVersion, AvatarUrl);
+
+    /// <summary>
+    /// <see cref="Avatar"/> from its parts, for a query that reads only those.
+    /// </summary>
+    public static string? AvatarOf(string userId, long? version, string? url) => version is not null ? $"avatars/{userId}?v={version}" : url;
 
     /// <summary>
     /// IANA timezone id, e.g. "Africa/Johannesburg". Clients convert UTC air times with it.
@@ -244,6 +296,7 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
     public const string OneRunningSubscription = "IX_subscriptions_UserId_Running";
 
     public DbSet<UserProfile> Profiles => Set<UserProfile>();
+    public DbSet<ProfileAvatar> Avatars => Set<ProfileAvatar>();
     public DbSet<Family> Families => Set<Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
@@ -283,9 +336,18 @@ public class IdentityContext(DbContextOptions<IdentityContext> options) : DbCont
             entity.Property(s => s.GoverningLaw).HasMaxLength(80);
         });
 
+        modelBuilder.Entity<ProfileAvatar>(entity =>
+        {
+            entity.ToTable("profile_avatars");
+            entity.HasKey(a => a.UserId);
+            entity.Property(a => a.UserId).HasMaxLength(64);
+            entity.Property(a => a.ContentType).HasMaxLength(32);
+        });
+
         modelBuilder.Entity<UserProfile>(entity =>
         {
             entity.ToTable("profiles");
+            entity.Ignore(p => p.Avatar);
             entity.HasKey(p => p.UserId);
             entity.Property(p => p.UserId).HasMaxLength(64);
             entity.Property(p => p.DisplayName).HasMaxLength(100);

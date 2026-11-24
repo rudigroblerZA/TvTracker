@@ -48,6 +48,15 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<Profile?> UpdateProfileAsync(UpdateProfile update, CancellationToken ct = default) =>
         SendAsync<Profile>(ApiClients.Identity, HttpMethod.Put, "api/v1/profile", update, ct);
 
+    /// <summary>
+    /// Makes <paramref name="image"/> (a JPEG, PNG or WebP, already shrunk) the user's picture; returns their profile with it.
+    /// </summary>
+    public Task<Profile?> UploadAvatarAsync(byte[] image, CancellationToken ct = default) =>
+        SendAsync<Profile>(ApiClients.Identity, HttpMethod.Put, "api/v1/me/avatar", new { image }, ct);
+
+    public Task<Profile?> RemoveAvatarAsync(CancellationToken ct = default) =>
+        SendAsync<Profile>(ApiClients.Identity, HttpMethod.Delete, "api/v1/me/avatar", null, ct);
+
     public Task DeleteAccountAsync(CancellationToken ct = default) =>
         SendAsync(ApiClients.Identity, HttpMethod.Delete, "api/v1/account", null, ct);
 

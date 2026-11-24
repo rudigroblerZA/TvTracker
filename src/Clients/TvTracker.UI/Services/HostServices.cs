@@ -70,6 +70,12 @@ public interface IPlatformServices
     bool SellsPlans => true;
 
     /// <summary>
+    /// What an uploaded picture's path ("avatars/{userId}?v=…") is under, for an img to load it. The web app serves
+    /// those paths itself, so there it is empty; the phone gives the gateway's address for Identity.API.
+    /// </summary>
+    string AvatarBase => "";
+
+    /// <summary>
     /// Shares a link: the share sheet on a phone, else copies it. True when it was shared or copied.
     /// </summary>
     Task<bool> ShareLinkAsync(string title, string url);

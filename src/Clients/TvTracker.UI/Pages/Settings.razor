@@ -4,6 +4,8 @@
 @inject NotificationsClient Notifications
 @inject UserSession Session
 @inject IPlatformServices Platform
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @inject IAuthActions Auth
 @inject SpoilerShield Shield
 @inject ThemeStore Theme
@@ -64,7 +66,28 @@
             {
                 <form class="stack" @onsubmit="SaveProfileAsync">
                     <label>Display name <input @bind="displayName" maxlength="100" required /></label>
-                    <label>Avatar URL <input @bind="avatarUrl" type="url" placeholder="https://…" /></label>
+                    <div class="avatar-edit">
+                        <Avatar Name="@profile.DisplayName" Src="@profile.Avatar" Large />
+                        <div class="stack">
+                            <div class="avatar-actions">
+                                @* The real file input is hidden; this label is its button. *@
+                                <label class="btn btn-quiet small" aria-disabled="@uploading">
+                                    @(uploading ? "Uploading…" : profile.AvatarUploaded ? "Change picture" : "Upload a picture")
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" @ref="avatarFile" @onchange="UploadAvatarAsync" disabled="@uploading" />
+                                </label>
+                                @if (profile.AvatarUploaded)
+                                {
+                                    <button type="button" class="btn btn-quiet small" @onclick="RemoveAvatarAsync" disabled="@uploading">Remove</button>
+                                }
+                            </div>
+                            <span class="muted small">Shown beside your name on your profile, in people lists and in the feed. It's cropped to a square.</span>
+                        </div>
+                    </div>
+                    <label>
+                        Or a picture's address
+                        <input @bind="avatarUrl" type="url" placeholder="https://…" maxlength="1024" />
+                        <span class="muted small">Used when you haven't uploaded one. It's loaded from that site by everyone who sees it.</span>
+                    </label>
                     <label>
                         Timezone
                         <span class="inline">
@@ -362,6 +385,14 @@
     private Profile? profile;
     private string displayName = "";
     private string? avatarUrl;
+    private ElementReference avatarFile;
+    private bool uploading;
+    private IJSObjectReference? avatarScript;
+
+    /// <summary>
+    /// The side of the square an uploaded picture is shrunk to, in pixels: enough for the large avatar on a sharp screen.
+    /// </summary>
+    private const int AvatarSize = 256;
     private string timeZone = "UTC";
     private string region = "US";
     private string language = "en";
@@ -435,16 +466,64 @@
         }
     }
 
-    private Task SaveProfileAsync() => RunAsync(async () =>
+    private async Task UploadAvatarAsync()
     {
-        var updated = await Identity.UpdateProfileAsync(new UpdateProfile(displayName, avatarUrl, timeZone, region, language));
+        uploading = true;
+        try
+        {
+            await RunAsync(async () =>
+            {
+                avatarScript ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/TvTracker.UI/avatar.js");
+                IJSStreamReference? picture;
+                try
+                {
+                    picture = await avatarScript.InvokeAsync<IJSStreamReference?>("squared", avatarFile, AvatarSize);
+                }
+                catch (JSException)
+                {
+                    error = "That file isn't a picture this can read. Try a JPEG or PNG.";
+                    return;
+                }
+                if (picture is null)
+                {
+                    return;
+                }
+                await using (picture)
+                {
+                    await using var stream = await picture.OpenReadStreamAsync(maxAllowedSize: 1024 * 1024);
+                    using var bytes = new MemoryStream();
+                    await stream.CopyToAsync(bytes);
+                    Use(await Identity.UploadAvatarAsync(bytes.ToArray()));
+                }
+                saved = "Picture saved.";
+            }, "That picture couldn't be used. Try a JPEG or PNG.");
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private Task RemoveAvatarAsync() => RunAsync(async () =>
+    {
+        Use(await Identity.RemoveAvatarAsync());
+        saved = "Picture removed.";
+    });
+
+    private void Use(Profile? updated)
+    {
         if (updated is not null)
         {
             profile = updated;
             Session.SetProfile(updated);
         }
+    }
+
+    private Task SaveProfileAsync() => RunAsync(async () =>
+    {
+        Use(await Identity.UpdateProfileAsync(new UpdateProfile(displayName, avatarUrl, timeZone, region, language)));
         saved = "Profile saved.";
-    }, "Check the timezone (e.g. Africa/Johannesburg) and the two-letter region.");
+    }, "Check the timezone (e.g. Africa/Johannesburg), the two-letter region, and that a picture's address starts with https://.");
 
     private Task SavePreferencesAsync() => RunAsync(async () =>
     {

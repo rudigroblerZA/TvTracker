@@ -1,10 +1,19 @@
 @inject IAuthActions Auth
 @inject NavigationManager Navigation
+@inject UserSession Session
+@implements IDisposable
 
 <AuthorizeView>
     <Authorized>
         <a href="stats" class="account-link">Stats</a>
-        <a href="settings" class="account-link">@(context.User.FindFirst("name")?.Value ?? context.User.Identity?.Name ?? "Account")</a>
+        @{ var name = Session.Profile?.DisplayName ?? context.User.FindFirst("name")?.Value ?? context.User.Identity?.Name ?? "Account"; }
+        <a href="settings" class="account-link account-me">
+            @if (Session.Profile?.Avatar is not null)
+            {
+                <Avatar Name="@name" Src="@Session.Profile.Avatar" />
+            }
+            <span>@name</span>
+        </a>
         <button class="btn btn-quiet header-sign-out" @onclick="Auth.SignOutAsync">Sign out</button>
     </Authorized>
     <NotAuthorized>
@@ -14,4 +23,12 @@
 
 @code {
     private Task SignIn() => Auth.SignInAsync(Navigation.Uri);
+
+    // The name and picture follow the profile: a change in Settings shows here at once.
+    // The layout loads the session; this only listens for it.
+    protected override void OnInitialized() => Session.Changed += Refresh;
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= Refresh;
 }

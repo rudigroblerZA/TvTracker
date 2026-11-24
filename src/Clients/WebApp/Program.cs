@@ -221,6 +221,29 @@ app.MapGet("/go/{showId:guid}", async (Guid showId, string provider, int type, s
     return Results.Redirect($"/shows/{showId}");
 });
 
+// People's uploaded pictures, at the path the shared UI gives an img ("avatars/{userId}?v=…"): the browser can't reach
+// Identity.API, so the picture is passed on from it. Each upload has its own v, so a picture is kept for good.
+app.MapGet("/avatars/{userId}", async (string userId, HttpContext http, IHttpClientFactory clients) =>
+{
+    try
+    {
+        using var response = await clients.CreateClient(ApiClients.Identity)
+            .GetAsync($"api/v1/avatars/{Uri.EscapeDataString(userId)}", HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+        // Only a picture Identity vouches for: it sends nothing else from here, and names the kind it found on upload.
+        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType is not { } kind || !kind.StartsWith("image/", StringComparison.Ordinal))
+        {
+            return Results.NotFound();
+        }
+        http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        http.Response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
+        return Results.Bytes(await response.Content.ReadAsByteArrayAsync(http.RequestAborted), kind);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.NotFound();
+    }
+});
+
 TestAffiliateNetwork.Map(app);
 TestPaymentProvider.Map(app);
 
