@@ -58,7 +58,7 @@
     <Project Path="src/TvTracker.EventBus/TvTracker.EventBus.csproj" />
     <Project Path="src/TvTracker.IntegrationEvents/TvTracker.IntegrationEvents.csproj" />
     <Project Path="src/TvTracker.Persistence/TvTracker.Persistence.csproj" />
-    <Project Path="src/TvTracker.ShowInsightsEngine/TvTracker.ShowInsightsEngine.csproj" />
+    <Project Path="src/TvTracker.InsightsEngine/TvTracker.InsightsEngine.csproj" />
   </Folder>
   <Folder Name="/Services/" />
   <Folder Name="/Tests/">

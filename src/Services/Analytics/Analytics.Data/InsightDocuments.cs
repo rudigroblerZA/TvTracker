@@ -28,12 +28,12 @@ public static class InsightDocuments
         public static readonly string Traits = Name(nameof(ShowDna.Traits));
         public static readonly string SharedCast = Name(nameof(ShowInsights.SharedCast));
         public static readonly string GetsGood = Name(nameof(ShowInsights.GetsGood));
-        public static readonly string Turn = Name(nameof(TvTracker.ShowInsightsEngine.GetsGood.Turn));
-        public static readonly string FromTheStart = Name(nameof(TvTracker.ShowInsightsEngine.GetsGood.FromTheStart));
+        public static readonly string Turn = Name(nameof(TvTracker.InsightsEngine.GetsGood.Turn));
+        public static readonly string FromTheStart = Name(nameof(TvTracker.InsightsEngine.GetsGood.FromTheStart));
         public static readonly string Outlook = Name(nameof(ShowInsights.Outlook));
         public static readonly string SeasonVerdict = Name(nameof(ShowInsights.SeasonVerdict));
-        public static readonly string Number = Name(nameof(TvTracker.ShowInsightsEngine.SeasonVerdict.Number));
-        public static readonly string FinaleAiredAtUtc = Name(nameof(TvTracker.ShowInsightsEngine.SeasonVerdict.FinaleAiredAtUtc));
+        public static readonly string Number = Name(nameof(TvTracker.InsightsEngine.SeasonVerdict.Number));
+        public static readonly string FinaleAiredAtUtc = Name(nameof(TvTracker.InsightsEngine.SeasonVerdict.FinaleAiredAtUtc));
         public static readonly string Key = Name(nameof(ShowTag.Key));
         public static readonly string Value = Name(nameof(DnaTrait.Value));
 
