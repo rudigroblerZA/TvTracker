@@ -2,6 +2,9 @@ using TvTracker.IntegrationEvents;
 
 namespace Analytics.Data;
 
+// Analytics' copy of our users' ratings, follows and watches, built from events. Its copy of the catalog is among the
+// insights engine's facts.
+
 public class UserShowRating
 {
     public required string UserId { get; set; }

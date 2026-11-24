@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
 
@@ -28,7 +27,7 @@ public static class TimeMachineApi
         ClaimsPrincipal user, AnalyticsContext db, HybridCache cache, TimeProvider time, DateOnly? date = null, string? tz = null,
         CancellationToken ct = default)
     {
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
         var today = ViewerRules.LocalDate(time.GetUtcNow(), zone);
         if (date is { } asked && (asked < TimeMachine.Earliest || asked >= today))
         {
@@ -58,22 +57,21 @@ public static class TimeMachineApi
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
 
         // Each show's first and last regular episode, to tell premieres and finales.
-        var spans = (await db.Episodes.AsNoTracking()
+        var spans = await db.Episodes.AsNoTracking()
                 .Where(e => showIds.Contains(e.ShowId) && e.SeasonNumber > 0 && e.AirsAtUtc != null)
                 .GroupBy(e => e.ShowId)
                 .Select(g => new { ShowId = g.Key, First = g.Min(e => e.AirsAtUtc), Last = g.Max(e => e.AirsAtUtc) })
-                .ToListAsync(ct))
-            .ToDictionary(s => s.ShowId, s => (s.First, s.Last));
+                .ToDictionaryAsync(s => s.ShowId, s => (s.First, s.Last), ct);
 
-        var onAir = new List<TimeMachineShowDto>();
-        if (date is not null)
+        if (date is null)
         {
-            var airing = await InWeeksAsync(db, zone, middles, TimeMachine.OnAirDays, ct);
-            var airingIds = airing.Select(e => e.ShowId).Distinct().ToList();
-            onAir = TimeMachine.OnAir(airing, await db.Shows.AsNoTracking().Where(s => airingIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct));
+            return TimeMachine.Of(date, today, zone, middles, episodes, shows, spans);
         }
 
-        return TimeMachine.Of(date, today, zone, middles, episodes, shows, spans, onAir);
+        var airing = await InWeeksAsync(db, zone, middles, TimeMachine.OnAirDays, ct);
+        var airingIds = airing.Select(e => e.ShowId).Distinct().ToList();
+        var airingShows = await db.Shows.AsNoTracking().Where(s => airingIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
+        return TimeMachine.Of(date, today, zone, middles, episodes, shows, spans, (airing, airingShows));
     }
 
     /// <summary>

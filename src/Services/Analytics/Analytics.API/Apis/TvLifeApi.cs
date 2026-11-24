@@ -57,7 +57,7 @@ public static class TvLifeApi
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["born"] = [$"Use a year from {EarliestBirthYear} to {now.Year}."] });
         }
         var userId = user.GetUserId();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
 
         // Every catalog show's first and last regular episode, from one aggregate.
         var runs = await db.Episodes.AsNoTracking().AiredRegular(now)
@@ -73,7 +73,7 @@ public static class TvLifeApi
             .ToListAsync(ct);
         var bulk = ShowFactRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
-            .Select(r => (r.ShowId, Year: TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone).Year, r.Minutes))
+            .Select(r => (r.ShowId, Year: ViewerRules.Local(r.WatchedAtUtc, zone).Year, r.Minutes))
             .ToList();
         var watchedShows = rows.Select(r => r.ShowId).ToHashSet();
         var progress = await Viewer.ProgressAsync(db, userId, now, null, ct);
@@ -84,7 +84,7 @@ public static class TvLifeApi
         var finales = known.Where(r => shows[r.ShowId].HasEnded()).ToLookup(r => r.Last.Year, r => r.ShowId);
         var started = watches.GroupBy(w => w.ShowId).ToLookup(g => g.Min(w => w.Year), g => g.Key);
         var finished = progress.Values.Where(p => p.AllWatched && p.LastWatchedAtUtc is { } last)
-            .ToLookup(p => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(p.LastWatchedAtUtc!.Value, DateTimeKind.Utc), zone).Year, p => p.ShowId);
+            .ToLookup(p => ViewerRules.Local(p.LastWatchedAtUtc!.Value, zone).Year, p => p.ShowId);
         var minutesByYear = watches.GroupBy(w => w.Year).ToDictionary(g => g.Key, g => g.Sum(w => w.Minutes));
 
         IReadOnlyList<TvLifeShowDto> Top(IEnumerable<Guid> ids, int take) =>

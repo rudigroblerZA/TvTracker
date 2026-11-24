@@ -94,7 +94,7 @@ public static class Streaks
     /// <summary>
     /// The Monday a date's week starts on.
     /// </summary>
-    internal static DateOnly WeekStart(DateOnly day) => day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
+    internal static DateOnly WeekStart(DateOnly day) => day.AddDays(-ViewerRules.Weekday(day.DayOfWeek));
 
     /// <summary>
     /// The current and longest runs of consecutive units (days, or weeks by their Monday) in <paramref name="dates"/>; the

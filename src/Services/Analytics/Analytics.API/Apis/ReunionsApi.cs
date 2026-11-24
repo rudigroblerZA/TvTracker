@@ -3,7 +3,6 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
 
@@ -54,6 +53,4 @@ public static class ReunionsApi
             .ToDictionary(x => x.ShowId, x => x.Weight);
         return (known, loved);
     }
-
-    // Character matching, by the same rules as Catalog.API's Universes (which links shows by shared characters).
 }

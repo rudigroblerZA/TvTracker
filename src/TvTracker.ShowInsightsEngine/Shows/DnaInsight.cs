@@ -60,10 +60,8 @@ public sealed class DnaInsight : IShowInsight
             return insights with { Dna = null };
         }
 
-        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
-        if (runtimes.Count > 0)
+        if (InsightMath.TypicalRuntime(aired) is { } typical)
         {
-            var typical = runtimes[runtimes.Count / 2];
             Add(DnaTraits.EpisodeLength, Linear(typical, EpisodeMinutes), () => $"About {typical} min an episode");
         }
 

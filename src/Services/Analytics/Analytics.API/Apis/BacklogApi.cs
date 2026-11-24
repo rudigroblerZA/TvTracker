@@ -68,7 +68,7 @@ public static class BacklogApi
             .ToListAsync(ct);
         var runs = await ShowValueFacts.RunTimesAsync(db, notStarted, now, ct);
         var shows = await db.Shows.AsNoTracking().Where(s => runs.Keys.Contains(s.ShowId)).ToListAsync(ct);
-        var insights = await ShowValueFacts.InsightsAsync(db, runs.Keys.ToList(), ct);
+        var insights = await ShowDocuments.LoadAsync(db, runs.Keys.ToList(), ct);
         var liked = await ShowValueFacts.LikedGenresAsync(db, userId, now, ct);
 
         var assessed = shows.Where(s => runs[s.ShowId].Episodes > 0)

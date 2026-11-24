@@ -24,10 +24,16 @@ public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int Lates
 }
 
 /// <summary>
-/// The caller's progress through their shows, which the on-request endpoints share.
+/// What the on-request endpoints share about the caller: their time zone and their progress through their shows.
 /// </summary>
 public static class Viewer
 {
+    /// <summary>
+    /// The viewer's time zone, from the profile's IANA id the client sends (<c>tz</c>); UTC when it's missing or unknown.
+    /// </summary>
+    public static TimeZoneInfo Zone(string? tz) =>
+        tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+
     /// <summary>
     /// Progress per show, for the given shows or (null) every show the viewer has watched. One query: aired regular
     /// episodes left-joined to the viewer's watches, grouped by show.
@@ -120,6 +126,10 @@ public static class NextPremieres
     }
 }
 
+/// <summary>
+/// Loads <see cref="ShowLoad"/>s for a set of shows in eight queries whatever their number, so the list endpoints (every
+/// dropped show, every refresher due, every catch-up) stop running five or six queries per show.
+/// </summary>
 public static class ShowLoads
 {
     /// <param name="withInsights">Load the shows' documents too (the comeback's turn, the backlog's assessments).</param>

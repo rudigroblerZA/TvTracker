@@ -36,4 +36,13 @@ internal static class InsightMath
     /// </summary>
     public static string Hours(int minutes) =>
         minutes < 60 ? $"{minutes} min" : minutes < 600 ? $"{minutes / 60.0:0.#} h" : $"{Math.Round(minutes / 60.0)} h";
+
+    /// <summary>
+    /// The episodes' typical running time: the (upper) median of the known ones; null when none is known.
+    /// </summary>
+    public static int? TypicalRuntime(IEnumerable<EpisodeCopy> episodes)
+    {
+        var runtimes = episodes.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
+        return runtimes.Count > 0 ? runtimes[runtimes.Count / 2] : null;
+    }
 }

@@ -28,8 +28,7 @@ public record TimeMachineShowDto(Guid ShowId, string Title, string? PosterUrl, i
 /// The TV time machine: what premiered, ended and stood out in a week of TV history, from the catalog copy's air dates
 /// and the provider's episode ratings. With no date, it's this week in every past year; with one, that date's week (a
 /// birthday, say). Weeks are calendar days in the caller's time zone, so an evening premiere in New York counts on its
-/// own day. Each week is a range scan of the air-time index, and a result is cached for everyone in that time zone that
-/// day; only the Watched marks are per caller.
+/// own day.
 /// </summary>
 public static class TimeMachine
 {
@@ -72,10 +71,10 @@ public static class TimeMachine
     /// <param name="episodes">The regular episodes that aired in those weeks.</param>
     /// <param name="shows">Their shows; an episode of a show that's gone is left out.</param>
     /// <param name="spans">Each show's first and last regular episode's air time, to tell premieres and finales.</param>
-    /// <param name="onAir">One date's "on air then" (<see cref="OnAir"/>).</param>
+    /// <param name="airing">One date only: the episodes within <see cref="OnAirDays"/> of it, with their shows.</param>
     internal static TimeMachineDto Of(DateOnly? date, DateOnly today, TimeZoneInfo zone, List<DateOnly> middles, List<EpisodeCopy> episodes,
         IReadOnlyDictionary<Guid, ShowCopy> shows, IReadOnlyDictionary<Guid, (DateTimeOffset? First, DateTimeOffset? Last)> spans,
-        List<TimeMachineShowDto> onAir)
+        (List<EpisodeCopy> Episodes, IReadOnlyDictionary<Guid, ShowCopy> Shows)? airing = null)
     {
         var everyYear = date is null;
 
@@ -110,14 +109,15 @@ public static class TimeMachine
             ? rated.GroupBy(e => WeekOf(e, zone, middles)).OrderByDescending(g => g.Key).Select(g => g.First()).Take(MaxBestEpisodes)
             : rated.DistinctBy(e => e.ShowId).Take(MaxBestEpisodes);
 
-        return new TimeMachineDto(date ?? today, everyYear, premieres, finales, best.Select(Dto).ToList(), onAir);
+        return new TimeMachineDto(date ?? today, everyYear, premieres, finales, best.Select(Dto).ToList(),
+            airing is { } on ? OnAir(on.Episodes, on.Shows) : []);
     }
 
     /// <summary>
     /// Shows with an episode among <paramref name="airing"/> (those within <see cref="OnAirDays"/> of the date), each at
     /// its latest season then, best known first.
     /// </summary>
-    internal static List<TimeMachineShowDto> OnAir(List<EpisodeCopy> airing, IReadOnlyDictionary<Guid, ShowCopy> shows) =>
+    private static List<TimeMachineShowDto> OnAir(List<EpisodeCopy> airing, IReadOnlyDictionary<Guid, ShowCopy> shows) =>
         airing.GroupBy(e => e.ShowId)
             .Where(g => shows.ContainsKey(g.Key))
             .Select(g => (Show: shows[g.Key], Season: g.Max(e => e.SeasonNumber)))

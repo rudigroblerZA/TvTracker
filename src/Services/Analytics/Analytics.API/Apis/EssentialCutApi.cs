@@ -3,7 +3,6 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
 
@@ -20,7 +19,7 @@ public static class EssentialCutApi
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, string level = "lean", CancellationToken ct = default)
     {
         level = level.ToLowerInvariant();
-        if (!EssentialCut.Levels.TryGetValue(level, out var settings))
+        if (!EssentialCut.Levels.ContainsKey(level))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["level"] = [$"Use one of {string.Join(", ", EssentialCut.Levels.Keys)}."] });
         }
@@ -36,8 +35,6 @@ public static class EssentialCutApi
             .Where(e => e.ShowId == showId && e.SeasonNumber > 0)
             .OrderBy(e => e.SeasonNumber).ThenBy(e => e.EpisodeNumber)
             .ToListAsync(ct);
-        var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
-
         var rating = await RatingsAsync(db, showId, ct);
         var notes = await NotesAsync(db, showId, ct);
 
@@ -46,13 +43,13 @@ public static class EssentialCutApi
             ? []
             : (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
 
-        return TypedResults.Ok(EssentialCut.Of(show, level, settings, episodes, aired, rating, notes, watched, now));
+        return TypedResults.Ok(EssentialCut.Of(show, level, episodes, rating, notes, watched, now));
     }
 
     /// <summary>
-    /// Moderators' notes on the show's episodes (see the class remarks), by episode.
+    /// Moderators' notes on the show's episodes (see <see cref="EssentialCut"/>), by episode.
     /// </summary>
-    internal static Task<Dictionary<Guid, EpisodeNoteCopy>> NotesAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
+    private static Task<Dictionary<Guid, EpisodeNoteCopy>> NotesAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
         db.EpisodeNotes.AsNoTracking().Where(n => n.ShowId == showId).ToDictionaryAsync(n => n.EpisodeId, ct);
 
     /// <summary>

@@ -21,7 +21,7 @@ public static class StreaksApi
         CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow();
         var today = ViewerRules.LocalDate(now, zone);
 
@@ -29,8 +29,7 @@ public static class StreaksApi
         var bulk = ShowFactRules.BulkMarks(rows);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc))).ToList();
 
-        DateOnly Local(DateTime utc) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone));
-        var (dayStreak, weekStreak) = Streaks.Calendar(watches.Select(w => Local(w.WatchedAtUtc)), today);
+        var (dayStreak, weekStreak) = Streaks.Calendar(watches.Select(w => DateOnly.FromDateTime(ViewerRules.Local(w.WatchedAtUtc, zone))), today);
 
         // Kept up: the regular aired episodes of the shows the caller watched outside bulk marks, in air order. An episode
         // can only be kept if it aired after the earliest watch less the window, so a back catalog watched years later isn't loaded.
