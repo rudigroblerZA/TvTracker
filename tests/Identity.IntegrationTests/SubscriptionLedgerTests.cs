@@ -1,5 +1,5 @@
+﻿using Identity.API.Payments;
 using Identity.Data;
-using Identity.API.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;

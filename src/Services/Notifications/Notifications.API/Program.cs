@@ -1,7 +1,7 @@
-using Notifications.API.Apis;
-using Notifications.Data;
+﻿using Notifications.API.Apis;
 using Notifications.API.IntegrationEvents;
 using Notifications.API.Services;
+using Notifications.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 

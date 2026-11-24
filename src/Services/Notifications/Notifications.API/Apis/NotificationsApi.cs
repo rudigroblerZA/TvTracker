@@ -1,8 +1,8 @@
 ﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Notifications.Data;
 using Notifications.API.Services;
+using Notifications.Data;
 using TvTracker;
 
 namespace Notifications.API.Apis;

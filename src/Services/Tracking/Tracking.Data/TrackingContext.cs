@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
 namespace Tracking.Data;

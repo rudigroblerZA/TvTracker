@@ -1,6 +1,6 @@
-﻿using Identity.Data;
-using Identity.API.Payments;
+﻿using Identity.API.Payments;
 using Identity.API.Services;
+using Identity.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using TvTracker.IntegrationEvents;

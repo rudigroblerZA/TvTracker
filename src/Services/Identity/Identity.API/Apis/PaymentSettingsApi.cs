@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
-using Identity.Data;
 using Identity.API.Payments;
+using Identity.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker;
