@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using OpenFeature;
+using OpenFeature.Constant;
 using OpenFeature.Model;
 
 namespace TvTracker;
@@ -122,23 +124,33 @@ public static class FeatureFlags
     /// <see cref="DefaultFor"/> goes by when flagd stops answering. Per process, so a flag never evaluated in a
     /// process falls back to <see cref="PaidInsights"/> there.
     /// </summary>
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlySet<string>?> SeenPlans = new();
+    private static readonly ConcurrentDictionary<string, (string? Said, IReadOnlySet<string>? Plans)> SeenPlans = new();
+
+    /// <summary>
+    /// The plans a flag's <see cref="PlansMetadata"/> names ("plus,family"), in order; empty for none, which means every plan.
+    /// </summary>
+    public static string[] ParsePlans(string? plans) =>
+        plans?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [];
 
     /// <summary>
     /// Records the plans <paramref name="flag"/> is limited to, as its <see cref="PlansMetadata"/> says
-    /// ("plus,family"; null or empty for every plan).
+    /// ("plus,family"; null or empty for every plan). Asked on every evaluation, so the same answer again costs a lookup.
     /// </summary>
-    public static void RememberPlans(string flag, string? plans) =>
-        SeenPlans[flag] = plans?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) is { Length: > 0 } limited
-            ? limited.ToHashSet()
-            : null;
+    public static void RememberPlans(string flag, string? plans)
+    {
+        if (SeenPlans.TryGetValue(flag, out var seen) && seen.Said == plans)
+        {
+            return;
+        }
+        SeenPlans[flag] = (plans, ParsePlans(plans) is { Length: > 0 } limited ? limited.ToHashSet() : null);
+    }
 
     /// <summary>
     /// Records the plans a flag is limited to from an answer flagd gave; an answer that failed carries nothing to record.
     /// </summary>
     public static void Remember(FlagEvaluationDetails<bool> details)
     {
-        if (details.ErrorType == OpenFeature.Constant.ErrorType.None && details.FlagMetadata is { } metadata)
+        if (details.ErrorType == ErrorType.None && details.FlagMetadata is { } metadata)
         {
             RememberPlans(details.FlagKey, metadata.GetString(PlansMetadata));
         }
@@ -148,7 +160,7 @@ public static class FeatureFlags
     /// The plans <paramref name="flag"/> is limited to, or null for every plan: as flagd last said, else as flagd.json has it.
     /// </summary>
     private static IReadOnlySet<string>? PlansOf(string flag) =>
-        SeenPlans.TryGetValue(flag, out var seen) ? seen : PaidInsights.Contains(flag) ? PaidPlans : null;
+        SeenPlans.TryGetValue(flag, out var seen) ? seen.Plans : PaidInsights.Contains(flag) ? PaidPlans : null;
 
     /// <summary>
     /// What <paramref name="flag"/> evaluates to when flagd is down, unreachable or doesn't know it: what flagd.json

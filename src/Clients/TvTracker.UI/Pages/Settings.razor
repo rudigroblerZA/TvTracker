@@ -9,7 +9,7 @@
 @inject IAuthActions Auth
 @inject SpoilerShield Shield
 @inject ThemeStore Theme
-@implements IDisposable
+@implements IAsyncDisposable
 @inject SocialClient Social
 
 <PageTitle>Settings · @Brand.AppName</PageTitle>
@@ -368,7 +368,21 @@
         StateHasChanged();
     });
 
-    public void Dispose() => Theme.Changed -= OnThemeChanged;
+    public async ValueTask DisposeAsync()
+    {
+        Theme.Changed -= OnThemeChanged;
+        if (avatarScript is not null)
+        {
+            try
+            {
+                await avatarScript.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is closing; its script objects go with it.
+            }
+        }
+    }
 
     private async Task SetThemeAsync(string? value)
     {
@@ -473,34 +487,42 @@
         {
             await RunAsync(async () =>
             {
-                avatarScript ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/TvTracker.UI/avatar.js");
-                IJSStreamReference? picture;
-                try
+                if (await PickedPictureAsync() is { } picture)
                 {
-                    picture = await avatarScript.InvokeAsync<IJSStreamReference?>("squared", avatarFile, AvatarSize);
+                    Use(await Identity.UploadAvatarAsync(picture));
+                    saved = "Picture saved.";
                 }
-                catch (JSException)
-                {
-                    error = "That file isn't a picture this can read. Try a JPEG or PNG.";
-                    return;
-                }
-                if (picture is null)
-                {
-                    return;
-                }
-                await using (picture)
-                {
-                    await using var stream = await picture.OpenReadStreamAsync(maxAllowedSize: 1024 * 1024);
-                    using var bytes = new MemoryStream();
-                    await stream.CopyToAsync(bytes);
-                    Use(await Identity.UploadAvatarAsync(bytes.ToArray()));
-                }
-                saved = "Picture saved.";
             }, "That picture couldn't be used. Try a JPEG or PNG.");
         }
         finally
         {
             uploading = false;
+        }
+    }
+
+    /// <summary>
+    /// The picture just chosen, cropped and shrunk by avatar.js; null when nothing was chosen or it isn't a picture
+    /// the browser can read (<see cref="error"/> then says so).
+    /// </summary>
+    private async Task<byte[]?> PickedPictureAsync()
+    {
+        avatarScript ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/TvTracker.UI/avatar.js");
+        try
+        {
+            await using var picture = await avatarScript.InvokeAsync<IJSStreamReference?>("squared", avatarFile, AvatarSize);
+            if (picture is null)
+            {
+                return null;
+            }
+            await using var stream = await picture.OpenReadStreamAsync(maxAllowedSize: 1024 * 1024);
+            using var bytes = new MemoryStream();
+            await stream.CopyToAsync(bytes);
+            return bytes.ToArray();
+        }
+        catch (JSException)
+        {
+            error = "That file isn't a picture this can read. Try a JPEG or PNG.";
+            return null;
         }
     }
 
