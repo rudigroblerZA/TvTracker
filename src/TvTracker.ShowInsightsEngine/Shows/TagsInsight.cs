@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// The show's tags: every <see cref="IShowTagRule"/> that applies, in registration order.

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The show insights engine: what is worked out about a show from what is known about it.
+    - Facts in (a show, its episodes, cast and makers, ratings, watches), insights out (ShowInsights and its parts).
+    - No database, no HTTP, no flags, no messaging: the services load the facts and store or serve the results.
+  -->
+
+  <ItemGroup>
+    <!-- For the catalog's own words that the facts are stated in (a show's status). -->
+    <ProjectReference Include="..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Analytics.Worker" />
+    <InternalsVisibleTo Include="Analytics.UnitTests" />
+  </ItemGroup>
+
+</Project>

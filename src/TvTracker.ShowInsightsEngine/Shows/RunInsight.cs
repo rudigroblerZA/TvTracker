@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// How long the show has run: seasons, episodes, hours, first and last air dates, and its longest break. Regular

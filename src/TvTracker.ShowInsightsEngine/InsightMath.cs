@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 internal static class InsightMath
 {

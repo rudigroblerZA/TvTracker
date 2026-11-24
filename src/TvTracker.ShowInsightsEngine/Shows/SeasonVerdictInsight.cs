@@ -1,8 +1,7 @@
-using Analytics.Data;
 using TvTracker.IntegrationEvents;
-using static Analytics.Worker.Insights.InsightMath;
+using static TvTracker.ShowInsightsEngine.InsightMath;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// How a season that just finished did (<see cref="SeasonVerdict"/>): the latest regular season with every listed

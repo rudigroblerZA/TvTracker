@@ -1,8 +1,7 @@
-using Analytics.Data;
 using TvTracker.IntegrationEvents;
-using static Analytics.Worker.Insights.InsightMath;
+using static TvTracker.ShowInsightsEngine.InsightMath;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// The show's DNA (see <see cref="DnaTraits"/>): each trait is a measure scaled to 0-1 between fixed anchors. The

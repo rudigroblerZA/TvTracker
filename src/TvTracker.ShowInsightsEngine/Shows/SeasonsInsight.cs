@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Per-season stats, the best and worst season, and whether the show is rising or falling.

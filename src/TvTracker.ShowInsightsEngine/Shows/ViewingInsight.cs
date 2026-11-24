@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Viewers per season, completion and drop-off, from our users' watched marks; none below the minimum number of viewers.

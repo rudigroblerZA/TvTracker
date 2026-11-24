@@ -8,7 +8,7 @@ namespace Analytics.API.Apis;
 
 /// <param name="Enough">At least <see cref="TvClockApi.MinWatches"/> watches to read a clock from; otherwise only the counts.</param>
 /// <param name="Since">The first day counted: a year back, or the first watch when that's later.</param>
-/// <param name="BulkLeftOut">Marks of a back catalog left out (<see cref="CopyRules.BulkMark"/>+ at once).</param>
+/// <param name="BulkLeftOut">Marks of a back catalog left out (<see cref="ShowFactRules.BulkMark"/>+ at once).</param>
 /// <param name="Grid">Minutes by weekday (Monday first) and local hour, 7 × 24.</param>
 /// <param name="Labels">What kind of viewer the clock says, strongest first; empty when nothing stands out.</param>
 /// <param name="Periods">Shares of minutes by part of the day, in day order.</param>
@@ -45,7 +45,7 @@ public record ClockShowDto(Guid ShowId, string Title, string? PosterUrl, int Min
 /// <list type="bullet">
 /// <item><b>When a watch happened:</b> a mark is usually made at the end of an episode, so its minutes go to the hour of
 /// the mark less half the episode's running time.</item>
-/// <item><b>Bulk marks are left out</b> (<see cref="CopyRules.BulkMark"/> or more of a show at once): they say when a back
+/// <item><b>Bulk marks are left out</b> (<see cref="ShowFactRules.BulkMark"/> or more of a show at once): they say when a back
 /// catalog was entered, not watched.</item>
 /// <item><b>Labels</b> compare shares with fixed thresholds: night (22:00-05:00) 35%+, morning (05:00-11:00) 30%+, lunch
 /// (11:00-14:00) 30%+, prime time (19:00-23:00) 50%+, weekends 55%+ (an even week is 29%), weeknights 85%+.</item>
@@ -84,7 +84,7 @@ public static class TvClockApi
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= from)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, e.RuntimeMinutes })
             .ToListAsync(ct);
-        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
+        var bulk = ShowFactRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r =>
             {

@@ -1,7 +1,6 @@
-using Analytics.Data;
-using static Analytics.Worker.Insights.InsightMath;
+using static TvTracker.ShowInsightsEngine.InsightMath;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// When the show gets good (<see cref="GetsGood"/>), from the provider's ratings of its regular episodes in air order.

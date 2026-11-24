@@ -48,7 +48,7 @@ public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownP
 /// or the phone never asks a third party for them (and needs no route to this service for an image).</item>
 /// <item><b>Prices</b> are estimates: US list prices of the cheapest plan, checked by hand (<see cref="NetworkServices.PricesAsOf"/>).</item>
 /// <item><b>The report</b> looks at the last 30 days of watching and the next 30 days of the user's followed shows.
-/// Bulk marks (<see cref="CopyRules.BulkMark"/>+ of a show's episodes at one moment, as Year in TV) say when episodes were marked, not watched, so they're
+/// Bulk marks (<see cref="ShowFactRules.BulkMark"/>+ of a show's episodes at one moment, as Year in TV) say when episodes were marked, not watched, so they're
 /// left out. A service with nothing watched and nothing coming is one to pause; over $2 an hour (a rental's price) is pricey.
 /// A free or unpriced service gets neither: there's no cost to weigh.</item>
 /// <item><b>The limit</b> applies only while the <c>plans</c> flag is on for the caller, as Tracking's list limits.</item>
@@ -177,7 +177,7 @@ public static class ServicesApi
             .Where(w => w.UserId == userId && w.WatchedAtUtc >= from)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, e.RuntimeMinutes })
             .ToListAsync(ct);
-        var bulk = CopyRules.BulkMarks(watches, w => w.ShowId, w => w.WatchedAtUtc);
+        var bulk = ShowFactRules.BulkMarks(watches, w => w.ShowId, w => w.WatchedAtUtc);
         var watched = watches.Where(w => !bulk.Contains((w.ShowId, w.WatchedAtUtc)))
             .GroupBy(w => w.ShowId)
             .ToDictionary(g => g.Key, g => (Minutes: g.Sum(w => w.RuntimeMinutes ?? 0), Episodes: g.Count()));

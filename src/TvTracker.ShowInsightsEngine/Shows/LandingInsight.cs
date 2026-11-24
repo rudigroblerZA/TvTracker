@@ -1,7 +1,6 @@
-﻿using Analytics.Data;
-using static Analytics.Worker.Insights.InsightMath;
+﻿using static TvTracker.ShowInsightsEngine.InsightMath;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Whether an ended show sticks the landing (<see cref="Landing"/>): its finale (last aired regular episode) against the

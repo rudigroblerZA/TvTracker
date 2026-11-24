@@ -1,8 +1,7 @@
-﻿using Analytics.Data;
+﻿
+using static TvTracker.ShowInsightsEngine.InsightMath;
 
-using static Analytics.Worker.Insights.InsightMath;
-
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Is it worth your time (<see cref="WorthIt"/>)? The provider's rating, moved by the earlier stages' findings about how

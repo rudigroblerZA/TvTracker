@@ -1580,6 +1580,7 @@ A release is a signed app bundle (`.aab`) built for one deployment: its host is 
 | TvTracker.EventBus | `src/TvTracker.EventBus` | `IEventBus`, handlers, subscriptions |
 | TvTracker.EventBus.RabbitMQ | `src/TvTracker.EventBus.RabbitMQ` | RabbitMQ implementation (one queue per service, retry-once then drop) |
 | TvTracker.Persistence | `src/TvTracker.Persistence` | EF Core outbox, inbox (idempotent consumers), database initialisation |
+| TvTracker.ShowInsightsEngine | `src/TvTracker.ShowInsightsEngine` | The per-show insights worked out from a show's facts (worth it, gets good, endings, forecasts, DNA, tags). No database, HTTP or flags: Analytics.Worker loads the facts and stores the results |
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
 | Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |

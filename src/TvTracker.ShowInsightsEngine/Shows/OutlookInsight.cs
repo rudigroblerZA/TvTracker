@@ -1,6 +1,5 @@
-using Analytics.Data;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Forecasts for a running show (see <see cref="ForecastModels"/>): its next season's rating and, between seasons with
