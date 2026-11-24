@@ -207,8 +207,8 @@ public static class FlagsApi
     /// The plans in a flag's metadata; null when it has none (every plan).
     /// </summary>
     private static List<string>? PlansOf(JsonObject flag) =>
-        flag["metadata"]?[TvTracker.FeatureFlags.PlansMetadata]?.GetValue<string>() is { Length: > 0 } plans
-            ? plans.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList()
+        TvTracker.FeatureFlags.ParsePlans(flag["metadata"]?[TvTracker.FeatureFlags.PlansMetadata]?.GetValue<string>()) is { Length: > 0 } plans
+            ? plans.ToList()
             : null;
 
     /// <summary>

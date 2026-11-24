@@ -227,16 +227,24 @@ app.MapGet("/avatars/{userId}", async (string userId, HttpContext http, IHttpCli
 {
     try
     {
-        using var response = await clients.CreateClient(ApiClients.Identity)
+        var response = await clients.CreateClient(ApiClients.Identity)
             .GetAsync($"api/v1/avatars/{Uri.EscapeDataString(userId)}", HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+        http.Response.RegisterForDispose(response);
         // Only a picture Identity vouches for: it sends nothing else from here, and names the kind it found on upload.
         if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType is not { } kind || !kind.StartsWith("image/", StringComparison.Ordinal))
         {
             return Results.NotFound();
         }
-        http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
-        http.Response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
-        return Results.Bytes(await response.Content.ReadAsByteArrayAsync(http.RequestAborted), kind);
+        // How long to keep it and what it may do are Identity's to say; they are passed on as given.
+        if (response.Headers.CacheControl is { } keep)
+        {
+            http.Response.Headers.CacheControl = keep.ToString();
+        }
+        if (response.Headers.TryGetValues("Content-Security-Policy", out var policy))
+        {
+            http.Response.Headers.ContentSecurityPolicy = policy.ToArray();
+        }
+        return Results.Stream(await response.Content.ReadAsStreamAsync(http.RequestAborted), kind);
     }
     catch (HttpRequestException)
     {

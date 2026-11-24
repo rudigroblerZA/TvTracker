@@ -8,6 +8,7 @@
         <a href="stats" class="account-link">Stats</a>
         @{ var name = Session.Profile?.DisplayName ?? context.User.FindFirst("name")?.Value ?? context.User.Identity?.Name ?? "Account"; }
         <a href="settings" class="account-link account-me">
+            @* Only a picture: an initial beside the name would say nothing the name doesn't. *@
             @if (Session.Profile?.Avatar is not null)
             {
                 <Avatar Name="@name" Src="@Session.Profile.Avatar" />

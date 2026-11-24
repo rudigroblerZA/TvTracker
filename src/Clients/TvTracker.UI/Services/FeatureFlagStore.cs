@@ -85,7 +85,7 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
             // turned off isn't part of any plan.
             .Where(d => d.details.Value && d.details.FlagMetadata?.GetString(FeatureFlags.PlansMetadata) is { Length: > 0 })
             .Select(d => new PlanFeature(d.key, d.details.FlagMetadata!.GetString(FeatureFlags.NameMetadata) ?? d.key,
-                d.details.FlagMetadata.GetString(FeatureFlags.PlansMetadata)!.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
+                FeatureFlags.ParsePlans(d.details.FlagMetadata.GetString(FeatureFlags.PlansMetadata))))
             .OrderBy(f => f.Name, StringComparer.CurrentCulture)
             .ToList();
         if (details.Any(d => d.details.FlagMetadata is not null))

@@ -12,6 +12,8 @@ using TvTracker.Persistence;
 
 namespace Identity.API.Apis;
 
+/// <param name="Avatar">The picture to show: the uploaded one's path under api/v1/, else <paramref name="AvatarUrl"/>, else null.</param>
+/// <param name="AvatarUploaded">Whether <paramref name="Avatar"/> is one they uploaded.</param>
 public record ProfileDto(
     string UserId,
     string DisplayName,
@@ -20,7 +22,6 @@ public record ProfileDto(
     string TimeZone,
     string Region,
     string Language,
-    // The picture to show: the uploaded one's path under api/v1/, else AvatarUrl, else null.
     string? Avatar = null,
     bool AvatarUploaded = false);
 
@@ -127,7 +128,8 @@ public static class ProfileApi
         response.Headers.CacheControl = "public, max-age=31536000, immutable";
         response.Headers.XContentTypeOptions = "nosniff";
         response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
-        return TypedResults.File(avatar.Bytes, avatar.ContentType);
+        // With its upload time, so a browser that asks again about a copy it holds is told it's still good (304).
+        return TypedResults.File(avatar.Bytes, avatar.ContentType, lastModified: new DateTimeOffset(avatar.UpdatedAtUtc, TimeSpan.Zero));
     }
 
     /// <summary>
