@@ -9,4 +9,9 @@
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The engine's facts and insights are used throughout. -->
+    <Using Include="TvTracker.ShowInsightsEngine" />
+  </ItemGroup>
+
 </Project>

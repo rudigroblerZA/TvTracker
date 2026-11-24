@@ -71,7 +71,7 @@ public static class TvLifeApi
             .Where(w => w.UserId == userId)
             .Join(db.Episodes, w => w.EpisodeId, e => e.EpisodeId, (w, e) => new { w.ShowId, w.WatchedAtUtc, Minutes = e.RuntimeMinutes ?? 0 })
             .ToListAsync(ct);
-        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
+        var bulk = ShowFactRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r => (r.ShowId, Year: TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone).Year, r.Minutes))
             .ToList();

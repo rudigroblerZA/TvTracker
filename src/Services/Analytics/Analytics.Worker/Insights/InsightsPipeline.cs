@@ -40,7 +40,7 @@ public sealed class InsightsPipeline(
     /// <returns>How many shows were computed.</returns>
     public async Task<int> RunAsync(CancellationToken ct, bool publishAll = false)
     {
-        var sources = await InsightSources.LoadAsync(db, time.GetUtcNow(), ct);
+        var sources = await InsightSourcesLoader.LoadAsync(db, time.GetUtcNow(), ct);
         var builders = lists.Select(l => l.Begin(sources)).ToList();
         var published = publications.Select(p => p.Begin(publishAll)).ToList();
 

@@ -14,11 +14,11 @@ public class CopyRulesTests
     [Fact]
     public void Eight_of_a_show_at_one_moment_is_a_bulk_mark()
     {
-        var watches = Watches(ShowA, Moment, CopyRules.BulkMark)
-            .Concat(Watches(ShowA, Moment.AddMinutes(1), CopyRules.BulkMark - 1))
-            .Concat(Watches(ShowB, Moment, CopyRules.BulkMark - 1));
+        var watches = Watches(ShowA, Moment, ShowFactRules.BulkMark)
+            .Concat(Watches(ShowA, Moment.AddMinutes(1), ShowFactRules.BulkMark - 1))
+            .Concat(Watches(ShowB, Moment, ShowFactRules.BulkMark - 1));
 
-        Assert.Equal([(ShowA, Moment)], CopyRules.BulkMarks(watches));
+        Assert.Equal([(ShowA, Moment)], ShowFactRules.BulkMarks(watches));
     }
 
     [Theory]

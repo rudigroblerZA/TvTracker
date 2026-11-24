@@ -1,8 +1,6 @@
-﻿using Analytics.Data;
-using TvTracker;
-using static Analytics.Worker.Insights.InsightMath;
+﻿using static TvTracker.ShowInsightsEngine.InsightMath;
 
-namespace Analytics.Worker.Insights;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// The release pattern of the latest fully aired season: all on one day ("Drops all at once"), or in up to
@@ -91,14 +89,15 @@ public sealed class WeekendBingeRule : IShowTagRule
 /// <summary>
 /// Our users' favourite (from the minimum number of ratings), else the provider's.
 /// </summary>
-public sealed class FanFavoriteRule(Branding brand) : IShowTagRule
+/// <param name="appName">The app's name as it is now, for "from 12 … users"; asked each time, since an admin can change it.</param>
+public sealed class FanFavoriteRule(Func<string> appName) : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
     {
         var rating = show.Rating;
         if (rating.Ours is >= ShowTags.FanFavoriteMinStars)
         {
-            return new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} {brand.AppName} users");
+            return new ShowTag(ShowTags.FanFavorite, "Fan favorite", $"★ {rating.Ours:0.0} from {rating.OurCount} {appName()} users");
         }
 
         return rating.External is >= ShowTags.FanFavoriteMinExternal

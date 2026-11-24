@@ -1,3 +1,5 @@
+using TvTracker;
+
 namespace Analytics.Worker.Insights;
 
 public static class InsightsServiceCollectionExtensions
@@ -33,7 +35,7 @@ public static class InsightsServiceCollectionExtensions
         services.AddSingleton<IShowTagRule, DropsAtOnceRule>();
         services.AddSingleton<IShowTagRule, BingeableRule>();
         services.AddSingleton<IShowTagRule, WeekendBingeRule>();
-        services.AddSingleton<IShowTagRule, FanFavoriteRule>();
+        services.AddSingleton<IShowTagRule>(provider => new FanFavoriteRule(() => provider.GetRequiredService<Branding>().AppName));
         services.AddSingleton<IShowTagRule, LimitedSeriesRule>();
         services.AddSingleton<IShowTagRule, QuickEpisodesRule>();
         services.AddSingleton<IShowTagRule, LongRunningRule>();

@@ -11,7 +11,7 @@ namespace Analytics.API.Apis;
 
 /// <param name="Year">The year shown.</param>
 /// <param name="Years">Years with viewing, latest first, for switching.</param>
-/// <param name="Bulk">Episodes left out because they were marked many at once (see <see cref="CopyRules.BulkMark"/>).</param>
+/// <param name="Bulk">Episodes left out because they were marked many at once (see <see cref="ShowFactRules.BulkMark"/>).</param>
 /// <param name="DaysWatched">Days with at least one episode.</param>
 /// <param name="LongestStreak">Most days in a row with an episode.</param>
 /// <param name="Finished">Ended shows whose last episode they watched this year.</param>
@@ -102,7 +102,7 @@ public static class YearInTvApi
             })
             .ToListAsync(ct);
 
-        var bulk = CopyRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
+        var bulk = ShowFactRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r => new Watch(r.ShowId, r.EpisodeId, r.WatchedAtUtc,
                 DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone)),

@@ -1,6 +1,5 @@
-﻿using Analytics.Data;
-
-namespace Analytics.Worker.Insights;
+﻿
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// The forecasts' models, trained each run on every show's season history and backtested on it: each model replays

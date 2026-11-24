@@ -17,4 +17,9 @@
     <InternalsVisibleTo Include="Analytics.IntegrationTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The engine's facts and insights are used throughout. -->
+    <Using Include="TvTracker.ShowInsightsEngine" />
+  </ItemGroup>
+
 </Project>

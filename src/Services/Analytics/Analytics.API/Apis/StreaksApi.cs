@@ -7,7 +7,7 @@ using TvTracker;
 namespace Analytics.API.Apis;
 
 /// <param name="KeptUpDays">The window for keeping up, so the page states the rule the figures follow.</param>
-/// <param name="BulkLeftOut">Marks of a back catalog left out (<see cref="CopyRules.BulkMark"/>+ at once).</param>
+/// <param name="BulkLeftOut">Marks of a back catalog left out (<see cref="ShowFactRules.BulkMark"/>+ at once).</param>
 /// <param name="Days">Days in a row with something watched.</param>
 /// <param name="Weeks">Weeks (Monday to Sunday) in a row with something watched; the longest run's dates are its first Monday
 /// and last Sunday.</param>
@@ -42,7 +42,7 @@ public record StreakDueDto(Guid ShowId, string Title, string? PosterUrl, int Sea
 /// <see cref="KeptUpDays"/> days of airing (or up to a day before, for a mark made at a premiere screening or across time
 /// zones). Episodes from before the first one kept up don't break anything; a whole-season drop counts if binged within
 /// the window. An episode still inside its window is neither kept nor missed yet: it's due.</item>
-/// <item><b>Bulk marks are left out</b> (<see cref="CopyRules.BulkMark"/> or more of a show at once): they say when a back
+/// <item><b>Bulk marks are left out</b> (<see cref="ShowFactRules.BulkMark"/> or more of a show at once): they say when a back
 /// catalog was entered, not when it was watched.</item>
 /// <item><b>No titles:</b> episodes are given by number, as Spoiler watch does; a due episode is by definition unseen.</item>
 /// </list>
@@ -75,7 +75,7 @@ public static class StreaksApi
         var today = Viewer.LocalDate(now, zone);
 
         var rows = await db.Watches.AsNoTracking().Where(w => w.UserId == userId).ToListAsync(ct);
-        var bulk = CopyRules.BulkMarks(rows);
+        var bulk = ShowFactRules.BulkMarks(rows);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc))).ToList();
 
         DateOnly Local(DateTime utc) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone));

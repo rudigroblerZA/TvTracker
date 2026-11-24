@@ -1,4 +1,4 @@
-namespace Analytics.Data;
+namespace TvTracker.ShowInsightsEngine;
 
 /// <summary>
 /// Everything Analytics knows about one show, computed hourly and served as-is by Analytics.API.
