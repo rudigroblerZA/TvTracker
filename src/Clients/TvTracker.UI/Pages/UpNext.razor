@@ -157,7 +157,7 @@
         {
             return await Analytics.GetCatchUpsAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             return null;
         }
@@ -172,7 +172,7 @@
         {
             return await Analytics.GetRefreshersAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             return null;
         }
@@ -183,17 +183,18 @@
         error = null;
         try
         {
-            // All three together, since none needs another's answer; WhenAll waits for every one, so none is left
-            // running when one fails.
+            // All three start together, since none needs another's answer. The two panels answer with nothing
+            // when Analytics fails or times out, so they don't take the list down.
             var itemsTask = Tracking.GetUpNextAsync();
             var refreshersTask = Flags.IfEnabledAsync(FeatureFlags.Refresher, LoadRefreshersAsync);
             var catchUpsTask = Flags.IfEnabledAsync(FeatureFlags.CatchUp, LoadCatchUpsAsync);
-            await Task.WhenAll(itemsTask, refreshersTask, catchUpsTask);
-            items = itemsTask.Result ?? [];
+            // The list first: it is the page, and shows even if a panel's answer then fails some unexpected way.
+            items = await itemsTask ?? [];
+            await Task.WhenAll(refreshersTask, catchUpsTask);
             refreshers = refreshersTask.Result;
             catchUps = catchUpsTask.Result;
         }
-        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or SignInRequiredException)
         {
             error = ErrorNotice.Describe(ex);
         }

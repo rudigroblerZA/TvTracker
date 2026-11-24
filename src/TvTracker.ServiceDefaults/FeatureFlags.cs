@@ -117,24 +117,64 @@ public static class FeatureFlags
     ]);
 
     /// <summary>
+    /// The plans each flag was last seen limited to (null: every plan), from the metadata flagd sent with an answer.
+    /// The flags page can put any flag into the paid plans or take one out, which only flagd knows; this is what
+    /// <see cref="DefaultFor"/> goes by when flagd stops answering. Per process, so a flag never evaluated in a
+    /// process falls back to <see cref="PaidInsights"/> there.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlySet<string>?> SeenPlans = new();
+
+    /// <summary>
+    /// Records the plans <paramref name="flag"/> is limited to, as its <see cref="PlansMetadata"/> says
+    /// ("plus,family"; null or empty for every plan).
+    /// </summary>
+    public static void RememberPlans(string flag, string? plans) =>
+        SeenPlans[flag] = plans?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) is { Length: > 0 } limited
+            ? limited.ToHashSet()
+            : null;
+
+    /// <summary>
+    /// Records the plans a flag is limited to from an answer flagd gave; an answer that failed carries nothing to record.
+    /// </summary>
+    public static void Remember(FlagEvaluationDetails<bool> details)
+    {
+        if (details.ErrorType == OpenFeature.Constant.ErrorType.None && details.FlagMetadata is { } metadata)
+        {
+            RememberPlans(details.FlagKey, metadata.GetString(PlansMetadata));
+        }
+    }
+
+    /// <summary>
+    /// The plans <paramref name="flag"/> is limited to, or null for every plan: as flagd last said, else as flagd.json has it.
+    /// </summary>
+    private static IReadOnlySet<string>? PlansOf(string flag) =>
+        SeenPlans.TryGetValue(flag, out var seen) ? seen : PaidInsights.Contains(flag) ? PaidPlans : null;
+
+    /// <summary>
     /// What <paramref name="flag"/> evaluates to when flagd is down, unreachable or doesn't know it: what flagd.json
-    /// says by default, plan rule included. A flag server outage neither takes features away nor brings back the ones
-    /// turned off, and it doesn't hand the paid insights to a caller known to be on another plan (no plan in
-    /// <paramref name="context"/> means "not known", and the flag isn't limited, as with flagd).
+    /// says by default, with the flag's plan rule (<see cref="PlansOf"/>). A flag server outage neither takes features
+    /// away nor brings back the ones turned off, and it doesn't hand a paid feature to a caller known to be on
+    /// another plan. No plan in <paramref name="context"/>, or an empty one, means "not known", and the flag isn't
+    /// limited, as with flagd. A flag the flags page turned off is still on here: only the plans are remembered.
     /// </summary>
     public static bool DefaultFor(string flag, EvaluationContext? context = null) =>
         OnByDefault.Contains(flag)
-        && (!PaidInsights.Contains(flag)
+        && (PlansOf(flag) is not { } plans
             || context?.ContainsKey(PlanAttribute) != true
-            || PaidPlans.Contains(context.GetValue(PlanAttribute).AsString ?? ""));
+            || context.GetValue(PlanAttribute).AsString is not { Length: > 0 } plan
+            || plans.Contains(plan));
 
     /// <summary>
     /// Whether <paramref name="flag"/> is on, falling back to <see cref="DefaultFor"/> when flagd can't answer. Read
     /// flags through this, so no caller goes back to a fixed default.
     /// </summary>
-    public static Task<bool> IsOnAsync(this IFeatureClient client, string flag, EvaluationContext? context = null,
-        CancellationToken cancellationToken = default) =>
-        client.GetBooleanValueAsync(flag, DefaultFor(flag, context), context, cancellationToken: cancellationToken);
+    public static async Task<bool> IsOnAsync(this IFeatureClient client, string flag, EvaluationContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        var details = await client.GetBooleanDetailsAsync(flag, DefaultFor(flag, context), context, cancellationToken: cancellationToken);
+        Remember(details);
+        return details.Value;
+    }
 
     /// <summary>
     /// The context attribute that carries the caller's plan ("free", "plus", "family"; see <c>Plans</c>). A flag in a plan

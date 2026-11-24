@@ -76,6 +76,10 @@ public sealed class FeatureFlagStore(IFeatureClient client, AuthenticationStateP
         }
         var context = FeatureFlags.ContextFor((await authState.GetAuthenticationStateAsync()).User);
         var details = await Task.WhenAll(FlagKeys.Select(async key => (key, details: await client.GetBooleanDetailsAsync(key, FeatureFlags.DefaultFor(key, context), context))));
+        foreach (var (_, answer) in details)
+        {
+            FeatureFlags.Remember(answer);
+        }
         var found = details
             // Without a plan in the context no plan rule applies, so Value is the flag's own state: a feature that's
             // turned off isn't part of any plan.
