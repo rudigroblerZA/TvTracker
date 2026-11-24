@@ -159,6 +159,21 @@ public sealed class WikidataSparql(IHttpClientFactory httpFactory, TimeProvider 
         }
     }
 
+    /// <summary>
+    /// How many callers are queued behind the one in flight (a cancelled one counts until Release passes it), for
+    /// tests to wait on instead of sleeping.
+    /// </summary>
+    internal int Waiting
+    {
+        get
+        {
+            lock (sync)
+            {
+                return waiters.Interactive.Count + waiters.Background.Count;
+            }
+        }
+    }
+
     private void Release()
     {
         lock (sync)
