@@ -24,21 +24,10 @@ public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int Lates
 }
 
 /// <summary>
-/// What the on-request endpoints share about the caller: their progress, and the helpers that read it.
+/// The caller's progress through their shows, which the on-request endpoints share.
 /// </summary>
 public static class Viewer
 {
-    /// <summary>
-    /// The viewer's time zone, from the profile's IANA id the client sends (<c>tz</c>); UTC when it's missing or unknown.
-    /// </summary>
-    public static TimeZoneInfo Zone(string? tz) =>
-        tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
-
-    /// <summary>
-    /// The date <paramref name="at"/> falls on in the viewer's calendar.
-    /// </summary>
-    public static DateOnly LocalDate(DateTimeOffset at, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
-
     /// <summary>
     /// Progress per show, for the given shows or (null) every show the viewer has watched. One query: aired regular
     /// episodes left-joined to the viewer's watches, grouped by show.
@@ -72,36 +61,6 @@ public static class Viewer
         return rows.ToDictionary(r => r.ShowId, r => new ShowProgress(r.ShowId, r.Aired, r.Watched, r.LatestSeason,
             r.Watched > 0 && r.LatestWatched == r.LatestAired, r.MinutesLeft, r.LastAired, r.LastWatched));
     }
-
-    /// <summary>
-    /// Where the viewer is in a show's aired episodes (in season order): the index of the furthest one watched (-1 for
-    /// none) and everything after it. Episodes skipped earlier on don't count as still to watch.
-    /// </summary>
-    public static (int Furthest, List<EpisodeCopy> Ahead) Split(List<EpisodeCopy> aired, HashSet<Guid> watched)
-    {
-        var furthest = aired.FindLastIndex(e => watched.Contains(e.EpisodeId));
-        return (furthest, aired.Skip(furthest + 1).ToList());
-    }
-
-    /// <summary>
-    /// A slow start's turn when it's still ahead of the viewer: the episodes between the furthest watched and the
-    /// turn, and their running time; null when the turn is behind them or isn't in the list.
-    /// </summary>
-    public static (GetsGoodTurn Turn, int EpisodesAway, int MinutesAway)? TurnAhead(List<EpisodeCopy> aired, int furthest, GetsGoodTurn? turn,
-        Func<EpisodeCopy, int> minutes)
-    {
-        if (turn is null || aired.FindIndex(e => e.EpisodeId == turn.EpisodeId) is var at && at <= furthest)
-        {
-            return null;
-        }
-        var between = aired.Skip(furthest + 1).Take(at - furthest - 1).ToList();
-        return (turn, between.Count, between.Sum(minutes));
-    }
-
-    /// <summary>
-    /// Tonight's plan's overrun, shared by the features that fill a time budget: max(5 min, a twelfth).
-    /// </summary>
-    public static int Overrun(int budgetMinutes) => Math.Max(5, budgetMinutes / 12);
 }
 
 /// <summary>
@@ -123,12 +82,6 @@ public static class ShowDocuments
     public static async Task<ShowInsights?> LoadAsync(AnalyticsContext db, Guid showId, CancellationToken ct) =>
         (await LoadAsync(db, [showId], ct)).GetValueOrDefault(showId);
 }
-
-/// <summary>
-/// A show's next season premiere: a scheduled first episode or an announced season, whichever is sooner.
-/// </summary>
-/// <param name="NewSeason">A season premiere (or an announced season), rather than the next episode of a season already airing.</param>
-public sealed record NextPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
 
 public static class NextPremieres
 {
@@ -165,48 +118,6 @@ public static class NextPremieres
         }
         return result;
     }
-}
-
-/// <summary>
-/// Everything an on-request endpoint needs about one show for one viewer: the show, its regular episodes in season
-/// order, the viewer's watches and stars, the ratings the essential cut goes by, moderators' notes and the stored
-/// document. Loaded for a set of shows in eight queries whatever their number, so the list endpoints (every dropped
-/// show, every refresher due, every catch-up) stop running five or six queries per show.
-/// </summary>
-public sealed class ShowLoad(ShowCopy show, List<EpisodeCopy> episodes, List<UserEpisodeWatch> watches, Dictionary<Guid, int> stars,
-    Func<EpisodeCopy, double?> rating, Dictionary<Guid, EpisodeNoteCopy> notes, ShowInsights? insights, DateTimeOffset now)
-{
-    public ShowCopy Show => show;
-
-    /// <summary>
-    /// Regular episodes, aired or not, in season order.
-    /// </summary>
-    public List<EpisodeCopy> Episodes => episodes;
-
-    public List<EpisodeCopy> Aired { get; } = episodes.Where(e => e.AirsAtUtc <= now).ToList();
-
-    public List<UserEpisodeWatch> Watches => watches;
-
-    public HashSet<Guid> Watched { get; } = watches.Select(w => w.EpisodeId).ToHashSet();
-
-    /// <summary>
-    /// The viewer's own stars per episode.
-    /// </summary>
-    public Dictionary<Guid, int> Stars => stars;
-
-    /// <summary>
-    /// The essential cut's rating of an episode (see <see cref="EssentialCutApi.RatingsAsync"/>).
-    /// </summary>
-    public Func<EpisodeCopy, double?> Rating => rating;
-
-    public Dictionary<Guid, EpisodeNoteCopy> Notes => notes;
-
-    public ShowInsights? Insights => insights;
-
-    /// <summary>
-    /// Episode runtimes, with missing ones as the show's typical one (see <see cref="EssentialCutApi.MinutesOf"/>).
-    /// </summary>
-    public Func<EpisodeCopy, int> Minutes => field ??= EssentialCutApi.MinutesOf(Aired);
 }
 
 public static class ShowLoads

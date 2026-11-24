@@ -85,7 +85,7 @@ public class EssentialCutTests
             [e[6].EpisodeId] = Note(e[6], EpisodeMarks.Skippable)
         };
 
-        var cut = EssentialCutApi.Decide(show, e, e, x => x.ExternalRating, EssentialCutApi.Lean, Now, notes);
+        var cut = EssentialCut.Decide(show, e, e, x => x.ExternalRating, EssentialCut.Lean, Now, notes);
 
         Assert.Equal(new[] { e[5].EpisodeId, e[6].EpisodeId }.Order(), cut.Where(d => !d.Value.Keep).Select(d => d.Key).Order());
         Assert.Equal((false, "noted-skippable"), cut[e[5].EpisodeId]);
@@ -102,7 +102,7 @@ public class EssentialCutTests
         var show = Show();
         var e = Season(show, 1, First, [.. Repeat(8.0, rated), .. Repeat(null, episodes - rated)]);
 
-        var why = EssentialCutApi.Unavailable(e, x => x.ExternalRating, NoNotes);
+        var why = EssentialCut.Unavailable(e, x => x.ExternalRating, NoNotes);
 
         if (reason is null)
         {
@@ -117,7 +117,7 @@ public class EssentialCutTests
     private static Dictionary<Guid, (bool Keep, string Why)> Decide(ShowCopy show, List<EpisodeCopy> episodes)
     {
         var aired = episodes.Where(e => e.AirsAtUtc <= Now).ToList();
-        return EssentialCutApi.Decide(show, episodes, aired, e => e.ExternalRating, EssentialCutApi.Lean, Now, NoNotes);
+        return EssentialCut.Decide(show, episodes, aired, e => e.ExternalRating, EssentialCut.Lean, Now, NoNotes);
     }
 
     private static EpisodeNoteCopy Note(EpisodeCopy e, string mark) =>

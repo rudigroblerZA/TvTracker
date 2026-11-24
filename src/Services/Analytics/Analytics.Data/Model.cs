@@ -2,54 +2,6 @@ using TvTracker.IntegrationEvents;
 
 namespace Analytics.Data;
 
-// Analytics' copy of the catalog and of our users' ratings, built from events.
-/// <summary>
-/// A show an actor is in the main cast of, anywhere on the catalog provider, from catalog events: what the reunion
-/// radar looks for actors working together again in.
-/// </summary>
-public class PersonCastCreditCopy
-{
-    public Guid PersonId { get; set; }
-    public required string ShowExternalId { get; set; }
-
-    /// <summary>
-    /// The catalog's id, when the show is in the catalog.
-    /// </summary>
-    public Guid? ShowId { get; set; }
-
-    public required string Title { get; set; }
-    public string? PosterUrl { get; set; }
-    public ShowStatus Status { get; set; }
-    public DateOnly? Premiered { get; set; }
-    public double Popularity { get; set; }
-    public double? Rating { get; set; }
-    public string? Character { get; set; }
-    public bool Voice { get; set; }
-}
-
-/// <summary>
-/// A moderator's note on an episode (from Research's <c>EpisodeNotesChanged</c>): essential or skippable, why, and the
-/// source. The essential cut follows it before ratings.
-/// </summary>
-public class EpisodeNoteCopy
-{
-    public Guid EpisodeId { get; set; }
-    public Guid ShowId { get; set; }
-
-    /// <summary>
-    /// One of <c>EpisodeMarks</c>.
-    /// </summary>
-    public required string Mark { get; set; }
-
-    public required string Reason { get; set; }
-    public required string SourceUrl { get; set; }
-
-    /// <summary>
-    /// When Research read the notes this came with; an older event leaves the show's notes alone.
-    /// </summary>
-    public DateTimeOffset TakenAtUtc { get; set; }
-}
-
 public class UserShowRating
 {
     public required string UserId { get; set; }

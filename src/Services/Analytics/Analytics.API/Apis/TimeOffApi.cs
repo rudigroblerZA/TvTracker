@@ -72,11 +72,6 @@ public static class TimeOffApi
     [System.ComponentModel.ImmutableObject(true)]
     public sealed record Shelf(IReadOnlyList<ShelfShow> Shows);
 
-    /// <param name="Dna">The show's DNA traits by key, when its document has them (While you wait compares them).</param>
-    [System.ComponentModel.ImmutableObject(true)]
-    public sealed record ShelfShow(Guid ShowId, string Title, string? PosterUrl, double? ExternalRating, IReadOnlyList<string> Genres,
-        int Episodes, int Minutes, string? Landing, GetsGoodTurn? Turn, bool Limited, IReadOnlyDictionary<string, double>? Dna = null);
-
     public static void MapTimeOffApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/time-off", GetAsync).RequireFeature(FeatureFlags.TimeOff);
 
@@ -91,7 +86,7 @@ public static class TimeOffApi
 
         var now = time.GetUtcNow();
         var budget = hours * 60;
-        var overrun = Viewer.Overrun(budget);
+        var overrun = ViewerRules.Overrun(budget);
         var candidates = (await CandidatesAsync(db, cache, userId, now, ct))
             .Where(c => c.Show.Minutes <= budget + overrun && c.Assessment.Value >= MinValue)
             .Select(c => new TimeOffShowDto(c.Show.ShowId, c.Show.Title, c.Show.PosterUrl, c.Show.Episodes, c.Show.Minutes, c.Assessment.Value,
@@ -105,27 +100,22 @@ public static class TimeOffApi
     }
 
     /// <summary>
-    /// A finished show the caller hasn't started, with how much it's worth to them.
-    /// </summary>
-    internal sealed record Candidate(ShelfShow Show, ShowValue.Assessment Assessment);
-
-    /// <summary>
     /// The finished shows worth offering the caller, which Fits your time off and While you wait share: on the shelf, not
     /// started (<paramref name="started"/> when the caller already knows, else from the watches), at least
     /// <see cref="MinMinutes"/> long, assessed against the caller's liked genres, and not fizzling out at the end. Each
     /// caller applies its own length and value cut.
     /// </summary>
-    internal static async Task<List<Candidate>> CandidatesAsync(AnalyticsContext db, HybridCache cache, string userId, DateTimeOffset now,
+    internal static async Task<List<ShelfCandidate>> CandidatesAsync(AnalyticsContext db, HybridCache cache, string userId, DateTimeOffset now,
         CancellationToken ct, IReadOnlySet<Guid>? started = null)
     {
         // The shelf (every finished show, its running time and its ending) is read once an hour, not per request: it
         // used to mean loading and deserializing several hundred documents for each visit.
         var shelf = await GetShelfAsync(db, cache, now, ct);
         started ??= (await db.Watches.AsNoTracking().Where(w => w.UserId == userId).Select(w => w.ShowId).Distinct().ToListAsync(ct)).ToHashSet();
-        var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
+        var liked = await ShowValueFacts.LikedGenresAsync(db, userId, now, ct);
         return shelf.Shows
             .Where(s => !started.Contains(s.ShowId) && s.Minutes >= MinMinutes)
-            .Select(s => new Candidate(s, ShowValue.Assess(s.ExternalRating, s.Genres, s.Landing, s.Turn, s.Limited, liked)))
+            .Select(s => new ShelfCandidate(s, ShowValue.Assess(s.ExternalRating, s.Genres, s.Landing, s.Turn, s.Limited, liked)))
             .Where(c => c.Assessment.Landing is not LandingVerdicts.Fizzles)
             .ToList();
     }
@@ -142,7 +132,7 @@ public static class TimeOffApi
     private static async Task<Shelf> ShelfAsync(AnalyticsContext db, DateTimeOffset now, CancellationToken ct)
     {
         var ended = await db.Shows.AsNoTracking().Ended().ToListAsync(ct);
-        var runs = await ShowValue.RunTimesAsync(db, ended.Select(s => s.ShowId).ToList(), now, ct);
+        var runs = await ShowValueFacts.RunTimesAsync(db, ended.Select(s => s.ShowId).ToList(), now, ct);
         var insights = await ShowDocuments.LoadAsync(db, runs.Keys.ToList(), ct);
         return new Shelf(ended.Where(s => runs.ContainsKey(s.ShowId))
             .Select(s =>

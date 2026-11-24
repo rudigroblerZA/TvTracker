@@ -151,7 +151,7 @@ public static class CatchUpApi
 
         var show = load.Show;
         var aired = load.Aired;
-        var (_, ahead) = Viewer.Split(aired, load.Watched);
+        var (_, ahead) = ViewerRules.Split(aired, load.Watched);
         if (ahead.Count == 0)
         {
             return null;
@@ -160,8 +160,8 @@ public static class CatchUpApi
         var minutes = load.Minutes;
         var rating = load.Rating;
         var notes = load.Notes;
-        var decisions = EssentialCutApi.Unavailable(aired, rating, notes) is null
-            ? EssentialCutApi.Decide(show, load.Episodes, aired, rating, EssentialCutApi.Lean, now, notes)
+        var decisions = EssentialCut.Unavailable(aired, rating, notes) is null
+            ? EssentialCut.Decide(show, load.Episodes, aired, rating, EssentialCut.Lean, now, notes)
             : null;
         var kept = decisions is null ? null : ahead.Where(e => decisions[e.EpisodeId].Keep).ToList();
 

@@ -118,7 +118,7 @@ public static class FinishOutlookApi
                     : null;
 
                 // The drop-off is ahead when it's past the furthest episode the user has watched.
-                var (furthest, _) = Viewer.Split(ordered, watched);
+                var (furthest, _) = ViewerRules.Split(ordered, watched);
                 var showInsights = insights.GetValueOrDefault(p.ShowId);
                 DropOff? ahead = null;
                 if (showInsights?.Viewing?.DropOff is { } dropOff
@@ -126,7 +126,7 @@ public static class FinishOutlookApi
                 {
                     ahead = dropOff;
                 }
-                var getsGood = Viewer.TurnAhead(ordered, furthest, showInsights?.GetsGood?.Turn, e => e.RuntimeMinutes ?? 0) is { } turn
+                var getsGood = ViewerRules.TurnAhead(ordered, furthest, showInsights?.GetsGood?.Turn, e => e.RuntimeMinutes ?? 0) is { } turn
                     ? new GetsGoodAheadDto(turn.Turn.SeasonNumber, turn.Turn.EpisodeNumber, turn.Turn.Title, turn.EpisodesAway, turn.MinutesAway)
                     : null;
 

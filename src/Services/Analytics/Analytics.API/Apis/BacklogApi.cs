@@ -66,10 +66,10 @@ public static class BacklogApi
             .Where(f => f.UserId == userId && !started.Contains(f.ShowId))
             .Select(f => f.ShowId)
             .ToListAsync(ct);
-        var runs = await ShowValue.RunTimesAsync(db, notStarted, now, ct);
+        var runs = await ShowValueFacts.RunTimesAsync(db, notStarted, now, ct);
         var shows = await db.Shows.AsNoTracking().Where(s => runs.Keys.Contains(s.ShowId)).ToListAsync(ct);
-        var insights = await ShowValue.InsightsAsync(db, runs.Keys.ToList(), ct);
-        var liked = await ShowValue.LikedGenresAsync(db, userId, now, ct);
+        var insights = await ShowValueFacts.InsightsAsync(db, runs.Keys.ToList(), ct);
+        var liked = await ShowValueFacts.LikedGenresAsync(db, userId, now, ct);
 
         var assessed = shows.Where(s => runs[s.ShowId].Episodes > 0)
             .Select(show =>
@@ -116,12 +116,12 @@ public static class BacklogApi
     private static int? CutMinutes(ShowLoad load, DateTimeOffset now)
     {
         var aired = load.Aired;
-        if (EssentialCutApi.Unavailable(aired, load.Rating, load.Notes) is not null)
+        if (EssentialCut.Unavailable(aired, load.Rating, load.Notes) is not null)
         {
             return null;
         }
 
-        var decisions = EssentialCutApi.Decide(load.Show, load.Episodes, aired, load.Rating, EssentialCutApi.Lean, now, load.Notes);
+        var decisions = EssentialCut.Decide(load.Show, load.Episodes, aired, load.Rating, EssentialCut.Lean, now, load.Notes);
         var kept = aired.Where(e => decisions[e.EpisodeId].Keep).Sum(load.Minutes);
         return kept < aired.Sum(load.Minutes) ? kept : null;
     }
