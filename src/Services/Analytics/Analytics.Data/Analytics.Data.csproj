@@ -12,12 +12,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
-    <ProjectReference Include="..\..\..\TvTracker.ShowInsightsEngine\TvTracker.ShowInsightsEngine.csproj" />
+    <ProjectReference Include="..\..\..\TvTracker.InsightsEngine\TvTracker.InsightsEngine.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- The engine's facts and insights are used throughout. -->
-    <Using Include="TvTracker.ShowInsightsEngine" />
+    <Using Include="TvTracker.InsightsEngine" />
   </ItemGroup>
 
 </Project>
