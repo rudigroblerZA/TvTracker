@@ -57,7 +57,7 @@ public static class TvLifeApi
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["born"] = [$"Use a year from {EarliestBirthYear} to {now.Year}."] });
         }
         var userId = user.GetUserId();
-        var zone = Viewer.Zone(tz);
+        var zone = ViewerRules.Zone(tz);
 
         // Every catalog show's first and last regular episode, from one aggregate.
         var runs = await db.Episodes.AsNoTracking().AiredRegular(now)

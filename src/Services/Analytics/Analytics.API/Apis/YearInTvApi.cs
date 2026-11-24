@@ -83,9 +83,9 @@ public static class YearInTvApi
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int? year = null, string? tz = null, CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = Viewer.Zone(tz);
+        var zone = ViewerRules.Zone(tz);
         var now = time.GetUtcNow();
-        var today = Viewer.LocalDate(now, zone);
+        var today = ViewerRules.LocalDate(now, zone);
 
         var rows = await db.Watches.AsNoTracking()
             .Where(w => w.UserId == userId)

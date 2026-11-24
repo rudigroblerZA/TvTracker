@@ -89,39 +89,6 @@ namespace Analytics.Data.Migrations
                     b.ToTable("discovery", (string)null);
                 });
 
-            modelBuilder.Entity("Analytics.Data.EpisodeNoteCopy", b =>
-                {
-                    b.Property<Guid>("EpisodeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Mark")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
-
-                    b.Property<Guid>("ShowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<DateTimeOffset>("TakenAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("EpisodeId");
-
-                    b.HasIndex("ShowId");
-
-                    b.ToTable("episode_notes", (string)null);
-                });
-
             modelBuilder.Entity("Analytics.Data.NetworkReportRow", b =>
                 {
                     b.Property<string>("Network")
@@ -141,50 +108,6 @@ namespace Analytics.Data.Migrations
                     b.HasKey("Network");
 
                     b.ToTable("network_reports", (string)null);
-                });
-
-            modelBuilder.Entity("Analytics.Data.PersonCastCreditCopy", b =>
-                {
-                    b.Property<Guid>("PersonId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ShowExternalId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("Character")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<double>("Popularity")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("PosterUrl")
-                        .HasColumnType("text");
-
-                    b.Property<DateOnly?>("Premiered")
-                        .HasColumnType("date");
-
-                    b.Property<double?>("Rating")
-                        .HasColumnType("double precision");
-
-                    b.Property<Guid?>("ShowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<bool>("Voice")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("PersonId", "ShowExternalId");
-
-                    b.ToTable("person_cast_credits", (string)null);
                 });
 
             modelBuilder.Entity("Analytics.Data.PersonInsightsRow", b =>
@@ -611,6 +534,39 @@ namespace Analytics.Data.Migrations
                     b.ToTable("episodes", (string)null);
                 });
 
+            modelBuilder.Entity("TvTracker.ShowInsightsEngine.EpisodeNoteCopy", b =>
+                {
+                    b.Property<Guid>("EpisodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Mark")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)");
+
+                    b.Property<Guid>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTimeOffset>("TakenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EpisodeId");
+
+                    b.HasIndex("ShowId");
+
+                    b.ToTable("episode_notes", (string)null);
+                });
+
             modelBuilder.Entity("TvTracker.ShowInsightsEngine.PersonCareerCopy", b =>
                 {
                     b.Property<Guid>("PersonId")
@@ -634,6 +590,50 @@ namespace Analytics.Data.Migrations
                     b.HasKey("PersonId");
 
                     b.ToTable("careers", (string)null);
+                });
+
+            modelBuilder.Entity("TvTracker.ShowInsightsEngine.PersonCastCreditCopy", b =>
+                {
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ShowExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Character")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<double>("Popularity")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("PosterUrl")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("Premiered")
+                        .HasColumnType("date");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid?>("ShowId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("Voice")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("PersonId", "ShowExternalId");
+
+                    b.ToTable("person_cast_credits", (string)null);
                 });
 
             modelBuilder.Entity("TvTracker.ShowInsightsEngine.ShowCopy", b =>

@@ -5,7 +5,7 @@ using TvTracker;
 
 namespace Analytics.API.Apis;
 
-/// <param name="Weight">How much it counts as loved (<see cref="ReunionsApi.LoveWeight"/>): 1 for 5 stars, 0.8 for 4, 0.5
+/// <param name="Weight">How much it counts as loved (<see cref="Reunions.LoveWeight"/>): 1 for 5 stars, 0.8 for 4, 0.5
 /// followed or watched and unrated.</param>
 public record LovedShowDto(Guid ShowId, double Weight);
 

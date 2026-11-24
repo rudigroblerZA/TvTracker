@@ -46,7 +46,7 @@ public class WhileYouWaitTests
     {
         // 10 days at 100 minutes a week is 142.86 minutes: a 143-minute show would finish a day late, so the budget is 142.
         var waits = new List<WhileYouWait.Wait> { new(Guid.NewGuid(), "x", null, "season", Today.AddDays(10), 2) };
-        var candidates = new List<TimeOffApi.Candidate> { Candidate("Short", 143, ["Drama"], null, 8.5), Candidate("Shorter", 140, ["Drama"], null, 8.5) };
+        var candidates = new List<ShelfCandidate> { Candidate("Short", 143, ["Drama"], null, 8.5), Candidate("Shorter", 140, ["Drama"], null, 8.5) };
 
         var plan = WhileYouWait.Plan(waits, candidates, pace: 100, Today, _ => ["Drama"], _ => null);
 
@@ -66,7 +66,7 @@ public class WhileYouWaitTests
             new(silo, "Silo", null, "season", Today.AddDays(56), 3)           // 8 weeks = 80 h
         };
         var mystery = Dna((DnaTraits.Release, 0.0), (DnaTraits.Acclaim, 0.9), (DnaTraits.EpisodeLength, 1.0), (DnaTraits.SeasonSize, 0.2), (DnaTraits.Finales, 0.9));
-        var candidates = new List<TimeOffApi.Candidate>
+        var candidates = new List<ShelfCandidate>
         {
             Candidate("Dark", 26 * 60, ["Drama", "Mystery", "Science-Fiction"], mystery, 8.7),            // 26 h, alike, fits the first
             Candidate("Counterpart", 20 * 60, ["Drama", "Science-Fiction", "Thriller"], mystery, 8.1),   // 20 h, alike, fits the first
@@ -109,9 +109,9 @@ public class WhileYouWaitTests
 
     private static IReadOnlyDictionary<string, double> Dna(params (string Key, double Value)[] traits) => traits.ToDictionary(t => t.Key, t => t.Value);
 
-    private static TimeOffApi.Candidate Candidate(string title, int minutes, string[] genres, IReadOnlyDictionary<string, double>? dna, double rating)
+    private static ShelfCandidate Candidate(string title, int minutes, string[] genres, IReadOnlyDictionary<string, double>? dna, double rating)
     {
-        var show = new TimeOffApi.ShelfShow(Guid.NewGuid(), title, null, rating, genres, minutes / 50, minutes, null, null, false, dna);
-        return new TimeOffApi.Candidate(show, ShowValue.Assess(rating, genres, null, null, false, ["Drama", "Mystery"]));
+        var show = new ShelfShow(Guid.NewGuid(), title, null, rating, genres, minutes / 50, minutes, null, null, false, dna);
+        return new ShelfCandidate(show, ShowValue.Assess(rating, genres, null, null, false, ["Drama", "Mystery"]));
     }
 }

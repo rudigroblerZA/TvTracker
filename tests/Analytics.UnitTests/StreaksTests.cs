@@ -1,5 +1,5 @@
 using Analytics.API.Apis;
-using static Analytics.API.Apis.StreaksApi;
+using static TvTracker.ShowInsightsEngine.Streaks;
 
 namespace Analytics.UnitTests;
 
