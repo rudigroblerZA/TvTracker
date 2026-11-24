@@ -1,4 +1,47 @@
 <Solution>
+  <Folder Name="/Services/Analytics/">
+    <Project Path="src/Services/Analytics/Analytics.API/Analytics.API.csproj" />
+    <Project Path="src/Services/Analytics/Analytics.Data/Analytics.Data.csproj" />
+    <Project Path="src/Services/Analytics/Analytics.Worker/Analytics.Worker.csproj" />
+  </Folder>
+  <Folder Name="/Services/Catalog/">
+    <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
+  </Folder>
+  <Folder Name="/Services/Financials/">
+    <Project Path="src/Services/Financials/Financials.API/Financials.API.csproj" />
+    <Project Path="src/Services/Financials/Financials.Data/Financials.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Identity/">
+    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="src/Services/Identity/Identity.Data/Identity.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Notifications/">
+    <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
+    <Project Path="src/Services/Notifications/Notifications.Data/Notifications.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Ratings/">
+    <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
+    <Project Path="src/Services/Ratings/Ratings.Data/Ratings.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Recomedations/">
+    <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
+    <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Research/">
+    <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
+    <Project Path="src/Services/Research/Research.Data/Research.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Social/">
+    <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
+    <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" />
+  </Folder>
+  <Folder Name="/Services/Tracking/">
+    <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
+    <Project Path="src/Services/Tracking/Tracking.Data/Tracking.Data.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
@@ -17,31 +60,7 @@
     <Project Path="src/TvTracker.Persistence/TvTracker.Persistence.csproj" />
     <Project Path="src/TvTracker.ShowInsightsEngine/TvTracker.ShowInsightsEngine.csproj" />
   </Folder>
-  <Folder Name="/Services/">
-    <Project Path="src/Services/Analytics/Analytics.API/Analytics.API.csproj" />
-    <Project Path="src/Services/Analytics/Analytics.Data/Analytics.Data.csproj" />
-    <Project Path="src/Services/Analytics/Analytics.Worker/Analytics.Worker.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.API/Catalog.API.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
-    <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
-    <Project Path="src/Services/Financials/Financials.API/Financials.API.csproj" />
-    <Project Path="src/Services/Financials/Financials.Data/Financials.Data.csproj" />
-    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
-    <Project Path="src/Services/Identity/Identity.Data/Identity.Data.csproj" />
-    <Project Path="src/Services/Notifications/Notifications.API/Notifications.API.csproj" />
-    <Project Path="src/Services/Notifications/Notifications.Data/Notifications.Data.csproj" />
-    <Project Path="src/Services/Ratings/Ratings.API/Ratings.API.csproj" />
-    <Project Path="src/Services/Ratings/Ratings.Data/Ratings.Data.csproj" />
-    <Project Path="src/Services/Recommendations/Recommendations.API/Recommendations.API.csproj" />
-    <Project Path="src/Services/Recommendations/Recommendations.Data/Recommendations.Data.csproj" />
-    <Project Path="src/Services/Research/Research.API/Research.API.csproj" />
-    <Project Path="src/Services/Research/Research.Data/Research.Data.csproj" />
-    <Project Path="src/Services/Social/Social.API/Social.API.csproj" />
-    <Project Path="src/Services/Social/Social.Data/Social.Data.csproj" />
-    <Project Path="src/Services/Tracking/Tracking.API/Tracking.API.csproj" />
-    <Project Path="src/Services/Tracking/Tracking.Data/Tracking.Data.csproj" />
-  </Folder>
+  <Folder Name="/Services/" />
   <Folder Name="/Tests/">
     <Project Path="tests/Analytics.IntegrationTests/Analytics.IntegrationTests.csproj" />
     <Project Path="tests/Analytics.UnitTests/Analytics.UnitTests.csproj" />
