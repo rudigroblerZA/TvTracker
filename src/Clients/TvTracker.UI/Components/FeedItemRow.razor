@@ -1,7 +1,7 @@
 @* One feed item: who did what to which show, and when. Episode numbers only, never titles: a follower may not have
    seen them yet. *@
 <li class="feed-item">
-    <a class="avatar" href="users/@Item.UserId" aria-hidden="true" tabindex="-1">@Initial(Item.DisplayName)</a>
+    <Avatar Name="@Item.DisplayName" Src="@Item.Avatar" UserId="@Item.UserId" />
     <div class="feed-body">
         <div>
             @if (ShowName)
@@ -58,8 +58,6 @@
         ({ } first, { } last) => $"{Format.EpisodeCode(first.SeasonNumber, first.EpisodeNumber)}–{Format.EpisodeCode(last.SeasonNumber, last.EpisodeNumber)} · {item.Episodes} episodes",
         _ => item.Episodes == 1 ? "1 episode" : $"{item.Episodes} episodes"
     };
-
-    public static string Initial(string name) => name.Length == 0 ? "?" : char.ToUpperInvariant(name[0]).ToString();
 
     private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 }

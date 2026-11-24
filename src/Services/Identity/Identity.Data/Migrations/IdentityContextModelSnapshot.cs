@@ -221,6 +221,29 @@ namespace Identity.Data.Migrations
                     b.ToTable("processed_payment_events", (string)null);
                 });
 
+            modelBuilder.Entity("Identity.Data.ProfileAvatar", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("profile_avatars", (string)null);
+                });
+
             modelBuilder.Entity("Identity.Data.SiteSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -345,6 +368,9 @@ namespace Identity.Data.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<long?>("AvatarVersion")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");

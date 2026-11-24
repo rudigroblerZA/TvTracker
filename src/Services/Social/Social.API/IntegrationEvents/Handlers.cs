@@ -73,14 +73,15 @@ public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
     IIntegrationEventHandler<UserProfileSnapshotIntegrationEvent>,
     IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
+    // Registering says nothing about a picture: one set since (events arrive in any order) is kept.
     public Task HandleAsync(UserRegisteredIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetNameAsync(e.UserId, e.DisplayName, ct), ct);
+        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, null, ct, knowsAvatar: false), ct);
 
     public Task HandleAsync(UserProfileUpdatedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetNameAsync(e.UserId, e.DisplayName, ct), ct);
+        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, e.Avatar, ct), ct);
 
     public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetNameAsync(e.UserId, e.DisplayName, ct), ct);
+        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, e.Avatar, ct), ct);
 
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
@@ -95,18 +96,20 @@ public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
     }
 
     /// <summary>
-    /// Names arrive in any order (a snapshot can follow an update), and the latest content wins either way.
+    /// Names and pictures arrive in any order (a snapshot can follow an update), and the latest content wins either
+    /// way. An event that says nothing about the picture (<paramref name="knowsAvatar"/> false) leaves it as it is.
     /// </summary>
-    private async Task SetNameAsync(string userId, string displayName, CancellationToken ct)
+    private async Task SetProfileAsync(string userId, string displayName, string? avatar, CancellationToken ct, bool knowsAvatar = true)
     {
         var profile = await db.Profiles.FindAsync([userId], ct);
         if (profile is null)
         {
-            db.Profiles.Add(new Profile { UserId = userId, DisplayName = displayName, UpdatedAtUtc = time.GetUtcNow().UtcDateTime });
+            db.Profiles.Add(new Profile { UserId = userId, DisplayName = displayName, Avatar = avatar, UpdatedAtUtc = time.GetUtcNow().UtcDateTime });
         }
-        else if (profile.DisplayName != displayName)
+        else if (profile.DisplayName != displayName || (knowsAvatar && profile.Avatar != avatar))
         {
             profile.DisplayName = displayName;
+            profile.Avatar = knowsAvatar ? avatar : profile.Avatar;
             profile.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
         }
     }

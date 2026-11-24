@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Identity.Data;
 using Identity.API.Payments;
 using Identity.API.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.IntegrationEvents;
@@ -18,7 +19,13 @@ public record ProfileDto(
     string? AvatarUrl,
     string TimeZone,
     string Region,
-    string Language);
+    string Language,
+    // The picture to show: the uploaded one's path under api/v1/, else AvatarUrl, else null.
+    string? Avatar = null,
+    bool AvatarUploaded = false);
+
+/// <param name="Image">The picture's bytes (base64 in JSON).</param>
+public record UploadAvatarRequest(byte[]? Image);
 
 public record UpdateProfileRequest(
     string DisplayName,
@@ -40,11 +47,101 @@ public static class ProfileApi
 
         api.MapGet("/profile", GetProfileAsync);
         api.MapPut("/profile", UpdateProfileAsync);
+        // The picture (JPEG, PNG or WebP, already shrunk by the client) as base64 in JSON, like every other request
+        // here. The body may be a third bigger than the picture, and little more.
+        api.MapPut("/me/avatar", UploadAvatarAsync).WithMetadata(new RequestSizeLimitAttribute(ProfileAvatar.MaxBytes * 3 / 2));
+        api.MapDelete("/me/avatar", RemoveAvatarAsync);
         api.MapDelete("/account", DeleteAccountAsync);
         // Each export reads every service, so a person gets a few an hour.
         api.MapGet("/account/export", ExportAsync).RequireRateLimiting(ClientRateLimiting.Export);
 
+        // Anyone may see a picture: profiles, people lists and the feed show them, signed in or not.
+        app.MapGet("/api/v1/avatars/{userId}", GetAvatarAsync).AllowAnonymous();
+
         return api;
+    }
+
+    /// <summary>
+    /// Keeps the picture sent as the caller's own, replacing any they had. It is taken as sent: the client shrinks
+    /// it first, and here only its kind (from its first bytes, not from anything the request claims) and weight are checked.
+    /// </summary>
+    private static async Task<Results<Ok<ProfileDto>, ValidationProblem>> UploadAvatarAsync(
+        UploadAvatarRequest request, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
+    {
+        var bytes = request.Image ?? [];
+        var contentType = ProfileAvatar.ContentTypeOf(bytes);
+        if (bytes.Length > ProfileAvatar.MaxBytes || contentType is null)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["image"] = [bytes.Length > ProfileAvatar.MaxBytes
+                    ? $"That picture is too big. It can be up to {ProfileAvatar.MaxBytes / 1024} KB."
+                    : "That isn't a picture this can show. Use a JPEG, PNG or WebP."]
+            });
+        }
+
+        var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
+        var now = time.GetUtcNow();
+        if (await db.Avatars.FindAsync([profile.UserId], ct) is { } avatar)
+        {
+            (avatar.ContentType, avatar.Bytes, avatar.UpdatedAtUtc) = (contentType, bytes, now.UtcDateTime);
+        }
+        else
+        {
+            db.Avatars.Add(new ProfileAvatar { UserId = profile.UserId, ContentType = contentType, Bytes = bytes, UpdatedAtUtc = now.UtcDateTime });
+        }
+        profile.AvatarVersion = now.ToUnixTimeMilliseconds();
+        return TypedResults.Ok(await SaveProfileAsync(profile, db, outbox, now, ct));
+    }
+
+    /// <summary>
+    /// Takes the caller's uploaded picture away; their picture is then the one at their avatar address, if they gave one.
+    /// </summary>
+    private static async Task<Ok<ProfileDto>> RemoveAvatarAsync(
+        ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, TimeProvider time, CancellationToken ct)
+    {
+        var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
+        if (profile.AvatarVersion is null)
+        {
+            return TypedResults.Ok(ToDto(profile));
+        }
+        if (await db.Avatars.FindAsync([profile.UserId], ct) is { } avatar)
+        {
+            db.Avatars.Remove(avatar);
+        }
+        profile.AvatarVersion = null;
+        return TypedResults.Ok(await SaveProfileAsync(profile, db, outbox, time.GetUtcNow(), ct));
+    }
+
+    /// <summary>
+    /// A user's uploaded picture. Its address changes with every upload (the v a profile's <c>Avatar</c> carries), so
+    /// it may be kept for good; it is sent as the kind found when it was uploaded, to be shown and never run.
+    /// </summary>
+    private static async Task<Results<FileContentHttpResult, NotFound>> GetAvatarAsync(string userId, HttpResponse response, IdentityContext db, CancellationToken ct)
+    {
+        var avatar = await db.Avatars.AsNoTracking().SingleOrDefaultAsync(a => a.UserId == userId, ct);
+        if (avatar is null)
+        {
+            return TypedResults.NotFound();
+        }
+        response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        response.Headers.XContentTypeOptions = "nosniff";
+        response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
+        return TypedResults.File(avatar.Bytes, avatar.ContentType);
+    }
+
+    /// <summary>
+    /// Saves a changed profile and tells the other services, which show its name and picture.
+    /// </summary>
+    private static async Task<ProfileDto> SaveProfileAsync(UserProfile profile, IdentityContext db, IIntegrationEventOutbox outbox, DateTimeOffset now,
+        CancellationToken ct)
+    {
+        profile.UpdatedAtUtc = now.UtcDateTime;
+        outbox.Add(new UserProfileUpdatedIntegrationEvent(
+            profile.UserId, profile.DisplayName, profile.Email, profile.TimeZone, profile.Region, profile.Language, profile.Avatar));
+        await db.SaveChangesAsync(ct);
+        await outbox.PublishAddedAsync(ct);
+        return ToDto(profile);
     }
 
     /// <summary>
@@ -74,15 +171,8 @@ public static class ProfileApi
         profile.Region = request.Region.ToUpperInvariant();
         profile.Language = request.Language;
         profile.Email = user.GetEmail() ?? profile.Email;
-        profile.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
 
-        outbox.Add(new UserProfileUpdatedIntegrationEvent(
-            profile.UserId, profile.DisplayName, profile.Email, profile.TimeZone, profile.Region, profile.Language));
-
-        await db.SaveChangesAsync(ct);
-        await outbox.PublishAddedAsync(ct);
-
-        return TypedResults.Ok(ToDto(profile));
+        return TypedResults.Ok(await SaveProfileAsync(profile, db, outbox, time.GetUtcNow(), ct));
     }
 
     /// <summary>
@@ -112,6 +202,7 @@ public static class ProfileApi
         {
             db.Profiles.Remove(profile);
         }
+        await db.Avatars.Where(a => a.UserId == userId).ExecuteDeleteAsync(ct);
 
         db.FamilyMembers.RemoveRange(await db.FamilyMembers.Where(m => m.UserId == userId).ToListAsync(ct));
         var members = await db.FamilyMembers.Where(m => m.OwnerUserId == userId).ToListAsync(ct);
@@ -233,14 +324,16 @@ public static class ProfileApi
         {
             errors["language"] = ["Language is required."];
         }
-        if (request.AvatarUrl is { Length: > 0 } url && !Uri.TryCreate(url, UriKind.Absolute, out _))
+        // https only: a page served over https won't show a picture fetched over http.
+        if (request.AvatarUrl is { Length: > 0 } url
+            && (url.Length > 1024 || !Uri.TryCreate(url.Trim(), UriKind.Absolute, out var address) || address.Scheme != Uri.UriSchemeHttps))
         {
-            errors["avatarUrl"] = ["Avatar must be an absolute URL."];
+            errors["avatarUrl"] = ["The picture's address must start with https://."];
         }
 
         return errors;
     }
 
     private static ProfileDto ToDto(UserProfile p) =>
-        new(p.UserId, p.DisplayName, p.Email, p.AvatarUrl, p.TimeZone, p.Region, p.Language);
+        new(p.UserId, p.DisplayName, p.Email, p.AvatarUrl, p.TimeZone, p.Region, p.Language, p.Avatar, p.AvatarVersion is not null);
 }

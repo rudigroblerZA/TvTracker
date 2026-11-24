@@ -13,7 +13,7 @@ namespace Social.API.Apis;
 public record ProgressDto(int Watched, int Aired, EpisodeCodeDto? Furthest, bool Finished);
 
 /// <param name="Stars">Their rating of the show, 1-5.</param>
-public record FriendOnShowDto(string UserId, string DisplayName, bool Following, ProgressDto Progress, int? Stars);
+public record FriendOnShowDto(string UserId, string DisplayName, bool Following, ProgressDto Progress, int? Stars, string? Avatar = null);
 
 /// <param name="Total">Everyone the caller follows and can see who follows, watched or rated the show.</param>
 public record FriendsOnShowDto(int Total, IReadOnlyList<FriendOnShowDto> People);
@@ -53,11 +53,12 @@ public static class TogetherApi
             .Select(w => w.UserId).Distinct().ToListAsync(ct);
         var ids = shows.Keys.Union(watchers).ToList();
         var progress = await ProgressAsync(db, ids, [showId], time.GetUtcNow(), ct);
-        var names = await db.Profiles.AsNoTracking().Where(p => ids.Contains(p.UserId)).ToDictionaryAsync(p => p.UserId, p => p.DisplayName, ct);
+        var names = await db.Profiles.AsNoTracking().Where(p => ids.Contains(p.UserId))
+            .ToDictionaryAsync(p => p.UserId, p => new { p.DisplayName, p.Avatar }, ct);
 
         var people = ids.Where(names.ContainsKey)
-            .Select(id => new FriendOnShowDto(id, names[id], shows.GetValueOrDefault(id)?.Followed == true,
-                progress[(id, showId)], shows.GetValueOrDefault(id)?.Stars))
+            .Select(id => new FriendOnShowDto(id, names[id].DisplayName, shows.GetValueOrDefault(id)?.Followed == true,
+                progress[(id, showId)], shows.GetValueOrDefault(id)?.Stars, names[id].Avatar))
             .OrderByDescending(p => p.Progress.Finished)
             .ThenByDescending(p => p.Progress.Watched)
             .ThenByDescending(p => p.Stars)

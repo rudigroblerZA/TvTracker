@@ -10,7 +10,7 @@
             @foreach (var person in f.People)
             {
                 <li class="person-row" @key="person.UserId">
-                    <a class="avatar" href="users/@person.UserId" aria-hidden="true" tabindex="-1">@FeedItemRow.Initial(person.DisplayName)</a>
+                    <Avatar Name="@person.DisplayName" Src="@person.Avatar" UserId="@person.UserId" />
                     <div class="feed-body">
                         <a class="strong" href="users/@person.UserId">@person.DisplayName</a>
                         <div class="muted small">@Describe(person.Progress, person.Following)</div>

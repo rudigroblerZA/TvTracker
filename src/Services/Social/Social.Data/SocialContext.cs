@@ -12,6 +12,12 @@ public class Profile
     public required string DisplayName { get; set; }
 
     /// <summary>
+    /// Their picture, as Identity's profile events carry it: an https address, or a path under Identity.API's
+    /// <c>api/v1/</c> for one they uploaded; null for none.
+    /// </summary>
+    public string? Avatar { get; set; }
+
+    /// <summary>
     /// Whether the people who can see this user see their activity. On unless they turn it off.
     /// </summary>
     public bool ShareActivity { get; set; } = true;
@@ -206,6 +212,7 @@ public class SocialContext(DbContextOptions<SocialContext> options) : DbContext(
             entity.HasKey(p => p.UserId);
             entity.Property(p => p.UserId).HasMaxLength(64);
             entity.Property(p => p.DisplayName).HasMaxLength(128);
+            entity.Property(p => p.Avatar).HasMaxLength(1024);
             entity.HasIndex(p => p.DisplayName);
         });
 

@@ -17,7 +17,10 @@ public enum DevicePlatform { Android, iOS, Web }
 
 // Identity
 
-public record Profile(string UserId, string DisplayName, string? Email, string? AvatarUrl, string TimeZone, string Region, string Language);
+/// <param name="Avatar">The picture to show (see <c>Avatar.razor</c>): the uploaded one's path, else <paramref name="AvatarUrl"/>, else null.</param>
+/// <param name="AvatarUploaded">Whether <paramref name="Avatar"/> is a picture they uploaded.</param>
+public record Profile(string UserId, string DisplayName, string? Email, string? AvatarUrl, string TimeZone, string Region, string Language,
+    string? Avatar = null, bool AvatarUploaded = false);
 
 public record UpdateProfile(string DisplayName, string? AvatarUrl, string TimeZone, string Region, string Language);
 
@@ -631,7 +634,7 @@ public record TimeOffMix(IReadOnlyList<TimeOffShow> Shows, int Minutes);
 /// <param name="Requested">The user asked to follow this private profile and is waiting for approval.</param>
 /// <param name="BlockedByYou">On the user's block list.</param>
 public record SocialPerson(string UserId, string DisplayName, int Followers, int Following, bool IsFollowing, bool FollowsYou, bool IsYou,
-    bool Private = false, bool Requested = false, bool BlockedByYou = false);
+    bool Private = false, bool Requested = false, bool BlockedByYou = false, string? Avatar = null);
 
 /// <param name="Requests">Follow requests waiting for the user's approval.</param>
 public record MySocial(string UserId, string DisplayName, bool ShareActivity, int Followers, int Following, bool Private = false, int Requests = 0);
@@ -659,7 +662,7 @@ public record ListShow(Guid ShowId, string? Title, string? PosterUrl);
 /// </summary>
 public record PeerProgress(int Watched, int Aired, EpisodeCode? Furthest, bool Finished);
 
-public record FriendOnShow(string UserId, string DisplayName, bool Following, PeerProgress Progress, int? Stars);
+public record FriendOnShow(string UserId, string DisplayName, bool Following, PeerProgress Progress, int? Stars, string? Avatar = null);
 
 public record FriendsOnShow(int Total, IReadOnlyList<FriendOnShow> People);
 
@@ -690,7 +693,7 @@ public record Feed(IReadOnlyList<FeedItem> Items, DateTime? NextBefore);
 
 /// <param name="Kind">"watched", "finished", "followed" or "rated".</param>
 public record FeedItem(Guid Id, string UserId, string DisplayName, string Kind, Guid ShowId, string? ShowTitle, string? PosterUrl,
-    int Episodes, EpisodeCode? First, EpisodeCode? Last, int? Stars, DateTime OccurredAtUtc);
+    int Episodes, EpisodeCode? First, EpisodeCode? Last, int? Stars, DateTime OccurredAtUtc, string? Avatar = null);
 
 public record EpisodeCode(int SeasonNumber, int EpisodeNumber);
 

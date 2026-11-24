@@ -686,6 +686,14 @@ progress { width: 100%; height: 6px; accent-color: var(--accent); border-radius:
 .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, var(--surface)); text-decoration: none; }
 .avatar.large { width: 64px; height: 64px; font-size: 1.6rem; }
+/* The picture sits over the initial, which shows until it arrives and stays if it never does. */
+.avatar { position: relative; overflow: hidden; }
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--surface); }
+.account-me { display: inline-flex; align-items: center; gap: 8px; }
+.account-me .avatar { width: 28px; height: 28px; font-size: 0.85rem; }
+.avatar-edit { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.avatar-edit .avatar-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.avatar-edit input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .user-hero { display: flex; align-items: center; gap: 16px; margin: 8px 0; }
 .user-hero h1 { margin: 0; overflow-wrap: anywhere; }
 .user-hero > div { flex: 1; min-width: 0; }
