@@ -1,8 +1,8 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Research.Data;
 using Research.API.Services;
+using Research.Data;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

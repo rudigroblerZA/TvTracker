@@ -1,6 +1,6 @@
 ﻿using Financials.API.Apis;
-using Financials.Data;
 using Financials.API.Services;
+using Financials.Data;
 
 namespace Financials.UnitTests;
 

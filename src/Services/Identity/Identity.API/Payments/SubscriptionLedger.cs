@@ -1,5 +1,5 @@
+﻿using Identity.API.Services;
 using Identity.Data;
-using Identity.API.Services;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TvTracker.IntegrationEvents;

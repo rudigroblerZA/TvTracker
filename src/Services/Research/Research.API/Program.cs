@@ -1,7 +1,7 @@
 ﻿using Research.API.Apis;
-using Research.Data;
 using Research.API.IntegrationEvents;
 using Research.API.Services;
+using Research.Data;
 using TvTracker;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;

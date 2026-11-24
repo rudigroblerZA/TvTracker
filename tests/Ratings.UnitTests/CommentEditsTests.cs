@@ -1,6 +1,6 @@
-using Ratings.API.Apis;
-using Ratings.Data;
+﻿using Ratings.API.Apis;
 using Ratings.API.Services;
+using Ratings.Data;
 
 namespace Ratings.UnitTests;
 

@@ -1,7 +1,7 @@
-using Identity.API.Apis;
-using Identity.Data;
+﻿using Identity.API.Apis;
 using Identity.API.Payments;
 using Identity.API.Services;
+using Identity.Data;
 using Microsoft.Extensions.Options;
 using TvTracker.Persistence;
 

@@ -1,6 +1,6 @@
-using Notifications.Data;
-using Notifications.API.IntegrationEvents;
+﻿using Notifications.API.IntegrationEvents;
 using Notifications.API.Services;
+using Notifications.Data;
 using TvTracker.IntegrationEvents;
 
 namespace Notifications.UnitTests;

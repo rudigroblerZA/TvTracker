@@ -1,5 +1,5 @@
+﻿using Notifications.API.Services;
 using Notifications.Data;
-using Notifications.API.Services;
 
 namespace Notifications.UnitTests;
 

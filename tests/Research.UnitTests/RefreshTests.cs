@@ -1,5 +1,5 @@
+﻿using Research.API.Services;
 using Research.Data;
-using Research.API.Services;
 
 namespace Research.UnitTests;
 
