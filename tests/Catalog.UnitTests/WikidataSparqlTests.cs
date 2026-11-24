@@ -11,6 +11,8 @@ namespace Catalog.UnitTests;
 /// </summary>
 public class WikidataSparqlTests
 {
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     private const string Empty = """{"results":{"bindings":[]}}""";
     private readonly FakeTimeProvider time = new(new DateTimeOffset(2026, 11, 9, 12, 0, 0, TimeSpan.Zero));
 
@@ -27,23 +29,23 @@ public class WikidataSparqlTests
         });
         var sparql = new WikidataSparql(new Factory(handler), time);
 
-        var a = Task.Run(() => sparql.QueryAsync("A", default));
+        var a = Task.Run(() => sparql.QueryAsync("A", Ct));
         await Until(() => order.Count == 1);
-        var b = Task.Run(() => sparql.QueryAsync("B", default));
-        await Task.Delay(50);
+        var b = Task.Run(() => sparql.QueryAsync("B", Ct));
+        await Task.Delay(50, Ct);
         var c = Task.Run(() =>
         {
             using var lane = ProviderCaller.Begin("search-import", ProviderLane.Interactive);
-            return sparql.QueryAsync("C", default);
+            return sparql.QueryAsync("C", Ct);
         });
-        await Task.Delay(50);
+        await Task.Delay(50, Ct);
         first.SetResult();
 
         // Each query waits a second after the one before, on the fake clock.
         while (!Task.WhenAll(a, b, c).IsCompleted)
         {
             time.Advance(TimeSpan.FromSeconds(1));
-            await Task.Delay(10);
+            await Task.Delay(10, Ct);
         }
         Assert.Equal(["A", "C", "B"], order);
     }
@@ -62,15 +64,15 @@ public class WikidataSparqlTests
         var sparql = new WikidataSparql(new Factory(handler), time);
         using var lane = ProviderCaller.Begin("history-import", ProviderLane.Interactive);
 
-        var refused = await Assert.ThrowsAsync<HttpRequestException>(() => sparql.QueryAsync("A", default));
+        var refused = await Assert.ThrowsAsync<HttpRequestException>(() => sparql.QueryAsync("A", Ct));
         Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
-        await Assert.ThrowsAsync<HttpRequestException>(() => sparql.QueryAsync("B", default));
+        await Assert.ThrowsAsync<HttpRequestException>(() => sparql.QueryAsync("B", Ct));
         Assert.Equal(1, calls);
     }
 
     private static async Task Until(Func<bool> condition)
     {
-        for (var i = 0; i < 200 && !condition(); i++) await Task.Delay(10);
+        for (var i = 0; i < 200 && !condition(); i++) await Task.Delay(10, Ct);
     }
 
     private sealed class Handler(Func<string, Task<HttpResponseMessage>> answer) : HttpMessageHandler
