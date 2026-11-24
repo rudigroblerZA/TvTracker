@@ -73,17 +73,17 @@ public static class TvClock
     internal static Watch Placed(Guid showId, DateTime markedAtUtc, int? runtimeMinutes, TimeZoneInfo zone)
     {
         var minutes = runtimeMinutes is > 0 ? runtimeMinutes.Value : DefaultRuntime;
-        var started = DateTime.SpecifyKind(markedAtUtc, DateTimeKind.Utc).AddMinutes(-minutes / 2.0);
-        return new Watch(showId, markedAtUtc, TimeZoneInfo.ConvertTimeFromUtc(started, zone), minutes);
+        return new Watch(showId, markedAtUtc, ViewerRules.Local(markedAtUtc.AddMinutes(-minutes / 2.0), zone), minutes);
     }
 
     /// <summary>
     /// The clock the watches make (in the order they were marked): only the counts when there are fewer than
-    /// <see cref="MinWatches"/>, in which case <paramref name="showOf"/> isn't asked anything.
+    /// <see cref="MinWatches"/>, in which case <paramref name="shows"/> isn't needed.
     /// </summary>
     /// <param name="since">The first day counted.</param>
-    /// <param name="showOf">A show's title and poster; null for one that's gone.</param>
-    internal static TvClockDto Of(List<Watch> watches, DateOnly since, int bulkLeftOut, Func<Guid, (string Title, string? PosterUrl)?> showOf)
+    /// <param name="shows">The watched shows' titles and posters; one that's gone is missing.</param>
+    internal static TvClockDto Of(List<Watch> watches, DateOnly since, int bulkLeftOut,
+        IReadOnlyDictionary<Guid, (string Title, string? PosterUrl)> shows)
     {
         var total = watches.Sum(w => w.Minutes);
         if (watches.Count < MinWatches)
@@ -128,7 +128,7 @@ public static class TvClock
         var peak = Enumerable.Range(0, 7).SelectMany(d => Enumerable.Range(0, 24).Select(h => new ClockPeakDto(d, h, grid[d, h])))
             .MaxBy(c => c.Minutes);
 
-        var top = watches.Where(w => showOf(w.ShowId) is not null)
+        var top = watches.Where(w => shows.ContainsKey(w.ShowId))
             .GroupBy(w => w.ShowId)
             .OrderByDescending(g => g.Sum(w => w.Minutes))
             .Take(MaxShows)
@@ -136,7 +136,7 @@ public static class TvClock
             {
                 var minutes = g.Sum(w => w.Minutes);
                 var part = g.GroupBy(w => PartOf(w.Local.Hour)).MaxBy(p => p.Sum(w => w.Minutes))!;
-                var show = showOf(g.Key)!.Value;
+                var show = shows[g.Key];
                 return new ClockShowDto(g.Key, show.Title, show.PosterUrl, minutes, part.Key, Math.Round((double)part.Sum(w => w.Minutes) / minutes, 2),
                     g.Where(w => Weekday(w.Local) >= 5).Sum(w => w.Minutes) * 2 > minutes);
             })
@@ -144,13 +144,13 @@ public static class TvClock
 
         return new TvClockDto(true, since, watches.Count, total, bulkLeftOut,
             Enumerable.Range(0, 7).Select(d => (IReadOnlyList<int>)Enumerable.Range(0, 24).Select(h => grid[d, h]).ToArray()).ToList(),
-            labels, peak, periods, weekend, Sittings(watches, showOf), top);
+            labels, peak, periods, weekend, Sittings(watches, shows), top);
     }
 
     /// <summary>
     /// Marks in a row grouped into sittings, and what they add up to.
     /// </summary>
-    private static SittingsDto? Sittings(List<Watch> watches, Func<Guid, (string Title, string? PosterUrl)?> showOf)
+    private static SittingsDto? Sittings(List<Watch> watches, IReadOnlyDictionary<Guid, (string Title, string? PosterUrl)> shows)
     {
         var sittings = new List<List<Watch>>();
         foreach (var w in watches)
@@ -166,13 +166,13 @@ public static class TvClock
         }
 
         var longest = sittings.OrderByDescending(s => s.Count).ThenByDescending(s => s.Sum(w => w.Minutes))
-            .FirstOrDefault(s => showOf(s.GroupBy(w => w.ShowId).MaxBy(g => g.Count())!.Key) is not null);
+            .FirstOrDefault(s => shows.ContainsKey(s.GroupBy(w => w.ShowId).MaxBy(g => g.Count())!.Key));
         if (longest is null)
         {
             return null;
         }
         var main = longest.GroupBy(w => w.ShowId).MaxBy(g => g.Count())!.Key;
-        var (title, poster) = showOf(main)!.Value;
+        var (title, poster) = shows[main];
         return new SittingsDto(sittings.Count, Math.Round(sittings.Average(s => s.Count), 1), (int)Math.Round(sittings.Average(s => s.Sum(w => w.Minutes))),
             Math.Round((double)sittings.Count(s => s.Count >= BingeEpisodes) / sittings.Count, 2),
             new LongestSittingDto(DateOnly.FromDateTime(longest[0].Local), longest.Count, longest.Sum(w => w.Minutes), main, title, poster,
@@ -182,7 +182,7 @@ public static class TvClock
     /// <summary>
     /// 0 Monday to 6 Sunday.
     /// </summary>
-    private static int Weekday(DateTime local) => ((int)local.DayOfWeek + 6) % 7;
+    private static int Weekday(DateTime local) => ViewerRules.Weekday(local.DayOfWeek);
 
     private static string PartOf(int hour) => hour switch
     {

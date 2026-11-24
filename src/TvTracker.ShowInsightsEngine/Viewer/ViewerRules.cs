@@ -6,10 +6,15 @@ namespace TvTracker.ShowInsightsEngine;
 public static class ViewerRules
 {
     /// <summary>
-    /// The viewer's time zone, from the profile's IANA id the client sends (<c>tz</c>); UTC when it's missing or unknown.
+    /// A UTC time (a watch's mark) on the viewer's clock.
     /// </summary>
-    public static TimeZoneInfo Zone(string? tz) =>
-        tz is not null && TimeZoneInfo.TryFindSystemTimeZoneById(tz, out var found) ? found : TimeZoneInfo.Utc;
+    public static DateTime Local(DateTime utc, TimeZoneInfo zone) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
+
+    /// <summary>
+    /// 0 Monday to 6 Sunday.
+    /// </summary>
+    public static int Weekday(DayOfWeek day) => ((int)day + 6) % 7;
 
     /// <summary>
     /// The date <paramref name="at"/> falls on in the viewer's calendar.

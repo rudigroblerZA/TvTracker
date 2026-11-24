@@ -50,10 +50,6 @@ public static class Refresher
 
     public const int DefaultBudget = 120;
 
-    internal const int MinBudget = 30;
-
-    internal const int MaxBudget = 600;
-
     /// <summary>
     /// Each season contributes up to this many of its best episodes before the rest are considered.
     /// </summary>

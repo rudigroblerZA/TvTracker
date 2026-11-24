@@ -121,7 +121,6 @@ public class UserEpisodeWatch
     public DateTime RecordedAtUtc { get; set; }
 }
 
-// Analytics' copy of the catalog and of our users' ratings, built from events.
 /// <summary>
 /// A show an actor is in the main cast of, anywhere on the catalog provider, from catalog events: what the reunion
 /// radar looks for actors working together again in.

@@ -140,7 +140,8 @@ public static partial class Reunions
 
     /// <summary>
     /// Any alias ("Frank Castle / The Punisher") of one matches any alias of the other, ignoring titles, quoted
-    /// nicknames and punctuation; the shorter may be part of the longer when it has two words or more.
+    /// nicknames and punctuation; the shorter may be part of the longer when it has two words or more. The same rules as
+    /// Catalog.API's Universes, which links shows by shared characters.
     /// </summary>
     private static bool SameCharacter(string a, string b)
     {

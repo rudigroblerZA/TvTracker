@@ -123,12 +123,9 @@ public sealed class LimitedSeriesRule : IShowTagRule
 public sealed class QuickEpisodesRule : IShowTagRule
 {
     public ShowTag? TagFor(ShowInsightContext show)
-    {
-        var runtimes = show.RegularAired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
-        return runtimes.Count > 0 && runtimes[runtimes.Count / 2] <= ShowTags.QuickEpisodeMaxMinutes
-            ? new ShowTag(ShowTags.QuickEpisodes, "Quick episodes", $"About {runtimes[runtimes.Count / 2]} min each")
+        => InsightMath.TypicalRuntime(show.RegularAired) is { } typical && typical <= ShowTags.QuickEpisodeMaxMinutes
+            ? new ShowTag(ShowTags.QuickEpisodes, "Quick episodes", $"About {typical} min each")
             : null;
-    }
 }
 
 /// <summary>

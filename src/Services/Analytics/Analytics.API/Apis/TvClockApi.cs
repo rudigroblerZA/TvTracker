@@ -20,7 +20,7 @@ public static class TvClockApi
         CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow().UtcDateTime;
         var from = now.AddYears(-1);
 
@@ -33,15 +33,18 @@ public static class TvClockApi
             .Select(r => TvClock.Placed(r.ShowId, r.WatchedAtUtc, r.RuntimeMinutes, zone))
             .OrderBy(w => w.MarkedAtUtc)
             .ToList();
-        var since = DateOnly.FromDateTime(watches.Count > 0 ? watches[0].Local : TimeZoneInfo.ConvertTimeFromUtc(from, zone));
+        var since = DateOnly.FromDateTime(watches.Count > 0 ? watches[0].Local : ViewerRules.Local(from, zone));
 
         // Titles and posters only once there's a clock to show them on.
-        var showIds = watches.Count >= TvClock.MinWatches ? watches.Select(w => w.ShowId).Distinct().ToList() : [];
-        var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId))
-            .Select(s => new { s.ShowId, s.Title, s.PosterUrl })
-            .ToDictionaryAsync(s => s.ShowId, ct);
+        var shows = new Dictionary<Guid, (string Title, string? PosterUrl)>();
+        if (watches.Count >= TvClock.MinWatches)
+        {
+            var showIds = watches.Select(w => w.ShowId).Distinct().ToList();
+            shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId))
+                .Select(s => new { s.ShowId, s.Title, s.PosterUrl })
+                .ToDictionaryAsync(s => s.ShowId, s => (s.Title, s.PosterUrl), ct);
+        }
 
-        return TypedResults.Ok(TvClock.Of(watches, since, rows.Count - watches.Count,
-            id => shows.TryGetValue(id, out var s) ? (s.Title, s.PosterUrl) : null));
+        return TypedResults.Ok(TvClock.Of(watches, since, rows.Count - watches.Count, shows));
     }
 }

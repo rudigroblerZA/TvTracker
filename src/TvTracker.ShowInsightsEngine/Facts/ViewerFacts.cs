@@ -9,8 +9,7 @@ public sealed record NextPremiere(int SeasonNumber, DateTimeOffset PremieresAtUt
 /// <summary>
 /// Everything a viewer insight needs about one show for one viewer: the show, its regular episodes in season
 /// order, the viewer's watches and stars, the ratings the essential cut goes by, moderators' notes and the stored
-/// document. Loaded for a set of shows in eight queries whatever their number, so the list endpoints (every dropped
-/// show, every refresher due, every catch-up) stop running five or six queries per show.
+/// document.
 /// </summary>
 public sealed class ShowLoad(ShowCopy show, List<EpisodeCopy> episodes, List<UserEpisodeWatch> watches, Dictionary<Guid, int> stars,
     Func<EpisodeCopy, double?> rating, Dictionary<Guid, EpisodeNoteCopy> notes, ShowInsights? insights, DateTimeOffset now)

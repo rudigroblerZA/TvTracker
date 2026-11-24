@@ -61,7 +61,7 @@ public static class TasteApi
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
 
         var showRatings = await db.ShowRatings.AsNoTracking()
             .Where(r => r.UserId == userId)
@@ -113,7 +113,7 @@ public static class TasteApi
         var local = TimeZoneInfo.ConvertTime(now, zone);
         var firstMonth = new DateTime(local.Year, local.Month, 1).AddMonths(-11);
         var byMonth = watches
-            .Select(w => (Local: TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(w.WatchedAtUtc, DateTimeKind.Utc), zone), w.RuntimeMinutes))
+            .Select(w => (Local: ViewerRules.Local(w.WatchedAtUtc, zone), w.RuntimeMinutes))
             .Where(w => w.Local >= firstMonth)
             .GroupBy(w => (w.Local.Year, w.Local.Month))
             .ToDictionary(g => g.Key, g => (Episodes: g.Count(), Minutes: g.Sum(w => w.RuntimeMinutes ?? 0)));

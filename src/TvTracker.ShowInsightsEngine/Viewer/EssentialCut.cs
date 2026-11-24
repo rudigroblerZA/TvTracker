@@ -102,8 +102,7 @@ public static class EssentialCut
     /// </summary>
     internal static Func<EpisodeCopy, int> MinutesOf(List<EpisodeCopy> aired)
     {
-        var runtimes = aired.Where(e => e.RuntimeMinutes > 0).Select(e => e.RuntimeMinutes!.Value).Order().ToList();
-        var typical = runtimes.Count > 0 ? runtimes[runtimes.Count / 2] : 0;
+        var typical = InsightMath.TypicalRuntime(aired) ?? 0;
         return e => e.RuntimeMinutes is > 0 ? e.RuntimeMinutes.Value : typical;
     }
 
@@ -137,7 +136,7 @@ public static class EssentialCut
         // A season's last episode is its finale only once nothing more of it is scheduled.
         var unaired = episodes.Where(e => e.AirsAtUtc is null || e.AirsAtUtc > now).Select(e => e.SeasonNumber).ToHashSet();
         var lastSeason = aired.Max(e => e.SeasonNumber);
-        var ended = show.Status == TvTracker.IntegrationEvents.ShowStatus.Ended && unaired.Count == 0;
+        var ended = show.Status == ShowStatus.Ended && unaired.Count == 0;
 
         var decisions = new Dictionary<Guid, (bool Keep, string Why)>();
         foreach (var season in aired.GroupBy(e => e.SeasonNumber))
@@ -259,14 +258,14 @@ public static class EssentialCut
     }
 
     /// <summary>
-    /// The show cut at a level (<see cref="Levels"/>), for a viewer who has <paramref name="watched"/> these episodes:
+    /// The show cut at a level (one of <see cref="Levels"/>), for a viewer who has <paramref name="watched"/> these episodes:
     /// every aired regular episode kept or skipped and why, the runs to skip, and what's left from where they are.
     /// </summary>
-    /// <param name="aired">The show's aired regular episodes, in season order.</param>
-    internal static EssentialCutDto Of(ShowCopy show, string level, (double Share, double Margin) settings, List<EpisodeCopy> episodes,
-        List<EpisodeCopy> aired, Func<EpisodeCopy, double?> rating, IReadOnlyDictionary<Guid, EpisodeNoteCopy> notes, HashSet<Guid> watched,
-        DateTimeOffset now)
+    /// <param name="episodes">The show's regular episodes, aired or not, in season order.</param>
+    internal static EssentialCutDto Of(ShowCopy show, string level, List<EpisodeCopy> episodes, Func<EpisodeCopy, double?> rating,
+        IReadOnlyDictionary<Guid, EpisodeNoteCopy> notes, HashSet<Guid> watched, DateTimeOffset now)
     {
+        var aired = episodes.Where(e => e.AirsAtUtc <= now).ToList();
         var minutes = MinutesOf(aired);
         var full = new CutTotalsDto(aired.Count, aired.Sum(minutes));
         if (Unavailable(aired, rating, notes) is { } reason)
@@ -274,7 +273,7 @@ public static class EssentialCut
             return new EssentialCutDto(show.ShowId, show.Title, level, false, reason, full, full, [], [], null);
         }
 
-        var decisions = Decide(show, episodes, aired, rating, settings, now, notes);
+        var decisions = Decide(show, episodes, aired, rating, Levels[level], now, notes);
         var seasons = aired.GroupBy(e => e.SeasonNumber)
             .Select(g => new CutSeasonDto(
                 g.Key,

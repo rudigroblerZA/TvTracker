@@ -14,6 +14,9 @@ public static class RefresherApi
     /// <summary>
     /// The list on Up Next looks at this many of the user's most recently paused shows.
     /// </summary>
+    private const int MinBudget = 30;
+    private const int MaxBudget = 600;
+
     private const int MaxShows = 40;
 
     public static void MapRefresherApi(this RouteGroupBuilder api)
@@ -28,9 +31,9 @@ public static class RefresherApi
     private static async Task<Results<Ok<RefresherDto>, NoContent, ValidationProblem>> GetOneAsync(
         Guid showId, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int minutes = Refresher.DefaultBudget, CancellationToken ct = default)
     {
-        if (minutes is < Refresher.MinBudget or > Refresher.MaxBudget)
+        if (minutes is < MinBudget or > MaxBudget)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["minutes"] = [$"Use {Refresher.MinBudget} to {Refresher.MaxBudget} minutes."] });
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["minutes"] = [$"Use {MinBudget} to {MaxBudget} minutes."] });
         }
 
         var now = time.GetUtcNow();

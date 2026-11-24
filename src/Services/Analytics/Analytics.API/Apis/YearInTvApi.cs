@@ -83,7 +83,7 @@ public static class YearInTvApi
         ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, int? year = null, string? tz = null, CancellationToken ct = default)
     {
         var userId = user.GetUserId();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
         var now = time.GetUtcNow();
         var today = ViewerRules.LocalDate(now, zone);
 
@@ -105,7 +105,7 @@ public static class YearInTvApi
         var bulk = ShowFactRules.BulkMarks(rows, r => r.ShowId, r => r.WatchedAtUtc);
         var watches = rows.Where(r => !bulk.Contains((r.ShowId, r.WatchedAtUtc)))
             .Select(r => new Watch(r.ShowId, r.EpisodeId, r.WatchedAtUtc,
-                DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone)),
+                DateOnly.FromDateTime(ViewerRules.Local(r.WatchedAtUtc, zone)),
                 r.RuntimeMinutes ?? 0, r.SeasonNumber, r.EpisodeNumber, r.Title, r.ExternalRating))
             .ToList();
         var years = watches.Select(w => w.Day.Year).Distinct().OrderDescending().ToList();
@@ -114,7 +114,7 @@ public static class YearInTvApi
         var inYear = watches.Where(w => w.Day.Year == shown).ToList();
         var lastYear = watches.Where(w => w.Day.Year == shown - 1).ToList();
         var bulkInYear = rows.Count(r => bulk.Contains((r.ShowId, r.WatchedAtUtc))
-            && TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.WatchedAtUtc, DateTimeKind.Utc), zone).Year == shown);
+            && ViewerRules.Local(r.WatchedAtUtc, zone).Year == shown);
 
         var showIds = inYear.Select(w => w.ShowId).Concat(lastYear.Select(w => w.ShowId)).Distinct().ToList();
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId)).ToDictionaryAsync(s => s.ShowId, ct);
@@ -180,18 +180,7 @@ public static class YearInTvApi
     /// <summary>
     /// Most consecutive days in the set.
     /// </summary>
-    internal static int LongestStreak(IEnumerable<DateOnly> days)
-    {
-        var (longest, run) = (0, 0);
-        DateOnly? previous = null;
-        foreach (var day in days.Distinct().Order())
-        {
-            run = previous is { } p && p.AddDays(1) == day ? run + 1 : 1;
-            longest = Math.Max(longest, run);
-            previous = day;
-        }
-        return longest;
-    }
+    internal static int LongestStreak(IEnumerable<DateOnly> days) => Streaks.Runs(days.Distinct().ToList(), d => d.DayNumber, 0).Longest;
 
     /// <summary>
     /// Finished (ended shows, last regular episode watched this year), caught up (running shows, every aired regular

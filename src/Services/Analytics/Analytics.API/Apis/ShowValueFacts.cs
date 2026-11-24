@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Analytics.API.Apis;
 
 /// <summary>
-/// What <see cref="ShowValue"/> is worked out from, loaded for a viewer: the genres they like, shows' running times and documents.
+/// What <see cref="ShowValue"/> is worked out from, loaded for a viewer: the genres they like, and shows' running times.
 /// </summary>
 internal static class ShowValueFacts
 {
@@ -52,10 +52,4 @@ internal static class ShowValueFacts
         return rows.ToDictionary(r => r.ShowId,
             r => (r.Count, r.Known == 0 ? 0 : (int)Math.Round(r.Sum + (r.Count - r.Known) * (double)r.Sum / r.Known)));
     }
-
-    /// <summary>
-    /// The shows' insights documents, keyed by show.
-    /// </summary>
-    internal static Task<Dictionary<Guid, ShowInsights>> InsightsAsync(AnalyticsContext db, List<Guid> showIds, CancellationToken ct) =>
-        ShowDocuments.LoadAsync(db, showIds, ct);
 }

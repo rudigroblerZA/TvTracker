@@ -25,7 +25,7 @@ public static class WhileYouWaitApi
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow();
-        var zone = ViewerRules.Zone(tz);
+        var zone = Viewer.Zone(tz);
         var today = ViewerRules.LocalDate(now, zone);
 
         var room = await WaitingRoomApi.ComputeAsync(db, userId, now, ct);
