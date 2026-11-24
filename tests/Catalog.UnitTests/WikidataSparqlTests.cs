@@ -30,15 +30,16 @@ public class WikidataSparqlTests
         var sparql = new WikidataSparql(new Factory(handler), time);
 
         var a = Task.Run(() => sparql.QueryAsync("A", Ct));
-        await Until(() => order.Count == 1);
+        await Until(() => Count(order) == 1, "A reaches Wikimedia");
+        // B, then C, each queued behind A before the next thing happens: waited for, not slept for.
         var b = Task.Run(() => sparql.QueryAsync("B", Ct));
-        await Task.Delay(50, Ct);
+        await Until(() => sparql.Waiting == 1, "B is waiting");
         var c = Task.Run(() =>
         {
             using var lane = ProviderCaller.Begin("search-import", ProviderLane.Interactive);
             return sparql.QueryAsync("C", Ct);
         });
-        await Task.Delay(50, Ct);
+        await Until(() => sparql.Waiting == 2, "C is waiting");
         first.SetResult();
 
         // Each query waits a second after the one before, on the fake clock.
@@ -47,6 +48,8 @@ public class WikidataSparqlTests
             time.Advance(TimeSpan.FromSeconds(1));
             await Task.Delay(10, Ct);
         }
+        // A query that failed says so here, before the order is looked at.
+        await Task.WhenAll(a, b, c);
         Assert.Equal(["A", "C", "B"], order);
     }
 
@@ -70,9 +73,19 @@ public class WikidataSparqlTests
         Assert.Equal(1, calls);
     }
 
-    private static async Task Until(Func<bool> condition)
+    /// <summary>
+    /// Waits for <paramref name="condition"/>, and fails the test by name when it hasn't come true in ten seconds.
+    /// </summary>
+    private static async Task Until(Func<bool> condition, string what)
     {
-        for (var i = 0; i < 200 && !condition(); i++) await Task.Delay(10, Ct);
+        for (var i = 0; i < 1000 && !condition(); i++) await Task.Delay(10, Ct);
+        Assert.True(condition(), $"Timed out waiting until {what}.");
+    }
+
+    // The handler adds to the list from other threads, under its lock.
+    private static int Count(List<string> order)
+    {
+        lock (order) return order.Count;
     }
 
     private sealed class Handler(Func<string, Task<HttpResponseMessage>> answer) : HttpMessageHandler
