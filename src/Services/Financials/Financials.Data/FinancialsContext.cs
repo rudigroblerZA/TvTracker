@@ -31,7 +31,7 @@ public class CostItem
     public required string Name { get; set; }
 
     /// <summary>
-    /// One of <see cref="Services.FinancialStatement.Categories"/>.
+    /// One of <c>FinancialStatement.Categories</c>.
     /// </summary>
     public required string Category { get; set; }
 

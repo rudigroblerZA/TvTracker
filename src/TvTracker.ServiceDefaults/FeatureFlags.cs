@@ -90,24 +90,43 @@ public static class FeatureFlags
     public const string Payments = "payments";
 
     /// <summary>
-    /// The flags flagd.json turns on (its <c>defaultVariant</c>); every other flag is off there. A test keeps the two
-    /// in step.
+    /// The insights Pro and Family add: on in flagd.json, each with the plan rule (<see cref="PlanRule"/>) for
+    /// <see cref="PaidPlans"/>. A test keeps this in step with the file.
     /// </summary>
-    public static readonly IReadOnlySet<string> OnByDefault = new HashSet<string>
+    public static readonly IReadOnlySet<string> PaidInsights = new HashSet<string>
     {
-        HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Forecasts, TonightPlan, Universes, EssentialCut, Social, ListLinks,
-        Plans, Payments, FamilyPlan, Affiliates,
-        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt, CharacterVoting,
-        // The rest of what Pro and Family add (each has the plan rule in flagd.json, as Forecasts, TonightPlan and EssentialCut do).
-        CatchUp, DnaTwins, MakersForYou, Mixtape, Refresher, ReunionRadar, SpoilerWatch, TasteTwins, TonightTogether, TvClock, TvLife,
-        WhileYouWait, YearInTv, YourServices,
+        CatchUp, DnaTwins, EssentialCut, Forecasts, MakersForYou, Mixtape, Refresher, ReunionRadar, SpoilerWatch, TasteTwins,
+        TonightPlan, TonightTogether, TvClock, TvLife, WhileYouWait, YearInTv, YourServices,
     };
 
     /// <summary>
-    /// What <paramref name="flag"/> evaluates to when flagd is down, unreachable or doesn't know it: what flagd.json
-    /// says by default. A flag server outage neither takes features away nor brings back the ones turned off.
+    /// The plans the paid insights are part of, as flagd.json's <c>plans</c> metadata names them.
     /// </summary>
-    public static bool DefaultFor(string flag) => OnByDefault.Contains(flag);
+    public static readonly IReadOnlySet<string> PaidPlans = new HashSet<string> { "plus", "family" };
+
+    /// <summary>
+    /// The flags flagd.json turns on (its <c>defaultVariant</c>); every other flag is off there. A test keeps the two
+    /// in step.
+    /// </summary>
+    public static readonly IReadOnlySet<string> OnByDefault = new HashSet<string>(
+    [
+        HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Universes, Social, ListLinks,
+        Plans, Payments, FamilyPlan, Affiliates,
+        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt, CharacterVoting,
+        .. PaidInsights,
+    ]);
+
+    /// <summary>
+    /// What <paramref name="flag"/> evaluates to when flagd is down, unreachable or doesn't know it: what flagd.json
+    /// says by default, plan rule included. A flag server outage neither takes features away nor brings back the ones
+    /// turned off, and it doesn't hand the paid insights to a caller known to be on another plan (no plan in
+    /// <paramref name="context"/> means "not known", and the flag isn't limited, as with flagd).
+    /// </summary>
+    public static bool DefaultFor(string flag, EvaluationContext? context = null) =>
+        OnByDefault.Contains(flag)
+        && (!PaidInsights.Contains(flag)
+            || context?.ContainsKey(PlanAttribute) != true
+            || PaidPlans.Contains(context.GetValue(PlanAttribute).AsString ?? ""));
 
     /// <summary>
     /// Whether <paramref name="flag"/> is on, falling back to <see cref="DefaultFor"/> when flagd can't answer. Read
@@ -115,7 +134,7 @@ public static class FeatureFlags
     /// </summary>
     public static Task<bool> IsOnAsync(this IFeatureClient client, string flag, EvaluationContext? context = null,
         CancellationToken cancellationToken = default) =>
-        client.GetBooleanValueAsync(flag, DefaultFor(flag), context, cancellationToken: cancellationToken);
+        client.GetBooleanValueAsync(flag, DefaultFor(flag, context), context, cancellationToken: cancellationToken);
 
     /// <summary>
     /// The context attribute that carries the caller's plan ("free", "plus", "family"; see <c>Plans</c>). A flag in a plan

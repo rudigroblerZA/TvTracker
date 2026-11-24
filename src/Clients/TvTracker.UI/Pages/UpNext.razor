@@ -183,11 +183,13 @@
         error = null;
         try
         {
-            items = await Tracking.GetUpNextAsync() ?? [];
-            // Together; WhenAll waits for both, so neither is left running when one fails.
+            // All three together, since none needs another's answer; WhenAll waits for every one, so none is left
+            // running when one fails.
+            var itemsTask = Tracking.GetUpNextAsync();
             var refreshersTask = Flags.IfEnabledAsync(FeatureFlags.Refresher, LoadRefreshersAsync);
             var catchUpsTask = Flags.IfEnabledAsync(FeatureFlags.CatchUp, LoadCatchUpsAsync);
-            await Task.WhenAll(refreshersTask, catchUpsTask);
+            await Task.WhenAll(itemsTask, refreshersTask, catchUpsTask);
+            items = itemsTask.Result ?? [];
             refreshers = refreshersTask.Result;
             catchUps = catchUpsTask.Result;
         }

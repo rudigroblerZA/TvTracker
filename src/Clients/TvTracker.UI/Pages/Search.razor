@@ -106,10 +106,10 @@ else if (results is not null)
         var titled = results.Items.Take(byTitle).ToList();
         var similar = results.Items.Skip(byTitle).ToList();
         <p class="muted">
-            @(results.TitleCount is null ? Count(results.TotalCount, "result")
+            @(results.TitleCount is null ? Format.Count(results.TotalCount, "result")
                 : byTitle == 0 ? "No titles match; these are similar in meaning."
-                : results.TotalCount == byTitle ? Count(byTitle, "result")
-                : $"{Count(byTitle, "title match", "title matches")}, and {results.TotalCount - byTitle} similar in meaning")
+                : results.TotalCount == byTitle ? Format.Count(byTitle, "result")
+                : $"{Format.Count(byTitle, "title match", "title matches")}, and {results.TotalCount - byTitle} similar in meaning")
         </p>
         @Cards(titled)
         @if (similar.Count > 0 && byTitle > 0)
@@ -161,8 +161,6 @@ else if (results is not null)
             </div>
         }
     </text>;
-
-    private static string Count(int count, string one, string? many = null) => count == 1 ? $"1 {one}" : $"{count} {many ?? one + "s"}";
 
     private static string Subtitle(ShowSummary show) =>
         string.Join(" · ", new[] { show.Year?.ToString(), show.Network, Format.Status(show.Status) }.Where(s => !string.IsNullOrEmpty(s)));
