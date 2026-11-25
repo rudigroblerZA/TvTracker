@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What every service keeps about a member, and that deleting their account leaves none of it: each service's own
+       database (its migrations, against a real Postgres in a container, tests/Shared) is filled from its model for two
+       members, the service's own handler of the account's deletion is run for one, and the database is searched for
+       them. A table added to a service is covered without a change here. Needs Docker. -->
+
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="System.Formats.Cbor" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <ProjectReference Include="..\..\src\Services\Tracking\Tracking.API\Tracking.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Ratings\Ratings.API\Ratings.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Social\Social.API\Social.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Recommendations\Recommendations.API\Recommendations.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Notifications\Notifications.API\Notifications.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Research\Research.API\Research.API.csproj" />
+    <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
+    <ProjectReference Include="..\..\src\Services\Financials\Financials.API\Financials.API.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -25,6 +25,11 @@ public record CheckoutDto(string Url);
 public record ReceiptDto(string Plan, string Interval, decimal Amount, string Currency, DateTime PaidAtUtc, DateTime PeriodEndUtc, string Provider);
 
 /// <summary>
+/// A member's payment records, as their data export has them.
+/// </summary>
+public record PaymentsExportDto(SubscriptionDto? Subscription, IReadOnlyList<ReceiptDto> Receipts);
+
+/// <summary>
 /// Buying Plus and Family through a payment provider (<see cref="IPaymentProvider"/>; the <c>payments</c> flag).
 /// <list type="bullet">
 /// <item><b>Checkout:</b> the app makes a session at today's price for the caller's region, and the provider's checkout
@@ -128,14 +133,12 @@ public static class PaymentsApi
     /// <summary>
     /// The caller's own payment records: their latest subscription and every receipt.
     /// </summary>
-    private static async Task<IResult> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
+    internal static async Task<Ok<PaymentsExportDto>> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        return TypedResults.Ok(new
-        {
-            Subscription = await LatestAsync(db, userId, ct) is { } subscription ? ToDto(subscription, providers) : null,
-            Receipts = await ReceiptsAsync(db, userId, ct)
-        });
+        return TypedResults.Ok(new PaymentsExportDto(
+            await LatestAsync(db, userId, ct) is { } subscription ? ToDto(subscription, providers) : null,
+            await ReceiptsAsync(db, userId, ct)));
     }
 
     /// <summary>
@@ -144,11 +147,11 @@ public static class PaymentsApi
     /// </summary>
     private static bool ProviderFailed(Exception ex, CancellationToken ct) => ex is not OperationCanceledException || !ct.IsCancellationRequested;
 
-    private static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> CancelAsync(
+    internal static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> CancelAsync(
         ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, TimeProvider time, ILogger<Subscription> logger, CancellationToken ct) =>
         ChangeAsync(user, db, providers, time, logger, cancel: true, ct);
 
-    private static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> ResumeAsync(
+    internal static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> ResumeAsync(
         ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, TimeProvider time, ILogger<Subscription> logger, CancellationToken ct) =>
         ChangeAsync(user, db, providers, time, logger, cancel: false, ct);
 
