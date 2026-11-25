@@ -58,6 +58,23 @@ public static partial class Reunions
     };
 
     /// <summary>
+    /// The shows the viewer knows (rated, followed or watched) and, among them, the ones they love with their weights
+    /// (<see cref="LoveWeight"/>).
+    /// </summary>
+    /// <param name="stars">Their stars per show.</param>
+    /// <param name="watched">Episodes watched per show.</param>
+    internal static (HashSet<Guid> Known, Dictionary<Guid, double> Loved) Love(IReadOnlyDictionary<Guid, int> stars, IReadOnlySet<Guid> followed,
+        IReadOnlyDictionary<Guid, int> watched)
+    {
+        var known = stars.Keys.Concat(followed).Concat(watched.Keys).ToHashSet();
+        var loved = known
+            .Select(id => (ShowId: id, Weight: LoveWeight(stars.GetValueOrDefault(id), followed.Contains(id), watched.GetValueOrDefault(id))))
+            .Where(x => x.Weight > 0)
+            .ToDictionary(x => x.ShowId, x => x.Weight);
+        return (known, loved);
+    }
+
+    /// <summary>
     /// The reunions, best first: for each loved show, the other shows two or more of its cast are in together.
     /// </summary>
     /// <param name="loved">The loved shows and their weights (<see cref="LoveWeight"/>).</param>

@@ -4,7 +4,26 @@ namespace TvTracker.InsightsEngine;
 /// A show's next season premiere: a scheduled first episode or an announced season, whichever is sooner.
 /// </summary>
 /// <param name="NewSeason">A season premiere (or an announced season), rather than the next episode of a season already airing.</param>
-public sealed record NextPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason);
+public sealed record NextPremiere(int SeasonNumber, DateTimeOffset PremieresAtUtc, bool NewSeason)
+{
+    /// <summary>
+    /// The next thing to air for a show: a scheduled season premiere or the soonest announced season, else (when
+    /// <paramref name="premieresOnly"/> is false) the next episode of the season under way. Null with nothing scheduled.
+    /// </summary>
+    /// <param name="episodes">The show's listed episodes.</param>
+    /// <param name="announced">Its soonest announced season still to come.</param>
+    public static NextPremiere? Of(IEnumerable<EpisodeCopy> episodes, AnnouncedSeason? announced, DateTimeOffset now, bool premieresOnly)
+    {
+        var scheduled = episodes.Where(e => e.AirsAtUtc > now && (!premieresOnly || e.EpisodeNumber == 1)).MinBy(e => e.AirsAtUtc);
+        return (scheduled, announced) switch
+        {
+            ({ } e, { } s) when s.PremieresAtUtc < e.AirsAtUtc => new NextPremiere(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
+            ({ } e, _) => new NextPremiere(e.SeasonNumber, e.AirsAtUtc!.Value, e.EpisodeNumber == 1),
+            (null, { } s) => new NextPremiere(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
+            _ => null
+        };
+    }
+}
 
 /// <summary>
 /// Everything a viewer insight needs about one show for one viewer: the show, its regular episodes in season
@@ -45,4 +64,22 @@ public sealed class ShowLoad(ShowCopy show, List<EpisodeCopy> episodes, List<Use
     /// Episode runtimes, with missing ones as the show's typical one (see <see cref="EssentialCut.MinutesOf"/>).
     /// </summary>
     public Func<EpisodeCopy, int> Minutes => field ??= EssentialCut.MinutesOf(Aired);
+}
+
+/// <summary>
+/// A viewer's progress on one show, as one row of counts. Regular episodes only, as Tracking counts.
+/// </summary>
+/// <param name="Aired">Aired regular episodes.</param>
+/// <param name="Watched">Of those, how many the viewer has watched.</param>
+/// <param name="LatestSeason">The latest season with an aired episode.</param>
+/// <param name="LatestWatched">The latest aired episode (by season and number) is watched: caught up, allowing skipped episodes.</param>
+/// <param name="MinutesLeft">The running time of the unwatched aired episodes (missing runtimes as 0).</param>
+/// <param name="LastAiredAtUtc">The latest aired episode's air time.</param>
+/// <param name="LastWatchedAtUtc">The viewer's latest watch of the show; null when they've watched none of it.</param>
+public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int LatestSeason, bool LatestWatched, int MinutesLeft,
+    DateTimeOffset? LastAiredAtUtc, DateTime? LastWatchedAtUtc)
+{
+    public bool AllWatched => Aired > 0 && Watched >= Aired;
+    public bool Started => Watched > 0;
+    public int Left => Aired - Watched;
 }

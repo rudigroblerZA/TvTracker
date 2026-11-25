@@ -109,6 +109,16 @@ public static class Refresher
     }
 
     /// <summary>
+    /// The refreshers that are due, the ones coming back soonest first, then the most recently paused.
+    /// </summary>
+    internal static List<RefresherDto> DueFirst(IEnumerable<RefresherDto> refreshers) => refreshers
+        .Where(r => r.Due)
+        .OrderBy(r => r.Returns is null)
+        .ThenBy(r => r.Returns?.PremieresAtUtc)
+        .ThenByDescending(r => r.LastWatchedAtUtc)
+        .ToList();
+
+    /// <summary>
     /// Candidates in order of how much they bring back, taken greedily while they fit the budget (with the same small
     /// overrun as Tonight's plan). Where they left off is always taken, even when it alone is over budget.
     /// </summary>

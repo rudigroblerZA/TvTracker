@@ -57,6 +57,14 @@ internal static class WhileYouWait
 
     public const double MinValueForChangeOfPace = 7.5;
 
+    /// <summary>
+    /// The pace to plan with: the measured one, or <see cref="AssumedMinutesPerWeek"/> and why when it can't be measured
+    /// (<c>nothing-watched</c> in the pace's weeks, or <c>no-runtimes</c> for watches of episodes without running times).
+    /// </summary>
+    public static (int MinutesPerWeek, string? AssumedBecause) PaceFor(CatchUp.Pace measured) =>
+        measured.MinutesPerWeek > 0 ? (measured.MinutesPerWeek, null)
+        : (AssumedMinutesPerWeek, measured.Watches > 0 ? "no-runtimes" : "nothing-watched");
+
     public sealed record Wait(Guid ShowId, string Title, string? PosterUrl, string Kind, DateOnly BackAt, int? SeasonNumber);
 
     /// <summary>

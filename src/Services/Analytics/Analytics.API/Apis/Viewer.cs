@@ -4,26 +4,6 @@ using Microsoft.EntityFrameworkCore;
 namespace Analytics.API.Apis;
 
 /// <summary>
-/// A viewer's progress on one show, aggregated in SQL: the "computed on request" endpoints used to load every aired
-/// episode of every show the user ever watched to count these in memory (a viewer of 150 shows pulled ~15,000 rows
-/// per show-page visit). Regular episodes only, as Tracking counts.
-/// </summary>
-/// <param name="Aired">Aired regular episodes.</param>
-/// <param name="Watched">Of those, how many the viewer has watched.</param>
-/// <param name="LatestSeason">The latest season with an aired episode.</param>
-/// <param name="LatestWatched">The latest aired episode (by season and number) is watched: caught up, allowing skipped episodes.</param>
-/// <param name="MinutesLeft">The running time of the unwatched aired episodes (missing runtimes as 0).</param>
-/// <param name="LastAiredAtUtc">The latest aired episode's air time.</param>
-/// <param name="LastWatchedAtUtc">The viewer's latest watch of the show; null when they've watched none of it.</param>
-public sealed record ShowProgress(Guid ShowId, int Aired, int Watched, int LatestSeason, bool LatestWatched, int MinutesLeft,
-    DateTimeOffset? LastAiredAtUtc, DateTime? LastWatchedAtUtc)
-{
-    public bool AllWatched => Aired > 0 && Watched >= Aired;
-    public bool Started => Watched > 0;
-    public int Left => Aired - Watched;
-}
-
-/// <summary>
 /// What the on-request endpoints share about the caller: their time zone and their progress through their shows.
 /// </summary>
 public static class Viewer
@@ -105,24 +85,9 @@ public static class NextPremieres
             .GroupBy(s => s.ShowId)
             .ToDictionary(g => g.Key, g => g.MinBy(s => s.PremieresAtUtc)!);
 
-        var result = new Dictionary<Guid, NextPremiere>();
-        foreach (var showId in showIds)
-        {
-            var scheduled = episodes[showId].Where(e => e.AirsAtUtc > now && (!premieresOnly || e.EpisodeNumber == 1)).MinBy(e => e.AirsAtUtc);
-            var season = announced.GetValueOrDefault(showId);
-            var next = (scheduled, season) switch
-            {
-                ({ } e, { } s) when s.PremieresAtUtc < e.AirsAtUtc => new NextPremiere(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
-                ({ } e, _) => new NextPremiere(e.SeasonNumber, e.AirsAtUtc!.Value, e.EpisodeNumber == 1),
-                (null, { } s) => new NextPremiere(s.SeasonNumber, s.PremieresAtUtc!.Value, true),
-                _ => null
-            };
-            if (next is not null)
-            {
-                result[showId] = next;
-            }
-        }
-        return result;
+        return showIds.Select(id => (Id: id, Next: NextPremiere.Of(episodes[id], announced.GetValueOrDefault(id), now, premieresOnly)))
+            .Where(x => x.Next is not null)
+            .ToDictionary(x => x.Id, x => x.Next!);
     }
 }
 

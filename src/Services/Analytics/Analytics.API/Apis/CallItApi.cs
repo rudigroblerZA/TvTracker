@@ -6,56 +6,13 @@ using TvTracker;
 
 namespace Analytics.API.Apis;
 
-/// <summary>
-/// A show's "Call it" panel: its next season to call, and the caller's calls on it.
-/// </summary>
-/// <param name="SeasonNumber">The season open to a call; null for an ended show (only past calls then).</param>
-/// <param name="PremieresAtUtc">Its first dated episode, when one is listed.</param>
-/// <param name="Mine">The caller's call on that season.</param>
-/// <param name="Model">The forecast model's rating for it, with its 80% range; only once the caller has called, so it
-/// doesn't anchor them.</param>
-/// <param name="Crowd">Everyone's average call, with how many; only once the caller has called, and with 5+ callers.</param>
-/// <param name="Past">The caller's earlier calls on this show, latest first.</param>
-public record ShowCallDto(int? SeasonNumber, DateTimeOffset? PremieresAtUtc, double? Mine, CallRangeDto? Model, CrowdCallDto? Crowd,
-    IReadOnlyList<CallDto> Past);
-
-public record CallRangeDto(double Rating, double Low, double High);
-
-public record CrowdCallDto(double Rating, int Callers);
-
-/// <param name="State">"open" (before its premiere), "airing" (premiered, not over yet) or "scored".</param>
-/// <param name="Model">The model's rating when the call was made; null when it had none.</param>
-/// <param name="Actual">The season's average episode rating, once scored.</param>
-/// <param name="BeatModel">Scored with a model: true when the caller was closer, false when the model was; null on a tie.</param>
-public record CallDto(Guid ShowId, string Title, string? PosterUrl, int SeasonNumber, double Rating, double? Model, double? Actual,
-    string State, bool? BeatModel, DateTimeOffset? PremieresAtUtc);
-
-/// <param name="Scored">Calls scored so far; <paramref name="AverageMiss"/> is the caller's mean distance from the
-/// actual rating, and <paramref name="ModelAverageMiss"/> the model's on the same calls (those it had a forecast for).</param>
-public record CallRecordDto(int Scored, double? AverageMiss, double? ModelAverageMiss, int BeatModel, int ModelWon);
-
-/// <param name="Suggestions">Followed running shows with a next season not called yet, soonest premiere first.</param>
-public record MyCallsDto(CallRecordDto Record, IReadOnlyList<CallDto> Calls, IReadOnlyList<CallDto> Suggestions);
-
 public record SetCallRequest(double Rating);
 
 /// <summary>
-/// Call it: predict a season's average episode rating before it premieres, and see whether you beat the forecast model
-/// (<see cref="RatingForecast"/>) once it's over.
-/// <list type="bullet">
-/// <item><b>Which season:</b> a running show's next one, the season after the latest to air. A call can be made or
-/// changed until its first episode airs; then it's locked.</item>
-/// <item><b>No anchoring:</b> the model's forecast and the crowd's average are shown only after the caller has called.
-/// The model's rating is kept with the call as it stood then, since the forecast moves as the show airs.</item>
-/// <item><b>Scoring</b> is Analytics.Worker's (<c>SeasonCallScorer</c>): the season's average provider rating once it's
-/// over. A miss is the distance from it; beating the model is being closer than it was.</item>
-/// <item><b>The privacy rule:</b> the crowd's average needs 5 or more callers.</item>
-/// </list>
+/// Call it (see <see cref="Calls"/>): the caller's calls are kept here; the scoring rules are the engine's.
 /// </summary>
 public static class CallItApi
 {
-    private const int MaxSuggestions = 12;
-
     public static void MapCallItApi(this RouteGroupBuilder api)
     {
         api.MapGet("/shows/{showId:guid}/call", GetShowAsync).RequireFeature(FeatureFlags.CallIt);
@@ -169,24 +126,12 @@ public static class CallItApi
             .Select(c => new CallDto(c.ShowId, shows[c.ShowId].Title, shows[c.ShowId].PosterUrl, c.Season, 0, null, null, "open", null,
                 premieres.GetValueOrDefault((c.ShowId, c.Season))))
             .OrderBy(c => c.PremieresAtUtc is null).ThenBy(c => c.PremieresAtUtc).ThenByDescending(c => shows[c.ShowId].Popularity)
-            .Take(MaxSuggestions)
+            .Take(Calls.MaxSuggestions)
             .ToList();
 
-        var dtos = calls.Where(c => shows.ContainsKey(c.ShowId))
-            .Select(c => ToDto(c, shows[c.ShowId], premieres.GetValueOrDefault((c.ShowId, c.SeasonNumber)), now))
-            .OrderBy(c => c.State switch { "airing" => 0, "open" => 1, _ => 2 })
-            .ThenBy(c => c.PremieresAtUtc ?? DateTimeOffset.MaxValue)
-            .ToList();
-
-        var scored = calls.Where(c => c.Actual is not null).ToList();
-        var withModel = scored.Where(c => c.ModelRating is not null).ToList();
-        var record = new CallRecordDto(
-            scored.Count,
-            scored.Count > 0 ? Math.Round(scored.Average(c => Math.Abs(c.Rating - c.Actual!.Value)), 2) : null,
-            withModel.Count > 0 ? Math.Round(withModel.Average(c => Math.Abs(c.ModelRating!.Value - c.Actual!.Value)), 2) : null,
-            withModel.Count(c => Beat(c) == true),
-            withModel.Count(c => Beat(c) == false));
-        return TypedResults.Ok(new MyCallsDto(record, dtos, suggestions));
+        var dtos = Calls.Ordered(calls.Where(c => shows.ContainsKey(c.ShowId))
+            .Select(c => ToDto(c, shows[c.ShowId], premieres.GetValueOrDefault((c.ShowId, c.SeasonNumber)), now)));
+        return TypedResults.Ok(new MyCallsDto(Calls.Record(calls.Select(c => (c.Rating, c.ModelRating, c.Actual)).ToList()), dtos, suggestions));
     }
 
     private static bool Running(ShowCopy show) => !show.HasEnded();
@@ -198,7 +143,7 @@ public static class CallItApi
     {
         var everyone = await db.SeasonCalls.AsNoTracking().Where(c => c.ShowId == showId && c.SeasonNumber == season)
             .GroupBy(_ => 1).Select(g => new { Count = g.Count(), Average = g.Average(c => c.Rating) }).FirstOrDefaultAsync(ct);
-        return everyone is { Count: >= InsightRules.MinUsersToShow } ? new CrowdCallDto(Math.Round(everyone.Average, 1), everyone.Count) : null;
+        return everyone is null ? null : Calls.Crowd(everyone.Count, everyone.Average);
     }
 
     /// <summary>
@@ -237,20 +182,5 @@ public static class CallItApi
 
     private static CallDto ToDto(SeasonCall call, ShowCopy show, DateTimeOffset? premieres, DateTimeOffset now) =>
         new(call.ShowId, show.Title, show.PosterUrl, call.SeasonNumber, call.Rating, call.ModelRating, call.Actual,
-            call.Actual is not null ? "scored" : premieres is { } p && p <= now ? "airing" : "open",
-            Beat(call), premieres);
-
-    /// <summary>
-    /// Whether the caller was closer to the actual rating than the model; null unscored, without a model, or tied.
-    /// </summary>
-    private static bool? Beat(SeasonCall call)
-    {
-        if (call.Actual is not { } actual || call.ModelRating is not { } model)
-        {
-            return null;
-        }
-        var mine = Math.Round(Math.Abs(call.Rating - actual), 2);
-        var theirs = Math.Round(Math.Abs(model - actual), 2);
-        return mine == theirs ? null : mine < theirs;
-    }
+            Calls.State(call.Actual, premieres, now), Calls.Beat(call.Rating, call.ModelRating, call.Actual), premieres);
 }

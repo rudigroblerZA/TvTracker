@@ -41,16 +41,10 @@ public static class ReunionsApi
         CancellationToken ct)
     {
         var stars = await db.ShowRatings.AsNoTracking().Where(r => r.UserId == userId).ToDictionaryAsync(r => r.ShowId, r => r.Stars, ct);
-        var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToListAsync(ct);
+        var followed = await db.Follows.AsNoTracking().Where(f => f.UserId == userId).Select(f => f.ShowId).ToHashSetAsync(ct);
         var watched = await db.Watches.AsNoTracking().Where(w => w.UserId == userId)
             .GroupBy(w => w.ShowId).Select(g => new { ShowId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(w => w.ShowId, w => w.Count, ct);
-
-        var known = stars.Keys.Concat(followed).Concat(watched.Keys).ToHashSet();
-        var loved = known
-            .Select(id => (ShowId: id, Weight: Reunions.LoveWeight(stars.GetValueOrDefault(id), followed.Contains(id), watched.GetValueOrDefault(id))))
-            .Where(x => x.Weight > 0)
-            .ToDictionary(x => x.ShowId, x => x.Weight);
-        return (known, loved);
+        return Reunions.Love(stars, followed, watched);
     }
 }

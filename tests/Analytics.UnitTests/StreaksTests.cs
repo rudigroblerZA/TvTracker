@@ -114,7 +114,7 @@ public class StreaksTests
 
     [Fact]
     public void Year_in_tv_counts_consecutive_days() =>
-        Assert.Equal(3, YearInTvApi.LongestStreak(Dates(-9, -8, -5, -4, -3, -3, -1)));
+        Assert.Equal(3, YearInTv.LongestStreak(Dates(-9, -8, -5, -4, -3, -3, -1)));
 
     private static List<DateOnly> Dates(params int[] offsets) => offsets.Select(o => Today.AddDays(o)).ToList();
 

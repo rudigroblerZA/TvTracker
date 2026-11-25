@@ -7,9 +7,8 @@ using TvTracker;
 namespace Analytics.API.Apis;
 
 /// <summary>
-/// The waiting room: running shows the caller is caught up on (every aired regular episode watched), with when each is
-/// back. Computed on request from the caller's own watches and the catalog copy, plus the hourly show documents'
-/// <see cref="ShowInsights.NextPremiere"/> and <see cref="Outlook"/>; ended shows have nothing to wait for.
+/// The waiting room (see <see cref="WaitingRoom"/>), computed on request from the caller's own watches, the catalog copy and
+/// the hourly show documents.
 /// </summary>
 public static class WaitingRoomApi
 {
@@ -45,40 +44,12 @@ public static class WaitingRoomApi
             .ToLookup(e => e.ShowId);
         var documents = await ShowDocuments.LoadAsync(db, caughtUp, ct);
 
-        var result = caughtUp.Select(id =>
-            {
-                var show = shows[id];
-                var insights = documents.GetValueOrDefault(id);
-                var lastAired = progress[id].LastAiredAtUtc;
-                var next = upcoming[id].MinBy(e => e.AirsAtUtc);
-                var currentSeason = progress[id].LatestSeason;
-
-                if (next is not null && next.SeasonNumber == currentSeason)
-                {
-                    return new WaitingShowDto(id, show.Title, show.PosterUrl, show.Network, "episode", next.AirsAtUtc, next.SeasonNumber,
-                        null, null, null, false, null, lastAired);
-                }
-                if (insights?.NextPremiere is { } premiere)
-                {
-                    return new WaitingShowDto(id, show.Title, show.PosterUrl, show.Network, "season", premiere.PremieresAtUtc,
-                        premiere.SeasonNumber, null, null, null, false, null, lastAired);
-                }
-                if (next is not null)
-                {
-                    return new WaitingShowDto(id, show.Title, show.PosterUrl, show.Network, "season", next.AirsAtUtc, next.SeasonNumber,
-                        null, null, null, false, null, lastAired);
-                }
-                var renewal = insights?.Outlook?.Renewal?.Share;
-                return insights?.Outlook?.NextSeason is { } forecast
-                    ? new WaitingShowDto(id, show.Title, show.PosterUrl, show.Network, "forecast", null, forecast.SeasonNumber,
-                        forecast.Likely, forecast.Earliest, forecast.Latest, forecast.Overdue, renewal, lastAired)
-                    : new WaitingShowDto(id, show.Title, show.PosterUrl, show.Network, "unknown", null, null, null, null, null, false,
-                        renewal, lastAired);
-            })
-            .OrderBy(s => s.Kind is "episode" or "season" ? 0 : s.Kind == "forecast" ? 1 : 2)
-            .ThenBy(s => s.BackAtUtc ?? (s.Likely is { } likely ? new DateTimeOffset(likely.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : DateTimeOffset.MaxValue))
-            .ThenByDescending(s => s.LastAiredUtc)
-            .ToList();
+        var result = WaitingRoom.Ordered(caughtUp.Select(id =>
+        {
+            var next = upcoming[id].MinBy(e => e.AirsAtUtc);
+            return WaitingRoom.Of(shows[id], documents.GetValueOrDefault(id), progress[id].LatestSeason, progress[id].LastAiredAtUtc,
+                next is null ? null : (next.SeasonNumber, next.AirsAtUtc));
+        }));
 
         return new Room(result, shows, documents, progress.Keys.ToHashSet());
     }
