@@ -1580,7 +1580,7 @@ A release is a signed app bundle (`.aab`) built for one deployment: its host is 
 | TvTracker.EventBus | `src/TvTracker.EventBus` | `IEventBus`, handlers, subscriptions |
 | TvTracker.EventBus.RabbitMQ | `src/TvTracker.EventBus.RabbitMQ` | RabbitMQ implementation (one queue per service, retry-once then drop) |
 | TvTracker.Persistence | `src/TvTracker.Persistence` | EF Core outbox, inbox (idempotent consumers), database initialisation |
-| TvTracker.InsightsEngine | `src/TvTracker.InsightsEngine` | The insights worked out from facts: per show (worth it, gets good, endings, forecasts, DNA, tags) and per viewer (streaks, essential cut, show value, while you wait, TV clock, reunion radar, Previously on…, time machine, worth going back). No database, HTTP or flags: Analytics.Worker and Analytics.API load the facts and store or serve the results |
+| TvTracker.InsightsEngine | `src/TvTracker.InsightsEngine` | The insights worked out from facts: per show (worth it, gets good, endings, forecasts, DNA, tags) and per viewer (streaks, essential cut, catch-up, backlog, Year in TV, taste, taste twins, reunion radar and the rest of the on-request insights). No database, HTTP or flags: Analytics.Worker and Analytics.API load the facts and store or serve the results |
 | TvTracker.IntegrationEvents | `src/TvTracker.IntegrationEvents` | Event contracts |
 | Identity.API | `src/Services/Identity` | Profile, timezone/region, account deletion, data export (Keycloak does sign-in) |
 | Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |

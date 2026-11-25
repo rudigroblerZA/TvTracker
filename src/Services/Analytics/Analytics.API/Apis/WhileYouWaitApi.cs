@@ -35,9 +35,7 @@ public static class WhileYouWaitApi
             return TypedResults.Ok(new WhileYouWaitDto(0, false, null, []));
         }
 
-        var measured = await CatchUpApi.PaceDetailsAsync(db, userId, now, ct);
-        var assumedBecause = measured.MinutesPerWeek > 0 ? null : measured.Watches > 0 ? "no-runtimes" : "nothing-watched";
-        var pace = assumedBecause is null ? measured.MinutesPerWeek : WhileYouWait.AssumedMinutesPerWeek;
+        var (pace, assumedBecause) = WhileYouWait.PaceFor(await CatchUpApi.PaceDetailsAsync(db, userId, now, ct));
         var candidates = (await TimeOffApi.CandidatesAsync(db, cache, userId, now, ct, room.Started))
             .Where(c => c.Assessment.Value >= WhileYouWait.MinValue)
             .ToList();

@@ -67,16 +67,8 @@ public static class RefresherApi
         var ids = paused.Select(p => p.ShowId).ToList();
         var loads = await ShowLoads.LoadAsync(db, userId, ids, now, withInsights: false, ct);
         var returns = await NextPremieres.FindAsync(db, ids, loads.Values.SelectMany(l => l.Episodes).ToLookup(e => e.ShowId), now, premieresOnly: false, ct);
-        var due = ids.Select(id => loads.GetValueOrDefault(id)).OfType<ShowLoad>()
+        return TypedResults.Ok(Refresher.DueFirst(ids.Select(id => loads.GetValueOrDefault(id)).OfType<ShowLoad>()
             .Select(load => Refresher.Build(load, returns.GetValueOrDefault(load.Show.ShowId), Refresher.DefaultBudget, now))
-            .OfType<RefresherDto>()
-            .Where(r => r.Due)
-            .ToList();
-
-        return TypedResults.Ok(due
-            .OrderBy(r => r.Returns is null)
-            .ThenBy(r => r.Returns?.PremieresAtUtc)
-            .ThenByDescending(r => r.LastWatchedAtUtc)
-            .ToList());
+            .OfType<RefresherDto>()));
     }
 }

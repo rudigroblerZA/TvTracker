@@ -20,6 +20,8 @@ internal static class ShowValue
     /// <summary>
     /// A show watched this far (of what's aired) counts as one the user liked.
     /// </summary>
+    internal const int LikedStars = 4;
+
     internal const double FinishedShare = 0.8;
 
     /// <param name="Landing">The <see cref="LandingVerdicts"/> verdict, for ended shows that have one.</param>
@@ -29,6 +31,27 @@ internal static class ShowValue
     /// <param name="TasteReason">The "Your kind of show: …" line, likewise.</param>
     internal sealed record Assessment(double Value, IReadOnlyList<string> Reasons, string? Landing, GetsGoodTurn? SlowStart, bool Limited,
         string? RatingReason = null, string? TasteReason = null);
+
+    /// <summary>
+    /// The shows the viewer liked: rated <see cref="LikedStars"/> stars or more, or watched at least
+    /// <see cref="FinishedShare"/> of.
+    /// </summary>
+    /// <param name="watched">Episodes watched per show.</param>
+    /// <param name="aired">Aired regular episodes per show.</param>
+    internal static List<Guid> LikedShows(IReadOnlyDictionary<Guid, int> stars, IReadOnlyDictionary<Guid, int> watched, IReadOnlyDictionary<Guid, int> aired) =>
+        stars.Where(s => s.Value >= LikedStars).Select(s => s.Key)
+            .Union(watched.Where(w => aired.TryGetValue(w.Key, out var episodes) && w.Value >= episodes * FinishedShare).Select(w => w.Key))
+            .ToList();
+
+    /// <summary>
+    /// The genres of the liked shows. With four or more such shows, a genre needs two of them, so one stray show
+    /// doesn't define a taste.
+    /// </summary>
+    internal static HashSet<string> LikedGenres(IReadOnlyCollection<IReadOnlyList<string>> likedShowsGenres)
+    {
+        var needed = likedShowsGenres.Count >= 4 ? 2 : 1;
+        return likedShowsGenres.SelectMany(g => g).GroupBy(g => g).Where(g => g.Count() >= needed).Select(g => g.Key).ToHashSet();
+    }
 
     internal static Assessment Assess(ShowCopy show, ShowInsights? insights, HashSet<string> liked) =>
         Assess(show, insights?.Landing?.Verdict, insights?.GetsGood?.Turn, insights?.Tags?.Any(t => t.Key == ShowTags.LimitedSeries) == true, liked);

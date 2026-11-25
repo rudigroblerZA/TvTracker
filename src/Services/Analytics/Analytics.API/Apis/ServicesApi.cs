@@ -20,26 +20,6 @@ public record MyServicesDto(string Plan, bool Allowed, IReadOnlyList<string> Ser
 
 public record SetMyServicesRequest(IReadOnlyList<string>? Services);
 
-/// <param name="Minutes">Watched in the last <see cref="ServicesApi.WindowDays"/> days, bulk marks left out.</param>
-/// <param name="CostPerHour">The month's price over those hours; null when the price is unknown or free, or nothing was watched.</param>
-/// <param name="Verdict">"value", "pricey", "quiet" (nothing watched, but followed shows are coming), "pause", or "free" /
-/// "unpriced" for a service with no price to weigh.</param>
-/// <param name="Watched">The shows watched on it in the window, most minutes first.</param>
-/// <param name="Coming">Followed shows with episodes airing on it in the next <see cref="ServicesApi.WindowDays"/> days.</param>
-public record ServiceUseDto(string Key, string Name, decimal? MonthlyUsd, int Minutes, decimal? CostPerHour, string Verdict,
-    IReadOnlyList<ServiceShowDto> Watched, IReadOnlyList<ServiceShowDto> Coming);
-
-/// <param name="Minutes">Watched in the window (for <see cref="ServiceUseDto.Watched"/>).</param>
-/// <param name="Episodes">Episodes watched, or airing in the window (for <see cref="ServiceUseDto.Coming"/>).</param>
-/// <param name="NextAirsAtUtc">The next episode, for coming shows.</param>
-public record ServiceShowDto(Guid ShowId, string Title, int Minutes, int Episodes, DateTimeOffset? NextAirsAtUtc);
-
-/// <param name="MonthlyUsd">The month's total for the services with a known price.</param>
-/// <param name="UnknownPrices">Services in the total without a known price.</param>
-/// <param name="Missing">Services the caller doesn't have, with followed shows coming on them.</param>
-public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownPrices, int Minutes, IReadOnlyList<ServiceUseDto> Services,
-    IReadOnlyList<ServiceUseDto> Missing, string PricesAsOf);
-
 /// <summary>
 /// The streaming services behind the networks (<see cref="NetworkServices"/>) and, on Plus and Family
 /// (<see cref="PlanLimits.TrackServices"/>), the services a user pays for and what each costs per hour they watch.
@@ -56,10 +36,6 @@ public record ServicesReportDto(int WindowDays, decimal MonthlyUsd, int UnknownP
 /// </summary>
 public static class ServicesApi
 {
-    public const int WindowDays = 30;
-    private const decimal PriceyPerHour = 2m;
-    private const int MaxShowsListed = 5;
-
     private static readonly TimeSpan LogoCacheTime = TimeSpan.FromDays(7);
     // A fetch that missed some logos (the favicon service down or slow) is kept only this long, so a blip isn't a week of initials.
     private static readonly TimeSpan PartialLogoCacheTime = TimeSpan.FromMinutes(15);
@@ -169,8 +145,8 @@ public static class ServicesApi
         }
 
         var now = time.GetUtcNow();
-        var from = now.UtcDateTime.AddDays(-WindowDays);
-        var until = now.AddDays(WindowDays);
+        var from = now.UtcDateTime.AddDays(-ServicesReport.WindowDays);
+        var until = now.AddDays(ServicesReport.WindowDays);
         var owned = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId).Select(s => s.ServiceKey).ToListAsync(ct);
 
         var watches = await db.Watches.AsNoTracking()
@@ -193,53 +169,11 @@ public static class ServicesApi
         var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.ShowId))
             .Select(s => new { s.ShowId, s.Title, s.Network })
             .ToDictionaryAsync(s => s.ShowId, ct);
-        var serviceOf = shows.Values
-            .Select(s => (s.ShowId, Service: NetworkServices.ForNetwork(s.Network)))
-            .Where(s => s.Service is not null)
-            .ToDictionary(s => s.ShowId, s => s.Service!.Key);
-
-        ServiceUseDto Use(NetworkService service)
-        {
-            var mine = serviceOf.Where(s => s.Value == service.Key).Select(s => s.Key).ToList();
-            var watchedHere = mine.Where(watched.ContainsKey)
-                .Select(id => new ServiceShowDto(id, shows[id].Title, watched[id].Minutes, watched[id].Episodes, null))
-                .OrderByDescending(s => s.Minutes).ToList();
-            var comingHere = mine.Where(coming.ContainsKey)
-                .Select(id => new ServiceShowDto(id, shows[id].Title, 0, coming[id].Episodes, coming[id].Next))
-                .OrderBy(s => s.NextAirsAtUtc).ToList();
-            var minutes = watchedHere.Sum(s => s.Minutes);
-            decimal? perHour = service.MonthlyUsd is > 0 && minutes > 0 ? Math.Round(service.MonthlyUsd.Value / (minutes / 60m), 2) : null;
-            var verdict = service.MonthlyUsd switch
-            {
-                null => "unpriced",
-                0 => "free",
-                _ when minutes == 0 => comingHere.Count > 0 ? "quiet" : "pause",
-                _ => perHour > PriceyPerHour ? "pricey" : "value"
-            };
-            return new ServiceUseDto(service.Key, service.Name, service.MonthlyUsd, minutes, perHour, verdict,
-                watchedHere.Take(MaxShowsListed).ToList(), comingHere.Take(MaxShowsListed).ToList());
-        }
-
-        var mineUse = owned.Select(NetworkServices.Get).OfType<NetworkService>().Select(Use)
-            .OrderByDescending(s => s.Minutes).ToList();
-        var missing = serviceOf.Values.Distinct().Except(owned)
-            .Select(NetworkServices.Get).OfType<NetworkService>().Select(Use)
-            .Where(s => s.Coming.Count > 0)
-            .OrderByDescending(s => s.Coming.Count).ToList();
-
-        return TypedResults.Ok(new ServicesReportDto(
-            WindowDays,
-            mineUse.Sum(s => s.MonthlyUsd ?? 0),
-            mineUse.Count(s => s.MonthlyUsd is null),
-            mineUse.Sum(s => s.Minutes),
-            mineUse,
-            missing,
-            NetworkServices.PricesAsOf));
+        return TypedResults.Ok(ServicesReport.Of(owned, watched,
+            coming.ToDictionary(c => c.Key, c => (c.Value.Episodes, c.Value.Next)),
+            shows.ToDictionary(s => s.Key, s => (s.Value.Title, s.Value.Network))));
     }
 
-    /// <summary>
-    /// The caller's plan from Analytics' copy, and whether it allows services: always while <c>plans</c> is off (fail open).
-    /// </summary>
     private static async Task<(string Plan, bool Allowed)> PlanOfAsync(ClaimsPrincipal user, string userId, AnalyticsContext db,
         CachedFlags flags, CancellationToken ct)
     {
