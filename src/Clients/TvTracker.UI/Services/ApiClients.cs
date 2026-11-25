@@ -31,16 +31,16 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     /// How payments are set up; null for anyone but an admin.
     /// </summary>
     public Task<PaymentSettings?> GetPaymentSettingsAsync(CancellationToken ct = default) =>
-        GetAsync<PaymentSettings>(ApiClients.Identity, "api/v1/admin/payments/settings", ct);
+        GetAsync<PaymentSettings>(ApiClients.Financials, "api/v1/admin/payments/settings", ct);
 
     public Task<PaymentSettings?> SavePaymentSettingsAsync(SavePaymentSettings settings, CancellationToken ct = default) =>
-        SendAsync<PaymentSettings>(ApiClients.Identity, HttpMethod.Put, "api/v1/admin/payments/settings", settings, ct);
+        SendAsync<PaymentSettings>(ApiClients.Financials, HttpMethod.Put, "api/v1/admin/payments/settings", settings, ct);
 
     /// <summary>
     /// Deletes what was set here, keys included: configuration alone is in force again.
     /// </summary>
     public Task<PaymentSettings?> ClearPaymentSettingsAsync(CancellationToken ct = default) =>
-        SendAsync<PaymentSettings>(ApiClients.Identity, HttpMethod.Delete, "api/v1/admin/payments/settings", null, ct);
+        SendAsync<PaymentSettings>(ApiClients.Financials, HttpMethod.Delete, "api/v1/admin/payments/settings", null, ct);
 
     public Task<Profile?> GetProfileAsync(CancellationToken ct = default) =>
         GetAsync<Profile>(ApiClients.Identity, "api/v1/profile", ct, cacheForOffline: true);
@@ -106,25 +106,25 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
         GetAsync<UserPlan>(ApiClients.Identity, "api/v1/me/plan", ct);
 
     public Task<PlanPrices?> GetPlanPricesAsync(CancellationToken ct = default) =>
-        GetAsync<PlanPrices>(ApiClients.Identity, "api/v1/plans/prices", ct);
+        GetAsync<PlanPrices>(ApiClients.Financials, "api/v1/plans/prices", ct);
 
     /// <summary>
     /// The caller's subscription (active, else the latest); null when they've never had one.
     /// </summary>
     public Task<PlanSubscription?> GetSubscriptionAsync(CancellationToken ct = default) =>
-        GetAsync<PlanSubscription>(ApiClients.Identity, "api/v1/me/subscription", ct);
+        GetAsync<PlanSubscription>(ApiClients.Financials, "api/v1/me/subscription", ct);
 
     /// <summary>
     /// Starts a checkout for <paramref name="plan"/> by the month or year; the page sends the browser to its address.
     /// </summary>
     public Task<CheckoutLink?> StartCheckoutAsync(string plan, string interval, CancellationToken ct = default) =>
-        SendAsync<CheckoutLink>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/checkout", new { plan, interval }, ct);
+        SendAsync<CheckoutLink>(ApiClients.Financials, HttpMethod.Post, "api/v1/me/checkout", new { plan, interval }, ct);
 
     public Task<PlanSubscription?> CancelSubscriptionAsync(CancellationToken ct = default) =>
-        SendAsync<PlanSubscription>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/subscription/cancel", null, ct);
+        SendAsync<PlanSubscription>(ApiClients.Financials, HttpMethod.Post, "api/v1/me/subscription/cancel", null, ct);
 
     public Task<PlanSubscription?> ResumeSubscriptionAsync(CancellationToken ct = default) =>
-        SendAsync<PlanSubscription>(ApiClients.Identity, HttpMethod.Post, "api/v1/me/subscription/resume", null, ct);
+        SendAsync<PlanSubscription>(ApiClients.Financials, HttpMethod.Post, "api/v1/me/subscription/resume", null, ct);
 
     /// <summary>
     /// Users by name or email, for admins (Plus users with no term); null for anyone else.
@@ -148,7 +148,7 @@ public sealed class IdentityClient(IHttpClientFactory f, IAccessTokenProvider t,
     /// What subscriptions bring in over the last <paramref name="days"/> days; null for anyone but an admin.
     /// </summary>
     public Task<RevenueReport?> GetRevenueReportAsync(int days, CancellationToken ct = default) =>
-        GetAsync<RevenueReport>(ApiClients.Identity, $"api/v1/admin/revenue?days={days}", ct);
+        GetAsync<RevenueReport>(ApiClients.Financials, $"api/v1/admin/revenue?days={days}", ct);
 
     public Task<PlanUser?> SetPlanAsync(string userId, string plan, CancellationToken ct = default) =>
         SendAsync<PlanUser>(ApiClients.Identity, HttpMethod.Put, $"api/v1/admin/plans/users/{Uri.EscapeDataString(userId)}", new { plan }, ct);
@@ -281,32 +281,32 @@ public sealed class CatalogClient(IHttpClientFactory f, IAccessTokenProvider t, 
     /// Affiliate links' report for the last <paramref name="days"/> days; null for anyone but an admin, or with the flag off.
     /// </summary>
     public Task<AffiliateReport?> GetAffiliateReportAsync(int days, CancellationToken ct = default) =>
-        GetAsync<AffiliateReport>(ApiClients.Catalog, $"api/v1/affiliates/report?days={days}", ct);
+        GetAsync<AffiliateReport>(ApiClients.Financials, $"api/v1/affiliates/report?days={days}", ct);
 
     /// <summary>
     /// The affiliate programs admins set up in Settings, and the others in force; null for anyone but an admin.
     /// </summary>
     public Task<AffiliatePrograms?> GetAffiliateProgramsAsync(CancellationToken ct = default) =>
-        GetAsync<AffiliatePrograms>(ApiClients.Catalog, "api/v1/affiliates/programs", ct);
+        GetAsync<AffiliatePrograms>(ApiClients.Financials, "api/v1/affiliates/programs", ct);
 
     /// <summary>
     /// False when it didn't happen: affiliate links are switched off, or the viewer isn't an admin.
     /// </summary>
     public async Task<bool> SaveAffiliateProgramAsync(string name, SaveAffiliateProgram program, CancellationToken ct = default) =>
-        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct) is not null;
+        await SendAsync<string>(ApiClients.Financials, HttpMethod.Put, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", program, ct) is not null;
 
     /// <summary>
     /// False when there was nothing to remove, or the viewer may not.
     /// </summary>
     public async Task<bool> DeleteAffiliateProgramAsync(string name, CancellationToken ct = default) =>
-        await SendAsync<string>(ApiClients.Catalog, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct) is not null;
+        await SendAsync<string>(ApiClients.Financials, HttpMethod.Delete, $"api/v1/affiliates/programs/{Uri.EscapeDataString(name)}", null, ct) is not null;
 
     /// <summary>
     /// Adds a test program for each main streaming service that has none; how many were added, or null when it
     /// didn't happen (switched off, or not an admin).
     /// </summary>
     public Task<int?> AddStarterAffiliateProgramsAsync(CancellationToken ct = default) =>
-        SendAsync<int?>(ApiClients.Catalog, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
+        SendAsync<int?>(ApiClients.Financials, HttpMethod.Post, "api/v1/affiliates/programs/starters", null, ct);
 
     /// <summary>
     /// Other shows with this show's title (remakes, revivals, namesakes); null with the flag off.

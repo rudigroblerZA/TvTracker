@@ -8,8 +8,8 @@ using TvTracker.UI.Services;
 namespace WebApp.Services;
 
 /// <summary>
-/// The test payment provider's pages (Identity's <c>TestPaymentProvider</c>), for trying payments locally: a checkout
-/// that pays, and a subscription page that renews or ends one, each by posting Identity a webhook signed with
+/// The test payment provider's pages (Financials' <c>TestPaymentProvider</c>), for trying payments locally: a checkout
+/// that pays, and a subscription page that renews or ends one, each by posting Financials a webhook signed with
 /// <c>Payments:Test:WebhookSecret</c>, as a real provider would.
 /// <list type="bullet">
 /// <item><b>Development only,</b> and only with the secret.</item>
@@ -42,7 +42,7 @@ public static class TestPaymentProvider
         app.MapPost($"{Path}/pay", async (HttpRequest request, IHttpClientFactory clients, CancellationToken ct) =>
         {
             var form = await request.ReadFormAsync(ct);
-            // Only the session: Identity takes the price and the period from the checkout it made.
+            // Only the session: Financials takes the price and the period from the checkout it made.
             var outcome = await SendAsync(clients, secret, new
             {
                 id = $"evt_{Guid.NewGuid():N}",
@@ -69,7 +69,7 @@ public static class TestPaymentProvider
         {
             var form = await request.ReadFormAsync(ct);
             var type = form["type"].ToString() is "subscription.ended" ? "subscription.ended" : "payment.succeeded";
-            // A renewal names no period: Identity extends the current one by the subscription's interval.
+            // A renewal names no period: Financials extends the current one by the subscription's interval.
             var outcome = await SendAsync(clients, secret, new
             {
                 id = $"evt_{Guid.NewGuid():N}",
@@ -82,7 +82,7 @@ public static class TestPaymentProvider
     }
 
     /// <summary>
-    /// Posts the event to Identity's webhook, signed; null when it was taken, else what went wrong.
+    /// Posts the event to Financials' webhook, signed; null when it was taken, else what went wrong.
     /// </summary>
     private static async Task<string?> SendAsync(IHttpClientFactory clients, string secret, object e, CancellationToken ct)
     {
@@ -94,12 +94,12 @@ public static class TestPaymentProvider
         request.Headers.Add(PaymentSignature.Header, PaymentSignature.Sign(body, secret, DateTimeOffset.UtcNow));
         try
         {
-            using var response = await clients.CreateClient(ApiClients.Identity).SendAsync(request, ct);
-            return response.IsSuccessStatusCode ? null : $"Identity answered {(int)response.StatusCode}.";
+            using var response = await clients.CreateClient(ApiClients.Financials).SendAsync(request, ct);
+            return response.IsSuccessStatusCode ? null : $"Financials answered {(int)response.StatusCode}.";
         }
         catch (HttpRequestException ex)
         {
-            return $"Identity couldn't be reached: {ex.Message}";
+            return $"Financials couldn't be reached: {ex.Message}";
         }
     }
 

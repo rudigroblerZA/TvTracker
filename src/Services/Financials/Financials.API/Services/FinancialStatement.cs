@@ -28,7 +28,7 @@ public record FinancialBookDto(string Currency, IReadOnlyList<FinancialRowDto> M
 /// entered costs, and what's left.
 /// </summary>
 /// <param name="Books">One for each currency, the busiest first.</param>
-/// <param name="SubscriptionsKnown">False when Identity.API couldn't be asked: the figures then lack subscriptions.</param>
+/// <param name="SubscriptionsKnown">False when subscription income couldn't be read: the figures then lack subscriptions.</param>
 /// <param name="Affiliates">"on", "off" (affiliate links are switched off) or "unknown" (Catalog.API couldn't be asked).</param>
 public record FinancialStatementDto(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialBookDto> Books,
     IReadOnlyList<string> Categories, bool SubscriptionsKnown, string Affiliates);
@@ -61,13 +61,13 @@ public sealed record IncomeMonth(DateOnly Month, string Currency, decimal Amount
 public sealed record CommissionMonth(DateOnly Month, string Currency, decimal Commission);
 
 /// <summary>
-/// Identity.API's answer: payments by month, and what the running subscriptions bring in a month now.
+/// Subscription income: payments by month, and what the running subscriptions bring in a month now.
 /// </summary>
 public sealed record SubscriptionIncome(IReadOnlyList<IncomeMonth> Months, IReadOnlyList<Money> MonthlyRecurring);
 
 /// <summary>
-/// Catalog.API's answer. <see cref="Off"/>: affiliate links are switched off, so there is no commission to ask for.
-/// <see cref="Unknown"/>: it couldn't be asked.
+/// Affiliate commission by month. <see cref="Off"/>: affiliate links are switched off, so there is none to count.
+/// <see cref="Unknown"/>: it couldn't be read (kept for the page, which names what's missing; both are read here now).
 /// </summary>
 /// <param name="State">One of <see cref="FinancialStatement"/>'s Affiliates values.</param>
 public sealed record AffiliateIncome(string State, IReadOnlyList<CommissionMonth> Months)

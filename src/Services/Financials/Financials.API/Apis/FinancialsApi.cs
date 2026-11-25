@@ -1,4 +1,5 @@
-﻿using Financials.API.Services;
+﻿using System.Security.Claims;
+using Financials.API.Services;
 using Financials.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -78,19 +79,19 @@ public static class FinancialsApi
         return TypedResults.Ok(Describe(null, options.Value));
     }
 
-    private static async Task<Ok<FinancialStatementDto>> StatementAsync(HttpContext http, FinancialsContext db, IncomeSources income,
+    private static async Task<Ok<FinancialStatementDto>> StatementAsync(ClaimsPrincipal user, FinancialsContext db, CachedFlags flags,
         IOptions<FinancialOptions> options, TimeProvider time, int months = 12, CancellationToken ct = default)
     {
         var window = FinancialStatement.Clamp(months);
-        var authorization = http.Request.Headers.Authorization.ToString();
-        // Both services at once, and the costs meanwhile.
-        var subscriptionsTask = income.SubscriptionsAsync(authorization, window, ct);
-        var commissionTask = income.CommissionAsync(authorization, window, ct);
+        var paid = await RevenueApi.IncomeAsync(db, time, window, ct);
+        var subscriptions = new SubscriptionIncome(
+            paid.Months.Select(m => new IncomeMonth(m.Month, m.Currency, m.Amount, m.Payments)).ToList(),
+            paid.MonthlyRecurring.Select(m => new Money(m.Currency, m.Amount)).ToList());
         var costs = await db.CostItems.AsNoTracking().ToListAsync(ct);
         var fees = await FeesInForceAsync(db, options.Value, ct);
 
-        return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, await subscriptionsTask,
-            await commissionTask, costs, new FinancialOptions { PaymentFeePercent = fees.Percent, PaymentFeeFixed = fees.Fixed }));
+        return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, subscriptions,
+            await AffiliateApi.MonthlyAsync(user, db, flags, time, window, ct), costs, new FinancialOptions { PaymentFeePercent = fees.Percent, PaymentFeeFixed = fees.Fixed }));
     }
 
     private static async Task<Ok<List<CostItemDto>>> CostsAsync(FinancialsContext db, CancellationToken ct) =>

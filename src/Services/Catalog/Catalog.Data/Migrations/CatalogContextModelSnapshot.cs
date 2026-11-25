@@ -27,95 +27,21 @@ namespace Catalog.Data.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Catalog.Data.AffiliateConversion", b =>
+            modelBuilder.Entity("Catalog.Data.AffiliateProgramsCopy", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
 
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.Property<Guid>("ClickId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<string>("Program")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("ReceivedAtUtc")
+                    b.Property<DateTimeOffset>("AsOfUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("TransactionId")
+                    b.Property<string>("Programs")
                         .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("jsonb");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClickId");
-
-                    b.HasIndex("ReceivedAtUtc");
-
-                    b.HasIndex("Program", "TransactionId")
-                        .IsUnique();
-
-                    b.ToTable("affiliate_conversions", (string)null);
-                });
-
-            modelBuilder.Entity("Catalog.Data.AffiliateProgramRecord", b =>
-                {
-                    b.Property<string>("Name")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PostbackKey")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.PrimitiveCollection<List<string>>("Regions")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text[]")
-                        .HasDefaultValueSql("'{}'");
-
-                    b.PrimitiveCollection<List<string>>("Services")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text[]")
-                        .HasDefaultValueSql("'{}'");
-
-                    b.Property<string>("Template")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<bool>("Test")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Name");
-
-                    b.ToTable("affiliate_programs", (string)null);
+                    b.ToTable("affiliate_programs_copy", (string)null);
                 });
 
             modelBuilder.Entity("Catalog.Data.CastMember", b =>
@@ -279,54 +205,6 @@ namespace Catalog.Data.Migrations
                     b.HasKey("Slug");
 
                     b.ToTable("nanogenres", (string)null);
-                });
-
-            modelBuilder.Entity("Catalog.Data.OutboundClick", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ClickedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Link")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("Program")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("Region")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<string>("Service")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<Guid>("ShowId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Surface")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClickedAtUtc");
-
-                    b.ToTable("outbound_clicks", (string)null);
                 });
 
             modelBuilder.Entity("Catalog.Data.Person", b =>
@@ -961,15 +839,6 @@ namespace Catalog.Data.Migrations
                     b.HasKey("EventId", "Handler");
 
                     b.ToTable("processed_integration_events", (string)null);
-                });
-
-            modelBuilder.Entity("Catalog.Data.AffiliateConversion", b =>
-                {
-                    b.HasOne("Catalog.Data.OutboundClick", null)
-                        .WithMany()
-                        .HasForeignKey("ClickId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Catalog.Data.CastMember", b =>

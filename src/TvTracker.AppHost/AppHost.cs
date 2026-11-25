@@ -234,13 +234,17 @@ else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Resea
     researchApi.WithEnvironment("Research__TmdbApiKey", tmdbKey);
 }
 
-// Financials: the business's own books, for admins. It keeps the costs an admin enters and asks Identity.API (subscription
-// payments) and Catalog.API (affiliate commission) for the income, with the admin's own token. Nothing about any user,
-// so it takes no part in the data export or account deletion, and it sends and hears no events.
+// Financials: the business's money. It sells the plans (checkout, the providers' webhooks, subscriptions and receipts)
+// and tells Identity.API when a member starts or stops paying; it owns the affiliate programs, which it publishes for
+// Catalog.API to build where-to-watch links from, and keeps the clicks Catalog reports and the sales the networks do;
+// and it keeps the books: that income against the costs an admin enters. It asks Identity for a buyer's region and for
+// the account counts, with the caller's own token, and takes part in the data export and account deletion for the
+// payment records it keeps.
 var financialsApi = Project("financials-api", "../Services/Financials/Financials.API/Financials.API.csproj")
     .WithReference(financialsDb).WaitFor(financialsDb)
+    .WithReference(flagd)
+    .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(identityApi)
-    .WithReference(catalogApi)
     .WithEnvironment("Identity__Url", keycloakUrl)
     // It never says the app's name, so it needn't follow it.
     .WithEnvironment("Branding__Refresh", "false")
@@ -266,9 +270,9 @@ foreach (var section in new[] { "Admin:Users", "Moderation:Users", "Moderation:B
 foreach (var admin in builder.Configuration.GetSection("Admin:Users").GetChildren())
 {
     identityApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
-    // ...and the affiliate report (Catalog.API).
+    // ...and Catalog.API's admin pages.
     catalogApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
-    // ...and the financials.
+    // ...and the financials: the books, revenue, payment settings and the affiliate programs and report.
     financialsApi.WithEnvironment($"Admin__Users__{admin.Key}", admin.Value);
 }
 identityApi
@@ -282,7 +286,8 @@ identityApi
     .WithReference(notificationsApi)
     .WithReference(socialApi)
     .WithReference(analyticsApi)
-    .WithReference(researchApi);
+    .WithReference(researchApi)
+    .WithReference(financialsApi);
 
 // The sync worker publishes catalog events, so it starts once the consuming services are healthy
 // (their health includes "queue bound and consuming") and Catalog.API has created the schema.
@@ -570,28 +575,28 @@ if (!string.IsNullOrEmpty(webPublicUrl))
 // The test affiliate network (running locally only; Affiliates:TestNetwork=false turns it off): a pretend network, so
 // affiliate links, postbacks and the report can be tried without a real program. Test programs set up in Settings, and
 // any service no program covers, send their where-to-watch clicks through the web app's /dev/affiliate-network page,
-// which can report a sale (TestAffiliateNetwork, AffiliateLinks.TestNetwork).
+// which can report a sale to Financials.API (TestAffiliateNetwork, AffiliateNetworks.TestNetwork).
 if (!builder.ExecutionContext.IsPublishMode && !string.Equals(builder.Configuration["Affiliates:TestNetwork"], "false", StringComparison.OrdinalIgnoreCase))
 {
     const string testNetworkKey = "test-network-key";
-    catalogApi
+    financialsApi
         .WithEnvironment("Affiliates__TestNetwork__Url", webApp.GetEndpoint("http"))
         .WithEnvironment("Affiliates__TestNetwork__Key", testNetworkKey);
     webApp.WithEnvironment("Affiliates__TestNetworkKey", testNetworkKey);
 }
 
-// The key Identity.API encrypts with what an admin enters on the Financials page (Stripe's keys): a secret of the
+// The key Financials.API encrypts with what an admin enters on the Financials page (Stripe's keys): a secret of the
 // deployment's own, made up once and kept, so the database alone doesn't give those keys away. Change it and the keys
 // saved under the old one can no longer be read; they are then entered again.
-identityApi.WithEnvironment("Payments__SettingsKey", Secret("payment-settings-key", "tvtracker-payment-settings-dev-key"));
+financialsApi.WithEnvironment("Payments__SettingsKey", Secret("payment-settings-key", "tvtracker-payment-settings-dev-key"));
 
 // Payments. A deployment sells through Stripe: its secret key and webhook
 // signing secret are secret parameters, the customer portal's login link and the plan page's public address plain ones,
 // all required. Running locally, Stripe sells in test mode once its key is given (user secrets:
 // Parameters:stripe-secret-key and stripe-webhook-secret, from `stripe listen`; README, Payments); otherwise the test
-// provider does, its checkout being the web app's /dev/payments page, which signs the webhooks it sends Identity with a
+// provider does, its checkout being the web app's /dev/payments page, which signs the webhooks it sends Financials with a
 // secret the two share.
-// Both values, locally: a webhook secret left unset would be a parameter with no value, which Identity waits on for ever.
+// Both values, locally: a webhook secret left unset would be a parameter with no value, which Financials waits on for ever.
 var stripeLocally = !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-secret-key"])
     && !string.IsNullOrEmpty(builder.Configuration["Parameters:stripe-webhook-secret"]);
 // Polar (a merchant of record, for where Stripe opens no accounts) the same way: locally once its token and webhook
@@ -603,7 +608,7 @@ if (publishing)
     // A deployment names its provider (PAYMENT_PROVIDER: stripe or polar; scripts/deploy.sh fills in stripe), and
     // carries both providers' settings, empty until there is an account: each one's webhooks are checked whichever
     // sells. The address the buyer is sent back to is the plan page at the site's public address (Deployment below).
-    identityApi
+    financialsApi
         .WithEnvironment("Payments__Provider", builder.AddParameter("payment-provider", "stripe"))
         .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
         .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true))
@@ -619,20 +624,20 @@ if (publishing)
 else if (polarLocally || stripeLocally)
 {
     // A real provider needs an absolute address to send the buyer back to: the web app's own, here, https when its
-    // launch profile has it (an endpoint that doesn't exist never resolves, and Identity would wait on it for ever).
+    // launch profile has it (an endpoint that doesn't exist never resolves, and Financials would wait on it for ever).
     var webScheme = webApp.Resource.Annotations.OfType<EndpointAnnotation>().Any(e => e.Name == "https") ? "https" : "http";
-    identityApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"));
-    // The optional settings, only where given: a parameter with no value is one Identity waits on for ever.
+    financialsApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"{webApp.GetEndpoint(webScheme)}/settings/plan"));
+    // The optional settings, only where given: a parameter with no value is one Financials waits on for ever.
     void Optional(string setting, string parameter)
     {
         if (builder.Configuration[$"Parameters:{parameter}"] is { Length: > 0 })
         {
-            identityApi.WithEnvironment(setting, builder.AddParameter(parameter));
+            financialsApi.WithEnvironment(setting, builder.AddParameter(parameter));
         }
     }
     if (polarLocally)
     {
-        identityApi
+        financialsApi
             .WithEnvironment("Payments__Provider", "polar")
             .WithEnvironment("Payments__Polar__ApiBase", builder.Configuration["Polar:ApiBase"] is { Length: > 0 } polarApi ? polarApi : "https://sandbox-api.polar.sh/")
             .WithEnvironment("Payments__Polar__AccessToken", builder.AddParameter("polar-access-token", secret: true))
@@ -645,7 +650,7 @@ else if (polarLocally || stripeLocally)
     }
     else
     {
-        identityApi
+        financialsApi
             .WithEnvironment("Payments__Provider", "stripe")
             .WithEnvironment("Payments__Stripe__SecretKey", builder.AddParameter("stripe-secret-key", secret: true))
             .WithEnvironment("Payments__Stripe__WebhookSecret", builder.AddParameter("stripe-webhook-secret", secret: true));
@@ -653,7 +658,7 @@ else if (polarLocally || stripeLocally)
         // A stand-in for Stripe's API (Stripe's stripe-mock, or a recorder) when testing without an account.
         if (builder.Configuration["Stripe:ApiBase"] is { Length: > 0 } apiBase)
         {
-            identityApi.WithEnvironment("Payments__Stripe__ApiBase", apiBase);
+            financialsApi.WithEnvironment("Payments__Stripe__ApiBase", apiBase);
         }
     }
 }
@@ -662,7 +667,7 @@ else
     // The test pages are linked relative to the page the buyer is on, so the browser keeps the origin (http or https)
     // it signed in on and its sign-in cookie.
     var paymentsSecret = Secret("payments-test-webhook-secret", "tvtracker-payments-dev-secret");
-    identityApi
+    financialsApi
         .WithEnvironment("Payments__Provider", "test")
         .WithEnvironment("Payments__ReturnUrl", "/settings/plan")
         .WithEnvironment("Payments__Test__WebhookSecret", paymentsSecret);
@@ -744,9 +749,9 @@ if (publishing)
         .WithEnvironment("OFFSITE_KEEP_DAYS", builder.AddParameter("offsite-keep-days", ""));
 
     webApp.WithEnvironment("WebApp__PublicUrl", publicUrl);
+    financialsApi.WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"https://{publicHost}/settings/plan"));
     identityApi
         .WithEnvironment("Keycloak__WebPublicUrl", publicUrl)
-        .WithEnvironment("Payments__ReturnUrl", ReferenceExpression.Create($"https://{publicHost}/settings/plan"))
         // The flags folder flagd reads, so the flags page's overrides reach it.
         .PublishAsDockerComposeService((_, service) => service.Volumes.Add(new()
         {

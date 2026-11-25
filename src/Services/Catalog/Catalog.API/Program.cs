@@ -1,11 +1,14 @@
 ﻿using Catalog.API.Alerts;
 using Catalog.API.Apis;
+using Catalog.API.IntegrationEvents;
 using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TvTracker;
+using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,16 +28,6 @@ builder.Services.AddDatabaseInitializer<CatalogContext>(async (db, services, ct)
     await db.Database.OpenConnectionAsync(ct);
     await ((NpgsqlConnection)db.Database.GetDbConnection()).ReloadTypesAsync(ct);
     await db.Database.CloseConnectionAsync();
-
-    // In development with the test network running, an empty affiliate programs table starts with a test program per
-    // main service. Only when empty: programs an admin removed don't come back while any other is left.
-    if (services.GetRequiredService<IHostEnvironment>().IsDevelopment()
-        && AffiliateLinks.TestNetwork(services.GetRequiredService<IConfiguration>()) is not null
-        && !await db.AffiliatePrograms.AnyAsync(ct))
-    {
-        db.AffiliatePrograms.AddRange(StarterPrograms.Missing([], services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime));
-        await db.SaveChangesAsync(ct);
-    }
 });
 
 builder.AddRedisDistributedCache("redis");
@@ -79,14 +72,14 @@ builder.Services.AddSingleton<Universes>();
 builder.Services.AddSingleton<DegreesGraph>();
 builder.Services.AddSingleton<Crossovers>();
 
-// Affiliate programs: an admin's from Settings (the affiliate_programs table), then the configuration's (read on each
-// click, so an edited appsettings file applies without a restart), then the development test network's catch-all, so a
-// real program for a service still wins.
-builder.Services.Configure<AffiliateOptions>(builder.Configuration.GetSection("Affiliates"));
-builder.Services.AddScoped<AffiliatePrograms>();
+// Affiliate programs are Financials.API's; where-to-watch links are built from the copy it publishes.
+builder.Services.AddScoped<CopiedAffiliatePrograms>();
 
-// Publishes only (crossover alerts); Catalog.API subscribes to nothing.
-builder.AddRabbitMQEventBus("eventbus");
+// Publishes crossover alerts and where-to-watch clicks; hears the affiliate programs Financials.API publishes.
+builder.AddRabbitMQEventBus("eventbus")
+    .AddSubscription<AffiliateProgramsChangedIntegrationEvent, AffiliateProgramsChangedHandler>();
+builder.Services.AddIntegrationEventOutbox<CatalogContext>();
+builder.Services.AddMemoryCache();
 builder.Services.AddHostedService<CrossoverAlerts>();
 builder.Services.AddAlert<DeadLettersAlert>();
 builder.Services.AddProblemDetails();

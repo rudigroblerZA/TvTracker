@@ -1,5 +1,4 @@
 ﻿using Identity.API.Apis;
-using Identity.API.Payments;
 using Identity.Data;
 using TvTracker.Persistence;
 
@@ -34,7 +33,7 @@ public sealed class DemoAccountRemover(IServiceScopeFactory scopes, ILogger<Demo
                 return;
             }
             await ProfileApi.DeleteAccountByIdAsync(UserId, services.GetRequiredService<IdentityContext>(), services.GetRequiredService<IIntegrationEventOutbox>(),
-                keycloak, services.GetRequiredService<TimeProvider>(), services.GetRequiredService<PaymentProviders>(), logger, stoppingToken);
+                keycloak, services.GetRequiredService<TimeProvider>(), stoppingToken);
             logger.LogWarning("Deleted the demo account: it comes with the realm file and isn't for production");
         }, stoppingToken);
 }
