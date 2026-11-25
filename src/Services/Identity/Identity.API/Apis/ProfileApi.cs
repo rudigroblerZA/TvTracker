@@ -1,7 +1,6 @@
 ﻿using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Identity.API.Payments;
 using Identity.API.Services;
 using Identity.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -40,7 +39,7 @@ public static class ProfileApi
     /// <summary>
     /// Services that hold per-user data and expose GET api/v1/me/export; each is an HttpClient of that name.
     /// </summary>
-    internal static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social", "analytics", "research"];
+    internal static readonly string[] ExportSources = ["tracking", "ratings", "recommendations", "notifications", "social", "analytics", "research", "financials"];
 
     public static RouteGroupBuilder MapProfileApi(this IEndpointRouteBuilder app)
     {
@@ -178,14 +177,15 @@ public static class ProfileApi
     }
 
     /// <summary>
-    /// Deletes the profile and then the Keycloak user, and publishes UserDeleted so every service purges the user's data.
+    /// Deletes the profile and then the Keycloak user, and publishes UserDeleted so every service purges the user's data
+    /// (Financials.API stops their subscription at the payment provider when it hears).
     /// An owner's family ends with them (its members go back to their own plans); a member just leaves theirs.
     /// </summary>
     private static async Task<NoContent> DeleteAccountAsync(
         ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak, TimeProvider time,
-        PaymentProviders payments, ILoggerFactory loggers, CancellationToken ct)
+        CancellationToken ct)
     {
-        await DeleteAccountByIdAsync(user.GetUserId(), db, outbox, keycloak, time, payments, loggers.CreateLogger(typeof(ProfileApi)), ct);
+        await DeleteAccountByIdAsync(user.GetUserId(), db, outbox, keycloak, time, ct);
         return TypedResults.NoContent();
     }
 
@@ -193,12 +193,8 @@ public static class ProfileApi
     /// The account deletion itself, for the endpoint and for <see cref="Services.DemoAccountRemover"/>.
     /// </summary>
     internal static async Task DeleteAccountByIdAsync(string userId, IdentityContext db, IIntegrationEventOutbox outbox, KeycloakAdminClient keycloak,
-        TimeProvider time, PaymentProviders payments, ILogger logger, CancellationToken ct)
+        TimeProvider time, CancellationToken ct)
     {
-        // Subscriptions first, so a failure before anything is deleted leaves the account whole to try again.
-        await PaymentsApi.StopSubscriptionsAsync(db, payments, userId, logger, ct);
-        await PaymentsApi.RemoveRecordsAsync(db, userId, ct);
-
         var profile = await db.Profiles.FindAsync([userId], ct);
         if (profile is not null)
         {
@@ -227,7 +223,7 @@ public static class ProfileApi
     /// </summary>
     private static async Task<IResult> ExportAsync(
         HttpContext httpContext, ClaimsPrincipal user, IdentityContext db, IIntegrationEventOutbox outbox,
-        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, PaymentProviders payments, TimeProvider time, CancellationToken ct)
+        IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, TimeProvider time, CancellationToken ct)
     {
         var logger = loggerFactory.CreateLogger("Identity.API.Export");
         var profile = await GetOrCreateProfileAsync(user, db, outbox, time, ct);
@@ -236,14 +232,7 @@ public static class ProfileApi
         var export = new JsonObject
         {
             ["exportedAtUtc"] = time.GetUtcNow().UtcDateTime,
-            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile)),
-            ["payments"] = new JsonObject
-            {
-                ["subscription"] = JsonSerializer.SerializeToNode(await PaymentsApi.LatestAsync(db, profile.UserId, ct) is { } s
-                    ? PaymentsApi.ToDto(s, payments)
-                    : null),
-                ["receipts"] = JsonSerializer.SerializeToNode(await PaymentsApi.ReceiptsAsync(db, profile.UserId, ct))
-            }
+            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile))
         };
 
         foreach (var source in ExportSources)

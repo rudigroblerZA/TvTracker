@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests of Financials' modules through their interfaces, against a real Postgres in a container (tests/Shared):
+       the subscription ledger's rules live in sequences of events, unique indexes and what gets published, which a
+       test of its date arithmetic doesn't reach. Needs Docker. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="System.Formats.Cbor" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <ProjectReference Include="..\..\src\Services\Financials\Financials.API\Financials.API.csproj" />
+  </ItemGroup>
+</Project>

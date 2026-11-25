@@ -19,15 +19,21 @@ public record PlanUserDto(string UserId, string DisplayName, string? Email, stri
 
 public record SetPlanRequest(string Plan);
 
+/// <param name="NewAccounts">When each account made in the window was made.</param>
+public record AccountsDto(int Accounts, int OnPaidPlan, IReadOnlyList<DateTime> NewAccounts);
+
 /// <summary>
 /// Plans (<see cref="Plans"/>): what a user pays for. Identity owns each user's plan; a change goes out as
 /// <see cref="UserPlanChangedIntegrationEvent"/> through the outbox, and every plan rides the daily profile snapshot, so
-/// services enforcing a limit keep a copy that heals. People buy plans through a payment provider (<see cref="PaymentsApi"/>),
+/// services enforcing a limit keep a copy that heals. People buy plans through Financials.API, which says when a subscription starts or ends
+/// (<see cref="IntegrationEvents.SubscriptionPlanHandlers"/>),
 /// and admins (<c>Admin:Users</c>) can still set one; both make the same change (<see cref="PlanState.SetPaidPlanAsync"/>).
 /// Non-admins get 404 from the admin endpoints.
 /// </summary>
 public static class PlansApi
 {
+    private const int MaxAccountDays = 365;
+
     private const int MaxSearchResults = 20;
 
     public static void MapPlansApi(this IEndpointRouteBuilder app)
@@ -37,6 +43,7 @@ public static class PlansApi
         api.MapGet("/me/plan", GetMyPlanAsync);
         api.MapGet("/admin/plans/users", SearchUsersAsync);
         api.MapPut("/admin/plans/users/{userId}", SetPlanAsync);
+        api.MapGet("/admin/accounts", AccountsAsync);
     }
 
     private static async Task<Ok<PlanDto>> GetMyPlanAsync(
@@ -96,6 +103,25 @@ public static class PlansApi
         }
 
         return TypedResults.Ok(new PlanUserDto(profile.UserId, profile.DisplayName, profile.Email, profile.Plan, profile.PlanChangedAtUtc));
+    }
+
+    /// <summary>
+    /// How many accounts there are, how many are on a paid plan (their own or a family's), and when each made in the last
+    /// <paramref name="days"/> days was made: Financials.API's revenue report sets its money against these.
+    /// </summary>
+    private static async Task<Results<Ok<AccountsDto>, NotFound>> AccountsAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
+        TimeProvider time, int days = 30, CancellationToken ct = default)
+    {
+        if (!AppAdmins.Is(user, config))
+        {
+            return TypedResults.NotFound();
+        }
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var start = today.AddDays(-(Math.Clamp(days, 1, MaxAccountDays) - 1)).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        return TypedResults.Ok(new AccountsDto(
+            await db.Profiles.CountAsync(ct),
+            await db.Profiles.CountAsync(p => p.EffectivePlan != Plans.Free, ct),
+            await db.Profiles.Where(p => p.CreatedAtUtc >= start).Select(p => p.CreatedAtUtc).ToListAsync(ct)));
     }
 
     private static PlanDto ToDto(UserProfile profile)

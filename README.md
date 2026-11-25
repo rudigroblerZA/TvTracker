@@ -667,7 +667,7 @@ link opens the web app's address in the browser and is counted there, as a signe
   public affiliate programme, so its entry stays a test one until there's a direct deal. Where the test network isn't
   running (production), test programs aren't used and their services get plain, still counted, links.
   A service that already has a program doesn't get a starter test program.
-- **Programs in configuration** still work, under Catalog.API's `Affiliates:Programs` (re-read on change), for
+- **Programs in configuration** still work, under Financials.API's `Affiliates:Programs` (re-read on change), for
   deployments that keep them with their secrets. A program in Settings with the same name wins:
 
   ```json
@@ -685,7 +685,7 @@ link opens the web app's address in the browser and is counted there, as a signe
   A program that isn't valid isn't used, and the report says so.
 - **Sales** come from the network's server-to-server postback, to the mobile gateway's public address
   (`https://PUBLIC_HOST/api` in a deployment):
-  `/catalog/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
+  `/financials/api/v1/affiliates/postback/{name}?click={click}&transaction={id}&amount={commission}&key={secret}`. A wrong
   key, an unknown program or a click that didn't go through that program gets 404; the same transaction twice is
   counted once. Postbacks work with the flag off, so sales from earlier clicks still count.
 - **Trying it locally:** the AppHost runs the test network by default, and the flag is on. Click any where-to-watch
@@ -727,13 +727,27 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
   figures and table. No tax is worked out.
 - **Where it comes from:** its own service, Financials.API (port 5115, database `financialsdb`, gateway route
   `/api/v1/financials`). `GET /api/v1/financials?months=12` answers with the whole statement: the service keeps the
-  costs (table `cost_items`) and asks Identity.API for subscription income by month
-  (`GET /api/v1/admin/income?months=12`) and Catalog.API for commission in the month the network reported the sale
-  (`GET /api/v1/affiliates/monthly?months=12`; no content while the `affiliates` flag is off; any other failure, a 404 included, shows as "couldn't be fetched"), passing on the admin's own
-  sign-in. Costs: `GET`, `POST`, `PUT /{id}` and `DELETE /{id}` under `/api/v1/financials/costs`. Anyone but an admin
-  gets 404.
-- **When a source is down:** each is given 5 seconds and isn't retried. The statement still comes, with the costs
-  complete, and the page says which income is missing and offers to try again.
+  costs (table `cost_items`), the subscriptions and receipts, and the affiliate clicks and sales, so the statement is
+  read from its own database: subscription income by the month it was paid, commission by the month the network
+  reported the sale (left out, and said to be off, while the `affiliates` flag is off). Costs: `GET`, `POST`,
+  `PUT /{id}` and `DELETE /{id}` under `/api/v1/financials/costs`. Anyone but an admin gets 404.
+- **What it owns, and what it asks and tells the others:**
+  - **Payments:** checkout, the providers' webhooks, subscriptions, receipts and the payment settings
+    ([Plans](#plans)). A member's plan stays Identity.API's: Financials publishes `SubscriptionStarted` when a
+    subscription starts or comes back and `SubscriptionEnded` when nothing of the member's is running any more, and
+    Identity moves the plan (an ending only while it's still that subscription's plan, so an admin's change stands).
+    A new subscriber's plan therefore changes a moment after the payment, not in the same instant.
+  - **A buyer's region** (prices are by region) and **the account counts** on the revenue report are asked of
+    Identity.API with the caller's own token (`GET /api/v1/profile`, `GET /api/v1/admin/accounts`), 5 seconds, no
+    retry. Without an answer a checkout is refused (503) rather than priced by guess, and the revenue report shows
+    the money with no accounts.
+  - **Affiliates:** the programs, the clicks, the networks' postbacks and the report. Catalog.API still builds each
+    where-to-watch link, from a copy of the programs Financials publishes (`AffiliateProgramsChanged`: on a change,
+    at start and hourly; the newest wins), and reports each click as an event (`OutboundClicked`) under the id the
+    link carries. A postback that beats its click (the test network's page, within a second) is given three seconds
+    for the click to arrive.
+  - **A deleted account:** on `UserDeleted` its running subscriptions are stopped at their providers and its payment
+    records removed; the data export includes them (`GET /api/v1/me/export`).
 - **Moved from Identity.API:** costs were first kept in Identity's database. That table is dropped and its rows are
   not copied, so costs entered before the move have to be entered again.
 - **Payment provider** (a section of the same page): which provider sells plans, Stripe's keys, the customer portal
@@ -759,7 +773,7 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
   - **Identity.API now starts without Stripe's keys.** It used to refuse to start when Stripe was the provider and a
     key was missing. Now plans simply aren't sold until the keys are there, from configuration or this page, and the
     service says so in its log when it starts.
-  - **Endpoints:** `GET`, `PUT` and `DELETE /api/v1/admin/payments/settings` (Identity.API) and
+  - **Endpoints:** `GET`, `PUT` and `DELETE /api/v1/admin/payments/settings` (Financials.API) and
     `/api/v1/financials/fees` (Financials.API). Admins only: anyone else gets 404. Saves are logged with who, never
     the values.
   - **Tried** as the admin with the development setup: Stripe without keys and a key of the wrong kind were refused;
@@ -838,7 +852,8 @@ started in a container by the tests themselves (Testcontainers; `tests/Shared`).
 running:
 
 ```bash
-dotnet test tests/Identity.IntegrationTests   # the subscription ledger: events in; subscriptions, receipts, plan and published events out
+dotnet test tests/Financials.IntegrationTests # the subscription ledger: events in; subscriptions, receipts and published events out
+dotnet test tests/Identity.IntegrationTests   # a member's plan as subscription events move it
 dotnet test tests/Catalog.IntegrationTests    # show sync: a scripted provider in; catalog rows and published events out
 dotnet test tests/Ratings.IntegrationTests    # favourite-character votes: the upsert, the counts, and a vote going with its watch
 ```
@@ -1257,7 +1272,7 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
     family is full, ended, or you're in another).
 - **Buying** (`payments` flag): each paid plan's card on `/settings/plan` has its price by the month and by the year,
   for your profile's region. Pro is $2.99 a month or $29.99 a year, Family $4.99 or $49.99; other regions' prices are
-  set in `Payments:Prices` on Identity.API. A purchase takes you to the provider's checkout and back, and the plan
+  set in `Payments:Prices` on Financials.API. A purchase takes you to the provider's checkout and back, and the plan
   changes as soon as the provider confirms the payment (within seconds). One subscription at a time: to switch between
   Pro and Family, cancel and buy the other.
   - **Cancelling:** you keep the plan until the period you paid for ends, then go back to Free (nothing you made goes),
@@ -1266,17 +1281,17 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
   - **Receipts** are in your data export, with the subscription. Deleting your account stops the subscription at once
     and deletes the payment records here (the provider keeps its own for its books).
   - **Trying it locally:** the AppHost turns on the test provider. "Buy" goes to the web app's `/dev/payments` page,
-    which charges nothing; "Pay" sends Identity a signed webhook as a real provider would. Its subscription page
+    which charges nothing; "Pay" sends Financials a signed webhook as a real provider would. Its subscription page
     (linked from your plan) renews it or ends it at once, to try a renewal or a period's end.
   - **Stripe:** "Buy" goes to Stripe's hosted checkout and comes back to `/settings/plan`; "Manage billing" on your plan
     opens Stripe's customer portal (card, invoices). To set it up:
-    - In Stripe (test mode first): a webhook endpoint at `https://<identity>/api/v1/payments/webhooks/stripe` for
+    - In Stripe (test mode first): a webhook endpoint at `https://<financials>/api/v1/payments/webhooks/stripe` for
       `invoice.paid`, `customer.subscription.updated` and `customer.subscription.deleted`, and the customer portal turned
       on, with its login link.
     - A deployment's parameters: `stripe-secret-key` and `stripe-webhook-secret` (secrets), `stripe-portal-url`, and
       `payments-return-url` (the web app's public `/settings/plan`).
     - Locally, in the AppHost's user secrets: `Parameters:stripe-secret-key` (`sk_test_…`) and
-      `Parameters:stripe-webhook-secret` from `stripe listen --forward-to http://localhost:5101/api/v1/payments/webhooks/stripe`
+      `Parameters:stripe-webhook-secret` from `stripe listen --forward-to http://localhost:5115/api/v1/payments/webhooks/stripe`
       (Stripe's CLI), and optionally `Parameters:stripe-portal-url`. With the key set, Stripe sells instead of the test
       provider; the checkout comes back to the web app's own address (https when it has one). Card `4242 4242 4242 4242` pays in test mode.
     - Prices: the checkout is made for `Payments:Prices`' amount, so nothing needs creating in Stripe's product list.
@@ -1289,7 +1304,7 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
         yearly). At Polar the product says how often it renews and carries the name the buyer sees; its price there
         doesn't matter, since every checkout sets the amount from `Payments:Prices`.
       - an organization access token that may write checkouts and subscriptions;
-      - a webhook endpoint at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/polar` for `order.paid`,
+      - a webhook endpoint at `https://PUBLIC_HOST/api/financials/api/v1/payments/webhooks/polar` for `order.paid`,
         `subscription.canceled`, `subscription.uncanceled` and `subscription.revoked`, and its signing secret.
     - A deployment's `.env`: `PAYMENT_PROVIDER=polar`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`,
       `POLAR_PRODUCT_PLUS_MONTH`, `POLAR_PRODUCT_PLUS_YEAR`, `POLAR_PRODUCT_FAMILY_MONTH`, `POLAR_PRODUCT_FAMILY_YEAR`
@@ -1297,7 +1312,7 @@ provider: Stripe or Polar in a deployment (and locally once either's test key is
     - Locally, in the AppHost's user secrets: `Parameters:polar-access-token` and `Parameters:polar-webhook-secret`
       (with both, Polar sells, against `https://sandbox-api.polar.sh/` unless `Polar:ApiBase` says otherwise), and
       `Parameters:polar-product-plus-month` and the other three. Polar's webhooks need a public address to reach
-      Identity: a tunnel to `http://localhost:5101/api/v1/payments/webhooks/polar`.
+      Financials: a tunnel to `http://localhost:5115/api/v1/payments/webhooks/polar`.
     - The Financials page can choose Polar as the provider and says what it still lacks, but doesn't hold its keys:
       those come from configuration. Set the fee rate there to Polar's, for the statement's estimate.
     - **Not tried against Polar:** the provider is written to Polar's published API (version 2026-10) and covered by
@@ -1593,7 +1608,7 @@ A release is a signed app bundle (`.aab`) built for one deployment: its host is 
 | Recommendations.API | `src/Services/Recommendations` | Similar shows, personalised picks (content + show DNA + collaborative), dismissals |
 | Social.API | `src/Services/Social` | Following people, the activity feed, people search and pages, the "share my activity" setting |
 | Research.API | `src/Services/Research` | Moderators' research: sources (Wikidata, Wikipedia, TMDB, pages), facts, a model-drafted insight, saved versions; saved facts override the catalog |
-| Financials.API | `src/Services/Financials` | Admins' financials: the costs, and the monthly statement of subscription income (from Identity.API) and affiliate commission (from Catalog.API) against them |
+| Financials.API | `src/Services/Financials` | The business's money: selling plans (checkout, the providers' webhooks, subscriptions, receipts; it tells Identity.API when a member starts or stops paying), the affiliate programs, clicks and commission (Catalog.API builds the links from the programs it publishes), the revenue report, and the monthly statement of that income against the costs an admin enters |
 | Notifications.API | `src/Services/Notifications` | Preferences, quiet hours, devices, inbox, push / web push / email delivery |
 | Analytics.Worker / Analytics.API | `src/Services/Analytics` | Insights for signed-in users: best and worst seasons, top episodes, season trends, episode patterns, run facts, premiere build-up, shared cast, discovery lists, actor insights, your taste |
 | Mobile.Bff | `src/ApiGateways/Mobile.Bff` | YARP gateway for the mobile app (`/catalog/...`, `/tracking/...`, ...) |
@@ -2357,8 +2372,8 @@ accounts and their passwords too) with `pg_dump`, one file each, into the deploy
 
 | Setting | For |
 | --- | --- |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
-| `PAYMENT_PROVIDER`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `POLAR_PRODUCT_*`, `POLAR_PORTAL_URL` | Selling through Polar instead (`PAYMENT_PROVIDER=polar`; `stripe` when left empty). Point Polar's webhook at `https://PUBLIC_HOST/api/identity/api/v1/payments/webhooks/polar`. See Payments. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PORTAL_URL` | Selling Pro and Family. Point Stripe's webhook at `https://PUBLIC_HOST/api/financials/api/v1/payments/webhooks/stripe`. Until they're set, turn the `payments` flag off on the flags page, or checkout fails. |
+| `PAYMENT_PROVIDER`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `POLAR_PRODUCT_*`, `POLAR_PORTAL_URL` | Selling through Polar instead (`PAYMENT_PROVIDER=polar`; `stripe` when left empty). Point Polar's webhook at `https://PUBLIC_HOST/api/financials/api/v1/payments/webhooks/polar`. See Payments. |
 | `PROXY_PORT` | The local port your own reverse proxy sends the site to, when you run one in front (see Behind your own reverse proxy, above) |
 | `OFFSITE_BUCKET` and the other `OFFSITE_*` | Copies of the backups off the machine, encrypted (see Backups, above) |
 | `SMTP_HOST`, `SMTP_FROM`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `SMTP_ENCRYPTION` | A mail account, so password reset works and new accounts confirm their address (see [Mail for password reset](#mail-for-password-reset)) |

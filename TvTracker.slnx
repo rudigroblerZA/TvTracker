@@ -66,6 +66,7 @@
     <Project Path="tests/Analytics.UnitTests/Analytics.UnitTests.csproj" />
     <Project Path="tests/Catalog.IntegrationTests/Catalog.IntegrationTests.csproj" />
     <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
+    <Project Path="tests/Financials.IntegrationTests/Financials.IntegrationTests.csproj" />
     <Project Path="tests/Financials.UnitTests/Financials.UnitTests.csproj" />
     <Project Path="tests/Identity.IntegrationTests/Identity.IntegrationTests.csproj" />
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />

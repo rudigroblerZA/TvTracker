@@ -6,14 +6,14 @@ namespace WebApp.Services;
 
 /// <summary>
 /// A pretend affiliate network for trying affiliate links locally (on when the AppHost runs locally, unless
-/// <c>Affiliates:TestNetwork=false</c>): Catalog.API's test programs send where-to-watch clicks here, and this page can
+/// <c>Affiliates:TestNetwork=false</c>): Financials.API's test programs send where-to-watch clicks here, and this page can
 /// report a sale for one through the real postback (<c>/api/v1/affiliates/postback/{program}</c>, in the program's own
 /// currency) before sending the viewer on to the service, so the
 /// report at /settings/affiliates fills with clicks and sales.
 /// <list type="bullet">
-/// <item><b>Development only,</b> and only with <c>Affiliates:TestNetworkKey</c>, the postback key Catalog.API's test
+/// <item><b>Development only,</b> and only with <c>Affiliates:TestNetworkKey</c>, the postback key Financials.API's test
 /// program expects.</item>
-/// <item><b>Server to server, as a network's would be:</b> the browser never sees the key; the web app calls Catalog.API
+/// <item><b>Server to server, as a network's would be:</b> the browser never sees the key; the web app calls Financials.API
 /// directly.</item>
 /// <item><b>No antiforgery:</b> the sale form posts to a development-only page whose only effect is a pretend
 /// sale.</item>
@@ -44,7 +44,7 @@ public static class TestAffiliateNetwork
             string outcome;
             try
             {
-                using var response = await clients.CreateClient(ApiClients.Catalog).GetAsync(url, ct);
+                using var response = await clients.CreateClient(ApiClients.Financials).GetAsync(url, ct);
                 var body = await response.Content.ReadAsStringAsync(ct);
                 outcome = response.IsSuccessStatusCode
                     ? $"Sale reported: {amount} commission (transaction {transaction[..8]}…). It's in the report now."

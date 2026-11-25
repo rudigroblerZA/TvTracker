@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Financials model, DbContext and migrations (the ledger and its statements), used by Financials.API, which owns the schema. -->
+  <!-- Financials model, DbContext and migrations (costs and fees, payments, affiliates), used by Financials.API, which owns the schema. -->
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

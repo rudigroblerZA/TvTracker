@@ -25,9 +25,8 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
     public DbSet<ShowNamesake> Namesakes => Set<ShowNamesake>();
     public DbSet<ShowNamesakeLookup> NamesakeLookups => Set<ShowNamesakeLookup>();
     public DbSet<PersonMadeShow> MadeShows => Set<PersonMadeShow>();
-    public DbSet<OutboundClick> OutboundClicks => Set<OutboundClick>();
-    public DbSet<AffiliateConversion> AffiliateConversions => Set<AffiliateConversion>();
-    public DbSet<AffiliateProgramRecord> AffiliatePrograms => Set<AffiliateProgramRecord>();
+
+    public DbSet<AffiliateProgramsCopy> AffiliatePrograms => Set<AffiliateProgramsCopy>();
 
     public DbSet<IntegrationEventLogEntry> IntegrationEventLogs => Set<IntegrationEventLogEntry>();
     public DbSet<ProcessedIntegrationEvent> ProcessedIntegrationEvents => Set<ProcessedIntegrationEvent>();
@@ -249,43 +248,11 @@ public class CatalogContext(DbContextOptions<CatalogContext> options) : DbContex
             entity.Property(m => m.Kind).HasMaxLength(32);
         });
 
-        // Written by Catalog.API (affiliate links), the one place it writes: clicks aren't shows, so the sync worker stays
-        // the only writer of the catalog itself.
-        modelBuilder.Entity<OutboundClick>(entity =>
+        modelBuilder.Entity<AffiliateProgramsCopy>(entity =>
         {
+            entity.ToTable("affiliate_programs_copy");
             entity.Property(c => c.Id).ValueGeneratedNever();
-            entity.ToTable("outbound_clicks");
-            entity.HasIndex(c => c.ClickedAtUtc);
-            entity.Property(c => c.Service).HasMaxLength(128);
-            entity.Property(c => c.Region).HasMaxLength(2);
-            entity.Property(c => c.Surface).HasMaxLength(32);
-            entity.Property(c => c.Plan).HasMaxLength(16);
-            entity.Property(c => c.Program).HasMaxLength(64);
-        });
-
-        modelBuilder.Entity<AffiliateProgramRecord>(entity =>
-        {
-            entity.ToTable("affiliate_programs");
-            entity.HasKey(p => p.Name);
-            entity.Property(p => p.Name).HasMaxLength(64);
-            entity.Property(p => p.Template).HasMaxLength(1024);
-            entity.Property(p => p.PostbackKey).HasMaxLength(256);
-            entity.Property(p => p.Currency).HasMaxLength(3);
-            entity.Property(p => p.Services).HasDefaultValueSql("'{}'");
-            entity.Property(p => p.Regions).HasDefaultValueSql("'{}'");
-        });
-
-        modelBuilder.Entity<AffiliateConversion>(entity =>
-        {
-            entity.Property(c => c.Id).ValueGeneratedNever();
-            entity.ToTable("affiliate_conversions");
-            entity.HasOne<OutboundClick>().WithMany().HasForeignKey(c => c.ClickId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(c => new { c.Program, c.TransactionId }).IsUnique();
-            entity.HasIndex(c => c.ReceivedAtUtc);
-            entity.Property(c => c.Program).HasMaxLength(64);
-            entity.Property(c => c.TransactionId).HasMaxLength(128);
-            entity.Property(c => c.Amount).HasPrecision(12, 2);
-            entity.Property(c => c.Currency).HasMaxLength(3);
+            entity.Property(c => c.Programs).HasColumnType("jsonb");
         });
 
         modelBuilder.HasPostgresExtension("vector");
