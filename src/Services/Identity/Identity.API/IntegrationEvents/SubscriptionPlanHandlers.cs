@@ -13,6 +13,8 @@ namespace Identity.API.IntegrationEvents;
 /// <item><b>Ended:</b> the plan goes back to free only while it's still the subscription's plan: an admin's change in
 /// between stands.</item>
 /// <item><b>Once:</b> each event is recorded with its change (the inbox), so a redelivery changes nothing.</item>
+/// <item><b>In order:</b> an event from before the plan last changed is left alone, so a late "ended" can't undo a
+/// newer subscription (or an admin's change made since).</item>
 /// </list>
 /// A member without a profile has nothing to move: a checkout makes the profile first, so this is an account deleted
 /// since.
@@ -33,10 +35,18 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
         {
             return;
         }
-        if (await db.Profiles.FindAsync([userId], ct) is { } profile
-            && await PlanState.SetPaidPlanAsync(db, outbox, profile, plan(profile.Plan), at, ct))
+        if (await db.Profiles.FindAsync([userId], ct) is { } profile)
         {
-            logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
+            if (profile.PlanChangedAtUtc is { } changed && at.UtcDateTime < changed)
+            {
+                // Events can arrive late and out of order (one that waited in the outbox, a redelivery): the plan has
+                // moved since this happened, so it has nothing to say.
+                logger.LogInformation("A subscription event of {At:u} for {UserId} was left: their plan changed after it, at {Changed:u}", at, userId, changed);
+            }
+            else if (await PlanState.SetPaidPlanAsync(db, outbox, profile, plan(profile.Plan), at, ct))
+            {
+                logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
+            }
         }
         db.MarkProcessed(e, handler);
         await db.SaveChangesAsync(ct);

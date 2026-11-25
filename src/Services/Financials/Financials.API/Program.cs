@@ -17,6 +17,9 @@ builder.AddFeatureFlags();
 builder.AddNpgsqlDbContext<FinancialsContext>("financialsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<FinancialsContext>(async (db, services, ct) =>
 {
+    // What payments and affiliates kept while they were Identity's and Catalog's, once.
+    await LegacyImport.RunAsync(db, services.GetRequiredService<IConfiguration>(), services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(LegacyImport)), ct);
+
     // In development with the test network running, an empty affiliate programs table starts with a test program per
     // main service. Only when empty: programs an admin removed don't come back while any other is left.
     if (services.GetRequiredService<IHostEnvironment>().IsDevelopment()

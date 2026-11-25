@@ -47,9 +47,9 @@ public static class PaymentSettingsApi
 {
     /// <summary>
     /// A provider's webhook as the outside world reaches it in a deployment: the site's address, the gateway under
-    /// /api, its identity route, then this service's own (<see cref="PaymentsApi"/>), which ends in the provider's name.
+    /// /api, its financials route, then this service's own (<see cref="PaymentsApi"/>), which ends in the provider's name.
     /// </summary>
-    private const string PublicWebhookPath = "/api/identity/api/v1/payments/webhooks/";
+    private const string PublicWebhookPath = "/api/financials/api/v1/payments/webhooks/";
 
     public static void MapPaymentSettingsApi(this IEndpointRouteBuilder app)
     {

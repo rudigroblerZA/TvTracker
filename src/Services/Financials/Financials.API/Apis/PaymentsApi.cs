@@ -126,8 +126,7 @@ public static class PaymentsApi
     }
 
     /// <summary>
-    /// A provider call that failed, for any reason short of the request itself being given up: an error answer, no
-    /// answer in time, a reply that couldn't be read, or the provider not being configured.
+    /// The caller's own payment records: their latest subscription and every receipt.
     /// </summary>
     private static async Task<IResult> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
     {
@@ -139,6 +138,10 @@ public static class PaymentsApi
         });
     }
 
+    /// <summary>
+    /// A provider call that failed, for any reason short of the request itself being given up: an error answer, no
+    /// answer in time, a reply that couldn't be read, or the provider not being configured.
+    /// </summary>
     private static bool ProviderFailed(Exception ex, CancellationToken ct) => ex is not OperationCanceledException || !ct.IsCancellationRequested;
 
     private static Task<Results<Ok<SubscriptionDto>, NotFound, ProblemHttpResult>> CancelAsync(

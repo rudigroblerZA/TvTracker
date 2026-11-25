@@ -71,7 +71,7 @@ public static class AffiliateSources
     public const string Settings = "settings";
 
     /// <summary>
-    /// Affiliates:Programs in Catalog.API's configuration.
+    /// Affiliates:Programs in Financials.API's configuration.
     /// </summary>
     public const string Configuration = "configuration";
 

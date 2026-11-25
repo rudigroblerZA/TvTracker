@@ -30,10 +30,7 @@ public class OutboundClick
     public required string Type { get; set; }
 
     /// <summary>
-    /// What the link opened: the show's page on the service, a search there, or its site.
-    /// </summary>
-    /// <summary>
-    /// How good the link was (the show's own page, a search, the service's front door), as Catalog.API names it.
+    /// What the link opened (the show's page on the service, a search there, or its site), as Catalog.API names it.
     /// </summary>
     public required string Link { get; set; }
 

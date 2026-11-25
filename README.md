@@ -748,6 +748,20 @@ test. Then both by day. Counts only: nothing names a person. The subscription ha
     for the click to arrive.
   - **A deleted account:** on `UserDeleted` its running subscriptions are stopped at their providers and its payment
     records removed; the data export includes them (`GET /api/v1/me/export`).
+  - **Upgrading a deployment from before the move:**
+    - **Its data comes across by itself.** The first time Financials.API starts it copies the subscriptions, receipts,
+      checkouts, applied provider events and payment settings from Identity's database, and the affiliate programs,
+      clicks and sales from Catalog's (`LegacyImport`; each group only while Financials has none of it). The old
+      tables are left where they were, unread: drop them once the copy has been checked.
+    - **Addresses already registered keep working through the gateway:** webhooks sent to
+      `/api/identity/api/v1/payments/webhooks/{provider}` and postbacks to
+      `/api/catalog/api/v1/affiliates/postback/{name}` are passed on to Financials. New registrations use the
+      `/api/financials/...` addresses the settings pages show. A provider pointed straight at Identity.API's own port,
+      not the gateway (local `stripe listen`), has to be pointed at Financials' instead.
+    - **`Affiliates:Programs` set on catalog-api's own environment** (`Affiliates__Programs__0__Name` and so on) moves
+      to financials-api's; set in the AppHost's configuration it is passed to Financials already.
+    - **The payment settings' key** (`PAYMENT_SETTINGS_KEY`) is the same one, now given to Financials, so keys an
+      admin entered still open.
 - **Moved from Identity.API:** costs were first kept in Identity's database. That table is dropped and its rows are
   not copied, so costs entered before the move have to be entered again.
 - **Payment provider** (a section of the same page): which provider sells plans, Stripe's keys, the customer portal

@@ -72,6 +72,35 @@ public sealed class SubscriptionPlanHandlersTests(IdentityDatabase database) : I
     }
 
     [Fact]
+    public async Task A_late_ending_doesnt_undo_a_newer_subscription()
+    {
+        await ProfileAsync();
+        // The first subscription ended at 09:00, but that event is held up; the member has subscribed again since.
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddHours(1)));
+        bus.Clear();
+
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At));
+
+        Assert.Equal(Plans.Plus, await PlanAsync());
+        Assert.Empty(PlanChanges());
+    }
+
+    [Fact]
+    public async Task A_late_start_doesnt_bring_back_a_plan_that_ended_since()
+    {
+        await ProfileAsync();
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddMinutes(-10)));
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1)));
+        bus.Clear();
+
+        // A redelivered copy under a new id, from before the ending.
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At));
+
+        Assert.Equal(Plans.Free, await PlanAsync());
+        Assert.Empty(PlanChanges());
+    }
+
+    [Fact]
     public async Task An_event_for_an_account_since_deleted_is_taken_and_changes_nothing()
     {
         await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At));

@@ -62,11 +62,8 @@ public static class RevenueApi
     }
 
     /// <summary>
-    /// Payments by month for the last <paramref name="months"/> months, this one included. Admins only: Financials.API
-    /// asks with the admin's own token.
-    /// </summary>
-    /// <summary>
-    /// What subscriptions brought in, month by month, for the financial statement.
+    /// What subscriptions brought in: payments by month for the last <paramref name="months"/> months, this one included.
+    /// For the financial statement, whose endpoint is the one that checks for an admin: this doesn't.
     /// </summary>
     internal static async Task<IncomeDto> IncomeAsync(FinancialsContext db, TimeProvider time, int months, CancellationToken ct)
     {
