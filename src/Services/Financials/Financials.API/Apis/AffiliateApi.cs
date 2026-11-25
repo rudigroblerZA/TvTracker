@@ -266,11 +266,6 @@ public static partial class AffiliateApi
     }
 
     /// <summary>
-    /// Commission by month and currency, for Financials.API's statement (which gets subscriptions from Identity.API).
-    /// Counted in the month the network reported the sale, this month included. Admins only. No content while
-    /// affiliate links are switched off.
-    /// </summary>
-    /// <summary>
     /// The click a postback names, sent through this program. The click comes from Catalog.API as an event, so one
     /// reported within moments of the click (the test network's page) may be a beat ahead of it: it's given a few seconds.
     /// </summary>
@@ -294,7 +289,9 @@ public static partial class AffiliateApi
     private static readonly TimeSpan ClickWait = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
-    /// Commission month by month, for the financial statement; off when affiliate links are.
+    /// Commission by month and currency, counted in the month the network reported the sale, this month included; off
+    /// when affiliate links are. For the financial statement, whose endpoint is the one that checks for an admin: this
+    /// doesn't.
     /// </summary>
     internal static async Task<AffiliateIncome> MonthlyAsync(ClaimsPrincipal user, FinancialsContext db, CachedFlags flags, TimeProvider time,
         int months, CancellationToken ct)

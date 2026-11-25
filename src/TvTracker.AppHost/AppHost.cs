@@ -242,6 +242,9 @@ else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Resea
 // payment records it keeps.
 var financialsApi = Project("financials-api", "../Services/Financials/Financials.API/Financials.API.csproj")
     .WithReference(financialsDb).WaitFor(financialsDb)
+    // Read once, at start, to bring across what payments and affiliates kept while they were Identity's and Catalog's
+    // (LegacyImport); nothing else here touches those databases.
+    .WithReference(identityDb).WithReference(catalogDb)
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(identityApi)
@@ -570,6 +573,14 @@ var webApp = Project("webapp", "../Clients/WebApp/WebApp.csproj")
 if (!string.IsNullOrEmpty(webPublicUrl))
 {
     webApp.WithEnvironment("WebApp__PublicUrl", webPublicUrl);
+}
+
+// Affiliate programs kept in configuration (Affiliates:Programs here, in user secrets or the environment) are
+// Financials.API's to read now. They used to be set on Catalog.API: a deployment that put them in catalog-api's own
+// environment moves them to financials-api's (README, Affiliate links).
+foreach (var setting in Microsoft.Extensions.Configuration.ConfigurationExtensions.AsEnumerable(builder.Configuration.GetSection("Affiliates:Programs")).Where(s => s.Value is not null))
+{
+    financialsApi.WithEnvironment(setting.Key.Replace(":", "__"), setting.Value);
 }
 
 // The test affiliate network (running locally only; Affiliates:TestNetwork=false turns it off): a pretend network, so

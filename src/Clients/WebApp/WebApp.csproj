@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The test payment provider's webhook signature, shared with Identity, which checks it. -->
+    <!-- The test payment provider's webhook signature, shared with Financials.API, which checks it. -->
     <Compile Include="..\..\Services\Financials\Financials.API\Payments\PaymentSignature.cs" Link="Services\PaymentSignature.cs" />
   </ItemGroup>
 
