@@ -1,7 +1,7 @@
 @using static TvTracker.UI.Services.ReportFormat
 @page "/settings/affiliates"
 @attribute [RequiresFeature(FeatureFlags.Affiliates)]
-@inject CatalogClient Catalog
+@inject FinancialsClient Books
 
 <PageTitle>Affiliate links · @Brand.AppName</PageTitle>
 
@@ -178,7 +178,7 @@
         error = null;
         try
         {
-            report = await Catalog.GetAffiliateReportAsync(days);
+            report = await Books.GetAffiliateReportAsync(days);
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {

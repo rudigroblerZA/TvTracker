@@ -47,6 +47,12 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
             {
                 logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
             }
+            else
+            {
+                // Nothing to move (subscribing again to the plan they still have), but it is the newest word on their
+                // plan: an older event still on its way mustn't undo it.
+                profile.PlanChangedAtUtc = at.UtcDateTime;
+            }
         }
         db.MarkProcessed(e, handler);
         await db.SaveChangesAsync(ct);

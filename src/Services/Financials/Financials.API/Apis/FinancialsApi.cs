@@ -83,15 +83,15 @@ public static class FinancialsApi
         IOptions<FinancialOptions> options, TimeProvider time, int months = 12, CancellationToken ct = default)
     {
         var window = FinancialStatement.Clamp(months);
-        var paid = await RevenueApi.IncomeAsync(db, time, window, ct);
-        var subscriptions = new SubscriptionIncome(
-            paid.Months.Select(m => new IncomeMonth(m.Month, m.Currency, m.Amount, m.Payments)).ToList(),
-            paid.MonthlyRecurring.Select(m => new Money(m.Currency, m.Amount)).ToList());
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        var start = FinancialStatement.FirstMonth(today, window).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var subscriptions = await RevenueApi.IncomeAsync(db, start, ct);
+        var commission = await AffiliateApi.MonthlyAsync(user, db, flags, start, ct);
         var costs = await db.CostItems.AsNoTracking().ToListAsync(ct);
         var fees = await FeesInForceAsync(db, options.Value, ct);
 
-        return TypedResults.Ok(FinancialStatement.Build(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), window, subscriptions,
-            await AffiliateApi.MonthlyAsync(user, db, flags, time, window, ct), costs, new FinancialOptions { PaymentFeePercent = fees.Percent, PaymentFeeFixed = fees.Fixed }));
+        return TypedResults.Ok(FinancialStatement.Build(today, window, subscriptions, commission, costs,
+            new FinancialOptions { PaymentFeePercent = fees.Percent, PaymentFeeFixed = fees.Fixed }));
     }
 
     private static async Task<Ok<List<CostItemDto>>> CostsAsync(FinancialsContext db, CancellationToken ct) =>

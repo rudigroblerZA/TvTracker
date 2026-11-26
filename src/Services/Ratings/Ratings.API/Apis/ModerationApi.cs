@@ -140,7 +140,7 @@ public static class ModerationApi
 
         correction.SuggestedValue = value;
         Review(correction, user, "accepted");
-        Log(db, user, "accept", "correction", id, $"{correction.Context}: {correction.Field} → {value}");
+        Log(db, user, "accept", CommunityApi.CorrectionKind, id, $"{correction.Context}: {correction.Field} → {value}");
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(CommunityApi.ToDto(correction));
     }
@@ -152,7 +152,7 @@ public static class ModerationApi
             return TypedResults.NotFound();
         }
         Review(correction, user, "rejected");
-        Log(db, user, "reject", "correction", id, $"{correction.Context}: {correction.Field}");
+        Log(db, user, "reject", CommunityApi.CorrectionKind, id, $"{correction.Context}: {correction.Field}");
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(CommunityApi.ToDto(correction));
     }
@@ -172,7 +172,7 @@ public static class ModerationApi
             return TypedResults.Problem("The catalog can't be reached right now; try again in a moment.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         Review(correction, user, "reverted");
-        Log(db, user, "revert", "correction", id, $"{correction.Context}: {correction.Field}");
+        Log(db, user, "revert", CommunityApi.CorrectionKind, id, $"{correction.Context}: {correction.Field}");
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(CommunityApi.ToDto(correction));
     }

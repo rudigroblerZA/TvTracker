@@ -46,7 +46,7 @@ public static class TimeOffApi
     /// <summary>
     /// The finished shows worth offering the caller, which Fits your time off and While you wait share: on the shelf, not
     /// started (<paramref name="started"/> when the caller already knows, else from the watches), at least
-    /// <see cref="MinMinutes"/> long, assessed against the caller's liked genres, and not fizzling out at the end. Each
+    /// <see cref="TimeOff.MinMinutes"/> long, assessed against the caller's liked genres, and not fizzling out at the end. Each
     /// caller applies its own length and value cut.
     /// </summary>
     internal static async Task<List<ShelfCandidate>> CandidatesAsync(AnalyticsContext db, HybridCache cache, string userId, DateTimeOffset now,

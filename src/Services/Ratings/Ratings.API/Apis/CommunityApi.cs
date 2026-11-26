@@ -38,6 +38,11 @@ public static class CommunityApi
     public const string CommentKind = "comment";
     public const string InsightKind = "insight";
 
+    /// <summary>
+    /// A suggested correction, as the moderation log names what a moderator acted on.
+    /// </summary>
+    public const string CorrectionKind = "correction";
+
     public static readonly IReadOnlySet<string> CorrectionFields = new HashSet<string>
     {
         "show-summary", "episode-title", "episode-summary", "episode-airdate", "episode-runtime", "other"

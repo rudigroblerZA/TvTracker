@@ -46,11 +46,7 @@ public static class YearInTvApi
                 DateOnly.FromDateTime(ViewerRules.Local(r.WatchedAtUtc, zone)),
                 r.RuntimeMinutes ?? 0, r.SeasonNumber, r.EpisodeNumber, r.Title, r.ExternalRating))
             .ToList();
-        var years = watches.Select(w => w.Day.Year).Distinct().OrderDescending().ToList();
-        var shown = year ?? (years.Count > 0 ? years[0] : today.Year);
-
-        var inYear = watches.Where(w => w.Day.Year == shown).ToList();
-        var lastYear = watches.Where(w => w.Day.Year == shown - 1).ToList();
+        var (shown, years, inYear, lastYear) = YearInTv.Split(watches, year, today);
         var bulkInYear = rows.Count(r => bulk.Contains((r.ShowId, r.WatchedAtUtc))
             && ViewerRules.Local(r.WatchedAtUtc, zone).Year == shown);
 
@@ -64,7 +60,7 @@ public static class YearInTvApi
                 .ToListAsync(ct))
             .ToLookup(e => e.ShowId, e => (e.EpisodeId, e.AirsAtUtc));
         var progress = YearInTv.Progress(ids, aired, rows.Select(r => (r.ShowId, r.EpisodeId, r.WatchedAtUtc)), shows, inYear,
-            shown == today.Year ? now.UtcDateTime : new DateTime(shown, 12, 31, 23, 59, 59, DateTimeKind.Utc));
+            YearInTv.AsOf(shown, today, now));
 
         return TypedResults.Ok(YearInTv.Of(shown, years, watches, inYear, shows, bulkInYear, progress,
             // Nothing to compare without both years, so their documents aren't read.

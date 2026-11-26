@@ -1,6 +1,7 @@
 @page "/settings/plan"
 @attribute [RequiresFeature(FeatureFlags.Plans)]
 @inject IdentityClient Identity
+@inject FinancialsClient Books
 @inject FeatureFlagStore Flags
 @inject NavigationManager Navigation
 @inject IPlatformServices Platform
@@ -163,8 +164,8 @@
             var featuresTask = Flags.PlanFeaturesAsync();
             if (await paymentsTask)
             {
-                var pricesTask = Identity.GetPlanPricesAsync();
-                var subscriptionTask = Identity.GetSubscriptionAsync();
+                var pricesTask = Books.GetPlanPricesAsync();
+                var subscriptionTask = Books.GetSubscriptionAsync();
                 await Task.WhenAll(pricesTask, subscriptionTask);
                 (prices, subscription) = (pricesTask.Result, subscriptionTask.Result);
             }
@@ -179,16 +180,16 @@
 
     private Task BuyAsync(string key, string interval) => RunAsync(async () =>
     {
-        if (await Identity.StartCheckoutAsync(key, interval) is { } link)
+        if (await Books.StartCheckoutAsync(key, interval) is { } link)
         {
             // The provider's checkout is another site; it sends the buyer back to this page.
             Navigation.NavigateTo(link.Url, forceLoad: true);
         }
     });
 
-    private Task CancelAsync() => RunAsync(async () => subscription = await Identity.CancelSubscriptionAsync());
+    private Task CancelAsync() => RunAsync(async () => subscription = await Books.CancelSubscriptionAsync());
 
-    private Task ResumeAsync() => RunAsync(async () => subscription = await Identity.ResumeSubscriptionAsync());
+    private Task ResumeAsync() => RunAsync(async () => subscription = await Books.ResumeSubscriptionAsync());
 
     private async Task RunAsync(Func<Task> action)
     {

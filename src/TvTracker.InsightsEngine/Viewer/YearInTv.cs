@@ -44,7 +44,7 @@ public record YearCalledItDto(Guid ShowId, string Title, string? PosterUrl, Date
 /// so needs <see cref="InsightRules.MinUsersToShow"/> of them.
 /// <list type="bullet">
 /// <item><b>Days are the user's:</b> watches are placed in the profile time zone (<c>tz</c>), as the time machine does.</item>
-/// <item><b>Bulk marks are left out:</b> a mark of <see cref="BulkMark"/> or more of a show's episodes at once ("watched up
+/// <item><b>Bulk marks are left out:</b> a mark of <see cref="ShowFactRules.BulkMark"/> or more of a show's episodes at once ("watched up
 /// to S05E10") says when they were marked, not watched, and seeding a back catalog would read as a record year. The
 /// count left out is returned, so the page can say so.</item>
 /// <item><b>Taste shift:</b> each DNA trait averaged over the year's shows, weighted by minutes watched, against the year
@@ -75,6 +75,27 @@ public static class YearInTv
     /// Most consecutive days in the set.
     /// </summary>
     internal static int LongestStreak(IEnumerable<DateOnly> days) => Streaks.Runs(days.Distinct().ToList(), d => d.DayNumber, 0).Longest;
+
+    /// <param name="Shown">The year recapped.</param>
+    /// <param name="Years">The years with viewing, latest first.</param>
+    internal sealed record Slice(int Shown, IReadOnlyList<int> Years, List<Watch> InYear, List<Watch> LastYear);
+
+    /// <summary>
+    /// The year to recap and its watches: the year asked for, else the latest with viewing, else this one; with the
+    /// year before it, for what shifted.
+    /// </summary>
+    internal static Slice Split(IReadOnlyCollection<Watch> watches, int? year, DateOnly today)
+    {
+        var years = watches.Select(w => w.Day.Year).Distinct().OrderDescending().ToList();
+        var shown = year ?? (years.Count > 0 ? years[0] : today.Year);
+        return new Slice(shown, years, watches.Where(w => w.Day.Year == shown).ToList(), watches.Where(w => w.Day.Year == shown - 1).ToList());
+    }
+
+    /// <summary>
+    /// The moment "left behind" is judged from: now for the year under way, the year's last second for one gone by.
+    /// </summary>
+    internal static DateTime AsOf(int shown, DateOnly today, DateTimeOffset now) =>
+        shown == today.Year ? now.UtcDateTime : new DateTime(shown, 12, 31, 23, 59, 59, DateTimeKind.Utc);
 
     /// <summary>
     /// Finished (ended shows, last regular episode watched this year), caught up (running shows, every aired regular

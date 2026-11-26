@@ -1,4 +1,3 @@
-using Analytics.API.Apis;
 using Analytics.Data;
 using TvTracker.IntegrationEvents;
 using static Analytics.UnitTests.Build;

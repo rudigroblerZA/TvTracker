@@ -36,18 +36,6 @@
         else
         {
             <p class="muted small">@($"{statement.From:MMMM yyyy} to {statement.To:d MMMM yyyy}, by UTC month.")</p>
-            var noSubscriptions = !statement.SubscriptionsKnown;
-            var noAffiliates = statement.Affiliates == Financials.AffiliatesUnknown;
-            @if (noSubscriptions || noAffiliates)
-            {
-                <p class="notice" role="status">
-                    @(noSubscriptions && noAffiliates ? "Subscription and affiliate income couldn't be fetched"
-                        : noSubscriptions ? "Subscription income couldn't be fetched" : "Affiliate commission couldn't be fetched"),
-                    so the figures below are without it. Costs are complete.
-                    <button class="btn btn-quiet small" type="button" @onclick="LoadAsync">Try again</button>
-                </p>
-            }
-
             @if (statement.Books.Count == 0)
             {
                 <p class="muted">Nothing has been earned or spent yet. Add what the business pays for under Costs, below.</p>
@@ -253,7 +241,7 @@
 
             <p class="muted small">
                 How it's worked out. Subscriptions are the payments received in the month. Affiliate commission is counted in the
-                month the network reported the sale@(statement.Affiliates == Financials.AffiliatesOff ? " (affiliate links are switched off, so there is none)" : "").
+                month the network reported the sale@(statement.AffiliatesOff ? " (affiliate links are switched off, so there is none)" : "").
                 @($"Fees are an estimate, {statement.FeePercent:0.##}% of each payment plus {statement.FeeFixed:0.00}, not the payment provider's bill. ")
                 Each currency is kept apart: nothing is converted. No tax is worked out.
             </p>

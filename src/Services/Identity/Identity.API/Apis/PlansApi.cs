@@ -43,7 +43,7 @@ public static class PlansApi
         api.MapGet("/me/plan", GetMyPlanAsync);
         api.MapGet("/admin/plans/users", SearchUsersAsync);
         api.MapPut("/admin/plans/users/{userId}", SetPlanAsync);
-        api.MapGet("/admin/accounts", AccountsAsync);
+        api.MapGet("/admin/accounts", AccountsAsync).RequireAppAdmin();
     }
 
     private static async Task<Ok<PlanDto>> GetMyPlanAsync(
@@ -109,13 +109,8 @@ public static class PlansApi
     /// How many accounts there are, how many are on a paid plan (their own or a family's), and when each made in the last
     /// <paramref name="days"/> days was made: Financials.API's revenue report sets its money against these.
     /// </summary>
-    private static async Task<Results<Ok<AccountsDto>, NotFound>> AccountsAsync(ClaimsPrincipal user, IConfiguration config, IdentityContext db,
-        TimeProvider time, int days = 30, CancellationToken ct = default)
+    private static async Task<Ok<AccountsDto>> AccountsAsync(IdentityContext db, TimeProvider time, int days = 30, CancellationToken ct = default)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         var start = today.AddDays(-(Math.Clamp(days, 1, MaxAccountDays) - 1)).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         return TypedResults.Ok(new AccountsDto(

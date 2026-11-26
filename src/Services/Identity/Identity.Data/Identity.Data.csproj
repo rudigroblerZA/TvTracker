@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Identity model, DbContext and migrations (accounts' plans, payments, settings and the copies it keeps), used by Identity.API, which owns the schema. -->
+  <!-- Identity model, DbContext and migrations (profiles, accounts' plans, families and settings), used by Identity.API, which owns the schema. -->
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

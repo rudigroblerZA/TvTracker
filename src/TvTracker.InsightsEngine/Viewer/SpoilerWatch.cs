@@ -3,7 +3,7 @@ namespace TvTracker.InsightsEngine;
 /// <param name="Shows">Shows with any risk, highest first.</param>
 public record SpoilerWatchDto(IReadOnlyList<SpoilerRiskDto> Shows);
 
-/// <param name="Level">"high", "medium" or "low" (see <see cref="SpoilerWatchApi"/>).</param>
+/// <param name="Level">"high", "medium" or "low" (see <see cref="SpoilerWatch"/>).</param>
 /// <param name="Unseen">Regular episodes aired in the last <see cref="SpoilerWatch.WindowDays"/> days that the viewer hasn't watched.</param>
 /// <param name="Latest">The riskiest of them; numbers only, never a title.</param>
 /// <param name="Behind">Every aired regular episode the viewer hasn't watched, and their running time: what it takes to be safe.</param>

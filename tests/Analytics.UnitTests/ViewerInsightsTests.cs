@@ -220,4 +220,31 @@ public class ViewerInsightsTests
         Assert.Equal(3, bias.Compared);
         Assert.Equal(2.0, bias.AverageDifference);
     }
+
+    // ---- Year in TV: which year
+
+    [Fact]
+    public void The_recap_is_of_the_year_asked_for_else_the_latest_with_viewing_else_this_one()
+    {
+        var today = new DateOnly(2026, 11, 2);
+        var watches = new[] { Watched(2024, 3), Watched(2025, 6), Watched(2025, 7) };
+
+        var latest = YearInTv.Split(watches, null, today);
+        Assert.Equal((2025, 2, 1), (latest.Shown, latest.InYear.Count, latest.LastYear.Count));
+        Assert.Equal([2025, 2024], latest.Years);
+        Assert.Equal((2024, 1, 0), YearInTv.Split(watches, 2024, today) is var asked ? (asked.Shown, asked.InYear.Count, asked.LastYear.Count) : default);
+        Assert.Equal(2026, YearInTv.Split([], null, today).Shown);
+    }
+
+    [Fact]
+    public void A_year_gone_by_is_judged_from_its_last_second_and_this_one_from_now()
+    {
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        Assert.Equal(Now.UtcDateTime, YearInTv.AsOf(2026, today, Now));
+        Assert.Equal(new DateTime(2024, 12, 31, 23, 59, 59, DateTimeKind.Utc), YearInTv.AsOf(2024, today, Now));
+    }
+
+    private static YearInTv.Watch Watched(int year, int month) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), new DateTime(year, month, 1, 20, 0, 0, DateTimeKind.Utc), new DateOnly(year, month, 1), 45, 1, 1, "Episode", 8.0);
 }

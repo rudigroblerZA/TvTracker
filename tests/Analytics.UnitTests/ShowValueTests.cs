@@ -1,4 +1,3 @@
-using Analytics.API.Apis;
 using Analytics.Data;
 
 namespace Analytics.UnitTests;

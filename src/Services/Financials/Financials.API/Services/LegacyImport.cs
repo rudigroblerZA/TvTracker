@@ -12,7 +12,8 @@ namespace Financials.API.Services;
 /// <item><b>Only into empty tables:</b> each group (payments, affiliates) is copied only while this database has none of
 /// it, so a second start, or a deployment that began here, copies nothing.</item>
 /// <item><b>Only where there's something to copy:</b> without the old database's connection string
-/// (<c>ConnectionStrings:identitydb</c>, <c>catalogdb</c>), or where its old tables aren't there, the group is skipped.</item>
+/// (<c>ConnectionStrings:identitydb</c>, <c>catalogdb</c>), or where its old tables aren't there, the group is skipped.
+/// Given the connection string, the old database has to open: a failure stops the start rather than be passed over.</item>
 /// <item><b>The old tables are left as they are:</b> their services no longer read them; a deployment drops them once it
 /// has checked the copy.</item>
 /// <item><b>Clicks gain what they now carry:</b> the show's title as Catalog has it today, and the listing's type and
@@ -57,16 +58,10 @@ public static class LegacyImport
     internal static async Task CopyAsync(FinancialsContext db, string sourceConnectionString, IReadOnlyList<(string Table, string Select)> tables,
         string what, ILogger logger, CancellationToken ct)
     {
+        // An old database that can't be opened stops the start: were the service to carry on, its first new row would
+        // make these tables look filled, and what was kept before would never be copied.
         await using var source = new NpgsqlConnection(sourceConnectionString);
-        try
-        {
-            await source.OpenAsync(ct);
-        }
-        catch (Exception ex) when (ex is NpgsqlException or System.Net.Sockets.SocketException or TimeoutException)
-        {
-            logger.LogWarning(ex, "The old database for {What} couldn't be opened; nothing was copied, and the next start tries again", what);
-            return;
-        }
+        await source.OpenAsync(ct);
         foreach (var (table, _) in tables)
         {
             await using var exists = new NpgsqlCommand("select to_regclass(@name) is not null", source);
@@ -95,20 +90,28 @@ public static class LegacyImport
                 await using var reader = await read.ExecuteReaderAsync(ct);
                 var columns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToList();
                 var insert = $"insert into {table} ({string.Join(", ", columns.Select(c => $"\"{c}\""))}) values ({string.Join(", ", columns.Select((_, i) => $"${i + 1}"))})";
+                // One command for the table, its values replaced row by row: a clicks table can be long.
+                await using var write = new NpgsqlCommand(insert, target, transaction);
+                write.Parameters.AddRange(columns.Select(_ => new NpgsqlParameter()).ToArray());
                 while (await reader.ReadAsync(ct))
                 {
-                    await using var write = new NpgsqlCommand(insert, target, transaction);
                     for (var i = 0; i < columns.Count; i++)
                     {
-                        write.Parameters.Add(new NpgsqlParameter { Value = reader.GetValue(i) });
+                        write.Parameters[i].Value = reader.GetValue(i);
                     }
                     await write.ExecuteNonQueryAsync(ct);
                     rows++;
                 }
-                copied.Add($"{rows} from {table}");
+                if (rows > 0)
+                {
+                    copied.Add($"{rows} from {table}");
+                }
             }
             await transaction.CommitAsync(ct);
-            logger.LogInformation("Copied {What} from where they were kept before: {Copied}", what, string.Join(", ", copied));
+            if (copied.Count > 0)
+            {
+                logger.LogInformation("Copied {What} from where they were kept before: {Copied}", what, string.Join(", ", copied));
+            }
         }
         finally
         {

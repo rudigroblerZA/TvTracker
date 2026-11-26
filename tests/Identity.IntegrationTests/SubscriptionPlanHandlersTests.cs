@@ -86,6 +86,21 @@ public sealed class SubscriptionPlanHandlersTests(IdentityDatabase database) : I
     }
 
     [Fact]
+    public async Task A_late_ending_doesnt_undo_subscribing_again_to_the_same_plan()
+    {
+        await ProfileAsync();
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At));
+        // They subscribed again before the first one's ending arrived: the plan was already Plus, so nothing moved.
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddHours(2)));
+        bus.Clear();
+
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1)));
+
+        Assert.Equal(Plans.Plus, await PlanAsync());
+        Assert.Empty(PlanChanges());
+    }
+
+    [Fact]
     public async Task A_late_start_doesnt_bring_back_a_plan_that_ended_since()
     {
         await ProfileAsync();

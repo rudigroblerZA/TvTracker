@@ -7,7 +7,7 @@ namespace TvTracker.Payments;
 /// <summary>
 /// The test payment provider's webhook signature, Stripe's shape: header <c>TvTracker-Signature:
 /// t={unix seconds},v1={hex HMAC-SHA256 of "{t}.{body}"}</c>. One file, linked into the web app, so the pages that send
-/// webhooks and Identity, which checks them, can't disagree about it.
+/// webhooks and Financials.API, which checks them, can't disagree about it.
 /// </summary>
 public static class PaymentSignature
 {

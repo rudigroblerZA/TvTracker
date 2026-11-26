@@ -1,4 +1,3 @@
-using Analytics.API.Apis;
 using static TvTracker.InsightsEngine.Streaks;
 
 namespace Analytics.UnitTests;

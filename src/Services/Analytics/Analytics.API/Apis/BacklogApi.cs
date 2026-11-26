@@ -31,7 +31,7 @@ public static class BacklogApi
 
         var assessed = Backlog.Assess(shows, runs, insights, liked);
         // The long shows' episodes, ratings and notes, in one load, for the lean cut's running time.
-        var cuts = await ShowLoads.LoadAsync(db, userId, assessed.Where(a => a.Verdict == "long").Select(a => a.Show.ShowId).ToList(), now,
+        var cuts = await ShowLoads.LoadAsync(db, userId, assessed.Where(a => a.Verdict == Backlog.Long).Select(a => a.Show.ShowId).ToList(), now,
             withInsights: false, ct);
         var dropped = await ComebackApi.AllAsync(db, userId, now, ct);
         return TypedResults.Ok(Backlog.Of(assessed, cuts, dropped, await CatchUpApi.PaceAsync(db, userId, now, ct), now));

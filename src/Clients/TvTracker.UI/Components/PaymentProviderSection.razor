@@ -183,7 +183,7 @@
     protected override async Task OnInitializedAsync()
     {
         // Two services, each on its own: one that isn't answering doesn't take the other's form with it.
-        var settingsTask = Identity.GetPaymentSettingsAsync();
+        var settingsTask = Books.GetPaymentSettingsAsync();
         var feesTask = Books.GetFeesAsync();
         Show(await OrNothingAsync(settingsTask));
         Show(await OrNothingAsync(feesTask));
@@ -231,7 +231,7 @@
     {
         var current = settings!;
         var portalWas = current.StripePortalUrlFrom == FromSettings ? current.StripePortalUrl ?? "" : "";
-        var saved = await Identity.SavePaymentSettingsAsync(new SavePaymentSettings(
+        var saved = await Books.SavePaymentSettingsAsync(new SavePaymentSettings(
             (form.Provider ?? "") == current.Provider ? null : form.Provider ?? "",
             // Keys typed and then hidden by choosing another provider aren't on the page any more: they aren't saved.
             StripeShown ? form.SecretKey : null, StripeShown ? form.WebhookSecret : null,
@@ -242,7 +242,7 @@
 
     private Task ClearProviderAsync() => ChangeAsync(provider: true, async () =>
     {
-        var cleared = await Identity.ClearPaymentSettingsAsync();
+        var cleared = await Books.ClearPaymentSettingsAsync();
         Show(cleared);
         return cleared is null ? null : "The deployment's configuration is in force again.";
     });

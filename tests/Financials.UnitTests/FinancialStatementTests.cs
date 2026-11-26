@@ -147,17 +147,10 @@ public class FinancialStatementTests
     }
 
     [Fact]
-    public void A_statement_says_which_income_it_couldnt_get()
+    public void A_statement_says_when_affiliate_links_are_off()
     {
-        var whole = Build();
-        var noIdentity = FinancialStatement.Build(Today, 3, subscriptions: null, AffiliateIncome.On([]), costs: [], Fees);
-        var noCatalog = FinancialStatement.Build(Today, 3, new([], []), AffiliateIncome.Unknown, costs: [], Fees);
-        var off = FinancialStatement.Build(Today, 3, new([], []), AffiliateIncome.Off, costs: [], Fees);
-
-        Assert.Equal((true, "on"), (whole.SubscriptionsKnown, whole.Affiliates));
-        Assert.False(noIdentity.SubscriptionsKnown);
-        Assert.Equal("unknown", noCatalog.Affiliates);
-        Assert.Equal("off", off.Affiliates);
+        Assert.False(Build().AffiliatesOff);
+        Assert.True(Build(affiliatesOff: true).AffiliatesOff);
     }
 
     // --- What a cost may be ----------------------------------------------------------------------------------------------

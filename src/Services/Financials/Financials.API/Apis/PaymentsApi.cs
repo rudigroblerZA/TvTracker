@@ -233,52 +233,21 @@ public static class PaymentsApi
     /// <summary>
     /// The active subscription, else the most recent; for the plan page and the export.
     /// </summary>
-    internal static Task<Subscription?> LatestAsync(FinancialsContext db, string userId, CancellationToken ct) =>
+    private static Task<Subscription?> LatestAsync(FinancialsContext db, string userId, CancellationToken ct) =>
         db.Subscriptions.AsNoTracking()
             .Where(s => s.UserId == userId)
             .OrderBy(s => s.Status)
             .ThenByDescending(s => s.CreatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
-    internal static async Task<List<ReceiptDto>> ReceiptsAsync(FinancialsContext db, string userId, CancellationToken ct) =>
+    private static async Task<List<ReceiptDto>> ReceiptsAsync(FinancialsContext db, string userId, CancellationToken ct) =>
         await db.Receipts.AsNoTracking()
             .Where(r => r.UserId == userId)
             .OrderBy(r => r.PaidAtUtc)
             .Select(r => new ReceiptDto(r.Plan, r.Interval, r.Amount, r.Currency, r.PaidAtUtc, r.PeriodEndUtc, r.Provider))
             .ToListAsync(ct);
 
-    /// <summary>
-    /// The first step of an account deletion, before the login goes: stops every running subscription at its provider at
-    /// once, so nobody is charged for an account that's gone. A provider that fails (down, timing out) is logged to be
-    /// stopped by hand and doesn't stop the deletion.
-    /// </summary>
-    internal static async Task StopSubscriptionsAsync(FinancialsContext db, PaymentProviders providers, string userId, ILogger logger, CancellationToken ct)
-    {
-        foreach (var subscription in await db.Subscriptions.Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
-        {
-            try
-            {
-                await (providers.Named(subscription.Provider)?.CancelAsync(subscription, now: true, ct) ?? Task.CompletedTask);
-            }
-            catch (Exception ex) when (!ct.IsCancellationRequested)
-            {
-                logger.LogError(ex, "Subscription {Subscription} couldn't be stopped at {Provider}; stop it there by hand", subscription.ProviderSubscriptionId, subscription.Provider);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Marks the user's payment records for deletion, in the same save as the profile (the provider keeps its own for its
-    /// books).
-    /// </summary>
-    internal static async Task RemoveRecordsAsync(FinancialsContext db, string userId, CancellationToken ct)
-    {
-        db.Receipts.RemoveRange(await db.Receipts.Where(r => r.UserId == userId).ToListAsync(ct));
-        db.Subscriptions.RemoveRange(await db.Subscriptions.Where(s => s.UserId == userId).ToListAsync(ct));
-        db.CheckoutSessions.RemoveRange(await db.CheckoutSessions.Where(c => c.UserId == userId).ToListAsync(ct));
-    }
-
-    internal static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>
+    private static SubscriptionDto ToDto(Subscription s, PaymentProviders providers) =>
         new(s.Plan, s.Interval, s.Status == SubscriptionStatus.Active, s.CancelAtPeriodEnd, s.CurrentPeriodEndUtc, s.EndedAtUtc, s.Provider,
             s.Status == SubscriptionStatus.Active ? providers.Named(s.Provider)?.ManageUrl(s) : null);
 }

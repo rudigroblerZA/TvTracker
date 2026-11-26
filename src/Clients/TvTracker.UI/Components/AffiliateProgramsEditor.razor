@@ -1,4 +1,4 @@
-@inject CatalogClient Catalog
+@inject FinancialsClient Books
 
 @* Affiliate programs, set up by admins: which services and regions a program covers and the network's tracked link. A
    test program is a stand-in until there's a real deal: its clicks go through the built-in test network's page, where
@@ -174,7 +174,7 @@
         error = null;
         try
         {
-            programs = await Catalog.GetAffiliateProgramsAsync();
+            programs = await Books.GetAffiliateProgramsAsync();
         }
         catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
         {
@@ -209,18 +209,18 @@
     private Task SaveAsync() => ChangeAsync(async () =>
     {
         var name = form!.Name.Trim().ToLowerInvariant();
-        return await Catalog.SaveAffiliateProgramAsync(name, new SaveAffiliateProgram(Split(form.Services), Split(form.Regions), form.Template,
+        return await Books.SaveAffiliateProgramAsync(name, new SaveAffiliateProgram(Split(form.Services), Split(form.Regions), form.Template,
             string.IsNullOrWhiteSpace(form.PostbackKey) ? null : form.PostbackKey, form.Currency, form.Test, form.Enabled, New: !editing))
             ? $"Saved {name}."
             : null;
     }, closeForm: true);
 
     private Task DeleteAsync(AffiliateProgramSettings program) => ChangeAsync(async () =>
-        await Catalog.DeleteAffiliateProgramAsync(program.Name)
+        await Books.DeleteAffiliateProgramAsync(program.Name)
             ? $"Removed {program.Name}. What's counted for it stays in the report, but sales its network reports from now on aren't taken: switch a program off instead to keep counting those."
             : null, closeForm: true);
 
-    private Task AddStartersAsync() => ChangeAsync(async () => await Catalog.AddStarterAffiliateProgramsAsync() switch
+    private Task AddStartersAsync() => ChangeAsync(async () => await Books.AddStarterAffiliateProgramsAsync() switch
     {
         null => null,
         0 => "The main services all have a program already.",
@@ -248,7 +248,7 @@
                 error = NotDone;
             }
             // The list and the page's report are separate calls: both at once.
-            var list = Catalog.GetAffiliateProgramsAsync();
+            var list = Books.GetAffiliateProgramsAsync();
             await Task.WhenAll(list, OnChanged.InvokeAsync());
             programs = await list ?? programs;
         }
