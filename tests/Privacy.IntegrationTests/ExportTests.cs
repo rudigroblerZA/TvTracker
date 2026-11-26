@@ -106,6 +106,10 @@ public sealed class ExportTests(PostgresServer server)
         var json = JsonSerializer.Serialize(Value(await export(user, read)), new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var held = await MemberData.DistinctiveAsync(read, member, Ct);
 
+        var nothingToFind = held.Where(t => t.Value.Count == 0).Select(t => t.Key).Order().ToList();
+        Assert.True(nothingToFind.Count == 0, "Tables whose rows have nothing this test could find in an export (no id, text or time of their own); teach MemberData about them: "
+            + string.Join(", ", nothingToFind));
+
         var exported = held.Where(t => t.Value.Any(v => json.Contains(v, StringComparison.OrdinalIgnoreCase))).Select(t => t.Key).ToHashSet();
         var missing = held.Keys.Where(t => !exported.Contains(t) && !leftOut.ContainsKey(t)).Order().ToList();
         Assert.True(missing.Count == 0, "Tables that hold something about a member that their export doesn't have. Export them, or list them as left out with why: "

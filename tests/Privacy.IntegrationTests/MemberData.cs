@@ -37,23 +37,22 @@ public static partial class MemberData
     /// someone says which it is, so it can't slip past the search unnoticed.
     /// </summary>
     /// <param name="notAboutAMember">Column names that are about something else (a show, a provider, a program).</param>
-    public static IReadOnlyList<string> Undecided(DbContext db, IReadOnlySet<string> notAboutAMember) => db.Model.GetEntityTypes()
-        .Where(t => t.GetTableName() is not null && !t.IsOwned())
-        .SelectMany(t => t.GetProperties()
-            .Where(p => p.ClrType == typeof(string) && MaybeAboutAPerson().IsMatch(p.Name) && !IsMember(p) && !NameColumn().IsMatch(p.Name)
-                && !notAboutAMember.Contains(p.Name))
-            .Select(p => $"{t.GetTableName()}.{p.Name}"))
-        .Order().ToList();
+    public static IReadOnlyList<string> Undecided(DbContext db, IReadOnlySet<string> notAboutAMember) => Columns(db,
+        p => p.ClrType == typeof(string) && MaybeAboutAPerson().IsMatch(p.Name) && !IsMember(p) && !NameColumn().IsMatch(p.Name)
+            && !notAboutAMember.Contains(p.Name));
 
     /// <summary>
     /// Columns named like a member's id that aren't text, as "table.Column": <see cref="SeedAsync"/> puts a member's id
     /// only in text ones, so one of these would go unfilled and unsearched without anyone noticing.
     /// </summary>
-    public static IReadOnlyList<string> NotText(DbContext db) => db.Model.GetEntityTypes()
+    public static IReadOnlyList<string> NotText(DbContext db) => Columns(db, p => p.ClrType != typeof(string) && MemberColumn().IsMatch(p.Name));
+
+    /// <summary>
+    /// The columns of every table in the model that <paramref name="where"/> picks, as "table.Column".
+    /// </summary>
+    private static IReadOnlyList<string> Columns(DbContext db, Func<IProperty, bool> where) => db.Model.GetEntityTypes()
         .Where(t => t.GetTableName() is not null && !t.IsOwned())
-        .SelectMany(t => t.GetProperties()
-            .Where(p => p.ClrType != typeof(string) && MemberColumn().IsMatch(p.Name))
-            .Select(p => $"{t.GetTableName()}.{p.Name}"))
+        .SelectMany(t => t.GetProperties().Where(where).Select(p => $"{t.GetTableName()}.{p.Name}"))
         .Order().ToList();
 
     /// <summary>
@@ -218,13 +217,21 @@ public static partial class MemberData
         }
 
         var found = new Dictionary<string, long>();
-        foreach (var (table, column) in columns)
+        foreach (var table in columns.GroupBy(c => c.Table, c => c.Column))
         {
-            await using var count = new NpgsqlCommand($"select count(*) from \"{table}\" where \"{column}\"::text like '%' || @id || '%'", connection);
+            // One read of the table for all its columns.
+            var names = table.ToList();
+            var counts = string.Join(", ", names.Select(column => $"count(*) filter (where \"{column}\"::text like '%' || @id || '%')"));
+            await using var count = new NpgsqlCommand($"select {counts} from \"{table.Key}\"", connection);
             count.Parameters.AddWithValue("id", memberId);
-            if ((long)(await count.ExecuteScalarAsync(ct))! is > 0 and var rows)
+            await using var reader = await count.ExecuteReaderAsync(ct);
+            await reader.ReadAsync(ct);
+            for (var i = 0; i < names.Count; i++)
             {
-                found[$"{table}.{column}"] = rows;
+                if (reader.GetInt64(i) is > 0 and var rows)
+                {
+                    found[$"{table.Key}.{names[i]}"] = rows;
+                }
             }
         }
         return found;
@@ -255,7 +262,7 @@ public static partial class MemberData
             {
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
-                    string[] read1 = reader.GetValue(i) switch
+                    string[] cell = reader.GetValue(i) switch
                     {
                         Guid id => [id.ToString()],
                         string text when text.Length >= 16 && !text.Contains(memberId, StringComparison.Ordinal) && !text.StartsWith('{') => [text],
@@ -263,10 +270,10 @@ public static partial class MemberData
                         DateTimeOffset at => Stamps(at.UtcDateTime),
                         _ => []
                     };
-                    all.UnionWith(read1);
+                    all.UnionWith(cell);
                     if (!pointers.Contains(reader.GetName(i)))
                     {
-                        values.AddRange(read1);
+                        values.AddRange(cell);
                     }
                 }
             }

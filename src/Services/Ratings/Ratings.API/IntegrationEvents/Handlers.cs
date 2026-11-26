@@ -24,9 +24,7 @@ public sealed class EpisodeWatchedHandler(RatingsContext db) : IIntegrationEvent
                 if (existing.TryGetValue(id, out var copy))
                 {
                     copy.ShowId = e.ShowId;
-                    // Watched again: as new as this event, so a snapshot taken before it can't take the row for one
-                    // whose unwatch was lost.
-                    copy.RecordedAtUtc = Later(copy.RecordedAtUtc, e.CreatedAt.UtcDateTime);
+                    copy.RecordedAtUtc = SnapshotRepair.Recorded(copy.RecordedAtUtc, e.CreatedAt);
                 }
                 else
                 {
@@ -35,8 +33,6 @@ public sealed class EpisodeWatchedHandler(RatingsContext db) : IIntegrationEvent
             }
         }, ct);
     }
-
-    private static DateTime Later(DateTime a, DateTime b) => a > b ? a : b;
 }
 
 public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>
