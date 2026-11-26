@@ -1,6 +1,7 @@
 ﻿using Analytics.Data;
 using Microsoft.EntityFrameworkCore;
 using TvTracker.EventBus;
+using TvTracker.Persistence;
 using TvTracker.IntegrationEvents;
 
 namespace Analytics.Worker.IntegrationEvents;
@@ -190,7 +191,7 @@ public sealed class CatalogEventHandlers(AnalyticsContext db, TimeProvider time)
     }
 
     private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<CatalogEventHandlers>(e), apply, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -249,7 +250,7 @@ public sealed class RatingEventHandlers(AnalyticsContext db) :
         });
 
     private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<RatingEventHandlers>(e), apply, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<RatingEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -308,7 +309,7 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
         });
 
     private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<TrackingEventHandlers>(e), apply, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<TrackingEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -322,7 +323,7 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
     IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
 {
     public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<SnapshotHandlers>(e), () => RepairActivityAsync(e, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<SnapshotHandlers>(e), () => RepairActivityAsync(e, ct), ct);
 
     private async Task RepairActivityAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
     {
@@ -365,7 +366,7 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
     }
 
     public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<SnapshotHandlers>(e), () => RepairRatingsAsync(e, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<SnapshotHandlers>(e), () => RepairRatingsAsync(e, ct), ct);
 
     private async Task RepairRatingsAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct)
     {
@@ -456,7 +457,7 @@ public sealed class EpisodeNotesHandler(AnalyticsContext db) : IIntegrationEvent
 public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
     public Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<UserDeletedHandler>(e), () => DeleteAsync(e, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserDeletedHandler>(e), () => DeleteAsync(e, ct), ct);
 
     private async Task DeleteAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
@@ -485,7 +486,7 @@ public sealed class PlanHandlers(AnalyticsContext db)
         e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
 
     private Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct) =>
-        db.HandleOnceAsync(e, HandlerExtensions.HandlerName<PlanHandlers>(e), () => KeepAsync(userId, plan, changedAt, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<PlanHandlers>(e), () => KeepAsync(userId, plan, changedAt, ct), ct);
 
     private async Task KeepAsync(string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
     {

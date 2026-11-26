@@ -17,13 +17,13 @@ public sealed class CatalogEventHandlers(SocialContext db) :
     IIntegrationEventHandler<EpisodeScheduledIntegrationEvent>
 {
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(CatalogEventHandlers), () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, ct), ct);
 
     public Task HandleAsync(ShowUpdatedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(CatalogEventHandlers), () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), () => UpsertShowAsync(e.ShowId, e.Title, e.PosterUrl, ct), ct);
 
     public Task HandleAsync(EpisodesScheduledIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(CatalogEventHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), async () =>
         {
             var ids = e.Episodes.Select(x => x.EpisodeId).ToList();
             var existing = await db.Episodes.Where(x => ids.Contains(x.EpisodeId)).ToDictionaryAsync(x => x.EpisodeId, ct);
@@ -34,7 +34,7 @@ public sealed class CatalogEventHandlers(SocialContext db) :
         }, ct);
 
     public Task HandleAsync(EpisodeScheduledIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(CatalogEventHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), async () =>
             Upsert(await db.Episodes.FindAsync([e.EpisodeId], ct), e.ShowId, e.EpisodeId, e.SeasonNumber, e.EpisodeNumber, e.AirsAtUtc, e.RuntimeMinutes), ct);
 
     private void Upsert(EpisodeCopy? episode, Guid showId, Guid episodeId, int season, int number, DateTimeOffset? airsAtUtc, int? runtimeMinutes)
@@ -75,13 +75,13 @@ public sealed class ProfileEventHandlers(SocialContext db, TimeProvider time) :
 {
     // Registering says nothing about a picture: one set since (events arrive in any order) is kept.
     public Task HandleAsync(UserRegisteredIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, kept => kept, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<ProfileEventHandlers>(e), () => SetProfileAsync(e.UserId, e.DisplayName, kept => kept, ct), ct);
 
     public Task HandleAsync(UserProfileUpdatedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, _ => e.Avatar, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<ProfileEventHandlers>(e), () => SetProfileAsync(e.UserId, e.DisplayName, _ => e.Avatar, ct), ct);
 
     public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(ProfileEventHandlers), () => SetProfileAsync(e.UserId, e.DisplayName, _ => e.Avatar, ct), ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<ProfileEventHandlers>(e), () => SetProfileAsync(e.UserId, e.DisplayName, _ => e.Avatar, ct), ct);
 
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
@@ -237,7 +237,7 @@ public sealed class ActivityEventHandlers(SocialContext db) :
         db.Activities.Add(new Activity { Id = Guid.CreateVersion7(), UserId = userId, Kind = kind, ShowId = showId, Stars = stars, OccurredAtUtc = at.UtcDateTime });
 
     private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
-        db.HandleOnceAsync(e, nameof(ActivityEventHandlers), apply, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<ActivityEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -256,7 +256,7 @@ public sealed class UserStateHandlers(SocialContext db) :
     IIntegrationEventHandler<RatingsSnapshotIntegrationEvent>
 {
     public Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var ids = e.EpisodeIds.Distinct().ToList();
             var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct);
@@ -270,11 +270,11 @@ public sealed class UserStateHandlers(SocialContext db) :
         }, ct);
 
     public Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), () =>
             db.Watches.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct), ct);
 
     public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var show = await ShowAsync(e.UserId, e.ShowId, ct);
             show.Followed = true;
@@ -282,7 +282,7 @@ public sealed class UserStateHandlers(SocialContext db) :
         }, ct);
 
     public Task HandleAsync(ShowUnfollowedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var show = await ShowAsync(e.UserId, e.ShowId, ct);
             show.Followed = false;
@@ -290,13 +290,13 @@ public sealed class UserStateHandlers(SocialContext db) :
         }, ct);
 
     public Task HandleAsync(ShowRatedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = e.Stars; }, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = e.Stars; }, ct);
 
     public Task HandleAsync(ShowRatingRemovedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = null; }, ct);
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () => { (await ShowAsync(e.UserId, e.ShowId, ct)).Stars = null; }, ct);
 
     public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var takenAt = e.TakenAtUtc.UtcDateTime;
             var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
@@ -334,7 +334,7 @@ public sealed class UserStateHandlers(SocialContext db) :
     /// Ratings carry no time here, so a rating changed after the snapshot can be undone until the next one.
     /// </summary>
     public Task HandleAsync(RatingsSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(UserStateHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var shows = await db.UserShows.Where(s => s.UserId == e.UserId).ToDictionaryAsync(s => s.ShowId, ct);
             var ratings = e.Shows.DistinctBy(r => r.ShowId).ToDictionary(r => r.ShowId, r => r.Stars);
@@ -375,18 +375,18 @@ public sealed class SharedListHandlers(SocialContext db) :
     IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>
 {
     public Task HandleAsync(ListSharedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(SharedListHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<SharedListHandlers>(e), async () =>
             Apply(await db.SharedLists.FindAsync([e.ListId], ct), e.ListId, e.UserId, e.Name, e.Description, e.ShowIds, e.UpdatedAtUtc), ct);
 
     public Task HandleAsync(ListUnsharedIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(SharedListHandlers), () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<SharedListHandlers>(e), () =>
             db.SharedLists.Where(l => l.ListId == e.ListId && l.UpdatedAtUtc <= e.UpdatedAtUtc.UtcDateTime).ExecuteDeleteAsync(ct), ct);
 
     /// <summary>
     /// Snapshots from before list sharing carry no lists (null), and change nothing.
     /// </summary>
     public Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct) =>
-        db.HandleOnceAsync(e, nameof(SharedListHandlers), async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<SharedListHandlers>(e), async () =>
         {
             if (e.SharedLists is not { } lists)
             {
@@ -428,25 +428,6 @@ public sealed class SharedListHandlers(SocialContext db) :
     }
 }
 
-internal static class InboxExtensions
-{
-    /// <summary>
-    /// The inbox: applies an event once per handler class, then saves the change and the mark together.
-    /// </summary>
-    public static async Task HandleOnceAsync(this SocialContext db, IntegrationEvent e, string handlerClass, Func<Task> apply, CancellationToken ct)
-    {
-        var handler = $"{handlerClass}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
-
-        await apply();
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
-    }
-}
-
 /// <summary>
 /// Keeps <see cref="UserPlanCopy"/> from Identity's plan changes and daily profile snapshot (which heals a lost change), as
 /// Tracking does; the newest by Identity's change time wins.
@@ -463,28 +444,22 @@ public sealed class PlanHandlers(SocialContext db)
 
     private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
     {
-        var handler = $"{nameof(PlanHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<PlanHandlers>(e), async () =>
         {
-            return;
-        }
-
-        var copy = await db.Plans.FindAsync([userId], ct);
-        if (copy is null)
-        {
-            // Free with no change is what no row already means.
-            if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+            var copy = await db.Plans.FindAsync([userId], ct);
+            if (copy is null)
             {
-                db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                // Free with no change is what no row already means.
+                if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+                {
+                    db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                }
             }
-        }
-        else if (changedAt >= copy.ChangedAtUtc)
-        {
-            copy.Plan = plan;
-            copy.ChangedAtUtc = changedAt;
-        }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            else if (changedAt >= copy.ChangedAtUtc)
+            {
+                copy.Plan = plan;
+                copy.ChangedAtUtc = changedAt;
+            }
+        }, ct);
     }
 }
