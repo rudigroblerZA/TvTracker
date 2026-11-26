@@ -22,7 +22,7 @@ public static class ExportApi
     public static void MapExportApi(this IEndpointRouteBuilder app) =>
         app.MapGet("/api/v1/me/export", ExportAsync).RequireAuthorization();
 
-    public static async Task<Results<Ok<ResearchExport>, UnauthorizedHttpResult>> ExportAsync(ClaimsPrincipal user, ResearchContext db, CancellationToken ct)
+    internal static async Task<Results<Ok<ResearchExport>, UnauthorizedHttpResult>> ExportAsync(ClaimsPrincipal user, ResearchContext db, CancellationToken ct)
     {
         // A token with no user (client credentials) has no export, and a null id would match what deleted moderators
         // left behind (their ids are cleared).

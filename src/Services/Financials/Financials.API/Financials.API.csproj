@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Financials.UnitTests" />
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
     <InternalsVisibleTo Include="Financials.IntegrationTests" />
   </ItemGroup>
 

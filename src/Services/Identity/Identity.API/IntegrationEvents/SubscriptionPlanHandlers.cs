@@ -33,28 +33,30 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
     {
         await db.HandleOnceAsync(e, InboxExtensions.HandlerName<SubscriptionPlanHandlers>(e), async () =>
         {
-            if (await db.Profiles.FindAsync([userId], ct) is { } profile)
+            // An account since deleted has no plan to move; the event is still marked.
+            if (await db.Profiles.FindAsync([userId], ct) is not { } profile)
             {
-                if (profile.PlanChangedAtUtc is { } changed && at.UtcDateTime < changed)
-                {
-                    // Events can arrive late and out of order (one that waited in the outbox, a redelivery): the plan has
-                    // moved since this happened, so it has nothing to say.
-                    logger.LogInformation("A subscription event of {At:u} for {UserId} was left: their plan changed after it, at {Changed:u}", at, userId, changed);
-                }
-                else if (plan(profile.Plan) is not { } next)
-                {
-                    // The ending of a plan that is no longer theirs: it says nothing about the one they have.
-                }
-                else if (await PlanState.SetPaidPlanAsync(db, outbox, profile, next, at, ct))
-                {
-                    logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
-                }
-                else
-                {
-                    // Nothing to move (subscribing again to the plan they still have), but it is the newest word on their
-                    // plan: an older event still on its way mustn't undo it.
-                    profile.PlanChangedAtUtc = at.UtcDateTime;
-                }
+                return;
+            }
+            if (profile.PlanChangedAtUtc is { } changed && at.UtcDateTime < changed)
+            {
+                // Events can arrive late and out of order (one that waited in the outbox, a redelivery): the plan has
+                // moved since this happened, so it has nothing to say.
+                logger.LogInformation("A subscription event of {At:u} for {UserId} was left: their plan changed after it, at {Changed:u}", at, userId, changed);
+            }
+            else if (plan(profile.Plan) is not { } next)
+            {
+                // The ending of a plan that is no longer theirs: it says nothing about the one they have.
+            }
+            else if (await PlanState.SetPaidPlanAsync(db, outbox, profile, next, at, ct))
+            {
+                logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
+            }
+            else
+            {
+                // Nothing to move (subscribing again to the plan they still have), but it is the newest word on their
+                // plan: an older event still on its way mustn't undo it.
+                profile.PlanChangedAtUtc = at.UtcDateTime;
             }
         }, ct);
         await outbox.PublishAddedAsync(ct);

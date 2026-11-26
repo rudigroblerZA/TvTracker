@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Analytics.UnitTests" />
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
     <InternalsVisibleTo Include="Analytics.IntegrationTests" />
   </ItemGroup>
 

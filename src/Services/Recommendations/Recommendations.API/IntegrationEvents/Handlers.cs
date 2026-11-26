@@ -18,8 +18,7 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
 {
     public async Task HandleAsync(ShowNanogenresChangedIntegrationEvent e, CancellationToken ct)
     {
-        var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        await db.HandleOnceAsync(e, handler, async () =>
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<ShowFeaturesHandler>(e), async () =>
         {
             var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
             var ids = shows.Select(s => s.ShowId).ToList();
@@ -52,8 +51,7 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
     /// </summary>
     public async Task HandleAsync(ShowDnaChangedIntegrationEvent e, CancellationToken ct)
     {
-        var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        await db.HandleOnceAsync(e, handler, async () =>
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<ShowFeaturesHandler>(e), async () =>
         {
             var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
             var ids = shows.Select(s => s.ShowId).ToList();
@@ -106,8 +104,7 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
         IReadOnlyList<string> genres, IReadOnlyList<string> keywords, IReadOnlyList<string> cast,
         IReadOnlyList<Guid> similar, double popularity, CancellationToken ct)
     {
-        var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        await db.HandleOnceAsync(e, handler, async () =>
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<ShowFeaturesHandler>(e), async () =>
         {
             var show = await db.Shows.FindAsync([showId], ct);
             if (show is null)
@@ -160,8 +157,7 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
 
     private async Task UpdateAsync(IntegrationEvent e, string userId, Guid showId, Action<UserShowSignal> apply, CancellationToken ct)
     {
-        var handler = $"{nameof(UserSignalHandler)}.{e.GetType().Name}";
-        await db.HandleOnceAsync(e, handler, async () =>
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserSignalHandler>(e), async () =>
         {
             var signal = await db.Signals.FindAsync([userId, showId], ct);
             if (signal is null)
@@ -207,8 +203,7 @@ public sealed class SnapshotHandler(RecommendationsContext db, RecommendationSto
     private async Task RepairAsync(IntegrationEvent e, string userId, DateTimeOffset takenAt, IEnumerable<Guid> shows,
         Action<UserShowSignal> apply, CancellationToken ct)
     {
-        var handler = $"{nameof(SnapshotHandler)}.{e.GetType().Name}";
-        await db.HandleOnceAsync(e, handler, async () =>
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<SnapshotHandler>(e), async () =>
         {
             var signals = await db.Signals.Where(s => s.UserId == userId).ToDictionaryAsync(s => s.ShowId, ct);
             foreach (var showId in shows.Where(id => !signals.ContainsKey(id)))

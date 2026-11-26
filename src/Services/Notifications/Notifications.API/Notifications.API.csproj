@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Notifications.UnitTests" />
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
   </ItemGroup>
 
 </Project>

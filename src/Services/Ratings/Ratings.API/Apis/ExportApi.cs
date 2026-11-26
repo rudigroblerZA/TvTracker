@@ -13,7 +13,7 @@ public static class ExportApi
     /// <summary>
     /// What the caller rated, wrote, reacted to, voted on and reported, collected by Identity.API's account export.
     /// </summary>
-    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
+    internal static async Task<IResult> ExportAsync(ClaimsPrincipal user, RatingsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         return Results.Ok(new

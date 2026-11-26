@@ -191,11 +191,7 @@ public static partial class MemberData
     /// </summary>
     public static async Task<Dictionary<string, long>> MentionsAsync(DbContext db, string memberId, CancellationToken ct)
     {
-        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync(ct);
-        }
+        var connection = await OpenAsync(db, ct);
         var columns = new List<(string Table, string Column, string Type, string Udt)>();
         await using (var list = new NpgsqlCommand("""
             select table_name, column_name, data_type, udt_name from information_schema.columns
@@ -233,11 +229,7 @@ public static partial class MemberData
     /// </summary>
     public static async Task<Dictionary<string, List<string>>> DistinctiveAsync(DbContext db, string memberId, CancellationToken ct)
     {
-        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync(ct);
-        }
+        var connection = await OpenAsync(db, ct);
         var found = new Dictionary<string, List<string>>();
         foreach (var type in MemberTypes(db))
         {
@@ -260,11 +252,9 @@ public static partial class MemberData
                             values.Add(text);
                             break;
                         // To the microsecond, as the database keeps it and JSON writes it: each row was made at its own.
-                        case DateTime at:
+                        case DateTime or DateTimeOffset:
+                            var at = reader.GetValue(i) is DateTimeOffset offset ? offset.UtcDateTime : reader.GetDateTime(i);
                             values.Add(at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture));
-                            break;
-                        case DateTimeOffset at:
-                            values.Add(at.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture));
                             break;
                     }
                 }
@@ -272,4 +262,20 @@ public static partial class MemberData
         }
         return found;
     }
+
+    private static async Task<NpgsqlConnection> OpenAsync(DbContext db, CancellationToken ct)
+    {
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(ct);
+        }
+        return connection;
+    }
+
+    /// <summary>
+    /// Any service's context, from its options.
+    /// </summary>
+    public static TContext Create<TContext>(DbContextOptions<TContext> options) where TContext : DbContext =>
+        (TContext)Activator.CreateInstance(typeof(TContext), options)!;
 }

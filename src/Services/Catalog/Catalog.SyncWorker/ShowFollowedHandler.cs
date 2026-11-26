@@ -10,11 +10,6 @@ namespace Catalog.SyncWorker;
 /// </summary>
 public sealed class ShowFollowedHandler(CatalogContext db, CatalogSynchronizer synchronizer) : IIntegrationEventHandler<ShowFollowedIntegrationEvent>
 {
-    public async Task HandleAsync(ShowFollowedIntegrationEvent @event, CancellationToken cancellationToken = default)
-    {
-        await db.HandleOnceAsync(@event, nameof(ShowFollowedHandler), async () =>
-        {
-            await synchronizer.MarkForRefreshAsync(@event.ShowId, cancellationToken);
-        }, cancellationToken);
-    }
+    public Task HandleAsync(ShowFollowedIntegrationEvent @event, CancellationToken cancellationToken = default) =>
+        db.HandleOnceAsync(@event, nameof(ShowFollowedHandler), () => synchronizer.MarkForRefreshAsync(@event.ShowId, cancellationToken), cancellationToken);
 }

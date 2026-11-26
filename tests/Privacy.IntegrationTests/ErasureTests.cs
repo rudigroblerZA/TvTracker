@@ -127,15 +127,12 @@ public sealed class ErasureTests(PostgresServer server)
     }
 
     // The model only: nothing is connected to.
-    private static TContext Model<TContext>() where TContext : DbContext => Create(new DbContextOptionsBuilder<TContext>().UseNpgsql("Host=unused").Options);
-
-    private static TContext Create<TContext>(DbContextOptions<TContext> options) where TContext : DbContext =>
-        (TContext)Activator.CreateInstance(typeof(TContext), options)!;
+    private static TContext Model<TContext>() where TContext : DbContext => MemberData.Create(new DbContextOptionsBuilder<TContext>().UseNpgsql("Host=unused").Options);
 
     private async Task ErasedAsync<TContext>(Func<TContext, IIntegrationEventHandler<UserDeletedIntegrationEvent>> handler) where TContext : DbContext
     {
         var options = new DbContextOptionsBuilder<TContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options;
-        TContext create(DbContextOptions<TContext> o) => Create(o);
+        TContext create(DbContextOptions<TContext> o) => MemberData.Create(o);
         var (leaving, staying) = (Member("leaving"), Member("staying"));
         await using (var db = create(options))
         {

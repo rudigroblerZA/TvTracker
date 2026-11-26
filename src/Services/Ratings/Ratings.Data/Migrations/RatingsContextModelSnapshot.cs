@@ -375,6 +375,8 @@ namespace Ratings.Data.Migrations
 
                     b.HasIndex("AtUtc");
 
+                    b.HasIndex("ModeratorId");
+
                     b.ToTable("moderation_actions", (string)null);
                 });
 

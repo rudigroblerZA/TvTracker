@@ -136,7 +136,7 @@ public static class PaymentsApi
     /// <summary>
     /// The caller's own payment records: their latest subscription, every receipt and the checkouts they started.
     /// </summary>
-    public static async Task<Ok<PaymentsExportDto>> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
+    internal static async Task<Ok<PaymentsExportDto>> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
     {
         var userId = user.GetUserId();
         return TypedResults.Ok(new PaymentsExportDto(

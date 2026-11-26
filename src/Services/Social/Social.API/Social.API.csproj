@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Social.IntegrationTests" />
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
   </ItemGroup>
 
 </Project>

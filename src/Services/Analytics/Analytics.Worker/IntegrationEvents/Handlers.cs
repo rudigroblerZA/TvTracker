@@ -341,24 +341,22 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
                 RecordedAtUtc = takenAt
             })
             .ToList();
-        var removeWatches = watches.Gone;
         db.Watches.AddRange(addWatches);
-        db.Watches.RemoveRange(removeWatches);
+        db.Watches.RemoveRange(watches.Gone);
 
         var follows = SnapshotRepair.Of(await db.Follows.Where(f => f.UserId == e.UserId).ToListAsync(ct), e.Follows,
             f => f.ShowId, f => f.ShowId, f => f.FollowedAtUtc, e.TakenAtUtc);
         var addFollows = follows.Missing
             .Select(f => new UserFollow { UserId = e.UserId, ShowId = f.ShowId, FollowedAtUtc = f.FollowedAtUtc.UtcDateTime })
             .ToList();
-        var removeFollows = follows.Gone;
         db.Follows.AddRange(addFollows);
-        db.Follows.RemoveRange(removeFollows);
+        db.Follows.RemoveRange(follows.Gone);
 
-        if (addWatches.Count + removeWatches.Count + addFollows.Count + removeFollows.Count > 0)
+        if (addWatches.Count + watches.Gone.Count + addFollows.Count + follows.Gone.Count > 0)
         {
             logger.LogInformation(
                 "Repaired {UserId}'s activity from Tracking's snapshot: watches +{AddedWatches} -{RemovedWatches}, follows +{AddedFollows} -{RemovedFollows}",
-                e.UserId, addWatches.Count, removeWatches.Count, addFollows.Count, removeFollows.Count);
+                e.UserId, addWatches.Count, watches.Gone.Count, addFollows.Count, follows.Gone.Count);
         }
     }
 

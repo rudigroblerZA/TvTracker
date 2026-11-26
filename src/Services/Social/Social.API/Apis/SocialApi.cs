@@ -340,7 +340,7 @@ public static class SocialApi
     /// <summary>
     /// For Identity's data export: the caller's settings, follows, requests, blocks and activity.
     /// </summary>
-    public static async Task<Ok<object>> ExportAsync(ClaimsPrincipal user, SocialContext db, CancellationToken ct)
+    internal static async Task<Ok<object>> ExportAsync(ClaimsPrincipal user, SocialContext db, CancellationToken ct)
     {
         var me = UserId(user);
         return TypedResults.Ok<object>(new
