@@ -132,9 +132,8 @@ public sealed class ErasureTests(PostgresServer server)
     private async Task ErasedAsync<TContext>(Func<TContext, IIntegrationEventHandler<UserDeletedIntegrationEvent>> handler) where TContext : DbContext
     {
         var options = new DbContextOptionsBuilder<TContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options;
-        TContext create(DbContextOptions<TContext> o) => MemberData.Create(o);
         var (leaving, staying) = (Member("leaving"), Member("staying"));
-        await using (var db = create(options))
+        await using (var db = MemberData.Create(options))
         {
             await db.Database.MigrateAsync(Ct);
             var seeded = await MemberData.SeedAsync(db, leaving, Ct);
@@ -143,7 +142,7 @@ public sealed class ErasureTests(PostgresServer server)
         }
 
         Dictionary<string, long> stayingBefore;
-        await using (var db = create(options))
+        await using (var db = MemberData.Create(options))
         {
             // Every table that names a member has the leaving member in it: otherwise the search below proves nothing of it.
             var before = await MemberData.MentionsAsync(db, leaving, Ct);
@@ -152,12 +151,12 @@ public sealed class ErasureTests(PostgresServer server)
             stayingBefore = await MemberData.MentionsAsync(db, staying, Ct);
         }
 
-        await using (var db = create(options))
+        await using (var db = MemberData.Create(options))
         {
             await handler(db).HandleAsync(new UserDeletedIntegrationEvent(leaving), Ct);
         }
 
-        await using (var after = create(options))
+        await using (var after = MemberData.Create(options))
         {
             var left = await MemberData.MentionsAsync(after, leaving, Ct);
             Assert.True(left.Count == 0, "Still there after the account was deleted: " + string.Join(", ", left.Select(m => $"{m.Key} ({m.Value})")));
