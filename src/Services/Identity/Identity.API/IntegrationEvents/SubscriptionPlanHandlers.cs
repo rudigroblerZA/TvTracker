@@ -26,9 +26,10 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
         ApplyAsync(e, e.UserId, _ => e.Plan, e.StartedAtUtc, ct);
 
     public Task HandleAsync(SubscriptionEndedIntegrationEvent e, CancellationToken ct) =>
-        ApplyAsync(e, e.UserId, current => current == e.Plan ? Plans.Free : current, e.EndedAtUtc, ct);
+        ApplyAsync(e, e.UserId, current => current == e.Plan ? Plans.Free : null, e.EndedAtUtc, ct);
 
-    private async Task ApplyAsync(IntegrationEvent e, string userId, Func<string, string> plan, DateTimeOffset at, CancellationToken ct)
+    /// <param name="plan">The plan the event leaves them on, given the one they have; null when it isn't about their plan.</param>
+    private async Task ApplyAsync(IntegrationEvent e, string userId, Func<string, string?> plan, DateTimeOffset at, CancellationToken ct)
     {
         var handler = $"{nameof(SubscriptionPlanHandlers)}.{e.GetType().Name}";
         if (await db.HasProcessedAsync(e, handler, ct))
@@ -43,15 +44,18 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
                 // moved since this happened, so it has nothing to say.
                 logger.LogInformation("A subscription event of {At:u} for {UserId} was left: their plan changed after it, at {Changed:u}", at, userId, changed);
             }
-            else if (await PlanState.SetPaidPlanAsync(db, outbox, profile, plan(profile.Plan), at, ct))
+            else if (plan(profile.Plan) is not { } next)
+            {
+                // The ending of a plan that is no longer theirs: it says nothing about the one they have.
+            }
+            else if (await PlanState.SetPaidPlanAsync(db, outbox, profile, next, at, ct))
             {
                 logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
             }
-            else if (e is SubscriptionStartedIntegrationEvent)
+            else
             {
                 // Nothing to move (subscribing again to the plan they still have), but it is the newest word on their
-                // plan: an older event still on its way mustn't undo it. An ending that moved nothing was about a plan
-                // that is no longer theirs, and says nothing about the one they have.
+                // plan: an older event still on its way mustn't undo it.
                 profile.PlanChangedAtUtc = at.UtcDateTime;
             }
         }

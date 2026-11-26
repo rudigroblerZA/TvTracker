@@ -9,9 +9,9 @@ namespace Financials.API.IntegrationEvents;
 
 /// <summary>
 /// An account was deleted: its running subscriptions are stopped at their providers, so nobody is charged for an account
-/// that's gone, its payment records are removed, and their name comes off the payment settings they saved. A provider that doesn't answer is logged to be stopped by hand; the
-/// records go all the same, as the person asked. The provider's confirmation then finds no subscription here
-/// (<see cref="LedgerResult.NotHere"/>).
+/// that's gone, its payment records are removed, and their name comes off the payment settings they saved. A provider
+/// that doesn't answer is logged to be stopped by hand; the records go all the same, as the person asked. The provider's
+/// confirmation then finds no subscription here (<see cref="LedgerResult.NotHere"/>).
 /// </summary>
 public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders providers, ILogger<UserDeletedHandler> logger)
     : IIntegrationEventHandler<UserDeletedIntegrationEvent>
