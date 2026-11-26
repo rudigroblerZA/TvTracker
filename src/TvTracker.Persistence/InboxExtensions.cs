@@ -16,8 +16,9 @@ public static class InboxExtensions
     /// <item><b>All or nothing:</b> the whole of that runs in one transaction through the execution strategy, so a
     /// handler that deletes with <c>ExecuteDelete</c> before adding rows can't be left half done by a failure at the
     /// save: either the event is applied and marked, or nothing changed and the bus's retry finds things as they were.</item>
-    /// <item><b>What <paramref name="apply"/> may do:</b> change tracked entities (it needn't save), and run
-    /// <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>. It can run more than once (a transient failure retries it), and the
+    /// <item><b>What <paramref name="apply"/> may do:</b> database work only: change tracked entities (it needn't save),
+    /// and run <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>. A call to another system belongs outside it, where it
+    /// doesn't hold the transaction open or get repeated with it. It can run more than once (a transient failure retries it), and the
     /// change tracker is cleared before each attempt, so it loads what it changes itself and doesn't rely on anything
     /// tracked before the call.</item>
     /// <item><b>Outbox:</b> events <paramref name="apply"/> adds to the outbox are stored with the change; publish them
@@ -45,7 +46,12 @@ public static class InboxExtensions
     /// <summary>
     /// The inbox name for a class that handles several events: the class and the event type.
     /// </summary>
-    public static string HandlerName<THandler>(IntegrationEvent e) => $"{typeof(THandler).Name}.{e.GetType().Name}";
+    public static string HandlerName<THandler>(IntegrationEvent e) => HandlerName(typeof(THandler).Name, e);
+
+    /// <summary>
+    /// The same under a name given outright, for a handler whose class no longer has the name its stored rows carry.
+    /// </summary>
+    public static string HandlerName(string handlerClass, IntegrationEvent e) => $"{handlerClass}.{e.GetType().Name}";
 
     /// <summary>
     /// Whether <paramref name="handler"/> has already processed the event. For a handler that can't use

@@ -251,7 +251,7 @@ public static class NotificationsApi
         return TypedResults.NoContent();
     }
 
-    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    internal static async Task<IResult> ExportAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var prefs = await db.Preferences.AsNoTracking().SingleOrDefaultAsync(p => p.UserId == userId, ct);

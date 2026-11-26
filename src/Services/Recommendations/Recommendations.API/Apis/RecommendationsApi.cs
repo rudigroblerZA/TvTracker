@@ -113,7 +113,7 @@ public static class RecommendationsApi
         return TypedResults.NoContent();
     }
 
-    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, RecommendationsContext db, CancellationToken ct)
+    internal static async Task<IResult> ExportAsync(ClaimsPrincipal user, RecommendationsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var dismissed = await db.Dismissals.AsNoTracking().Where(d => d.UserId == userId)

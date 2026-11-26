@@ -26,7 +26,7 @@ public sealed class PlanCopyHandlers<TContext>(TContext db)
         e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
 
     private Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct) =>
-        db.HandleOnceAsync(e, $"{InboxName}.{e.GetType().Name}", async () =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName(InboxName, e), async () =>
         {
             var copy = await db.Plans.FindAsync([userId], ct);
             if (Kept(copy is null ? null : (copy.Plan, copy.ChangedAtUtc), plan, changedAt) is not { } kept)

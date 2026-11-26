@@ -21,9 +21,14 @@ public sealed class ExportTests(PostgresServer server)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    /// <summary>
+    /// The same in every service that keeps one.
+    /// </summary>
+    private const string PlanCopy = "A copy of their plan, which Identity keeps and puts in the export itself.";
+
     [Fact]
     public Task Tracking_exports_what_it_holds() => ExportedAsync<Tracking.Data.TrackingContext>(
-        (user, db) => Tracking.API.Apis.ExportApi.ExportAsync(user, db, Ct), new() { ["user_plans"] = "A copy of their plan, which Identity keeps and puts in the export itself." });
+        (user, db) => Tracking.API.Apis.ExportApi.ExportAsync(user, db, Ct), new() { ["user_plans"] = PlanCopy });
 
     [Fact]
     public Task Ratings_exports_what_it_holds() => ExportedAsync<Ratings.Data.RatingsContext>(
@@ -33,7 +38,7 @@ public sealed class ExportTests(PostgresServer server)
     public Task Social_exports_what_it_holds() => ExportedAsync<Social.Data.SocialContext>(
         async (user, db) => await Social.API.Apis.SocialApi.ExportAsync(user, db, Ct), new()
         {
-            ["user_plans"] = "A copy of their plan, which Identity keeps and puts in the export itself.",
+            ["user_plans"] = PlanCopy,
             ["profiles"] = "A copy of their name and picture, which Identity keeps and exports.",
             ["shared_lists"] = "A copy of the lists they share, which Tracking keeps and exports.",
             ["user_shows"] = "A copy of what they follow and rated, which Tracking and Ratings keep and export.",
@@ -44,7 +49,7 @@ public sealed class ExportTests(PostgresServer server)
     public Task Recommendations_exports_what_it_holds() => ExportedAsync<Recommendations.Data.RecommendationsContext>(
         (user, db) => Recommendations.API.Apis.RecommendationsApi.ExportAsync(user, db, Ct), new()
         {
-            ["user_plans"] = "A copy of their plan, which Identity keeps and puts in the export itself.",
+            ["user_plans"] = PlanCopy,
             ["user_show_signals"] = "A copy of what they follow, watched and rated, which Tracking and Ratings keep and export.",
             ["dirty_users"] = "A note that their recommendations need working out again; it says nothing else of them."
         });
@@ -65,7 +70,7 @@ public sealed class ExportTests(PostgresServer server)
     public Task Analytics_exports_what_it_holds() => ExportedAsync<Analytics.Data.AnalyticsContext>(
         async (user, db) => await Analytics.API.Apis.ExportApi.GetAsync(user, db, Ct), new()
         {
-            ["user_plans"] = "A copy of their plan, which Identity keeps and puts in the export itself.",
+            ["user_plans"] = PlanCopy,
             ["user_follows"] = "A copy of what they follow, which Tracking keeps and exports.",
             ["user_episode_watches"] = "A copy of what they watched, which Tracking keeps and exports.",
             ["user_show_ratings"] = "A copy of their show ratings, which Ratings keeps and exports.",
@@ -86,14 +91,14 @@ public sealed class ExportTests(PostgresServer server)
     {
         var options = new DbContextOptionsBuilder<TContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options;
         var member = $"member-{Guid.NewGuid():N}"[..20];
-        await using (var db = Create(options))
+        await using (var db = MemberData.Create(options))
         {
             await db.Database.MigrateAsync(Ct);
             var seeded = await MemberData.SeedAsync(db, member, Ct);
             Assert.True(seeded.Failures.Count == 0, "Rows this test couldn't make from the model alone; teach MemberData about them:\n  " + string.Join("\n  ", seeded.Failures));
         }
 
-        await using var read = Create(options);
+        await using var read = MemberData.Create(options);
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", member)], "test"));
         var json = JsonSerializer.Serialize(Value(await export(user, read)), new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var held = await MemberData.DistinctiveAsync(read, member, Ct);
@@ -115,7 +120,4 @@ public sealed class ExportTests(PostgresServer server)
         IValueHttpResult value => value.Value,
         _ => throw new InvalidOperationException($"The export answered {result.GetType().Name}, which carries nothing.")
     };
-
-    private static TContext Create<TContext>(DbContextOptions<TContext> options) where TContext : DbContext =>
-        (TContext)Activator.CreateInstance(typeof(TContext), options)!;
 }

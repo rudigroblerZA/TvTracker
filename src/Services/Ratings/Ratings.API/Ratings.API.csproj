@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ratings.IntegrationTests" />
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
   </ItemGroup>
 
 </Project>

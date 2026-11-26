@@ -15,7 +15,7 @@ public static class ExportApi
     /// <summary>
     /// The user's tracking data, collected by Identity.API's account export.
     /// </summary>
-    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, TrackingContext db, CancellationToken ct)
+    internal static async Task<IResult> ExportAsync(ClaimsPrincipal user, TrackingContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var follows = await db.Follows.AsNoTracking().Where(f => f.UserId == userId)

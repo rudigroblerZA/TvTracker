@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Tracking.Data\Tracking.Data.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Privacy.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

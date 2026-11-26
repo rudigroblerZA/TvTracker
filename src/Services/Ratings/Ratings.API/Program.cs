@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Ratings.API.Apis;
 using Ratings.API.IntegrationEvents;
 using Ratings.API.Services;

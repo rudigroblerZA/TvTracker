@@ -18,11 +18,10 @@ public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders pr
 {
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
-        await db.HandleOnceAsync(e, nameof(UserDeletedHandler), async () =>
-        {
-            await StopSubscriptionsAsync(e.UserId, ct);
-            await RemoveRecordsAsync(e.UserId, ct);
-        }, ct);
+        // The providers are asked first, outside the inbox's transaction: a slow one mustn't hold it open, and an event
+        // delivered again finds nothing running to stop.
+        await StopSubscriptionsAsync(e.UserId, ct);
+        await db.HandleOnceAsync(e, nameof(UserDeletedHandler), () => RemoveRecordsAsync(e.UserId, ct), ct);
     }
 
     /// <summary>
@@ -31,7 +30,7 @@ public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders pr
     /// </summary>
     private async Task StopSubscriptionsAsync(string userId, CancellationToken ct)
     {
-        foreach (var subscription in await db.Subscriptions.Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
+        foreach (var subscription in await db.Subscriptions.AsNoTracking().Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
         {
             try
             {

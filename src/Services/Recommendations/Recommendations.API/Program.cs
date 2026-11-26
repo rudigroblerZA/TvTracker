@@ -1,10 +1,10 @@
-using TvTracker.UserPlans;
 ﻿using Recommendations.API.Apis;
 using Recommendations.API.IntegrationEvents;
 using Recommendations.API.Services;
 using Recommendations.Data;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
+using TvTracker.UserPlans;
 
 var builder = WebApplication.CreateBuilder(args);
 

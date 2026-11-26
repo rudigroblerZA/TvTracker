@@ -367,6 +367,8 @@ public class RatingsContext(DbContextOptions<RatingsContext> options) : DbContex
         {
             entity.ToTable("moderation_actions");
             entity.HasIndex(a => a.AtUtc);
+            // For the deletion handler and the export, which ask for one moderator's actions.
+            entity.HasIndex(a => a.ModeratorId);
             entity.Property(a => a.ModeratorId).HasMaxLength(64);
             entity.Property(a => a.ModeratorName).HasMaxLength(100);
             entity.Property(a => a.Action).HasMaxLength(16);

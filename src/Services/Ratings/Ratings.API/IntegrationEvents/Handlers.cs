@@ -36,14 +36,10 @@ public sealed class EpisodeWatchedHandler(RatingsContext db) : IIntegrationEvent
 
 public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEventHandler<EpisodeUnwatchedIntegrationEvent>
 {
-    public async Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct)
-    {
-        await db.HandleOnceAsync(e, nameof(EpisodeUnwatchedHandler), async () =>
-        {
-            await db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
-            // A favourite-character vote on the episode goes with the watch (see RatingsContext).
-        }, ct);
-    }
+    // A favourite-character vote on the episode goes with the watch (see RatingsContext).
+    public Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, nameof(EpisodeUnwatchedHandler),
+            () => db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct), ct);
 }
 
 /// <summary>

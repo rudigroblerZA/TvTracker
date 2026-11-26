@@ -2,7 +2,8 @@ namespace TvTracker.IntegrationEvents;
 
 /// <summary>
 /// How a service repairs its copy of something a member did (their watched episodes, their follows) from the owning
-/// service's snapshot of it (<see cref="TrackingSnapshotIntegrationEvent"/>): one rule for every copy.
+/// service's snapshot of it (<see cref="TrackingSnapshotIntegrationEvent"/>): one rule for every copy that keeps a row
+/// for each thing done. (Recommendations keeps a count per show instead, and sets it from the snapshot whole.)
 /// <list type="bullet">
 /// <item><b>Missing:</b> in the snapshot but not the copy (an event was lost). Added.</item>
 /// <item><b>Gone:</b> in the copy but not the snapshot, and recorded before the snapshot was taken (the removal was
