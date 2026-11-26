@@ -30,7 +30,15 @@ public record FinancialBookDto(string Currency, IReadOnlyList<FinancialRowDto> M
 /// <param name="Books">One for each currency, the busiest first.</param>
 /// <param name="AffiliatesOff">Affiliate links are switched off, so there is no commission in the figures.</param>
 public record FinancialStatementDto(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialBookDto> Books,
-    IReadOnlyList<string> Categories, bool AffiliatesOff);
+    IReadOnlyList<string> Categories, bool AffiliatesOff)
+{
+    // What an app from before affiliates and payments moved here reads in their place (a phone's app is updated when
+    // its owner gets round to it): without them it warns that subscription income is missing. Remove both once no
+    // such app is in use.
+    public bool SubscriptionsKnown => true;
+
+    public string Affiliates => AffiliatesOff ? "off" : "on";
+}
 
 /// <summary>
 /// What the payment provider is assumed to keep of each payment, for the fee estimate (<c>Financials</c>). The

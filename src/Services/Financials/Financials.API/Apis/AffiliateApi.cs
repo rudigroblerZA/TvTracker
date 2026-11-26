@@ -295,7 +295,7 @@ public static partial class AffiliateApi
 
     /// <summary>
     /// When a click id was made: Catalog.API makes them as version 7 ids, whose first 48 bits are the time in
-    /// milliseconds. Null for any other kind of id.
+    /// milliseconds. Null for any other kind of id, and for one whose time is past what a date can hold.
     /// </summary>
     internal static DateTimeOffset? MadeAt(Guid clickId)
     {
@@ -309,7 +309,7 @@ public static partial class AffiliateApi
         {
             milliseconds = milliseconds << 8 | bytes[i];
         }
-        return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+        return milliseconds <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds() ? DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) : null;
     }
 
     /// <summary>

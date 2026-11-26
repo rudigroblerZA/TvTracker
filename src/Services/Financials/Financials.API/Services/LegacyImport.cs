@@ -58,10 +58,19 @@ public static class LegacyImport
     internal static async Task CopyAsync(FinancialsContext db, string sourceConnectionString, IReadOnlyList<(string Table, string Select)> tables,
         string what, ILogger logger, CancellationToken ct)
     {
-        // An old database that can't be opened stops the start: were the service to carry on, its first new row would
-        // make these tables look filled, and what was kept before would never be copied.
+        // An old database that can't be reached stops the start: were the service to carry on, its first new row would
+        // make these tables look filled, and what was kept before would never be copied. One that isn't there at all
+        // (dropped since, or never made) has nothing to copy, like one without the tables.
         await using var source = new NpgsqlConnection(sourceConnectionString);
-        await source.OpenAsync(ct);
+        try
+        {
+            await source.OpenAsync(ct);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.InvalidCatalogName)
+        {
+            logger.LogInformation("No old database to copy {What} from: {Message}", what, ex.MessageText);
+            return;
+        }
         foreach (var (table, _) in tables)
         {
             await using var exists = new NpgsqlCommand("select to_regclass(@name) is not null", source);

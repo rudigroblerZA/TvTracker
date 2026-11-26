@@ -111,10 +111,7 @@ public sealed class ErasureTests(PostgresServer server)
         HashSet<string> notAboutAMember =
         [
             "Name", "ExternalId", "ShowExternalId", "ImdbId", "TvdbId", "TmdbId", "WikidataId", "GifId", "PlaceId", "EventId", "TransactionId",
-            "ProviderSubscriptionId", "ProviderPaymentId", "PersonName", "ProviderName", "ShowName", "NetworkName", "Title", "EventTypeName",
-            // The admin who last saved the payment settings, by username. It is the deployment's own record of who set
-            // its keys; an account's deletion names an id, not a username, so it can't be found from one and is kept.
-            "UpdatedBy"
+            "ProviderSubscriptionId", "ProviderPaymentId", "PersonName", "ProviderName", "ShowName", "NetworkName", "Title", "EventTypeName"
         ];
         DbContext[] models =
         [

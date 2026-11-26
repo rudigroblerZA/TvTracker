@@ -47,10 +47,11 @@ public sealed class SubscriptionPlanHandlers(IdentityContext db, IIntegrationEve
             {
                 logger.LogInformation("Plan of {UserId} set to {Plan} by their subscription", userId, profile.Plan);
             }
-            else
+            else if (e is SubscriptionStartedIntegrationEvent)
             {
                 // Nothing to move (subscribing again to the plan they still have), but it is the newest word on their
-                // plan: an older event still on its way mustn't undo it.
+                // plan: an older event still on its way mustn't undo it. An ending that moved nothing was about a plan
+                // that is no longer theirs, and says nothing about the one they have.
                 profile.PlanChangedAtUtc = at.UtcDateTime;
             }
         }

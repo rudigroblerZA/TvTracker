@@ -39,6 +39,12 @@ public class PaymentSettings
     /// The admin who last saved them (a username).
     /// </summary>
     public string? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// That admin's id, so their name can be taken off when their account is deleted. Null on a row saved before this
+    /// was kept.
+    /// </summary>
+    public string? UpdatedById { get; set; }
 }
 
 /// <summary>

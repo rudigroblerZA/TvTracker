@@ -140,6 +140,7 @@ public class FinancialsContext(DbContextOptions<FinancialsContext> options) : Db
             entity.Property(s => s.StripeWebhookSecret).HasMaxLength(1024);
             entity.Property(s => s.StripePortalUrl).HasMaxLength(Data.PaymentSettings.PortalUrlLength);
             entity.Property(s => s.UpdatedBy).HasMaxLength(Data.PaymentSettings.UpdatedByLength);
+            entity.Property(s => s.UpdatedById).HasMaxLength(64);
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

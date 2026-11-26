@@ -9,7 +9,7 @@ namespace Financials.API.IntegrationEvents;
 
 /// <summary>
 /// An account was deleted: its running subscriptions are stopped at their providers, so nobody is charged for an account
-/// that's gone, and its payment records are removed. A provider that doesn't answer is logged to be stopped by hand; the
+/// that's gone, its payment records are removed, and their name comes off the payment settings they saved. A provider that doesn't answer is logged to be stopped by hand; the
 /// records go all the same, as the person asked. The provider's confirmation then finds no subscription here
 /// (<see cref="LedgerResult.NotHere"/>).
 /// </summary>
@@ -55,5 +55,10 @@ public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders pr
         db.Receipts.RemoveRange(await db.Receipts.Where(r => r.UserId == userId).ToListAsync(ct));
         db.Subscriptions.RemoveRange(await db.Subscriptions.Where(s => s.UserId == userId).ToListAsync(ct));
         db.CheckoutSessions.RemoveRange(await db.CheckoutSessions.Where(c => c.UserId == userId).ToListAsync(ct));
+        // The settings an admin saved stay in force; who saved them is no longer said.
+        foreach (var settings in await db.PaymentSettings.Where(s => s.UpdatedById == userId).ToListAsync(ct))
+        {
+            (settings.UpdatedBy, settings.UpdatedById) = (null, null);
+        }
     }
 }

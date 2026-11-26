@@ -50,13 +50,13 @@ public static class Backlog
     private static readonly string[] Order = ["start-next", "worth-it", "long", "ends-badly", "let-it-go"];
 
     /// <summary>
-    /// A followed, unstarted show with how much it's worth to the viewer and what to do about it.
-    /// </summary>
-    /// <summary>
     /// The verdict of a show worth watching that runs <see cref="LongMinutes"/> or more: the lean cut's length is worked out for these.
     /// </summary>
     internal const string Long = "long";
 
+    /// <summary>
+    /// A followed, unstarted show with how much it's worth to the viewer and what to do about it.
+    /// </summary>
     internal sealed record Assessed(ShowCopy Show, int Episodes, int Minutes, ShowValue.Assessment Assessment, string Verdict);
 
     /// <summary>
