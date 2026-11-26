@@ -9,7 +9,7 @@ namespace Ratings.API.IntegrationEvents;
 /// <summary>
 /// Records watched episodes so comments can stay hidden until the reader has watched, and for episode duels.
 /// </summary>
-public sealed class EpisodeWatchedHandler(RatingsContext db, TimeProvider time) : IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>
+public sealed class EpisodeWatchedHandler(RatingsContext db) : IIntegrationEventHandler<EpisodeWatchedIntegrationEvent>
 {
     public async Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct)
     {
@@ -19,7 +19,6 @@ public sealed class EpisodeWatchedHandler(RatingsContext db, TimeProvider time) 
             var existing = await db.WatchedEpisodes
                 .Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId))
                 .ToDictionaryAsync(w => w.EpisodeId, ct);
-            var now = time.GetUtcNow().UtcDateTime;
             foreach (var id in ids)
             {
                 if (existing.TryGetValue(id, out var copy))
@@ -28,7 +27,7 @@ public sealed class EpisodeWatchedHandler(RatingsContext db, TimeProvider time) 
                 }
                 else
                 {
-                    db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, RecordedAtUtc = now });
+                    db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, RecordedAtUtc = e.CreatedAt.UtcDateTime });
                 }
             }
         }, ct);
@@ -51,30 +50,23 @@ public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEve
 /// Repairs the watched copy from Tracking's daily snapshot: adds what's missing, fills in show ids, and removes what's
 /// gone, keeping anything recorded after the snapshot was read. Before this, an unwatch never reached Ratings.
 /// </summary>
-public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time) : IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>
+public sealed class TrackingSnapshotHandler(RatingsContext db) : IIntegrationEventHandler<TrackingSnapshotIntegrationEvent>
 {
     public async Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
     {
         await db.HandleOnceAsync(e, nameof(TrackingSnapshotHandler), async () =>
         {
-            var watches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId, w => w.ShowId);
-            var copies = await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct);
-            var takenAt = e.TakenAtUtc.UtcDateTime;
-            foreach (var copy in copies)
+            var watches = SnapshotRepair.Of(await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct), e.Watches,
+                w => w.EpisodeId, w => w.EpisodeId, w => w.RecordedAtUtc, e.TakenAtUtc);
+            foreach (var (copy, watch) in watches.Both)
             {
-                if (watches.TryGetValue(copy.EpisodeId, out var showId))
-                {
-                    copy.ShowId = showId;
-                }
-                else if (copy.RecordedAtUtc < takenAt)
-                {
-                    db.WatchedEpisodes.Remove(copy);
-                }
+                copy.ShowId = watch.ShowId;
             }
-            var known = copies.Select(c => c.EpisodeId).ToHashSet();
-            var now = time.GetUtcNow().UtcDateTime;
-            db.WatchedEpisodes.AddRange(watches.Where(w => !known.Contains(w.Key))
-                .Select(w => new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = w.Key, ShowId = w.Value, RecordedAtUtc = now }));
+            db.WatchedEpisodes.RemoveRange(watches.Gone);
+            db.WatchedEpisodes.AddRange(watches.Missing.Select(w => new WatchedEpisodeCopy
+            {
+                UserId = e.UserId, EpisodeId = w.EpisodeId, ShowId = w.ShowId, RecordedAtUtc = e.TakenAtUtc.UtcDateTime
+            }));
         }, ct);
     }
 }

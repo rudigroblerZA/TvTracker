@@ -265,7 +265,8 @@ public sealed class UserStateHandlers(SocialContext db) :
                 UserId = e.UserId,
                 EpisodeId = id,
                 ShowId = e.ShowId,
-                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime
+                WatchedAtUtc = (e.WatchedAtUtc ?? e.CreatedAt).UtcDateTime,
+                RecordedAtUtc = e.CreatedAt.UtcDateTime
             }));
         }, ct);
 
@@ -299,17 +300,17 @@ public sealed class UserStateHandlers(SocialContext db) :
         db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var takenAt = e.TakenAtUtc.UtcDateTime;
-            var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
-            var watched = watches.Select(w => w.EpisodeId).ToHashSet();
-            var snapshot = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
-            db.Watches.AddRange(snapshot.Values.Where(w => !watched.Contains(w.EpisodeId)).Select(w => new UserWatch
+            var watches = SnapshotRepair.Of(await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct), e.Watches,
+                w => w.EpisodeId, w => w.EpisodeId, w => w.RecordedAtUtc, e.TakenAtUtc);
+            db.Watches.AddRange(watches.Missing.Select(w => new UserWatch
             {
                 UserId = e.UserId,
                 EpisodeId = w.EpisodeId,
                 ShowId = w.ShowId,
-                WatchedAtUtc = w.WatchedAtUtc.UtcDateTime
+                WatchedAtUtc = w.WatchedAtUtc.UtcDateTime,
+                RecordedAtUtc = takenAt
             }));
-            db.Watches.RemoveRange(watches.Where(w => !snapshot.ContainsKey(w.EpisodeId) && w.WatchedAtUtc < takenAt));
+            db.Watches.RemoveRange(watches.Gone);
 
             var shows = await db.UserShows.Where(s => s.UserId == e.UserId).ToDictionaryAsync(s => s.ShowId, ct);
             var follows = e.Follows.DistinctBy(f => f.ShowId).ToDictionary(f => f.ShowId);
@@ -425,41 +426,5 @@ public sealed class SharedListHandlers(SocialContext db) :
         copy.Description = description;
         copy.ShowIds = showIds.ToList();
         copy.UpdatedAtUtc = updatedAt.UtcDateTime;
-    }
-}
-
-/// <summary>
-/// Keeps <see cref="UserPlanCopy"/> from Identity's plan changes and daily profile snapshot (which heals a lost change), as
-/// Tracking does; the newest by Identity's change time wins.
-/// </summary>
-public sealed class PlanHandlers(SocialContext db)
-    : IIntegrationEventHandler<UserPlanChangedIntegrationEvent>, IIntegrationEventHandler<UserProfileSnapshotIntegrationEvent>
-{
-    public Task HandleAsync(UserPlanChangedIntegrationEvent e, CancellationToken ct) =>
-        ApplyAsync(e, e.UserId, e.Plan, e.ChangedAtUtc, ct);
-
-    // A snapshot from before plans existed carries none; a plan never changed is free since sign-up, as old as can be.
-    public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
-        e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
-
-    private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
-    {
-        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<PlanHandlers>(e), async () =>
-        {
-            var copy = await db.Plans.FindAsync([userId], ct);
-            if (copy is null)
-            {
-                // Free with no change is what no row already means.
-                if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
-                {
-                    db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
-                }
-            }
-            else if (changedAt >= copy.ChangedAtUtc)
-            {
-                copy.Plan = plan;
-                copy.ChangedAtUtc = changedAt;
-            }
-        }, ct);
     }
 }

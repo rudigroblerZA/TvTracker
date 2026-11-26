@@ -3,7 +3,7 @@ using TvTracker.Persistence;
 
 namespace Social.Data;
 
-public class SocialContext(DbContextOptions<SocialContext> options) : DbContext(options), IIntegrationEventLogDbContext
+public class SocialContext(DbContextOptions<SocialContext> options) : DbContext(options), IIntegrationEventLogDbContext, IUserPlanCopies
 {
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<UserFollow> Follows => Set<UserFollow>();
@@ -22,13 +22,7 @@ public class SocialContext(DbContextOptions<SocialContext> options) : DbContext(
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<UserPlanCopy>(entity =>
-        {
-            entity.ToTable("user_plans");
-            entity.HasKey(p => p.UserId);
-            entity.Property(p => p.UserId).HasMaxLength(64);
-            entity.Property(p => p.Plan).HasMaxLength(16);
-        });
+        modelBuilder.AddUserPlanCopies();
 
         modelBuilder.Entity<Profile>(entity =>
         {

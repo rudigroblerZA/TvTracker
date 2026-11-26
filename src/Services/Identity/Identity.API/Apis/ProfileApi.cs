@@ -232,7 +232,9 @@ public static class ProfileApi
         var export = new JsonObject
         {
             ["exportedAtUtc"] = time.GetUtcNow().UtcDateTime,
-            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile))
+            ["profile"] = JsonSerializer.SerializeToNode(ToDto(profile)),
+            // Their own plan and when it last changed; the services that keep a copy of it don't export theirs.
+            ["plan"] = new JsonObject { ["plan"] = profile.Plan, ["changedAtUtc"] = profile.PlanChangedAtUtc }
         };
 
         foreach (var source in ExportSources)

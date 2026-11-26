@@ -3,7 +3,7 @@ using TvTracker.Persistence;
 
 namespace Analytics.Data;
 
-public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbContext(options), IIntegrationEventLogDbContext
+public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbContext(options), IIntegrationEventLogDbContext, IUserPlanCopies
 {
     public DbSet<ShowCopy> Shows => Set<ShowCopy>();
     public DbSet<EpisodeCopy> Episodes => Set<EpisodeCopy>();
@@ -175,13 +175,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.Property(p => p.Document).HasColumnType("jsonb");
         });
 
-        modelBuilder.Entity<UserPlanCopy>(entity =>
-        {
-            entity.ToTable("user_plans");
-            entity.HasKey(p => p.UserId);
-            entity.Property(p => p.UserId).HasMaxLength(64);
-            entity.Property(p => p.Plan).HasMaxLength(16);
-        });
+        modelBuilder.AddUserPlanCopies();
 
         modelBuilder.Entity<UserService>(entity =>
         {

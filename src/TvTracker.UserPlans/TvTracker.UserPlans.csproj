@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A member's plan, for the services that keep their own copy of it (Tracking, Analytics, Social, Recommendations):
+    keeping the copy from Identity's events, reading the caller's plan from it, and what that plan allows.
+  -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\TvTracker.Persistence\TvTracker.Persistence.csproj" />
+    <ProjectReference Include="..\TvTracker.IntegrationEvents\TvTracker.IntegrationEvents.csproj" />
+  </ItemGroup>
+
+</Project>

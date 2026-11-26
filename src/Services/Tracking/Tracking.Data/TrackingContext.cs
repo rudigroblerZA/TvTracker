@@ -3,7 +3,7 @@ using TvTracker.Persistence;
 
 namespace Tracking.Data;
 
-public class TrackingContext(DbContextOptions<TrackingContext> options) : DbContext(options), IIntegrationEventLogDbContext
+public class TrackingContext(DbContextOptions<TrackingContext> options) : DbContext(options), IIntegrationEventLogDbContext, IUserPlanCopies
 {
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<WatchedEpisode> WatchedEpisodes => Set<WatchedEpisode>();
@@ -52,13 +52,7 @@ public class TrackingContext(DbContextOptions<TrackingContext> options) : DbCont
             entity.HasKey(i => new { i.ListId, i.ShowId });
         });
 
-        modelBuilder.Entity<UserPlanCopy>(entity =>
-        {
-            entity.ToTable("user_plans");
-            entity.HasKey(p => p.UserId);
-            entity.Property(p => p.UserId).HasMaxLength(64);
-            entity.Property(p => p.Plan).HasMaxLength(16);
-        });
+        modelBuilder.AddUserPlanCopies();
 
         modelBuilder.Entity<ShowCopy>(entity =>
         {

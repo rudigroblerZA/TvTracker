@@ -113,14 +113,20 @@ public static class RecommendationsApi
         return TypedResults.NoContent();
     }
 
-    private static async Task<IResult> ExportAsync(ClaimsPrincipal user, RecommendationsContext db, CancellationToken ct)
+    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, RecommendationsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var dismissed = await db.Dismissals.AsNoTracking().Where(d => d.UserId == userId)
             .Select(d => new { d.ShowId, d.DismissedAtUtc })
             .ToListAsync(ct);
 
-        return Results.Ok(new { dismissedShows = dismissed });
+        // What was worked out for them from what they follow, watch and rate (which Tracking and Ratings export).
+        var recommended = await db.UserRecommendations.AsNoTracking().Where(r => r.UserId == userId)
+            .OrderBy(r => r.Rank)
+            .Select(r => new { r.ShowId, r.Rank, r.Score, r.Reason, r.ComputedAtUtc })
+            .ToListAsync(ct);
+
+        return Results.Ok(new { dismissedShows = dismissed, recommendations = recommended });
     }
 
     private static async Task<List<RecommendedShowDto>> ToDtosAsync(List<ScoredShow> picks, RecommendationsContext db, CancellationToken ct)

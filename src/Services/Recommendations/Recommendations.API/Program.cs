@@ -1,3 +1,4 @@
+using TvTracker.UserPlans;
 ﻿using Recommendations.API.Apis;
 using Recommendations.API.IntegrationEvents;
 using Recommendations.API.Services;
@@ -10,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
-builder.Services.AddUserPlans<Recommendations.API.Services.CopiedUserPlans>();
+builder.Services.AddCopiedUserPlans<RecommendationsContext>();
 
 builder.AddNpgsqlDbContext<RecommendationsContext>("recommendationsdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 // Databases made by EnsureCreated, before migrations, have InitialCreate's schema.
@@ -20,8 +21,8 @@ builder.AddRedisDistributedCache("redis");
 builder.Services.AddHybridCache();
 
 builder.AddRabbitMQEventBus("eventbus")
-    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
-    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>()
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanCopyHandlers<RecommendationsContext>>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanCopyHandlers<RecommendationsContext>>()
     .AddSubscription<ShowAddedIntegrationEvent, ShowFeaturesHandler>()
     .AddSubscription<ShowUpdatedIntegrationEvent, ShowFeaturesHandler>()
     .AddSubscription<ShowDnaChangedIntegrationEvent, ShowFeaturesHandler>()

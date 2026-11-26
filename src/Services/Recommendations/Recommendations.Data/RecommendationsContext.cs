@@ -5,7 +5,7 @@ using TvTracker.Persistence;
 
 namespace Recommendations.Data;
 
-public class RecommendationsContext(DbContextOptions<RecommendationsContext> options) : DbContext(options), IIntegrationEventLogDbContext
+public class RecommendationsContext(DbContextOptions<RecommendationsContext> options) : DbContext(options), IIntegrationEventLogDbContext, IUserPlanCopies
 {
     public DbSet<ShowFeatures> Shows => Set<ShowFeatures>();
     public DbSet<ShowDna> Dna => Set<ShowDna>();
@@ -22,13 +22,7 @@ public class RecommendationsContext(DbContextOptions<RecommendationsContext> opt
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<UserPlanCopy>(entity =>
-        {
-            entity.ToTable("user_plans");
-            entity.HasKey(p => p.UserId);
-            entity.Property(p => p.UserId).HasMaxLength(64);
-            entity.Property(p => p.Plan).HasMaxLength(16);
-        });
+        modelBuilder.AddUserPlanCopies();
 
         modelBuilder.Entity<ShowFeatures>(entity =>
         {

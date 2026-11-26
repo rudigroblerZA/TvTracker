@@ -19,6 +19,27 @@ public interface IUserPlans
     /// <see cref="FeatureFlags.Plans"/> flag is off for the caller) or the plan can't be found, so plan rules let them in.
     /// </summary>
     Task<string?> PlanAsync(HttpContext context);
+
+    /// <summary>
+    /// The caller's plan whether or not plans apply to them, and whether they do: for a plan's limits, where the answer
+    /// names the plan even while nothing is limited. The plan is null when it can't be found.
+    /// </summary>
+    Task<(string? Plan, bool Applies)> OfAsync(HttpContext context);
+}
+
+/// <summary>
+/// The refusal when something isn't on the caller's plan, the same from every service, so clients can tell it from
+/// other refusals and offer the upgrade.
+/// </summary>
+public static class PlanRefusal
+{
+    public const string ProblemType = "plan-limit";
+
+    /// <summary>
+    /// 403, typed <see cref="ProblemType"/>, with the reason.
+    /// </summary>
+    public static Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult Problem(string detail) =>
+        TypedResults.Problem(detail, statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: ProblemType);
 }
 
 /// <summary>
@@ -43,13 +64,21 @@ public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUs
     /// </summary>
     protected virtual TimeSpan CacheFor => TimeSpan.FromSeconds(30);
 
-    public async Task<string?> PlanAsync(HttpContext context)
+    public async Task<string?> PlanAsync(HttpContext context) =>
+        await AppliesAsync(context) ? await NamedAsync(context) : null;
+
+    public async Task<(string? Plan, bool Applies)> OfAsync(HttpContext context) =>
+        (await NamedAsync(context), await AppliesAsync(context));
+
+    private Task<bool> AppliesAsync(HttpContext context) =>
+        flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(context.User), context.RequestAborted);
+
+    /// <summary>
+    /// The caller's plan: free when signed out, null when it can't be found; kept a short while per user.
+    /// </summary>
+    private async Task<string?> NamedAsync(HttpContext context)
     {
         var user = context.User;
-        if (!await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), context.RequestAborted))
-        {
-            return null;
-        }
         if (user.Identity?.IsAuthenticated != true)
         {
             return FeatureFlags.FreePlan;

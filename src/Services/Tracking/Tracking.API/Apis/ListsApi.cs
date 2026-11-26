@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Tracking.Data;
 using TvTracker;
+using TvTracker.UserPlans;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
@@ -68,16 +69,16 @@ public static class ListsApi
     /// <summary>
     /// What the caller's plan allows, as the list endpoints enforce it, and how many lists they have.
     /// </summary>
-    private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, CachedFlags flags, CancellationToken ct)
+    private static async Task<Ok<ListLimitsDto>> GetLimitsAsync(ClaimsPrincipal user, TrackingContext db, HttpContext http, IUserPlans plans, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var (plan, limits) = await PlanAsync(user, db, flags, ct);
+        var (plan, limits) = await plans.AllowanceAsync(http);
         var lists = await db.Lists.CountAsync(l => l.UserId == userId, ct);
         return TypedResults.Ok(new ListLimitsDto(plan, limits?.MaxLists, limits?.ShareLists ?? true, lists, limits is not null));
     }
 
     private static async Task<Results<Created<ListSummaryDto>, ValidationProblem, ProblemHttpResult>> CreateListAsync(
-        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
+        CreateListRequest request, ClaimsPrincipal user, TrackingContext db, HttpContext http, IUserPlans plans, TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
         {
@@ -90,9 +91,9 @@ public static class ListsApi
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [$"You can have at most {MaxListsPerUser} lists."] });
         }
-        if (await PlanAsync(user, db, flags, ct) is (var plan, { MaxLists: { } max }) && count >= max)
+        if (await plans.AllowanceAsync(http) is (var plan, { MaxLists: { } max }) && count >= max)
         {
-            return PlanLimit($"{Plans.Name(plan)} accounts can have {max} lists. {Plans.Name(Plans.Plus)} has as many as you like.");
+            return PlanRefusal.Problem($"{Plans.Name(plan)} accounts can have {max} lists. {Plans.Name(Plans.Plus)} has as many as you like.");
         }
 
         var now = time.GetUtcNow().UtcDateTime;
@@ -136,7 +137,7 @@ public static class ListsApi
     }
 
     private static async Task<Results<NoContent, NotFound, ValidationProblem, ProblemHttpResult>> UpdateListAsync(
-        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, CachedFlags flags,
+        Guid id, UpdateListRequest request, ClaimsPrincipal user, TrackingContext db, IIntegrationEventOutbox outbox, HttpContext http, IUserPlans plans,
         TimeProvider time, CancellationToken ct)
     {
         if (Validate(request.Name, request.Description) is { } errors)
@@ -151,9 +152,9 @@ public static class ListsApi
         }
 
         var wasShared = list.Shared;
-        if (request.Shared == true && !wasShared && await PlanAsync(user, db, flags, ct) is (var plan, { ShareLists: false }))
+        if (request.Shared == true && !wasShared && await plans.AllowanceAsync(http) is (var plan, { ShareLists: false }))
         {
-            return PlanLimit($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
+            return PlanRefusal.Problem($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
         }
 
         list.Name = request.Name.Trim();
@@ -287,7 +288,7 @@ public static class ListsApi
     /// Gives the list a link, or returns the one it has.
     /// </summary>
     private static async Task<Results<Ok<ListLinkDto>, NotFound, ProblemHttpResult>> CreateLinkAsync(
-        Guid id, ClaimsPrincipal user, TrackingContext db, CachedFlags flags, CancellationToken ct)
+        Guid id, ClaimsPrincipal user, TrackingContext db, HttpContext http, IUserPlans plans, CancellationToken ct)
     {
         var list = await FindOwnedAsync(id, user, db, ct);
         if (list is null)
@@ -296,9 +297,9 @@ public static class ListsApi
         }
         if (list.LinkToken is null)
         {
-            if (await PlanAsync(user, db, flags, ct) is (var plan, { ShareLists: false }))
+            if (await plans.AllowanceAsync(http) is (var plan, { ShareLists: false }))
             {
-                return PlanLimit($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
+                return PlanRefusal.Problem($"Sharing lists is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} lists are just for you.");
             }
             list.LinkToken = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
             await db.SaveChangesAsync(ct);
@@ -339,25 +340,4 @@ public static class ListsApi
             .ToList();
         return TypedResults.Ok(new LinkedListDto(list.Name, list.Description, items, list.UpdatedAtUtc));
     }
-
-    /// <summary>
-    /// The caller's plan and its limits; null limits while the <c>plans</c> flag is off for them (fail open: nobody is
-    /// limited then).
-    /// </summary>
-    private static async Task<(string Plan, PlanLimits? Limits)> PlanAsync(ClaimsPrincipal user, TrackingContext db, CachedFlags flags,
-        CancellationToken ct)
-    {
-        var userId = user.GetUserId();
-        var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
-        var on = await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), ct);
-        return (plan, on ? Plans.Limits(plan) : null);
-    }
-
-    /// <summary>
-    /// 403 with the reason, typed so clients can tell a plan limit from other refusals and offer the upgrade.
-    /// </summary>
-    private static ProblemHttpResult PlanLimit(string detail) =>
-        TypedResults.Problem(detail, statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: PlanLimitProblem);
-
-    public const string PlanLimitProblem = "plan-limit";
 }
