@@ -81,13 +81,15 @@ public static class YearInTv
     internal sealed record Slice(int Shown, IReadOnlyList<int> Years, List<Watch> InYear, List<Watch> LastYear);
 
     /// <summary>
-    /// The year to recap and its watches: the year asked for (when it is one a date can have), else the latest with
-    /// viewing, else this one; with the year before it, for what shifted.
+    /// The year to recap and its watches: the year asked for (when it is one they could have a recap of: from their
+    /// first year with viewing to this one), else the latest with viewing, else this one; with the year before it, for
+    /// what shifted.
     /// </summary>
     internal static Slice Split(IReadOnlyCollection<Watch> watches, int? year, DateOnly today)
     {
         var years = watches.Select(w => w.Day.Year).Distinct().OrderDescending().ToList();
-        var shown = year is >= 1 and <= 9999 ? year.Value : years.Count > 0 ? years[0] : today.Year;
+        var latest = years.Count > 0 ? years[0] : today.Year;
+        var shown = year is { } asked && asked >= Math.Min(years.LastOrDefault(latest), today.Year) && asked <= today.Year ? asked : latest;
         return new Slice(shown, years, watches.Where(w => w.Day.Year == shown).ToList(), watches.Where(w => w.Day.Year == shown - 1).ToList());
     }
 

@@ -17,12 +17,29 @@ public sealed class LegacyImportTests(PostgresServer server)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    /// <summary>
+    /// Configuration that names the old databases, as a deployment's does.
+    /// </summary>
+    private static IConfiguration Old(string identity, string catalog) => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["ConnectionStrings:identitydb"] = identity, ["ConnectionStrings:catalogdb"] = catalog
+    }).Build();
+
+    /// <summary>
+    /// A new Financials database, migrated and empty.
+    /// </summary>
+    private async Task<FinancialsContext> FinancialsAsync()
+    {
+        var db = new FinancialsContext(new DbContextOptionsBuilder<FinancialsContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options);
+        await db.Database.MigrateAsync(Ct);
+        return db;
+    }
+
     [Fact]
     public async Task Rows_kept_before_the_move_are_copied_once()
     {
         var identity = await server.CreateDatabaseAsync();
         var catalog = await server.CreateDatabaseAsync();
-        var financials = await server.CreateDatabaseAsync();
         await using (var old = new IdentityContext(new DbContextOptionsBuilder<IdentityContext>().UseNpgsql(identity).Options))
         {
             await old.Database.MigrateAsync(Ct);
@@ -51,12 +68,8 @@ public sealed class LegacyImportTests(PostgresServer server)
                 values ('66666666-6666-6666-6666-666666666666', '44444444-4444-4444-4444-444444444444', 'netflix-us', 'tx-1', 4.50, 'USD', now());
                 """, Ct);
         }
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ConnectionStrings:identitydb"] = identity, ["ConnectionStrings:catalogdb"] = catalog
-        }).Build();
-        await using var db = new FinancialsContext(new DbContextOptionsBuilder<FinancialsContext>().UseNpgsql(financials).Options);
-        await db.Database.MigrateAsync(Ct);
+        var configuration = Old(identity, catalog);
+        await using var db = await FinancialsAsync();
 
         await LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct);
         // A second start finds its tables filled and copies nothing.
@@ -81,12 +94,8 @@ public sealed class LegacyImportTests(PostgresServer server)
     public async Task A_deployment_that_began_here_has_nothing_to_copy()
     {
         var empty = await server.CreateDatabaseAsync();
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ConnectionStrings:identitydb"] = empty, ["ConnectionStrings:catalogdb"] = empty
-        }).Build();
-        await using var db = new FinancialsContext(new DbContextOptionsBuilder<FinancialsContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options);
-        await db.Database.MigrateAsync(Ct);
+        var configuration = Old(empty, empty);
+        await using var db = await FinancialsAsync();
 
         await LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct);
 
@@ -98,12 +107,8 @@ public sealed class LegacyImportTests(PostgresServer server)
     public async Task An_old_database_that_is_gone_has_nothing_to_copy()
     {
         var gone = new Npgsql.NpgsqlConnectionStringBuilder(await server.CreateDatabaseAsync()) { Database = "dropped_since" }.ConnectionString;
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ConnectionStrings:identitydb"] = gone, ["ConnectionStrings:catalogdb"] = gone
-        }).Build();
-        await using var db = new FinancialsContext(new DbContextOptionsBuilder<FinancialsContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options);
-        await db.Database.MigrateAsync(Ct);
+        var configuration = Old(gone, gone);
+        await using var db = await FinancialsAsync();
 
         await LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct);
 
