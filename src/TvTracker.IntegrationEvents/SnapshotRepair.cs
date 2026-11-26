@@ -13,7 +13,9 @@ namespace TvTracker.IntegrationEvents;
 /// "Recorded" is when the owning service heard of it, on its clock, not when the member says it happened: the phone's
 /// offline queue backdates a watch, and one synced after the snapshot is newer than it whatever its watch time. So a
 /// copy stamps a row from an event with the event's <c>CreatedAt</c> and a row from a snapshot with its
-/// <c>TakenAtUtc</c>, never with its own clock, which needn't agree with the owner's.
+/// <c>TakenAtUtc</c>, never with its own clock, which needn't agree with the owner's. An event for a row the copy
+/// already has (watched again) restamps it (<see cref="Recorded"/>), or a snapshot taken before the event would take the
+/// row for one whose removal was lost.
 /// </summary>
 public static class SnapshotRepair
 {
@@ -22,9 +24,10 @@ public static class SnapshotRepair
 
     /// <param name="copies">What the service holds for the member.</param>
     /// <param name="snapshot">What the owner holds; the first of any repeated key counts.</param>
-    /// <param name="recordedAt">When a copy's row was recorded (see the class).</param>
+    /// <param name="recordedAt">When a copy's row was recorded (see the class); null for a row from before that was
+    /// kept, which is never taken as gone.</param>
     public static Changes<TCopy, TSnapshot> Of<TCopy, TSnapshot, TKey>(IEnumerable<TCopy> copies, IEnumerable<TSnapshot> snapshot,
-        Func<TCopy, TKey> copyKey, Func<TSnapshot, TKey> snapshotKey, Func<TCopy, DateTime> recordedAt, DateTimeOffset takenAt)
+        Func<TCopy, TKey> copyKey, Func<TSnapshot, TKey> snapshotKey, Func<TCopy, DateTime?> recordedAt, DateTimeOffset takenAt)
         where TKey : notnull
     {
         var owned = snapshot.DistinctBy(snapshotKey).ToDictionary(snapshotKey);
@@ -45,4 +48,10 @@ public static class SnapshotRepair
         }
         return new Changes<TCopy, TSnapshot>(owned.Values.Where(s => !held.Contains(snapshotKey(s))).ToList(), gone, both);
     }
+
+    /// <summary>
+    /// When a row the copy already holds counts as recorded after an event about it: the later of what it had and the
+    /// event's time (an event delivered late doesn't make a row older).
+    /// </summary>
+    public static DateTime Recorded(DateTime held, DateTimeOffset eventAt) => held > eventAt.UtcDateTime ? held : eventAt.UtcDateTime;
 }

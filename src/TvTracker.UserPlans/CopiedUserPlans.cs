@@ -14,6 +14,10 @@ namespace TvTracker.UserPlans;
 public sealed class CopiedUserPlans<TContext>(CachedFlags flags, IMemoryCache cache) : UserPlansBase(flags, cache)
     where TContext : DbContext, IUserPlanCopies
 {
+    // Not kept: the copy is a read by key in the request's own database, and a plan that has just changed (someone who
+    // has just paid) must count at once, for limits and for plan rules on flags alike.
+    protected override TimeSpan CacheFor => TimeSpan.Zero;
+
     protected override async Task<string?> LookUpAsync(HttpContext context, string userId) =>
         (await context.RequestServices.GetRequiredService<TContext>().Plans.FindAsync([userId], context.RequestAborted))?.Plan ?? Plans.Free;
 }

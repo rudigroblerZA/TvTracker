@@ -255,14 +255,15 @@ public static class NotificationsApi
     {
         var userId = user.GetUserId();
         var prefs = await db.Preferences.AsNoTracking().SingleOrDefaultAsync(p => p.UserId == userId, ct);
+        var showPreferences = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId)
+            .Select(p => new { p.ShowId, p.Muted }).ToListAsync(ct);
 
         return Results.Ok(new
         {
             preferences = prefs is null ? null : ToDto(prefs),
             // Kept beside showPreferences, which says the same and more, for anything that reads an earlier export's shape.
-            mutedShows = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId && p.Muted).Select(p => p.ShowId).ToListAsync(ct),
-            showPreferences = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId)
-                .Select(p => new { p.ShowId, p.Muted }).ToListAsync(ct),
+            mutedShows = showPreferences.Where(p => p.Muted).Select(p => p.ShowId).ToList(),
+            showPreferences,
             devices = await db.Devices.AsNoTracking().Where(d => d.UserId == userId)
                 .Select(d => new { d.Platform, d.CreatedAtUtc, d.LastSeenAtUtc }).ToListAsync(ct),
             inbox = await db.Inbox.AsNoTracking().Where(i => i.UserId == userId).OrderBy(i => i.CreatedAtUtc)

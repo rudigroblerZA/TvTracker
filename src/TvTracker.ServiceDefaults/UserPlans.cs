@@ -22,8 +22,7 @@ public interface IUserPlans
 
     /// <summary>
     /// The caller's plan whether or not plans apply to them, and whether they do: for a plan's limits, where the answer
-    /// names the plan even while nothing is limited. The plan is null when it can't be found. Unlike
-    /// <see cref="PlanAsync"/> it is looked up on every call, so a change of plan counts at once.
+    /// names the plan even while nothing is limited. The plan is null when it can't be found.
     /// </summary>
     Task<(string? Plan, bool Applies)> OfAsync(HttpContext context);
 }
@@ -45,7 +44,7 @@ public static class PlanRefusal
 
 /// <summary>
 /// The shared part of every plan source: the <see cref="FeatureFlags.Plans"/> switch, signed-out callers, and a short cache
-/// per user; a service supplies the lookup (<see cref="LookUpAsync"/>). Registered scoped, since <see cref="CachedFlags"/>
+/// per user where the source wants one; a service supplies the lookup (<see cref="LookUpAsync"/>). Registered scoped, since <see cref="CachedFlags"/>
 /// and OpenFeature's <see cref="IFeatureClient"/> behind it are (as a singleton, every service that registered one failed to start); the cache is the
 /// process-wide <see cref="IMemoryCache"/>.
 /// <list type="bullet">
@@ -61,26 +60,24 @@ public static class PlanRefusal
 public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUserPlans
 {
     /// <summary>
-    /// How long a user's plan is kept: a change reaches the service within this time.
+    /// How long a user's plan is kept: a change reaches the service within this time. Zero keeps nothing, for a source
+    /// cheap enough to ask every time.
     /// </summary>
     protected virtual TimeSpan CacheFor => TimeSpan.FromSeconds(30);
 
     public async Task<string?> PlanAsync(HttpContext context) =>
         await AppliesAsync(context) ? await NamedAsync(context) : null;
 
-    // Looked up afresh: a limit is enforced on the plan they have now, not the one of half a minute ago, or someone who
-    // has just paid is refused what they paid for.
     public async Task<(string? Plan, bool Applies)> OfAsync(HttpContext context) =>
-        (await NamedAsync(context, fresh: true), await AppliesAsync(context));
+        (await NamedAsync(context), await AppliesAsync(context));
 
     private Task<bool> AppliesAsync(HttpContext context) =>
         flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(context.User), context.RequestAborted);
 
     /// <summary>
-    /// The caller's plan: free when signed out, null when it can't be found; kept a short while per user.
+    /// The caller's plan: free when signed out, null when it can't be found; kept per user for <see cref="CacheFor"/>.
     /// </summary>
-    /// <param name="fresh">Look it up even when one is kept, and keep the answer.</param>
-    private async Task<string?> NamedAsync(HttpContext context, bool fresh = false)
+    private async Task<string?> NamedAsync(HttpContext context)
     {
         var user = context.User;
         if (user.Identity?.IsAuthenticated != true)
@@ -92,8 +89,12 @@ public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUs
             return null;
         }
 
+        if (CacheFor <= TimeSpan.Zero)
+        {
+            return await LookUpAsync(context, id);
+        }
         var key = (nameof(UserPlansBase), id);
-        if (!fresh && cache.TryGetValue(key, out string? known))
+        if (cache.TryGetValue(key, out string? known))
         {
             return known;
         }

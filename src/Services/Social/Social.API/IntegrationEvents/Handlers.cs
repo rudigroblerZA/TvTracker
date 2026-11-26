@@ -260,11 +260,9 @@ public sealed class UserStateHandlers(SocialContext db) :
         {
             var ids = e.EpisodeIds.Distinct().ToList();
             var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).ToListAsync(ct);
-            // Watched again: as new as this event, so a snapshot taken before it can't take the row for one whose
-            // unwatch was lost.
-            foreach (var watch in existing.Where(w => w.RecordedAtUtc < e.CreatedAt.UtcDateTime))
+            foreach (var watch in existing)
             {
-                watch.RecordedAtUtc = e.CreatedAt.UtcDateTime;
+                watch.RecordedAtUtc = SnapshotRepair.Recorded(watch.RecordedAtUtc, e.CreatedAt);
             }
             db.Watches.AddRange(ids.Except(existing.Select(w => w.EpisodeId)).Select(id => new UserWatch
             {
@@ -322,7 +320,7 @@ public sealed class UserStateHandlers(SocialContext db) :
             // A follow is a mark on the member's row for the show, which their rating shares: missing sets it (on a new
             // row if need be), gone clears it. One with no time is from before times were kept, and is left.
             var follows = SnapshotRepair.Of(shows.Values.Where(s => s.Followed).ToList(), e.Follows,
-                s => s.ShowId, f => f.ShowId, s => s.FollowedAtUtc ?? DateTime.MaxValue, e.TakenAtUtc);
+                s => s.ShowId, f => f.ShowId, s => s.FollowedAtUtc, e.TakenAtUtc);
             foreach (var follow in follows.Missing)
             {
                 if (!shows.TryGetValue(follow.ShowId, out var show))

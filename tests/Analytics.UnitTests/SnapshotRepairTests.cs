@@ -70,4 +70,22 @@ public class SnapshotRepairTests
 
         Assert.Equal(2, changes.Gone.Count);
     }
+
+    [Fact]
+    public void A_row_with_no_recorded_time_is_never_taken_as_gone()
+    {
+        var changes = SnapshotRepair.Of([new Copy("old", default)], Array.Empty<Owned>(), c => c.Key, s => s.Key, _ => (DateTime?)null, TakenAt);
+
+        Assert.Empty(changes.Gone);
+    }
+
+    [Fact]
+    public void An_event_about_a_row_already_held_restamps_it_but_never_backwards()
+    {
+        var held = TakenAt.UtcDateTime;
+
+        Assert.Equal(held.AddHours(1), SnapshotRepair.Recorded(held, TakenAt.AddHours(1)));
+        // Delivered late: the row is already newer than the event.
+        Assert.Equal(held, SnapshotRepair.Recorded(held, TakenAt.AddHours(-1)));
+    }
 }
