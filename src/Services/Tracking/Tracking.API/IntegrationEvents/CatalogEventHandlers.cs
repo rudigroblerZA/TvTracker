@@ -88,18 +88,8 @@ public sealed class CatalogEventHandlers(TrackingContext db, TimeProvider time) 
         show.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
     }
 
-    private async Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply)
-    {
-        var handler = $"{nameof(CatalogEventHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
-        {
-            return;
-        }
-
-        await apply();
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
-    }
+    private Task HandleOnceAsync(IntegrationEvent e, CancellationToken ct, Func<Task> apply) =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<CatalogEventHandlers>(e), apply, ct);
 }
 
 /// <summary>
@@ -132,28 +122,22 @@ public sealed class PlanHandlers(TrackingContext db)
 
     private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
     {
-        var handler = $"{nameof(PlanHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, InboxExtensions.HandlerName<PlanHandlers>(e), async () =>
         {
-            return;
-        }
-
-        var copy = await db.Plans.FindAsync([userId], ct);
-        if (copy is null)
-        {
-            // Free with no change is what no row already means.
-            if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+            var copy = await db.Plans.FindAsync([userId], ct);
+            if (copy is null)
             {
-                db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                // Free with no change is what no row already means.
+                if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+                {
+                    db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                }
             }
-        }
-        else if (changedAt >= copy.ChangedAtUtc)
-        {
-            copy.Plan = plan;
-            copy.ChangedAtUtc = changedAt;
-        }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            else if (changedAt >= copy.ChangedAtUtc)
+            {
+                copy.Plan = plan;
+                copy.ChangedAtUtc = changedAt;
+            }
+        }, ct);
     }
 }

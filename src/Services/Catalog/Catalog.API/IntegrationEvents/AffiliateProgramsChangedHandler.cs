@@ -14,23 +14,20 @@ public sealed class AffiliateProgramsChangedHandler(CatalogContext db) : IIntegr
 {
     public async Task HandleAsync(AffiliateProgramsChangedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(AffiliateProgramsChangedHandler), ct))
+        await db.HandleOnceAsync(e, nameof(AffiliateProgramsChangedHandler), async () =>
         {
-            return;
-        }
-        var copy = await db.AffiliatePrograms.FindAsync([AffiliateProgramsCopy.OnlyId], ct);
-        if (copy is null)
-        {
-            db.AffiliatePrograms.Add(new AffiliateProgramsCopy
+            var copy = await db.AffiliatePrograms.FindAsync([AffiliateProgramsCopy.OnlyId], ct);
+            if (copy is null)
             {
-                Id = AffiliateProgramsCopy.OnlyId, Programs = CopiedAffiliatePrograms.Write(e.Programs), AsOfUtc = e.AsOfUtc
-            });
-        }
-        else if (e.AsOfUtc >= copy.AsOfUtc)
-        {
-            (copy.Programs, copy.AsOfUtc) = (CopiedAffiliatePrograms.Write(e.Programs), e.AsOfUtc);
-        }
-        db.MarkProcessed(e, nameof(AffiliateProgramsChangedHandler));
-        await db.SaveChangesAsync(ct);
+                db.AffiliatePrograms.Add(new AffiliateProgramsCopy
+                {
+                    Id = AffiliateProgramsCopy.OnlyId, Programs = CopiedAffiliatePrograms.Write(e.Programs), AsOfUtc = e.AsOfUtc
+                });
+            }
+            else if (e.AsOfUtc >= copy.AsOfUtc)
+            {
+                (copy.Programs, copy.AsOfUtc) = (CopiedAffiliatePrograms.Write(e.Programs), e.AsOfUtc);
+            }
+        }, ct);
     }
 }

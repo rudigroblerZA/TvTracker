@@ -175,18 +175,13 @@ public sealed class UserEventHandlers(NotificationsContext db, NotificationHubPu
 
     public async Task HandleAsync(UserProfileUpdatedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(UserProfileUpdatedIntegrationEvent), ct))
+        await db.HandleOnceAsync(e, nameof(UserProfileUpdatedIntegrationEvent), async () =>
         {
-            return;
-        }
-
-        var prefs = await GetOrCreatePreferencesAsync(e.UserId, ct);
-        prefs.TimeZone = e.TimeZone;
-        prefs.Email = e.Email ?? prefs.Email;
-        prefs.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
-
-        db.MarkProcessed(e, nameof(UserProfileUpdatedIntegrationEvent));
-        await db.SaveChangesAsync(ct);
+            var prefs = await GetOrCreatePreferencesAsync(e.UserId, ct);
+            prefs.TimeZone = e.TimeZone;
+            prefs.Email = e.Email ?? prefs.Email;
+            prefs.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        }, ct);
     }
 
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)

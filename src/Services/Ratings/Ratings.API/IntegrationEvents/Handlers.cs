@@ -13,29 +13,25 @@ public sealed class EpisodeWatchedHandler(RatingsContext db, TimeProvider time) 
 {
     public async Task HandleAsync(EpisodeWatchedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(EpisodeWatchedHandler), ct))
+        await db.HandleOnceAsync(e, nameof(EpisodeWatchedHandler), async () =>
         {
-            return;
-        }
-
-        var ids = e.EpisodeIds.Distinct().ToList();
-        var existing = await db.WatchedEpisodes
-            .Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId))
-            .ToDictionaryAsync(w => w.EpisodeId, ct);
-        var now = time.GetUtcNow().UtcDateTime;
-        foreach (var id in ids)
-        {
-            if (existing.TryGetValue(id, out var copy))
+            var ids = e.EpisodeIds.Distinct().ToList();
+            var existing = await db.WatchedEpisodes
+                .Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId))
+                .ToDictionaryAsync(w => w.EpisodeId, ct);
+            var now = time.GetUtcNow().UtcDateTime;
+            foreach (var id in ids)
             {
-                copy.ShowId = e.ShowId;
+                if (existing.TryGetValue(id, out var copy))
+                {
+                    copy.ShowId = e.ShowId;
+                }
+                else
+                {
+                    db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, RecordedAtUtc = now });
+                }
             }
-            else
-            {
-                db.WatchedEpisodes.Add(new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = id, ShowId = e.ShowId, RecordedAtUtc = now });
-            }
-        }
-        db.MarkProcessed(e, nameof(EpisodeWatchedHandler));
-        await db.SaveChangesAsync(ct);
+        }, ct);
     }
 }
 
@@ -43,15 +39,11 @@ public sealed class EpisodeUnwatchedHandler(RatingsContext db) : IIntegrationEve
 {
     public async Task HandleAsync(EpisodeUnwatchedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(EpisodeUnwatchedHandler), ct))
+        await db.HandleOnceAsync(e, nameof(EpisodeUnwatchedHandler), async () =>
         {
-            return;
-        }
-
-        await db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
-        // A favourite-character vote on the episode goes with the watch (see RatingsContext).
-        db.MarkProcessed(e, nameof(EpisodeUnwatchedHandler));
-        await db.SaveChangesAsync(ct);
+            await db.WatchedEpisodes.Where(w => w.UserId == e.UserId && w.EpisodeId == e.EpisodeId).ExecuteDeleteAsync(ct);
+            // A favourite-character vote on the episode goes with the watch (see RatingsContext).
+        }, ct);
     }
 }
 
@@ -63,31 +55,27 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
 {
     public async Task HandleAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(TrackingSnapshotHandler), ct))
+        await db.HandleOnceAsync(e, nameof(TrackingSnapshotHandler), async () =>
         {
-            return;
-        }
-
-        var watches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId, w => w.ShowId);
-        var copies = await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct);
-        var takenAt = e.TakenAtUtc.UtcDateTime;
-        foreach (var copy in copies)
-        {
-            if (watches.TryGetValue(copy.EpisodeId, out var showId))
+            var watches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId, w => w.ShowId);
+            var copies = await db.WatchedEpisodes.Where(w => w.UserId == e.UserId).ToListAsync(ct);
+            var takenAt = e.TakenAtUtc.UtcDateTime;
+            foreach (var copy in copies)
             {
-                copy.ShowId = showId;
+                if (watches.TryGetValue(copy.EpisodeId, out var showId))
+                {
+                    copy.ShowId = showId;
+                }
+                else if (copy.RecordedAtUtc < takenAt)
+                {
+                    db.WatchedEpisodes.Remove(copy);
+                }
             }
-            else if (copy.RecordedAtUtc < takenAt)
-            {
-                db.WatchedEpisodes.Remove(copy);
-            }
-        }
-        var known = copies.Select(c => c.EpisodeId).ToHashSet();
-        var now = time.GetUtcNow().UtcDateTime;
-        db.WatchedEpisodes.AddRange(watches.Where(w => !known.Contains(w.Key))
-            .Select(w => new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = w.Key, ShowId = w.Value, RecordedAtUtc = now }));
-        db.MarkProcessed(e, nameof(TrackingSnapshotHandler));
-        await db.SaveChangesAsync(ct);
+            var known = copies.Select(c => c.EpisodeId).ToHashSet();
+            var now = time.GetUtcNow().UtcDateTime;
+            db.WatchedEpisodes.AddRange(watches.Where(w => !known.Contains(w.Key))
+                .Select(w => new WatchedEpisodeCopy { UserId = e.UserId, EpisodeId = w.Key, ShowId = w.Value, RecordedAtUtc = now }));
+        }, ct);
     }
 }
 

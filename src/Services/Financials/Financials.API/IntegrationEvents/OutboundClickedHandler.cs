@@ -14,25 +14,27 @@ public sealed class OutboundClickedHandler(FinancialsContext db) : IIntegrationE
 {
     public async Task HandleAsync(OutboundClickedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(OutboundClickedHandler), ct) || await db.OutboundClicks.AnyAsync(c => c.Id == e.ClickId, ct))
+        await db.HandleOnceAsync(e, nameof(OutboundClickedHandler), async () =>
         {
-            return;
-        }
-        db.OutboundClicks.Add(new OutboundClick
-        {
-            Id = e.ClickId,
-            ShowId = e.ShowId,
-            ShowTitle = e.ShowTitle.Length > 256 ? e.ShowTitle[..256] : e.ShowTitle,
-            Service = e.Service,
-            Type = e.Type,
-            Link = e.Link,
-            Region = e.Region,
-            Surface = e.Surface,
-            Plan = e.Plan,
-            Program = e.Program,
-            ClickedAtUtc = e.ClickedAtUtc.UtcDateTime
-        });
-        db.MarkProcessed(e, nameof(OutboundClickedHandler));
-        await db.SaveChangesAsync(ct);
+            // The same click under a new event id (Catalog sent it again): the row is already here.
+            if (await db.OutboundClicks.AnyAsync(c => c.Id == e.ClickId, ct))
+            {
+                return;
+            }
+            db.OutboundClicks.Add(new OutboundClick
+            {
+                Id = e.ClickId,
+                ShowId = e.ShowId,
+                ShowTitle = e.ShowTitle.Length > 256 ? e.ShowTitle[..256] : e.ShowTitle,
+                Service = e.Service,
+                Type = e.Type,
+                Link = e.Link,
+                Region = e.Region,
+                Surface = e.Surface,
+                Plan = e.Plan,
+                Program = e.Program,
+                ClickedAtUtc = e.ClickedAtUtc.UtcDateTime
+            });
+        }, ct);
     }
 }

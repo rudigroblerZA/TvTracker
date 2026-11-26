@@ -19,37 +19,32 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
     public async Task HandleAsync(ShowNanogenresChangedIntegrationEvent e, CancellationToken ct)
     {
         var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
-
-        var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
-        var ids = shows.Select(s => s.ShowId).ToList();
-        var existing = await db.Nanogenres.Where(n => ids.Contains(n.ShowId)).ToDictionaryAsync(n => n.ShowId, ct);
-        var changed = false;
-        foreach (var show in shows)
-        {
-            if (!existing.TryGetValue(show.ShowId, out var row))
+            var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
+            var ids = shows.Select(s => s.ShowId).ToList();
+            var existing = await db.Nanogenres.Where(n => ids.Contains(n.ShowId)).ToDictionaryAsync(n => n.ShowId, ct);
+            var changed = false;
+            foreach (var show in shows)
             {
-                row = new ShowNanogenres { ShowId = show.ShowId };
-                db.Nanogenres.Add(row);
+                if (!existing.TryGetValue(show.ShowId, out var row))
+                {
+                    row = new ShowNanogenres { ShowId = show.ShowId };
+                    db.Nanogenres.Add(row);
+                }
+                else if (row.Names.SequenceEqual(show.Nanogenres))
+                {
+                    continue;
+                }
+                row.Names = show.Nanogenres.ToList();
+                changed = true;
             }
-            else if (row.Names.SequenceEqual(show.Nanogenres))
+
+            if (changed)
             {
-                continue;
+                await MarkEveryoneDirtyAsync(ct);
             }
-            row.Names = show.Nanogenres.ToList();
-            changed = true;
-        }
-
-        if (changed)
-        {
-            await MarkEveryoneDirtyAsync(ct);
-        }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+        }, ct);
     }
 
     /// <summary>
@@ -58,40 +53,35 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
     public async Task HandleAsync(ShowDnaChangedIntegrationEvent e, CancellationToken ct)
     {
         var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
-
-        var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
-        var ids = shows.Select(s => s.ShowId).ToList();
-        var existing = await db.Dna.Where(d => ids.Contains(d.ShowId)).ToDictionaryAsync(d => d.ShowId, ct);
-        var now = time.GetUtcNow().UtcDateTime;
-        var changed = false;
-        foreach (var show in shows)
-        {
-            if (!existing.TryGetValue(show.ShowId, out var dna))
+            var shows = e.Shows.DistinctBy(s => s.ShowId).ToList();
+            var ids = shows.Select(s => s.ShowId).ToList();
+            var existing = await db.Dna.Where(d => ids.Contains(d.ShowId)).ToDictionaryAsync(d => d.ShowId, ct);
+            var now = time.GetUtcNow().UtcDateTime;
+            var changed = false;
+            foreach (var show in shows)
             {
-                dna = new ShowDna { ShowId = show.ShowId };
-                db.Dna.Add(dna);
+                if (!existing.TryGetValue(show.ShowId, out var dna))
+                {
+                    dna = new ShowDna { ShowId = show.ShowId };
+                    db.Dna.Add(dna);
+                }
+                else if (dna.Traits.Count == show.Traits.Count && show.Traits.All(t => dna.Traits.TryGetValue(t.Key, out var v) && v == t.Value))
+                {
+                    continue;
+                }
+
+                dna.Traits = new Dictionary<string, double>(show.Traits);
+                dna.UpdatedAtUtc = now;
+                changed = true;
             }
-            else if (dna.Traits.Count == show.Traits.Count && show.Traits.All(t => dna.Traits.TryGetValue(t.Key, out var v) && v == t.Value))
+
+            if (changed)
             {
-                continue;
+                await MarkEveryoneDirtyAsync(ct);
             }
-
-            dna.Traits = new Dictionary<string, double>(show.Traits);
-            dna.UpdatedAtUtc = now;
-            changed = true;
-        }
-
-        if (changed)
-        {
-            await MarkEveryoneDirtyAsync(ct);
-        }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+        }, ct);
     }
 
     public Task HandleAsync(ShowAddedIntegrationEvent e, CancellationToken ct) =>
@@ -117,30 +107,25 @@ public sealed class ShowFeaturesHandler(RecommendationsContext db, TimeProvider 
         IReadOnlyList<Guid> similar, double popularity, CancellationToken ct)
     {
         var handler = $"{nameof(ShowFeaturesHandler)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
+            var show = await db.Shows.FindAsync([showId], ct);
+            if (show is null)
+            {
+                show = new ShowFeatures { ShowId = showId, Title = title };
+                db.Shows.Add(show);
+            }
 
-        var show = await db.Shows.FindAsync([showId], ct);
-        if (show is null)
-        {
-            show = new ShowFeatures { ShowId = showId, Title = title };
-            db.Shows.Add(show);
-        }
-
-        show.Title = title;
-        show.PosterUrl = posterUrl;
-        show.Status = status;
-        show.Genres = genres.ToList();
-        show.Keywords = keywords.ToList();
-        show.CastNames = cast.ToList();
-        show.SimilarShowIds = similar.ToList();
-        show.Popularity = popularity;
-        show.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            show.Title = title;
+            show.PosterUrl = posterUrl;
+            show.Status = status;
+            show.Genres = genres.ToList();
+            show.Keywords = keywords.ToList();
+            show.CastNames = cast.ToList();
+            show.SimilarShowIds = similar.ToList();
+            show.Popularity = popularity;
+            show.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
+        }, ct);
     }
 }
 
@@ -176,24 +161,20 @@ public sealed class UserSignalHandler(RecommendationsContext db, RecommendationS
     private async Task UpdateAsync(IntegrationEvent e, string userId, Guid showId, Action<UserShowSignal> apply, CancellationToken ct)
     {
         var handler = $"{nameof(UserSignalHandler)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
+            var signal = await db.Signals.FindAsync([userId, showId], ct);
+            if (signal is null)
+            {
+                signal = new UserShowSignal { UserId = userId, ShowId = showId };
+                db.Signals.Add(signal);
+            }
 
-        var signal = await db.Signals.FindAsync([userId, showId], ct);
-        if (signal is null)
-        {
-            signal = new UserShowSignal { UserId = userId, ShowId = showId };
-            db.Signals.Add(signal);
-        }
+            apply(signal);
+            signal.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
 
-        apply(signal);
-        signal.UpdatedAtUtc = time.GetUtcNow().UtcDateTime;
-
-        await store.MarkDirtyAsync(userId, ct);
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            await store.MarkDirtyAsync(userId, ct);
+        }, ct);
     }
 }
 
@@ -227,38 +208,34 @@ public sealed class SnapshotHandler(RecommendationsContext db, RecommendationSto
         Action<UserShowSignal> apply, CancellationToken ct)
     {
         var handler = $"{nameof(SnapshotHandler)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
-
-        var signals = await db.Signals.Where(s => s.UserId == userId).ToDictionaryAsync(s => s.ShowId, ct);
-        foreach (var showId in shows.Where(id => !signals.ContainsKey(id)))
-        {
-            var added = new UserShowSignal { UserId = userId, ShowId = showId };
-            db.Signals.Add(added);
-            signals[showId] = added;
-        }
-
-        var changed = false;
-        var now = time.GetUtcNow().UtcDateTime;
-        foreach (var signal in signals.Values.Where(s => s.UpdatedAtUtc < takenAt.UtcDateTime))
-        {
-            var before = (signal.Followed, signal.EpisodesWatched, signal.Rating);
-            apply(signal);
-            if (before != (signal.Followed, signal.EpisodesWatched, signal.Rating))
+            var signals = await db.Signals.Where(s => s.UserId == userId).ToDictionaryAsync(s => s.ShowId, ct);
+            foreach (var showId in shows.Where(id => !signals.ContainsKey(id)))
             {
-                signal.UpdatedAtUtc = now;
-                changed = true;
+                var added = new UserShowSignal { UserId = userId, ShowId = showId };
+                db.Signals.Add(added);
+                signals[showId] = added;
             }
-        }
 
-        if (changed)
-        {
-            await store.MarkDirtyAsync(userId, ct);
-        }
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            var changed = false;
+            var now = time.GetUtcNow().UtcDateTime;
+            foreach (var signal in signals.Values.Where(s => s.UpdatedAtUtc < takenAt.UtcDateTime))
+            {
+                var before = (signal.Followed, signal.EpisodesWatched, signal.Rating);
+                apply(signal);
+                if (before != (signal.Followed, signal.EpisodesWatched, signal.Rating))
+                {
+                    signal.UpdatedAtUtc = now;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                await store.MarkDirtyAsync(userId, ct);
+            }
+        }, ct);
     }
 }
 
@@ -291,27 +268,22 @@ public sealed class PlanHandlers(RecommendationsContext db)
     private async Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
     {
         var handler = $"{nameof(PlanHandlers)}.{e.GetType().Name}";
-        if (await db.HasProcessedAsync(e, handler, ct))
+        await db.HandleOnceAsync(e, handler, async () =>
         {
-            return;
-        }
-
-        var copy = await db.Plans.FindAsync([userId], ct);
-        if (copy is null)
-        {
-            // Free with no change is what no row already means.
-            if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+            var copy = await db.Plans.FindAsync([userId], ct);
+            if (copy is null)
             {
-                db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                // Free with no change is what no row already means.
+                if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
+                {
+                    db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
+                }
             }
-        }
-        else if (changedAt >= copy.ChangedAtUtc)
-        {
-            copy.Plan = plan;
-            copy.ChangedAtUtc = changedAt;
-        }
-
-        db.MarkProcessed(e, handler);
-        await db.SaveChangesAsync(ct);
+            else if (changedAt >= copy.ChangedAtUtc)
+            {
+                copy.Plan = plan;
+                copy.ChangedAtUtc = changedAt;
+            }
+        }, ct);
     }
 }

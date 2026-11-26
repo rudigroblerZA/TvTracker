@@ -18,14 +18,11 @@ public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders pr
 {
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
-        if (await db.HasProcessedAsync(e, nameof(UserDeletedHandler), ct))
+        await db.HandleOnceAsync(e, nameof(UserDeletedHandler), async () =>
         {
-            return;
-        }
-        await StopSubscriptionsAsync(e.UserId, ct);
-        await RemoveRecordsAsync(e.UserId, ct);
-        db.MarkProcessed(e, nameof(UserDeletedHandler));
-        await db.SaveChangesAsync(ct);
+            await StopSubscriptionsAsync(e.UserId, ct);
+            await RemoveRecordsAsync(e.UserId, ct);
+        }, ct);
     }
 
     /// <summary>

@@ -12,14 +12,9 @@ public sealed class ShowFollowedHandler(CatalogContext db, CatalogSynchronizer s
 {
     public async Task HandleAsync(ShowFollowedIntegrationEvent @event, CancellationToken cancellationToken = default)
     {
-        if (await db.HasProcessedAsync(@event, nameof(ShowFollowedHandler), cancellationToken))
+        await db.HandleOnceAsync(@event, nameof(ShowFollowedHandler), async () =>
         {
-            return;
-        }
-
-        await synchronizer.MarkForRefreshAsync(@event.ShowId, cancellationToken);
-
-        db.MarkProcessed(@event, nameof(ShowFollowedHandler));
-        await db.SaveChangesAsync(cancellationToken);
+            await synchronizer.MarkForRefreshAsync(@event.ShowId, cancellationToken);
+        }, cancellationToken);
     }
 }
