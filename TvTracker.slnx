@@ -71,6 +71,7 @@
     <Project Path="tests/Identity.IntegrationTests/Identity.IntegrationTests.csproj" />
     <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
     <Project Path="tests/Notifications.UnitTests/Notifications.UnitTests.csproj" />
+    <Project Path="tests/Privacy.IntegrationTests/Privacy.IntegrationTests.csproj" />
     <Project Path="tests/Ratings.IntegrationTests/Ratings.IntegrationTests.csproj" />
     <Project Path="tests/Ratings.UnitTests/Ratings.UnitTests.csproj" />
     <Project Path="tests/Recommendations.UnitTests/Recommendations.UnitTests.csproj" />

@@ -866,7 +866,8 @@ started in a container by the tests themselves (Testcontainers; `tests/Shared`).
 running:
 
 ```bash
-dotnet test tests/Financials.IntegrationTests # the subscription ledger: events in; subscriptions, receipts and published events out
+dotnet test tests/Financials.IntegrationTests # the subscription ledger, cancel and resume, the export, a deleted account, and the one-off copy
+dotnet test tests/Privacy.IntegrationTests    # every service forgets a deleted member: each database is filled from its model, then searched
 dotnet test tests/Identity.IntegrationTests   # a member's plan as subscription events move it
 dotnet test tests/Catalog.IntegrationTests    # show sync: a scripted provider in; catalog rows and published events out
 dotnet test tests/Ratings.IntegrationTests    # favourite-character votes: the upsert, the counts, and a vote going with its watch

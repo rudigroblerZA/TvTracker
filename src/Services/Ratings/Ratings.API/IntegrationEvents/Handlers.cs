@@ -93,8 +93,17 @@ public sealed class TrackingSnapshotHandler(RatingsContext db, TimeProvider time
 
 public sealed class UserDeletedHandler(RatingsContext db) : IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
+    internal const string FormerModerator = "a former moderator";
+
     public async Task HandleAsync(UserDeletedIntegrationEvent e, CancellationToken ct)
     {
+        // What they did as a moderator stays, in the log and on the corrections they reviewed, without their name (as
+        // Research keeps a former moderator's notes): the corrections first, while the log still says which were theirs.
+        var reviewed = db.ModerationActions.Where(a => a.ModeratorId == e.UserId && a.TargetKind == "correction").Select(a => a.TargetId);
+        await db.Corrections.Where(c => reviewed.Contains(c.Id)).ExecuteUpdateAsync(s => s.SetProperty(c => c.ReviewedBy, FormerModerator), ct);
+        await db.ModerationActions.Where(a => a.ModeratorId == e.UserId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.ModeratorId, "").SetProperty(a => a.ModeratorName, FormerModerator), ct);
+
         await db.ShowRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.EpisodeRatings.Where(r => r.UserId == e.UserId).ExecuteDeleteAsync(ct);
         var comments = db.Comments.Where(c => c.UserId == e.UserId).Select(c => c.Id);
