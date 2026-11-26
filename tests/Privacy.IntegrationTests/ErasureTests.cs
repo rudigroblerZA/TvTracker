@@ -124,6 +124,10 @@ public sealed class ErasureTests(PostgresServer server)
 
         Assert.True(undecided.Count == 0, "Is each of these a member's id or name (add its pattern to MemberData), or about something else (list it here)?\n  "
             + string.Join("\n  ", undecided));
+
+        var notText = models.SelectMany(db => MemberData.NotText(db).Select(c => $"{db.GetType().Name}: {c}")).ToList();
+        Assert.True(notText.Count == 0, "Named like a member's id but not text, so these tests neither fill nor expect it; teach MemberData about the type:\n  "
+            + string.Join("\n  ", notText));
     }
 
     // The model only: nothing is connected to.
