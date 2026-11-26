@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
+using TvTracker.UserPlans;
 using TvTracker.IntegrationEvents;
 
 namespace Analytics.API.Apis;
@@ -95,10 +96,10 @@ public static class ServicesApi
     }
 
     private static async Task<Ok<MyServicesDto>> GetMineAsync(
-        ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, HttpContext http, IUserPlans plans, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
+        var (plan, allowed) = await PlanOfAsync(plans, http);
         var services = await db.UserServices.AsNoTracking().Where(s => s.UserId == userId).Select(s => s.ServiceKey).ToListAsync(ct);
         return TypedResults.Ok(new MyServicesDto(plan, allowed, services));
     }
@@ -107,10 +108,10 @@ public static class ServicesApi
     /// Replaces the caller's services. A plan without it keeps what it saved before, but can't change it.
     /// </summary>
     private static async Task<Results<Ok<MyServicesDto>, ValidationProblem, ProblemHttpResult>> SetMineAsync(
-        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
+        SetMyServicesRequest request, ClaimsPrincipal user, AnalyticsContext db, HttpContext http, IUserPlans plans, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
+        var (plan, allowed) = await PlanOfAsync(plans, http);
         if (!allowed)
         {
             return PlanLimit(plan);
@@ -135,10 +136,10 @@ public static class ServicesApi
     }
 
     private static async Task<Results<Ok<ServicesReportDto>, ProblemHttpResult>> GetReportAsync(
-        ClaimsPrincipal user, AnalyticsContext db, CachedFlags flags, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal user, AnalyticsContext db, HttpContext http, IUserPlans plans, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        var (plan, allowed) = await PlanOfAsync(user, userId, db, flags, ct);
+        var (plan, allowed) = await PlanOfAsync(plans, http);
         if (!allowed)
         {
             return PlanLimit(plan);
@@ -174,18 +175,12 @@ public static class ServicesApi
             shows.ToDictionary(s => s.Key, s => (s.Value.Title, s.Value.Network))));
     }
 
-    private static async Task<(string Plan, bool Allowed)> PlanOfAsync(ClaimsPrincipal user, string userId, AnalyticsContext db,
-        CachedFlags flags, CancellationToken ct)
+    private static async Task<(string Plan, bool Allowed)> PlanOfAsync(IUserPlans plans, HttpContext http)
     {
-        var plan = await db.Plans.AsNoTracking().Where(p => p.UserId == userId).Select(p => p.Plan).FirstOrDefaultAsync(ct) ?? Plans.Free;
-        var limited = await flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(user), ct);
-        return (plan, !limited || Plans.Limits(plan).TrackServices);
+        var (plan, limits) = await plans.AllowanceAsync(http);
+        return (plan, limits?.TrackServices ?? true);
     }
 
-    /// <summary>
-    /// 403 typed <c>plan-limit</c>, as Tracking answers, so clients offer the upgrade.
-    /// </summary>
     private static ProblemHttpResult PlanLimit(string plan) =>
-        TypedResults.Problem($"Keeping your services is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} accounts can see the report cards' prices.",
-            statusCode: StatusCodes.Status403Forbidden, title: "Not on your plan", type: "plan-limit");
+        PlanRefusal.Problem($"Keeping your services is part of {Plans.Name(Plans.Plus)}. {Plans.Name(plan)} accounts can see the report cards' prices.");
 }

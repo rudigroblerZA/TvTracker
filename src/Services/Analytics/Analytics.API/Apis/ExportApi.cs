@@ -21,7 +21,7 @@ public static class ExportApi
 {
     public static void MapExportApi(this RouteGroupBuilder api) => api.MapGet("/me/export", GetAsync);
 
-    private static async Task<Ok<AnalyticsExportDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct)
+    public static async Task<Ok<AnalyticsExportDto>> GetAsync(ClaimsPrincipal user, AnalyticsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         return TypedResults.Ok(new AnalyticsExportDto(

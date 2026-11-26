@@ -3,6 +3,7 @@ using Analytics.Worker;
 using Analytics.Worker.Insights;
 using Analytics.Worker.IntegrationEvents;
 using TvTracker;
+using TvTracker.UserPlans;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
@@ -33,8 +34,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<RatingsSnapshotIntegrationEvent, SnapshotHandlers>()
     .AddSubscription<EpisodeNotesChangedIntegrationEvent, EpisodeNotesHandler>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>()
-    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
-    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>();
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanCopyHandlers<AnalyticsContext>>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanCopyHandlers<AnalyticsContext>>();
 
 // Publishes show tags for the catalog's search filter.
 builder.Services.AddIntegrationEventOutbox<AnalyticsContext>();

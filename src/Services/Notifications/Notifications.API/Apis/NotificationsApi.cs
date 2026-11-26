@@ -251,7 +251,7 @@ public static class NotificationsApi
         return TypedResults.NoContent();
     }
 
-    private static async Task<IResult> ExportAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
+    public static async Task<IResult> ExportAsync(ClaimsPrincipal user, NotificationsContext db, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var prefs = await db.Preferences.AsNoTracking().SingleOrDefaultAsync(p => p.UserId == userId, ct);
@@ -259,7 +259,8 @@ public static class NotificationsApi
         return Results.Ok(new
         {
             preferences = prefs is null ? null : ToDto(prefs),
-            mutedShows = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId && p.Muted).Select(p => p.ShowId).ToListAsync(ct),
+            showPreferences = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId)
+                .Select(p => new { p.ShowId, p.Muted }).ToListAsync(ct),
             devices = await db.Devices.AsNoTracking().Where(d => d.UserId == userId)
                 .Select(d => new { d.Platform, d.CreatedAtUtc, d.LastSeenAtUtc }).ToListAsync(ct),
             inbox = await db.Inbox.AsNoTracking().Where(i => i.UserId == userId).OrderBy(i => i.CreatedAtUtc)

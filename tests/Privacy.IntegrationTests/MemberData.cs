@@ -225,4 +225,51 @@ public static partial class MemberData
         }
         return found;
     }
+
+    /// <summary>
+    /// For each table that names a member, the values in <paramref name="memberId"/>'s rows that no other row has: ids
+    /// and the made-up text <see cref="SeedAsync"/> filled in. Finding one of them somewhere (an export) shows the row
+    /// got there. Times count too, to the microsecond, since each row was made at its own; numbers and switches don't.
+    /// </summary>
+    public static async Task<Dictionary<string, List<string>>> DistinctiveAsync(DbContext db, string memberId, CancellationToken ct)
+    {
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(ct);
+        }
+        var found = new Dictionary<string, List<string>>();
+        foreach (var type in MemberTypes(db))
+        {
+            var table = type.GetTableName()!;
+            var where = string.Join(" or ", type.GetProperties().Where(IsMember).Select(p => $"\"{p.GetColumnName()}\" = @id"));
+            await using var read = new NpgsqlCommand($"select * from \"{table}\" where {where}", connection);
+            read.Parameters.AddWithValue("id", memberId);
+            await using var reader = await read.ExecuteReaderAsync(ct);
+            var values = found.TryGetValue(table, out var known) ? known : found[table] = [];
+            while (await reader.ReadAsync(ct))
+            {
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    switch (reader.GetValue(i))
+                    {
+                        case Guid id:
+                            values.Add(id.ToString());
+                            break;
+                        case string text when text.Length >= 16 && !text.Contains(memberId, StringComparison.Ordinal) && !text.StartsWith('{'):
+                            values.Add(text);
+                            break;
+                        // To the microsecond, as the database keeps it and JSON writes it: each row was made at its own.
+                        case DateTime at:
+                            values.Add(at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture));
+                            break;
+                        case DateTimeOffset at:
+                            values.Add(at.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture));
+                            break;
+                    }
+                }
+            }
+        }
+        return found;
+    }
 }

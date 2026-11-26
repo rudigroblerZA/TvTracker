@@ -52,6 +52,7 @@
     <Project Path="src/TvTracker.Alerts/TvTracker.Alerts.csproj" />
     <Project Path="src/TvTracker.AppHost/TvTracker.AppHost.csproj" />
     <Project Path="src/TvTracker.ServiceDefaults/TvTracker.ServiceDefaults.csproj" />
+    <Project Path="src/TvTracker.UserPlans/TvTracker.UserPlans.csproj" />
   </Folder>
   <Folder Name="/BuildingBlocks/">
     <Project Path="src/TvTracker.EventBus.RabbitMQ/TvTracker.EventBus.RabbitMQ.csproj" />

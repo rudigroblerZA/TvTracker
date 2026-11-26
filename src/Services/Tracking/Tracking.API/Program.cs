@@ -1,3 +1,4 @@
+using TvTracker.UserPlans;
 ﻿using Tracking.API.Apis;
 using Tracking.API.IntegrationEvents;
 using Tracking.API.Services;
@@ -9,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddFeatureFlags();
-builder.Services.AddUserPlans<Tracking.API.Services.CopiedUserPlans>();
+builder.Services.AddCopiedUserPlans<TrackingContext>();
 builder.AddDefaultAuthentication();
 
 builder.AddNpgsqlDbContext<TrackingContext>("trackingdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
@@ -26,8 +27,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<EpisodesScheduledIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodeScheduledIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<UserDeletedIntegrationEvent, UserDeletedHandler>()
-    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
-    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>();
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanCopyHandlers<TrackingContext>>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanCopyHandlers<TrackingContext>>();
 builder.Services.AddIntegrationEventOutbox<TrackingContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);

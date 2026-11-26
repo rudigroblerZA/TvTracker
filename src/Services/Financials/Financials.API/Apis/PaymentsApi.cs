@@ -27,7 +27,10 @@ public record ReceiptDto(string Plan, string Interval, decimal Amount, string Cu
 /// <summary>
 /// A member's payment records, as their data export has them.
 /// </summary>
-public record PaymentsExportDto(SubscriptionDto? Subscription, IReadOnlyList<ReceiptDto> Receipts);
+/// <param name="Checkouts">The checkouts they started, paid for or not.</param>
+public record PaymentsExportDto(SubscriptionDto? Subscription, IReadOnlyList<ReceiptDto> Receipts, IReadOnlyList<CheckoutRecordDto> Checkouts);
+
+public record CheckoutRecordDto(string Plan, string Interval, decimal Amount, string Currency, DateTime StartedAtUtc, DateTime? CompletedAtUtc, string Provider);
 
 /// <summary>
 /// Buying Plus and Family through a payment provider (<see cref="IPaymentProvider"/>; the <c>payments</c> flag).
@@ -131,14 +134,17 @@ public static class PaymentsApi
     }
 
     /// <summary>
-    /// The caller's own payment records: their latest subscription and every receipt.
+    /// The caller's own payment records: their latest subscription, every receipt and the checkouts they started.
     /// </summary>
-    internal static async Task<Ok<PaymentsExportDto>> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
+    public static async Task<Ok<PaymentsExportDto>> ExportAsync(ClaimsPrincipal user, FinancialsContext db, PaymentProviders providers, CancellationToken ct)
     {
         var userId = user.GetUserId();
         return TypedResults.Ok(new PaymentsExportDto(
             await LatestAsync(db, userId, ct) is { } subscription ? ToDto(subscription, providers) : null,
-            await ReceiptsAsync(db, userId, ct)));
+            await ReceiptsAsync(db, userId, ct),
+            await db.CheckoutSessions.AsNoTracking().Where(c => c.UserId == userId).OrderBy(c => c.CreatedAtUtc)
+                .Select(c => new CheckoutRecordDto(c.Plan, c.Interval, c.Amount, c.Currency, c.CreatedAtUtc, c.CompletedAtUtc, c.Provider))
+                .ToListAsync(ct)));
     }
 
     /// <summary>

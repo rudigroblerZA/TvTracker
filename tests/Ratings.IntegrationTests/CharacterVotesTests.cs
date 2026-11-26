@@ -247,7 +247,7 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     private async Task SnapshotAsync(string user, DateTimeOffset takenAt, params Guid[] watched)
     {
         await using var db = database.Context();
-        await new TrackingSnapshotHandler(db, TimeProvider.System).HandleAsync(
+        await new TrackingSnapshotHandler(db).HandleAsync(
             new TrackingSnapshotIntegrationEvent(user, takenAt, [], [.. watched.Select(id => new SnapshotWatch(show, id, takenAt))]), Ct);
     }
 

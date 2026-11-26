@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\Services\Notifications\Notifications.API\Notifications.API.csproj" />
     <ProjectReference Include="..\..\src\Services\Research\Research.API\Research.API.csproj" />
     <ProjectReference Include="..\..\src\Services\Analytics\Analytics.Worker\Analytics.Worker.csproj" />
+    <ProjectReference Include="..\..\src\Services\Analytics\Analytics.API\Analytics.API.csproj" />
     <ProjectReference Include="..\..\src\Services\Financials\Financials.API\Financials.API.csproj" />
   </ItemGroup>
 

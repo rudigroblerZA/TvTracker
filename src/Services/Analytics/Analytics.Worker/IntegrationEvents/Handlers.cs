@@ -328,10 +328,10 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
     private async Task RepairActivityAsync(TrackingSnapshotIntegrationEvent e, CancellationToken ct)
     {
         var takenAt = e.TakenAtUtc.UtcDateTime;
-        var watches = await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct);
-        var watched = watches.Select(w => w.EpisodeId).ToHashSet();
-        var snapshotWatches = e.Watches.DistinctBy(w => w.EpisodeId).ToDictionary(w => w.EpisodeId);
-        var addWatches = snapshotWatches.Values.Where(w => !watched.Contains(w.EpisodeId))
+        // By when the mark reached Tracking, not the watch time the user gave (SnapshotRepair).
+        var watches = SnapshotRepair.Of(await db.Watches.Where(w => w.UserId == e.UserId).ToListAsync(ct), e.Watches,
+            w => w.EpisodeId, w => w.EpisodeId, w => w.RecordedAtUtc, e.TakenAtUtc);
+        var addWatches = watches.Missing
             .Select(w => new UserEpisodeWatch
             {
                 UserId = e.UserId,
@@ -341,19 +341,16 @@ public sealed class SnapshotHandlers(AnalyticsContext db, ILogger<SnapshotHandle
                 RecordedAtUtc = takenAt
             })
             .ToList();
-        // By when the mark reached us, not the watch time the user gave: the phone's offline queue backdates those, and
-        // a mark synced after the snapshot was taken is newer than it whatever its watch time.
-        var removeWatches = watches.Where(w => !snapshotWatches.ContainsKey(w.EpisodeId) && w.RecordedAtUtc < takenAt).ToList();
+        var removeWatches = watches.Gone;
         db.Watches.AddRange(addWatches);
         db.Watches.RemoveRange(removeWatches);
 
-        var follows = await db.Follows.Where(f => f.UserId == e.UserId).ToListAsync(ct);
-        var followed = follows.Select(f => f.ShowId).ToHashSet();
-        var snapshotFollows = e.Follows.DistinctBy(f => f.ShowId).ToDictionary(f => f.ShowId);
-        var addFollows = snapshotFollows.Values.Where(f => !followed.Contains(f.ShowId))
+        var follows = SnapshotRepair.Of(await db.Follows.Where(f => f.UserId == e.UserId).ToListAsync(ct), e.Follows,
+            f => f.ShowId, f => f.ShowId, f => f.FollowedAtUtc, e.TakenAtUtc);
+        var addFollows = follows.Missing
             .Select(f => new UserFollow { UserId = e.UserId, ShowId = f.ShowId, FollowedAtUtc = f.FollowedAtUtc.UtcDateTime })
             .ToList();
-        var removeFollows = follows.Where(f => !snapshotFollows.ContainsKey(f.ShowId) && f.FollowedAtUtc < takenAt).ToList();
+        var removeFollows = follows.Gone;
         db.Follows.AddRange(addFollows);
         db.Follows.RemoveRange(removeFollows);
 
@@ -468,41 +465,5 @@ public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventH
         await db.Plans.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.UserServices.Where(s => s.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.SeasonCalls.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
-    }
-}
-
-/// <summary>
-/// Keeps <see cref="UserPlanCopy"/> from Identity's plan changes and daily profile snapshot (which heals a lost change),
-/// for the plan's limits on Analytics.API's endpoints. The newest by Identity's change time wins.
-/// </summary>
-public sealed class PlanHandlers(AnalyticsContext db)
-    : IIntegrationEventHandler<UserPlanChangedIntegrationEvent>, IIntegrationEventHandler<UserProfileSnapshotIntegrationEvent>
-{
-    public Task HandleAsync(UserPlanChangedIntegrationEvent e, CancellationToken ct) =>
-        ApplyAsync(e, e.UserId, e.Plan, e.ChangedAtUtc, ct);
-
-    // A snapshot from before plans existed carries none; a plan never changed is free since sign-up, as old as can be.
-    public Task HandleAsync(UserProfileSnapshotIntegrationEvent e, CancellationToken ct) =>
-        e.Plan is { } plan ? ApplyAsync(e, e.UserId, plan, e.PlanChangedAtUtc ?? DateTimeOffset.MinValue, ct) : Task.CompletedTask;
-
-    private Task ApplyAsync(IntegrationEvent e, string userId, string plan, DateTimeOffset changedAt, CancellationToken ct) =>
-        db.HandleOnceAsync(e, InboxExtensions.HandlerName<PlanHandlers>(e), () => KeepAsync(userId, plan, changedAt, ct), ct);
-
-    private async Task KeepAsync(string userId, string plan, DateTimeOffset changedAt, CancellationToken ct)
-    {
-        var copy = await db.Plans.FindAsync([userId], ct);
-        if (copy is null)
-        {
-            // Free with no change is what no row already means.
-            if (plan != TvTracker.IntegrationEvents.Plans.Free || changedAt != DateTimeOffset.MinValue)
-            {
-                db.Plans.Add(new UserPlanCopy { UserId = userId, Plan = plan, ChangedAtUtc = changedAt });
-            }
-        }
-        else if (changedAt >= copy.ChangedAtUtc)
-        {
-            copy.Plan = plan;
-            copy.ChangedAtUtc = changedAt;
-        }
     }
 }

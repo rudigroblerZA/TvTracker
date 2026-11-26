@@ -3,6 +3,7 @@ using Social.API.IntegrationEvents;
 using Social.API.Services;
 using Social.Data;
 using TvTracker;
+using TvTracker.UserPlans;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
 
@@ -11,14 +12,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddDefaultAuthentication();
 builder.AddFeatureFlags();
-builder.Services.AddUserPlans<Social.API.Services.CopiedUserPlans>();
+builder.Services.AddCopiedUserPlans<SocialContext>();
 
 builder.AddNpgsqlDbContext<SocialContext>("socialdb", configureSettings: s => s.ConnectionString = ConnectionPool.Limit(s.ConnectionString));
 builder.Services.AddDatabaseInitializer<SocialContext>();
 
 builder.AddRabbitMQEventBus("eventbus")
-    .AddSubscription<UserPlanChangedIntegrationEvent, PlanHandlers>()
-    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanHandlers>()
+    .AddSubscription<UserPlanChangedIntegrationEvent, PlanCopyHandlers<SocialContext>>()
+    .AddSubscription<UserProfileSnapshotIntegrationEvent, PlanCopyHandlers<SocialContext>>()
     .AddSubscription<ShowAddedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<ShowUpdatedIntegrationEvent, CatalogEventHandlers>()
     .AddSubscription<EpisodesScheduledIntegrationEvent, CatalogEventHandlers>()

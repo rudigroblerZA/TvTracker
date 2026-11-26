@@ -212,25 +212,6 @@ namespace Social.Data.Migrations
                     b.ToTable("follows", (string)null);
                 });
 
-            modelBuilder.Entity("Social.Data.UserPlanCopy", b =>
-                {
-                    b.Property<string>("UserId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset>("ChangedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("user_plans", (string)null);
-                });
-
             modelBuilder.Entity("Social.Data.UserShow", b =>
                 {
                     b.Property<string>("UserId")
@@ -264,6 +245,9 @@ namespace Social.Data.Migrations
 
                     b.Property<Guid>("EpisodeId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ShowId")
                         .HasColumnType("uuid");
@@ -324,6 +308,25 @@ namespace Social.Data.Migrations
                     b.HasKey("EventId", "Handler");
 
                     b.ToTable("processed_integration_events", (string)null);
+                });
+
+            modelBuilder.Entity("TvTracker.Persistence.UserPlanCopy", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_plans", (string)null);
                 });
 #pragma warning restore 612, 618
         }

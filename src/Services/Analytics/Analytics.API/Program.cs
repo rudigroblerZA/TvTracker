@@ -1,3 +1,4 @@
+using TvTracker.UserPlans;
 using Analytics.API.Apis;
 using Analytics.Data;
 using TvTracker.Persistence;
@@ -6,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddFeatureFlags();
-builder.Services.AddUserPlans<Analytics.API.Services.CopiedUserPlans>();
+builder.Services.AddCopiedUserPlans<AnalyticsContext>();
 builder.AddDefaultAuthentication();
 
 // Analytics.API owns the analyticsdb schema (EF Core migrations); the worker waits for this service to be healthy.

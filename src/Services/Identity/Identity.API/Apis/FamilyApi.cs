@@ -69,8 +69,7 @@ public static class FamilyApi
         var userId = user.GetUserId();
         if (await db.Profiles.FindAsync([userId], ct) is not { Plan: Plans.Family })
         {
-            return TypedResults.Problem($"Inviting people is part of the {Plans.Name(Plans.Family)} plan.", statusCode: StatusCodes.Status403Forbidden,
-                title: "Not on your plan", type: "plan-limit");
+            return PlanRefusal.Problem($"Inviting people is part of the {Plans.Name(Plans.Family)} plan.");
         }
         if (await db.FamilyMembers.AnyAsync(m => m.UserId == userId, ct))
         {
