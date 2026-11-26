@@ -252,6 +252,28 @@ public sealed class CharacterVotesTests(RatingsDatabase database) : IClassFixtur
     }
 
     [Fact]
+    public async Task Watching_again_after_a_snapshot_was_taken_keeps_the_watch_that_snapshot_lacks()
+    {
+        var me = NewUser();
+        var first = DateTimeOffset.UtcNow.AddHours(-3);
+        await using (var db = database.Context())
+        {
+            await new EpisodeWatchedHandler(db).HandleAsync(new EpisodeWatchedIntegrationEvent(me, show, [episode]) { CreatedAt = first }, Ct);
+        }
+        // The unwatch was lost; they watch it again an hour after Tracking read a snapshot without it, and the watch
+        // gets here before the snapshot does.
+        await using (var db = database.Context())
+        {
+            await new EpisodeWatchedHandler(db).HandleAsync(new EpisodeWatchedIntegrationEvent(me, show, [episode]) { CreatedAt = first.AddHours(2) }, Ct);
+        }
+
+        await SnapshotAsync(me, first.AddHours(1));
+
+        await using var check = database.Context();
+        Assert.True(await check.WatchedEpisodes.AnyAsync(w => w.UserId == me && w.EpisodeId == episode, Ct));
+    }
+
+    [Fact]
     public async Task A_snapshot_without_the_watch_takes_the_vote_with_it_and_keeps_the_rest()
     {
         var kept = Guid.NewGuid();

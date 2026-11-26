@@ -259,6 +259,8 @@ public static class NotificationsApi
         return Results.Ok(new
         {
             preferences = prefs is null ? null : ToDto(prefs),
+            // Kept beside showPreferences, which says the same and more, for anything that reads an earlier export's shape.
+            mutedShows = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId && p.Muted).Select(p => p.ShowId).ToListAsync(ct),
             showPreferences = await db.ShowPreferences.AsNoTracking().Where(p => p.UserId == userId)
                 .Select(p => new { p.ShowId, p.Muted }).ToListAsync(ct),
             devices = await db.Devices.AsNoTracking().Where(d => d.UserId == userId)

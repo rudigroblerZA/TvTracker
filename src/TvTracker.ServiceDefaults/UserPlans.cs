@@ -22,7 +22,8 @@ public interface IUserPlans
 
     /// <summary>
     /// The caller's plan whether or not plans apply to them, and whether they do: for a plan's limits, where the answer
-    /// names the plan even while nothing is limited. The plan is null when it can't be found.
+    /// names the plan even while nothing is limited. The plan is null when it can't be found. Unlike
+    /// <see cref="PlanAsync"/> it is looked up on every call, so a change of plan counts at once.
     /// </summary>
     Task<(string? Plan, bool Applies)> OfAsync(HttpContext context);
 }
@@ -67,8 +68,10 @@ public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUs
     public async Task<string?> PlanAsync(HttpContext context) =>
         await AppliesAsync(context) ? await NamedAsync(context) : null;
 
+    // Looked up afresh: a limit is enforced on the plan they have now, not the one of half a minute ago, or someone who
+    // has just paid is refused what they paid for.
     public async Task<(string? Plan, bool Applies)> OfAsync(HttpContext context) =>
-        (await NamedAsync(context), await AppliesAsync(context));
+        (await NamedAsync(context, fresh: true), await AppliesAsync(context));
 
     private Task<bool> AppliesAsync(HttpContext context) =>
         flags.IsEnabledAsync(FeatureFlags.Plans, FeatureFlags.ContextFor(context.User), context.RequestAborted);
@@ -76,7 +79,8 @@ public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUs
     /// <summary>
     /// The caller's plan: free when signed out, null when it can't be found; kept a short while per user.
     /// </summary>
-    private async Task<string?> NamedAsync(HttpContext context)
+    /// <param name="fresh">Look it up even when one is kept, and keep the answer.</param>
+    private async Task<string?> NamedAsync(HttpContext context, bool fresh = false)
     {
         var user = context.User;
         if (user.Identity?.IsAuthenticated != true)
@@ -89,7 +93,7 @@ public abstract class UserPlansBase(CachedFlags flags, IMemoryCache cache) : IUs
         }
 
         var key = (nameof(UserPlansBase), id);
-        if (cache.TryGetValue(key, out string? known))
+        if (!fresh && cache.TryGetValue(key, out string? known))
         {
             return known;
         }

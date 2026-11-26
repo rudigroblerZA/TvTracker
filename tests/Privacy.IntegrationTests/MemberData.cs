@@ -239,39 +239,44 @@ public static partial class MemberData
     public static async Task<Dictionary<string, List<string>>> DistinctiveAsync(DbContext db, string memberId, CancellationToken ct)
     {
         var connection = await OpenAsync(db, ct);
-        var found = new Dictionary<string, List<string>>();
+        var (found, held) = (new Dictionary<string, List<string>>(), new Dictionary<string, HashSet<string>>());
         foreach (var type in MemberTypes(db))
         {
             var table = type.GetTableName()!;
             var where = string.Join(" or ", type.GetProperties().Where(IsMember).Select(p => $"\"{p.GetColumnName()}\" = @id"));
             // Not the columns that point at another row: that row's id found in an export says nothing of this one.
-            var own = string.Join(", ", type.GetProperties().Where(p => !p.IsForeignKey()).Select(p => $"\"{p.GetColumnName()}\""));
-            await using var read = new NpgsqlCommand($"select {own} from \"{table}\" where {where}", connection);
+            var pointers = type.GetProperties().Where(p => p.IsForeignKey()).Select(p => p.GetColumnName()).ToHashSet();
+            await using var read = new NpgsqlCommand($"select * from \"{table}\" where {where}", connection);
             read.Parameters.AddWithValue("id", memberId);
             await using var reader = await read.ExecuteReaderAsync(ct);
             var values = found.TryGetValue(table, out var known) ? known : found[table] = [];
+            var all = held.TryGetValue(table, out var before) ? before : held[table] = [];
             while (await reader.ReadAsync(ct))
             {
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
-                    switch (reader.GetValue(i))
+                    string[] read1 = reader.GetValue(i) switch
                     {
-                        case Guid id:
-                            values.Add(id.ToString());
-                            break;
-                        case string text when text.Length >= 16 && !text.Contains(memberId, StringComparison.Ordinal) && !text.StartsWith('{'):
-                            values.Add(text);
-                            break;
-                        // To the microsecond, as the database keeps it and JSON writes it: each row was made at its own.
-                        case DateTime at:
-                            values.AddRange(Stamps(at));
-                            break;
-                        case DateTimeOffset at:
-                            values.AddRange(Stamps(at.UtcDateTime));
-                            break;
+                        Guid id => [id.ToString()],
+                        string text when text.Length >= 16 && !text.Contains(memberId, StringComparison.Ordinal) && !text.StartsWith('{') => [text],
+                        DateTime at => Stamps(at),
+                        DateTimeOffset at => Stamps(at.UtcDateTime),
+                        _ => []
+                    };
+                    all.UnionWith(read1);
+                    if (!pointers.Contains(reader.GetName(i)))
+                    {
+                        values.AddRange(read1);
                     }
                 }
             }
+        }
+        // Only what one table alone holds, in any column: an id two tables share (a vote and the watch it hangs on)
+        // found in an export shows one of them got there, not which.
+        var shared = held.Values.SelectMany(values => values).GroupBy(v => v).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+        foreach (var values in found.Values)
+        {
+            values.RemoveAll(shared.Contains);
         }
         return found;
     }
