@@ -13,7 +13,7 @@
     <!-- dotnet/runtime packages (Microsoft.Extensions.*), which service on their own numbers; MobileApp uses it too. -->
     <RuntimeVersion>10.0.15</RuntimeVersion>
     <!-- dotnet/extensions packages (resilience, service discovery, hybrid cache, AI abstractions, test time). -->
-    <ExtensionsVersion>10.11.0</ExtensionsVersion>
+    <ExtensionsVersion>10.11.1</ExtensionsVersion>
     <EfCoreVersion>10.0.15</EfCoreVersion>
     <OpenTelemetryVersion>1.21.0</OpenTelemetryVersion>
     <OpenTelemetryInstrumentationVersion>1.21.0</OpenTelemetryInstrumentationVersion>
