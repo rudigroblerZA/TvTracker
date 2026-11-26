@@ -252,9 +252,11 @@ public static partial class MemberData
                             values.Add(text);
                             break;
                         // To the microsecond, as the database keeps it and JSON writes it: each row was made at its own.
-                        case DateTime or DateTimeOffset:
-                            var at = reader.GetValue(i) is DateTimeOffset offset ? offset.UtcDateTime : reader.GetDateTime(i);
-                            values.Add(at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture));
+                        case DateTime at:
+                            values.Add(Stamp(at));
+                            break;
+                        case DateTimeOffset at:
+                            values.Add(Stamp(at.UtcDateTime));
                             break;
                     }
                 }
@@ -265,13 +267,14 @@ public static partial class MemberData
 
     private static async Task<NpgsqlConnection> OpenAsync(DbContext db, CancellationToken ct)
     {
-        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync(ct);
-        }
-        return connection;
+        await db.Database.OpenConnectionAsync(ct);
+        return (NpgsqlConnection)db.Database.GetDbConnection();
     }
+
+    /// <summary>
+    /// A time as JSON writes it, to the microsecond the database keeps.
+    /// </summary>
+    private static string Stamp(DateTime at) => at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Any service's context, from its options.
