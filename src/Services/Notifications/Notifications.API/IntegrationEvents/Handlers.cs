@@ -154,24 +154,25 @@ public sealed class UserEventHandlers(NotificationsContext db, NotificationHubPu
     IIntegrationEventHandler<UserProfileUpdatedIntegrationEvent>,
     IIntegrationEventHandler<UserDeletedIntegrationEvent>
 {
-    public async Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct)
-    {
-        if (await db.Followers.FindAsync([e.ShowId, e.UserId], ct) is null)
+    // Once: a follow delivered again after they unfollowed mustn't bring the follower back.
+    public Task HandleAsync(ShowFollowedIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserEventHandlers>(e), async () =>
         {
-            db.Followers.Add(new Follower { ShowId = e.ShowId, UserId = e.UserId });
-            await db.SaveChangesAsync(ct);
-        }
-    }
+            if (await db.Followers.FindAsync([e.ShowId, e.UserId], ct) is null)
+            {
+                db.Followers.Add(new Follower { ShowId = e.ShowId, UserId = e.UserId });
+            }
+        }, ct);
 
     public Task HandleAsync(ShowUnfollowedIntegrationEvent e, CancellationToken ct) =>
         db.Followers.Where(f => f.ShowId == e.ShowId && f.UserId == e.UserId).ExecuteDeleteAsync(ct);
 
-    public async Task HandleAsync(UserRegisteredIntegrationEvent e, CancellationToken ct)
-    {
-        var prefs = await GetOrCreatePreferencesAsync(e.UserId, ct);
-        prefs.Email ??= e.Email;
-        await db.SaveChangesAsync(ct);
-    }
+    public Task HandleAsync(UserRegisteredIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserEventHandlers>(e), async () =>
+        {
+            var prefs = await GetOrCreatePreferencesAsync(e.UserId, ct);
+            prefs.Email ??= e.Email;
+        }, ct);
 
     public async Task HandleAsync(UserProfileUpdatedIntegrationEvent e, CancellationToken ct)
     {

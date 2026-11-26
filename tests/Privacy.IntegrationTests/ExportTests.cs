@@ -32,7 +32,10 @@ public sealed class ExportTests(PostgresServer server)
 
     [Fact]
     public Task Ratings_exports_what_it_holds() => ExportedAsync<Ratings.Data.RatingsContext>(
-        (user, db) => Ratings.API.Apis.ExportApi.ExportAsync(user, db, Ct), new());
+        (user, db) => Ratings.API.Apis.ExportApi.ExportAsync(user, db, Ct), new()
+        {
+            ["watched_episodes"] = "A copy of what they watched, which Tracking keeps and exports."
+        });
 
     [Fact]
     public Task Social_exports_what_it_holds() => ExportedAsync<Social.Data.SocialContext>(

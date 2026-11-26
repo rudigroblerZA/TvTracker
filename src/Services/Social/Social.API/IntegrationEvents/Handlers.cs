@@ -259,8 +259,14 @@ public sealed class UserStateHandlers(SocialContext db) :
         db.HandleOnceAsync(e, InboxExtensions.HandlerName<UserStateHandlers>(e), async () =>
         {
             var ids = e.EpisodeIds.Distinct().ToList();
-            var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct);
-            db.Watches.AddRange(ids.Except(existing).Select(id => new UserWatch
+            var existing = await db.Watches.Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId)).ToListAsync(ct);
+            // Watched again: as new as this event, so a snapshot taken before it can't take the row for one whose
+            // unwatch was lost.
+            foreach (var watch in existing.Where(w => w.RecordedAtUtc < e.CreatedAt.UtcDateTime))
+            {
+                watch.RecordedAtUtc = e.CreatedAt.UtcDateTime;
+            }
+            db.Watches.AddRange(ids.Except(existing.Select(w => w.EpisodeId)).Select(id => new UserWatch
             {
                 UserId = e.UserId,
                 EpisodeId = id,
@@ -313,18 +319,24 @@ public sealed class UserStateHandlers(SocialContext db) :
             db.Watches.RemoveRange(watches.Gone);
 
             var shows = await db.UserShows.Where(s => s.UserId == e.UserId).ToDictionaryAsync(s => s.ShowId, ct);
-            var follows = e.Follows.DistinctBy(f => f.ShowId).ToDictionary(f => f.ShowId);
-            foreach (var follow in follows.Values)
+            // A follow is a mark on the member's row for the show, which their rating shares: missing sets it (on a new
+            // row if need be), gone clears it. One with no time is from before times were kept, and is left.
+            var follows = SnapshotRepair.Of(shows.Values.Where(s => s.Followed).ToList(), e.Follows,
+                s => s.ShowId, f => f.ShowId, s => s.FollowedAtUtc ?? DateTime.MaxValue, e.TakenAtUtc);
+            foreach (var follow in follows.Missing)
             {
                 if (!shows.TryGetValue(follow.ShowId, out var show))
                 {
                     db.UserShows.Add(show = new UserShow { UserId = e.UserId, ShowId = follow.ShowId });
-                    shows[follow.ShowId] = show;
                 }
                 show.Followed = true;
                 show.FollowedAtUtc ??= follow.FollowedAtUtc.UtcDateTime;
             }
-            foreach (var show in shows.Values.Where(s => s.Followed && !follows.ContainsKey(s.ShowId) && s.FollowedAtUtc < takenAt))
+            foreach (var (show, follow) in follows.Both)
+            {
+                show.FollowedAtUtc ??= follow.FollowedAtUtc.UtcDateTime;
+            }
+            foreach (var show in follows.Gone)
             {
                 show.Followed = false;
                 show.FollowedAtUtc = null;

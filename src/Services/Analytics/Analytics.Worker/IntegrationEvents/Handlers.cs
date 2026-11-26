@@ -268,10 +268,15 @@ public sealed class TrackingEventHandlers(AnalyticsContext db) :
             var ids = e.EpisodeIds.Distinct().ToList();
             var existing = await db.Watches
                 .Where(w => w.UserId == e.UserId && ids.Contains(w.EpisodeId))
-                .Select(w => w.EpisodeId)
                 .ToListAsync(ct);
+            // Watched again: as new as this event, so a snapshot taken before it can't take the row for one whose
+            // unwatch was lost.
+            foreach (var watch in existing.Where(w => w.RecordedAtUtc < e.CreatedAt.UtcDateTime))
+            {
+                watch.RecordedAtUtc = e.CreatedAt.UtcDateTime;
+            }
 
-            db.Watches.AddRange(ids.Except(existing).Select(id => new UserEpisodeWatch
+            db.Watches.AddRange(ids.Except(existing.Select(w => w.EpisodeId)).Select(id => new UserEpisodeWatch
             {
                 UserId = e.UserId,
                 EpisodeId = id,
