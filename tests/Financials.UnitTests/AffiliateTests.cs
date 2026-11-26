@@ -262,5 +262,7 @@ public class AffiliateTests
         Assert.Equal(at, AffiliateApi.MadeAt(Guid.CreateVersion7(at)));
         // An id of another kind (a network's own, a guess) says nothing, so its postback isn't kept waiting.
         Assert.Null(AffiliateApi.MadeAt(Guid.Parse("11111111-2222-4333-8444-555555555555")));
+        // Version 7 by its digit, with a time past the year 9999: made up, not made by Catalog.
+        Assert.Null(AffiliateApi.MadeAt(Guid.Parse("ffffffff-ffff-7000-8000-000000000000")));
     }
 }

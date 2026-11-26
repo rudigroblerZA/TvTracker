@@ -93,4 +93,20 @@ public sealed class LegacyImportTests(PostgresServer server)
         Assert.False(await db.Subscriptions.AnyAsync(Ct));
         Assert.False(await db.AffiliatePrograms.AnyAsync(Ct));
     }
+
+    [Fact]
+    public async Task An_old_database_that_is_gone_has_nothing_to_copy()
+    {
+        var gone = new Npgsql.NpgsqlConnectionStringBuilder(await server.CreateDatabaseAsync()) { Database = "dropped_since" }.ConnectionString;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:identitydb"] = gone, ["ConnectionStrings:catalogdb"] = gone
+        }).Build();
+        await using var db = new FinancialsContext(new DbContextOptionsBuilder<FinancialsContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options);
+        await db.Database.MigrateAsync(Ct);
+
+        await LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct);
+
+        Assert.False(await db.Subscriptions.AnyAsync(Ct));
+    }
 }

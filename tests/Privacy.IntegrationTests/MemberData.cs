@@ -22,7 +22,7 @@ public static partial class MemberData
     /// <summary>
     /// A column that holds a member's name or address beside their id: what a row shows of them.
     /// </summary>
-    [GeneratedRegex("(DisplayName|ModeratorName|ByName|ReviewedBy|Email)$")]
+    [GeneratedRegex("(DisplayName|ModeratorName|ByName|ReviewedBy|UpdatedBy|Email)$")]
     private static partial Regex NameColumn();
 
     /// <summary>

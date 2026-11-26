@@ -234,6 +234,9 @@ public class ViewerInsightsTests
         Assert.Equal([2025, 2024], latest.Years);
         Assert.Equal((2024, 1, 0), YearInTv.Split(watches, 2024, today) is var asked ? (asked.Shown, asked.InYear.Count, asked.LastYear.Count) : default);
         Assert.Equal(2026, YearInTv.Split([], null, today).Shown);
+        // A year no date can have is as good as none asked for.
+        Assert.Equal(latest.Shown, YearInTv.Split(watches, 0, today).Shown);
+        Assert.Equal(latest.Shown, YearInTv.Split(watches, 10000, today).Shown);
     }
 
     [Fact]

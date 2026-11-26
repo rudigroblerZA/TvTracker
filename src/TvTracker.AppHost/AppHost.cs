@@ -246,7 +246,7 @@ var financialsApi = Project("financials-api", "../Services/Financials/Financials
     // Read once, at start, to bring across what payments and affiliates kept while they were Identity's and Catalog's
     // (LegacyImport); nothing else here touches those databases. Remove these two references together with
     // LegacyImport once every deployment has started Financials once and its copy has been checked.
-    .WithReference(identityDb).WithReference(catalogDb)
+    .WithReference(identityDb).WaitFor(identityDb).WithReference(catalogDb).WaitFor(catalogDb)
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
     .WithReference(identityApi)

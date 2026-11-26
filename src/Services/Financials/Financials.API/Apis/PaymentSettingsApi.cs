@@ -106,7 +106,7 @@ public static class PaymentSettingsApi
             (row.Provider, row.StripePortalUrl) = (newProvider, newPortal);
             row.StripeSecretKey = secretKey is null ? row.StripeSecretKey : cipher.Protect(secretKey);
             row.StripeWebhookSecret = webhookSecret is null ? row.StripeWebhookSecret : cipher.Protect(webhookSecret);
-            (row.UpdatedAtUtc, row.UpdatedBy) = (now, admin);
+            (row.UpdatedAtUtc, row.UpdatedBy, row.UpdatedById) = (now, admin, user.GetUserId());
             await db.SaveChangesAsync(ct);
             return null;
         }, ct);

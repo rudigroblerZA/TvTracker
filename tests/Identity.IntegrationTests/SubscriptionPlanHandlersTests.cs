@@ -101,6 +101,21 @@ public sealed class SubscriptionPlanHandlersTests(IdentityDatabase database) : I
     }
 
     [Fact]
+    public async Task An_ending_that_moved_nothing_doesnt_hide_a_start_that_arrives_after_it()
+    {
+        await ProfileAsync();
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At));
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1)));
+        // A second ending of the old subscription, later than the new subscription whose start is still on its way.
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(3)));
+        bus.Clear();
+
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddHours(2)));
+
+        Assert.Equal(Plans.Plus, await PlanAsync());
+    }
+
+    [Fact]
     public async Task A_late_start_doesnt_bring_back_a_plan_that_ended_since()
     {
         await ProfileAsync();

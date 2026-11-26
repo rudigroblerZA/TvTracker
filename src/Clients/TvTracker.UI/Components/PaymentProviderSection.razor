@@ -1,9 +1,7 @@
-@inject IdentityClient Identity
 @inject FinancialsClient Books
 
-@* The payment provider, on the admins' financials page: which one sells plans and Stripe's keys (Identity.API), and
-   the rate it charges, which the fee estimate above uses (Financials.API). Two forms, saved on their own, since two
-   services keep them. Keys go in and never come back: the page only says whether each is set. *@
+@* The payment provider, on the admins' financials page: which one sells plans and Stripe's keys, and the rate
+   it charges, which the fee estimate above uses (both Financials.API's). Two forms, saved on their own. Keys go in and never come back: the page only says whether each is set. *@
 @if (settings is not null || fees is not null)
 {
     <section class="payment-provider">
@@ -161,7 +159,7 @@
 
 @code {
     /// <summary>
-    /// What the API says of a value an admin set here (Identity.API's PaymentSettingsApi).
+    /// What the API says of a value an admin set here (Financials.API's PaymentSettingsApi).
     /// </summary>
     private const string FromSettings = "settings";
 
