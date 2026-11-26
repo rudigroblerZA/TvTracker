@@ -46,11 +46,24 @@ public static partial class MemberData
         .Order().ToList();
 
     /// <summary>
+    /// Columns named like a member's id that aren't text, as "table.Column": <see cref="SeedAsync"/> puts a member's id
+    /// only in text ones, so one of these would go unfilled and unsearched without anyone noticing.
+    /// </summary>
+    public static IReadOnlyList<string> NotText(DbContext db) => db.Model.GetEntityTypes()
+        .Where(t => t.GetTableName() is not null && !t.IsOwned())
+        .SelectMany(t => t.GetProperties()
+            .Where(p => p.ClrType != typeof(string) && MemberColumn().IsMatch(p.Name))
+            .Select(p => $"{t.GetTableName()}.{p.Name}"))
+        .Order().ToList();
+
+    /// <summary>
     /// The name rows are given for a member, so it can be searched for like their id.
     /// </summary>
     public static string NameOf(string memberId) => "name-" + memberId;
 
     private static int number = 1;
+
+    private static readonly DateTimeOffset Started = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
     public sealed record Seeded(IReadOnlyList<string> Tables, IReadOnlyList<string> Failures);
 
@@ -165,8 +178,9 @@ public static partial class MemberData
             _ when type == typeof(float) => 1f,
             _ when type == typeof(decimal) => 1m,
             _ when type == typeof(bool) => false,
-            _ when type == typeof(DateTime) => DateTime.UtcNow,
-            _ when type == typeof(DateTimeOffset) => DateTimeOffset.UtcNow,
+            // Each its own whole second, so a time found somewhere else is this row's and no other's.
+            _ when type == typeof(DateTime) => Started.UtcDateTime.AddSeconds(-next),
+            _ when type == typeof(DateTimeOffset) => Started.AddSeconds(-next),
             _ when type == typeof(DateOnly) => DateOnly.FromDateTime(DateTime.UtcNow),
             _ when type == typeof(byte[]) => new byte[] { 1 },
             _ when type == typeof(List<string>) => new List<string>(),
@@ -186,34 +200,28 @@ public static partial class MemberData
 
     /// <summary>
     /// Every place the database mentions <paramref name="memberId"/> or the name its rows were given
-    /// (<see cref="NameOf"/>): text columns that are either, lists that hold either, and JSON that has the id anywhere
-    /// inside (which the name, made from it, does too). Each as "table.column", with how many rows.
+    /// (<see cref="NameOf"/>, which has the id in it): any column of any type whose text has the id anywhere inside.
+    /// Each as "table.column", with how many rows.
     /// </summary>
     public static async Task<Dictionary<string, long>> MentionsAsync(DbContext db, string memberId, CancellationToken ct)
     {
         var connection = await OpenAsync(db, ct);
-        var columns = new List<(string Table, string Column, string Type, string Udt)>();
-        await using (var list = new NpgsqlCommand("""
-            select table_name, column_name, data_type, udt_name from information_schema.columns
-            where table_schema = 'public' and (data_type in ('text', 'character varying', 'jsonb', 'json') or udt_name in ('_text', '_varchar'))
-            """, connection))
+        // Every column, whatever its type, read as text: an id kept as a uuid, in a list or inside JSON is found too.
+        var columns = new List<(string Table, string Column)>();
+        await using (var list = new NpgsqlCommand("select table_name, column_name from information_schema.columns where table_schema = 'public'", connection))
         await using (var reader = await list.ExecuteReaderAsync(ct))
         {
             while (await reader.ReadAsync(ct))
             {
-                columns.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+                columns.Add((reader.GetString(0), reader.GetString(1)));
             }
         }
 
         var found = new Dictionary<string, long>();
-        foreach (var (table, column, type, udt) in columns)
+        foreach (var (table, column) in columns)
         {
-            var where = udt is "_text" or "_varchar" ? $"@id = any(\"{column}\") or @name = any(\"{column}\")"
-                : type is "jsonb" or "json" ? $"\"{column}\"::text like '%' || @id || '%'"
-                : $"\"{column}\" in (@id, @name)";
-            await using var count = new NpgsqlCommand($"select count(*) from \"{table}\" where {where}", connection);
+            await using var count = new NpgsqlCommand($"select count(*) from \"{table}\" where \"{column}\"::text like '%' || @id || '%'", connection);
             count.Parameters.AddWithValue("id", memberId);
-            count.Parameters.AddWithValue("name", NameOf(memberId));
             if ((long)(await count.ExecuteScalarAsync(ct))! is > 0 and var rows)
             {
                 found[$"{table}.{column}"] = rows;
@@ -225,7 +233,8 @@ public static partial class MemberData
     /// <summary>
     /// For each table that names a member, the values in <paramref name="memberId"/>'s rows that no other row has: ids
     /// and the made-up text <see cref="SeedAsync"/> filled in. Finding one of them somewhere (an export) shows the row
-    /// got there. Times count too, to the microsecond, since each row was made at its own; numbers and switches don't.
+    /// got there. Times count too, since <see cref="SeedAsync"/> gives each its own second; numbers and switches don't, and
+    /// neither does a column that points at another row.
     /// </summary>
     public static async Task<Dictionary<string, List<string>>> DistinctiveAsync(DbContext db, string memberId, CancellationToken ct)
     {
@@ -235,7 +244,9 @@ public static partial class MemberData
         {
             var table = type.GetTableName()!;
             var where = string.Join(" or ", type.GetProperties().Where(IsMember).Select(p => $"\"{p.GetColumnName()}\" = @id"));
-            await using var read = new NpgsqlCommand($"select * from \"{table}\" where {where}", connection);
+            // Not the columns that point at another row: that row's id found in an export says nothing of this one.
+            var own = string.Join(", ", type.GetProperties().Where(p => !p.IsForeignKey()).Select(p => $"\"{p.GetColumnName()}\""));
+            await using var read = new NpgsqlCommand($"select {own} from \"{table}\" where {where}", connection);
             read.Parameters.AddWithValue("id", memberId);
             await using var reader = await read.ExecuteReaderAsync(ct);
             var values = found.TryGetValue(table, out var known) ? known : found[table] = [];
@@ -253,10 +264,10 @@ public static partial class MemberData
                             break;
                         // To the microsecond, as the database keeps it and JSON writes it: each row was made at its own.
                         case DateTime at:
-                            values.Add(Stamp(at));
+                            values.AddRange(Stamps(at));
                             break;
                         case DateTimeOffset at:
-                            values.Add(Stamp(at.UtcDateTime));
+                            values.AddRange(Stamps(at.UtcDateTime));
                             break;
                     }
                 }
@@ -272,9 +283,14 @@ public static partial class MemberData
     }
 
     /// <summary>
-    /// A time as JSON writes it, to the microsecond the database keeps.
+    /// A time as JSON writes it, quotes and all, so only the whole value matches: as a UTC time, as one with an offset,
+    /// and as one that says neither.
     /// </summary>
-    private static string Stamp(DateTime at) => at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFF", System.Globalization.CultureInfo.InvariantCulture);
+    private static string[] Stamps(DateTime at)
+    {
+        var text = at.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFF", System.Globalization.CultureInfo.InvariantCulture);
+        return [$"\"{text}Z\"", $"\"{text}+00:00\"", $"\"{text}\""];
+    }
 
     /// <summary>
     /// Any service's context, from its options.
