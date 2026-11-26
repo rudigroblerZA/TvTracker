@@ -1,6 +1,6 @@
-using Financials.API.Apis;
 using Financials.API.Payments;
 using Financials.Data;
+using Microsoft.EntityFrameworkCore;
 using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Persistence;
@@ -22,9 +22,38 @@ public sealed class UserDeletedHandler(FinancialsContext db, PaymentProviders pr
         {
             return;
         }
-        await PaymentsApi.StopSubscriptionsAsync(db, providers, e.UserId, logger, ct);
-        await PaymentsApi.RemoveRecordsAsync(db, e.UserId, ct);
+        await StopSubscriptionsAsync(e.UserId, ct);
+        await RemoveRecordsAsync(e.UserId, ct);
         db.MarkProcessed(e, nameof(UserDeletedHandler));
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Stops every running subscription at its provider at once, so nobody is charged for an account that's gone. A
+    /// provider that fails (down, timing out) is logged to be stopped by hand and doesn't keep the records.
+    /// </summary>
+    private async Task StopSubscriptionsAsync(string userId, CancellationToken ct)
+    {
+        foreach (var subscription in await db.Subscriptions.Where(s => s.UserId == userId && s.Status == SubscriptionStatus.Active).ToListAsync(ct))
+        {
+            try
+            {
+                await (providers.Named(subscription.Provider)?.CancelAsync(subscription, now: true, ct) ?? Task.CompletedTask);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Subscription {Subscription} couldn't be stopped at {Provider}; stop it there by hand", subscription.ProviderSubscriptionId, subscription.Provider);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marks the member's payment records for deletion; the caller saves (the provider keeps its own for its books).
+    /// </summary>
+    private async Task RemoveRecordsAsync(string userId, CancellationToken ct)
+    {
+        db.Receipts.RemoveRange(await db.Receipts.Where(r => r.UserId == userId).ToListAsync(ct));
+        db.Subscriptions.RemoveRange(await db.Subscriptions.Where(s => s.UserId == userId).ToListAsync(ct));
+        db.CheckoutSessions.RemoveRange(await db.CheckoutSessions.Where(c => c.UserId == userId).ToListAsync(ct));
     }
 }

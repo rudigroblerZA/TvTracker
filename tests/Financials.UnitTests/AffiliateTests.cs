@@ -128,7 +128,7 @@ public class AffiliateTests
         var report = AffiliateReport.Build(from, to, clicks, conversions, new Dictionary<Guid, string> { [lasso] = "Ted Lasso" }, [Netflix]);
 
         Assert.Equal((65, 40, 2), (report.Clicks, report.AffiliatedClicks, report.Conversions));
-        Assert.Equal([new MoneyDto("USD", 8.00m)], report.Revenue);
+        Assert.Equal([new Money("USD", 8.00m)], report.Revenue);
 
         var netflix = report.Services[0];
         Assert.Equal(("Netflix", "netflix-us", 40, 2, 8.00m, "USD"), (netflix.Service, netflix.Program, netflix.Clicks, netflix.Conversions, netflix.Revenue, netflix.Currency));
@@ -252,5 +252,15 @@ public class AffiliateTests
         var program = Assert.Single(AffiliatePrograms.Merge(records, [], null));
         Assert.Null(AffiliateLinks.For([program], "Netflix", "US"));
         Assert.True(AffiliateNetworks.KeyMatches(program, "a-long-random-secret"));
+    }
+
+    [Fact]
+    public void A_click_id_says_when_it_was_made()
+    {
+        var at = new DateTimeOffset(2026, 11, 25, 14, 20, 13, 242, TimeSpan.Zero);
+
+        Assert.Equal(at, AffiliateApi.MadeAt(Guid.CreateVersion7(at)));
+        // An id of another kind (a network's own, a guess) says nothing, so its postback isn't kept waiting.
+        Assert.Null(AffiliateApi.MadeAt(Guid.Parse("11111111-2222-4333-8444-555555555555")));
     }
 }

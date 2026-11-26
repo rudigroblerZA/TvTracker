@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +24,26 @@ public static partial class MemberData
     /// </summary>
     [GeneratedRegex("(DisplayName|ModeratorName|ByName|ReviewedBy|Email)$")]
     private static partial Regex NameColumn();
+
+    /// <summary>
+    /// A column whose name says it might be about a person: an id, who did something, a name or an address.
+    /// </summary>
+    [GeneratedRegex("(Id|By|Name|Email)$")]
+    private static partial Regex MaybeAboutAPerson();
+
+    /// <summary>
+    /// Text columns whose names might be about a person (<see cref="MaybeAboutAPerson"/>) that this class neither treats
+    /// as a member's id or name nor has been told aren't one, as "table.Column". A new such column lands here until
+    /// someone says which it is, so it can't slip past the search unnoticed.
+    /// </summary>
+    /// <param name="notAboutAMember">Column names that are about something else (a show, a provider, a program).</param>
+    public static IReadOnlyList<string> Undecided(DbContext db, IReadOnlySet<string> notAboutAMember) => db.Model.GetEntityTypes()
+        .Where(t => t.GetTableName() is not null && !t.IsOwned())
+        .SelectMany(t => t.GetProperties()
+            .Where(p => p.ClrType == typeof(string) && MaybeAboutAPerson().IsMatch(p.Name) && !IsMember(p) && !NameColumn().IsMatch(p.Name)
+                && !notAboutAMember.Contains(p.Name))
+            .Select(p => $"{t.GetTableName()}.{p.Name}"))
+        .Order().ToList();
 
     /// <summary>
     /// The name rows are given for a member, so it can be searched for like their id.

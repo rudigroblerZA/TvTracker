@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using Aspire.Hosting.Dotnet;
+using Microsoft.Extensions.Configuration;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -243,7 +244,8 @@ else if (!builder.ExecutionContext.IsPublishMode && builder.Configuration["Resea
 var financialsApi = Project("financials-api", "../Services/Financials/Financials.API/Financials.API.csproj")
     .WithReference(financialsDb).WaitFor(financialsDb)
     // Read once, at start, to bring across what payments and affiliates kept while they were Identity's and Catalog's
-    // (LegacyImport); nothing else here touches those databases.
+    // (LegacyImport); nothing else here touches those databases. Remove these two references together with
+    // LegacyImport once every deployment has started Financials once and its copy has been checked.
     .WithReference(identityDb).WithReference(catalogDb)
     .WithReference(flagd)
     .WithReference(eventBus).WaitFor(eventBus)
@@ -578,7 +580,7 @@ if (!string.IsNullOrEmpty(webPublicUrl))
 // Affiliate programs kept in configuration (Affiliates:Programs here, in user secrets or the environment) are
 // Financials.API's to read now. They used to be set on Catalog.API: a deployment that put them in catalog-api's own
 // environment moves them to financials-api's (README, Affiliate links).
-foreach (var setting in Microsoft.Extensions.Configuration.ConfigurationExtensions.AsEnumerable(builder.Configuration.GetSection("Affiliates:Programs")).Where(s => s.Value is not null))
+foreach (var setting in builder.Configuration.GetSection("Affiliates:Programs").AsEnumerable().Where(s => s.Value is not null))
 {
     financialsApi.WithEnvironment(setting.Key.Replace(":", "__"), setting.Value);
 }

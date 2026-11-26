@@ -52,6 +52,11 @@ public static class Backlog
     /// <summary>
     /// A followed, unstarted show with how much it's worth to the viewer and what to do about it.
     /// </summary>
+    /// <summary>
+    /// The verdict of a show worth watching that runs <see cref="LongMinutes"/> or more: the lean cut's length is worked out for these.
+    /// </summary>
+    internal const string Long = "long";
+
     internal sealed record Assessed(ShowCopy Show, int Episodes, int Minutes, ShowValue.Assessment Assessment, string Verdict);
 
     /// <summary>
@@ -67,7 +72,7 @@ public static class Backlog
                 var assessment = ShowValue.Assess(show, insights.GetValueOrDefault(show.ShowId), liked);
                 var verdict = assessment.Value < LetGoBelow ? "let-it-go"
                     : assessment.Landing is LandingVerdicts.Fizzles or LandingVerdicts.FinaleLetsDown && assessment.Value < EndsBadlyBelow ? "ends-badly"
-                    : runs[show.ShowId].Minutes >= LongMinutes ? "long"
+                    : runs[show.ShowId].Minutes >= LongMinutes ? Long
                     : "worth-it";
                 return new Assessed(show, runs[show.ShowId].Episodes, runs[show.ShowId].Minutes, assessment, verdict);
             })

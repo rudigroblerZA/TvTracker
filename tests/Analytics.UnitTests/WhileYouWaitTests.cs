@@ -1,5 +1,4 @@
-﻿using Analytics.API.Apis;
-using TvTracker.IntegrationEvents;
+﻿using TvTracker.IntegrationEvents;
 
 namespace Analytics.UnitTests;
 

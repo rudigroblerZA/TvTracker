@@ -10,8 +10,6 @@ using TvTracker.IntegrationEvents;
 
 namespace Financials.API.Apis;
 
-public record MoneyDto(string Currency, decimal Amount);
-
 /// <param name="Program">Null for clicks on a service with no program: the traffic it would be worth.</param>
 /// <param name="EarningsPerClick">Revenue over clicks, in <paramref name="Currency"/>.</param>
 public record AffiliateServiceRowDto(string Service, string? Program, int Clicks, int Conversions, decimal Revenue, string? Currency,
@@ -53,13 +51,13 @@ public record SaveAffiliateProgramRequest(IReadOnlyList<string>? Services, IRead
     string? Currency, bool Test, bool Enabled = true, bool New = false);
 
 /// <param name="Revenue">Commission reported in the window, per currency.</param>
-public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<MoneyDto> Revenue,
+public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int AffiliatedClicks, int Conversions, IReadOnlyList<Money> Revenue,
     IReadOnlyList<AffiliateServiceRowDto> Services, IReadOnlyList<AffiliateBreakdownDto> Surfaces, IReadOnlyList<AffiliateBreakdownDto> Plans,
     IReadOnlyList<AffiliateDayDto> Days, IReadOnlyList<AffiliateShowRowDto> Shows, IReadOnlyList<AffiliateProgramDto> Programs);
 
 /// <summary>
-/// Affiliate links, measured: where-to-watch clicks go through <c>POST /outbound</c>, which records the click and answers
-/// with where to send the viewer; networks report sales to <c>/affiliates/postback/{program}</c>; admins read the report.
+/// Affiliate links, measured: where-to-watch clicks go through Catalog.API's <c>POST /outbound</c>, which answers with
+/// where to send the viewer and reports the click, kept here; networks report sales to <c>/affiliates/postback/{program}</c>; admins read the report.
 /// <list type="bullet">
 /// <item><b>Only stored links:</b> the destination is the show's listed link for that provider (the same one the show page
 /// shows), wrapped by its program, never an address from the request, so this can't be used as an open redirect.</item>
@@ -71,7 +69,6 @@ public record AffiliateReportDto(DateOnly From, DateOnly To, int Clicks, int Aff
 public static partial class AffiliateApi
 {
     private const int MaxReportDays = 365;
-    private const int MaxReportMonths = 36;
 
     public static void MapAffiliateApi(this IEndpointRouteBuilder app)
     {
@@ -79,7 +76,7 @@ public static partial class AffiliateApi
         // The networks call this, with the program's key; not behind the flag, so a sale for a click sent before it was
         // switched off still counts.
         api.MapGet("/affiliates/postback/{program}", PostbackAsync);
-        api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates);
+        api.MapGet("/affiliates/report", ReportAsync).RequireAuthorization().RequireFeature(FeatureFlags.Affiliates).RequireAppAdmin();
 
         // Programs, set up by admins in Settings (404 for anyone else).
         var programs = api.MapGroup("/affiliates/programs").RequireAuthorization().RequireFeature(FeatureFlags.Affiliates)
@@ -265,19 +262,30 @@ public static partial class AffiliateApi
         return TypedResults.Ok("ok");
     }
 
+    private const int ClickWaits = 6;
+    private static readonly TimeSpan ClickWait = TimeSpan.FromMilliseconds(500);
+
     /// <summary>
-    /// The click a postback names, sent through this program. The click comes from Catalog.API as an event, so one
-    /// reported within moments of the click (the test network's page) may be a beat ahead of it: it's given a few seconds.
+    /// A click this recent may still be on its way here from Catalog.API.
+    /// </summary>
+    private static readonly TimeSpan ClickInFlight = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// The click a postback names, sent through this program. The click comes from Catalog.API as an event, so a sale
+    /// reported within moments of the click (the test network's page) may be a beat ahead of it. Only then is it waited
+    /// for, a few seconds: the click's id says when it was made (<see cref="MadeAt"/>), and an older or foreign id is
+    /// answered at once.
     /// </summary>
     private static async Task<bool> ClickKnownAsync(FinancialsContext db, Guid clickId, string program, TimeProvider time, CancellationToken ct)
     {
+        var waits = MadeAt(clickId) is { } made && time.GetUtcNow() - made < ClickInFlight ? ClickWaits : 0;
         for (var attempt = 0; ; attempt++)
         {
             if (await db.OutboundClicks.AnyAsync(c => c.Id == clickId && c.Program == program, ct))
             {
                 return true;
             }
-            if (attempt == ClickWaits)
+            if (attempt >= waits)
             {
                 return false;
             }
@@ -285,24 +293,38 @@ public static partial class AffiliateApi
         }
     }
 
-    private const int ClickWaits = 6;
-    private static readonly TimeSpan ClickWait = TimeSpan.FromMilliseconds(500);
+    /// <summary>
+    /// When a click id was made: Catalog.API makes them as version 7 ids, whose first 48 bits are the time in
+    /// milliseconds. Null for any other kind of id.
+    /// </summary>
+    internal static DateTimeOffset? MadeAt(Guid clickId)
+    {
+        if (clickId.Version != 7)
+        {
+            return null;
+        }
+        var bytes = clickId.ToByteArray(bigEndian: true);
+        long milliseconds = 0;
+        for (var i = 0; i < 6; i++)
+        {
+            milliseconds = milliseconds << 8 | bytes[i];
+        }
+        return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+    }
 
     /// <summary>
-    /// Commission by month and currency, counted in the month the network reported the sale, this month included; off
+    /// Commission since <paramref name="start"/> by month and currency, counted in the month the network reported the sale; off
     /// when affiliate links are. For the financial statement, whose endpoint is the one that checks for an admin: this
     /// doesn't.
     /// </summary>
-    internal static async Task<AffiliateIncome> MonthlyAsync(ClaimsPrincipal user, FinancialsContext db, CachedFlags flags, TimeProvider time,
-        int months, CancellationToken ct)
+    internal static async Task<AffiliateIncome> MonthlyAsync(ClaimsPrincipal user, FinancialsContext db, CachedFlags flags, DateTime start,
+        CancellationToken ct)
     {
         if (!await flags.IsEnabledAsync(FeatureFlags.Affiliates, FeatureFlags.ContextFor(user), ct))
         {
             return AffiliateIncome.Off;
         }
 
-        var today = time.GetUtcNow().UtcDateTime;
-        var start = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(Math.Clamp(months, 1, MaxReportMonths) - 1));
         var sales = await db.AffiliateConversions.AsNoTracking().Where(c => c.ReceivedAtUtc >= start)
             .Select(c => new { c.ReceivedAtUtc, c.Currency, c.Amount })
             .ToListAsync(ct);
@@ -313,14 +335,9 @@ public static partial class AffiliateApi
             .ToList());
     }
 
-    private static async Task<Results<Ok<AffiliateReportDto>, NotFound>> ReportAsync(ClaimsPrincipal user, IConfiguration config, FinancialsContext db,
-        AffiliatePrograms programs, TimeProvider time, int days = 30, CancellationToken ct = default)
+    private static async Task<Ok<AffiliateReportDto>> ReportAsync(FinancialsContext db, AffiliatePrograms programs, TimeProvider time,
+        int days = 30, CancellationToken ct = default)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
-
         var to = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         var from = to.AddDays(-(Math.Clamp(days, 1, MaxReportDays) - 1));
         var start = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -403,7 +420,7 @@ internal static class AffiliateReport
 
         return new AffiliateReportDto(from, to, clicks.Sum(c => c.Clicks), clicks.Where(c => c.Program is not null).Sum(c => c.Clicks),
             conversions.Count,
-            conversions.GroupBy(c => c.Currency).Select(g => new MoneyDto(g.Key, g.Sum(c => c.Amount))).OrderBy(m => m.Currency, StringComparer.Ordinal).ToList(),
+            conversions.GroupBy(c => c.Currency).Select(g => new Money(g.Key, g.Sum(c => c.Amount))).OrderBy(m => m.Currency, StringComparer.Ordinal).ToList(),
             services, By(c => c.Surface, c => c.Surface), By(c => c.Plan, c => c.Plan), days, shows,
             programs.Select(AffiliateApi.Describe).ToList());
     }

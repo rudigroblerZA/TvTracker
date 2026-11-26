@@ -62,7 +62,7 @@ public static class AffiliateNetworks
 /// Every affiliate program, in the order a click tries them (ones switched off in Settings included, marked so): live ones from Settings, then the
 /// configuration's, then Settings' test programs, then the test network's catch-all, so a stand-in never takes a click
 /// a real program covers. Kept a few seconds, so a click doesn't read the table each time
-/// and a change in Settings applies almost at once (<see cref="Forget"/> makes it at once for the admin who made it).
+/// and a change in Settings applies almost at once (<see cref="ChangedAsync"/> makes it at once for the admin who made it).
 /// </summary>
 public sealed class AffiliatePrograms(FinancialsContext db, IOptionsMonitor<AffiliateOptions> options, IConfiguration configuration, IMemoryCache cache,
     IIntegrationEventOutbox outbox, TimeProvider time)

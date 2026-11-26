@@ -1,4 +1,5 @@
 using Financials.API.Apis;
+using Financials.API.Services;
 
 namespace Financials.UnitTests;
 
@@ -22,7 +23,7 @@ public class RevenueReportTests
             new("c", "family", "month", 89m, "ZAR", true)
         ], started: [], ended: 0, receipts: [], checkoutsStarted: 0, checkoutsCompleted: 0);
 
-        Assert.Equal([new RevenueMoneyDto("USD", 5.49m), new RevenueMoneyDto("ZAR", 89m)], report.MonthlyRecurring);
+        Assert.Equal([new Money("USD", 5.49m), new Money("ZAR", 89m)], report.MonthlyRecurring);
         Assert.Equal(3, report.PayingAccounts);
         Assert.Equal(0.3, report.PaidShare);
         // A family's members are on a paid plan without paying.
@@ -52,7 +53,7 @@ public class RevenueReportTests
             receipts: [new(At(2), 2.99m, "USD"), new(At(3), 29.99m, "USD")], checkoutsStarted: 4, checkoutsCompleted: 2);
 
         Assert.Equal(3, report.NewAccounts);
-        Assert.Equal([new RevenueMoneyDto("USD", 32.98m)], report.Received);
+        Assert.Equal([new Money("USD", 32.98m)], report.Received);
         Assert.Equal((4, 2, 1, 1), (report.CheckoutsStarted, report.CheckoutsCompleted, report.NewSubscriptions, report.Ended));
         Assert.Equal(
             [new RevenueDayDto(From, 2, 0, 0), new RevenueDayDto(From.AddDays(1), 0, 1, 1), new RevenueDayDto(To, 1, 1, 0)],
@@ -82,9 +83,9 @@ public class RevenueReportTests
 
         Assert.Equal(
         [
-            new IncomeMonthDto(new DateOnly(2026, 11, 1), "USD", 32.98m, 2),
-            new IncomeMonthDto(new DateOnly(2026, 11, 1), "ZAR", 89m, 1),
-            new IncomeMonthDto(new DateOnly(2026, 10, 1), "ZAR", 89m, 1)
+            new IncomeMonth(new DateOnly(2026, 11, 1), "USD", 32.98m, 2),
+            new IncomeMonth(new DateOnly(2026, 11, 1), "ZAR", 89m, 1),
+            new IncomeMonth(new DateOnly(2026, 10, 1), "ZAR", 89m, 1)
         ], months);
     }
 }

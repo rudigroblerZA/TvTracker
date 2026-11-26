@@ -1,7 +1,6 @@
 @using static TvTracker.UI.Services.ReportFormat
 @page "/settings/revenue"
-@inject IdentityClient Identity
-@inject CatalogClient Catalog
+@inject FinancialsClient Books
 @inject FeatureFlagStore Flags
 
 <PageTitle>Revenue · @Brand.AppName</PageTitle>
@@ -208,7 +207,7 @@
         var window = days;
         error = null;
         // Both reports at once; the affiliate one only while its flag is on, and its failure doesn't take the page down.
-        var revenueTask = Identity.GetRevenueReportAsync(window);
+        var revenueTask = Books.GetRevenueReportAsync(window);
         var affiliatesTask = AffiliatesAsync(window);
         try
         {
@@ -242,7 +241,7 @@
     {
         try
         {
-            return await Flags.IsEnabledAsync(FeatureFlags.Affiliates) ? (true, await Catalog.GetAffiliateReportAsync(window)) : (false, null);
+            return await Flags.IsEnabledAsync(FeatureFlags.Affiliates) ? (true, await Books.GetAffiliateReportAsync(window)) : (false, null);
         }
         catch (HttpRequestException)
         {

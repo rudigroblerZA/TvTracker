@@ -1,5 +1,4 @@
-﻿using System.Security.Claims;
-using Financials.API.Payments;
+﻿using Financials.API.Payments;
 using Financials.API.Services;
 using Financials.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -8,8 +7,6 @@ using TvTracker;
 using TvTracker.IntegrationEvents;
 
 namespace Financials.API.Apis;
-
-public record RevenueMoneyDto(string Currency, decimal Amount);
 
 /// <param name="Plan">"plus" or "family".</param>
 /// <param name="Interval">"month" or "year".</param>
@@ -33,59 +30,39 @@ public record RevenueDayDto(DateOnly Day, int NewAccounts, int Payments, int New
 /// <param name="NewSubscriptions">Subscriptions that started in the window.</param>
 /// <param name="Ended">Subscriptions that ended in the window.</param>
 public record RevenueReportDto(DateOnly From, DateOnly To, int Accounts, int NewAccounts, int PayingAccounts, int OnPaidPlan, double PaidShare,
-    IReadOnlyList<RevenueMoneyDto> MonthlyRecurring, IReadOnlyList<RevenueMoneyDto> Received, int CheckoutsStarted, int CheckoutsCompleted,
+    IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> Received, int CheckoutsStarted, int CheckoutsCompleted,
     int NewSubscriptions, int Ended, IReadOnlyList<RevenuePlanRowDto> Plans, IReadOnlyList<RevenueDayDto> Days);
 
 /// <summary>
-/// Subscription payments received in one month and currency.
-/// </summary>
-/// <param name="Month">The month's first day (UTC).</param>
-public record IncomeMonthDto(DateOnly Month, string Currency, decimal Amount, int Payments);
-
-/// <summary>
-/// What subscriptions brought in by month, and what the running ones bring in a month now: Identity's half of the
-/// business's books, which Financials.API puts together with costs and affiliate commission.
-/// </summary>
-public record IncomeDto(IReadOnlyList<IncomeMonthDto> Months, IReadOnlyList<RevenueMoneyDto> MonthlyRecurring);
-
-/// <summary>
-/// The subscription side of revenue, for the admins' Revenue page (the affiliate side is Catalog.API's report).
+/// The subscription side of revenue, for the admins' Revenue page (the affiliate side is <see cref="AffiliateApi"/>'s report).
 /// </summary>
 public static class RevenueApi
 {
     private const int MaxReportDays = 365;
-    private const int MaxIncomeMonths = 36;
 
-    public static void MapRevenueApi(this IEndpointRouteBuilder app)
-    {
-        app.MapGet("/api/v1/admin/revenue", ReportAsync).RequireAuthorization();
-    }
+    public static void MapRevenueApi(this IEndpointRouteBuilder app) =>
+        app.MapGet("/api/v1/admin/revenue", ReportAsync).RequireAuthorization().RequireAppAdmin();
 
     /// <summary>
-    /// What subscriptions brought in: payments by month for the last <paramref name="months"/> months, this one included.
-    /// For the financial statement, whose endpoint is the one that checks for an admin: this doesn't.
+    /// What subscriptions brought in since <paramref name="start"/>, by month, and what the running ones bring in a
+    /// month now: the financial statement's subscription side.
     /// </summary>
-    internal static async Task<IncomeDto> IncomeAsync(FinancialsContext db, TimeProvider time, int months, CancellationToken ct)
-    {
-        var today = time.GetUtcNow().UtcDateTime;
-        var start = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-(Math.Clamp(months, 1, MaxIncomeMonths) - 1));
-        var receipts = await db.Receipts.AsNoTracking().Where(r => r.PaidAtUtc >= start)
+    internal static async Task<SubscriptionIncome> IncomeAsync(FinancialsContext db, DateTime start, CancellationToken ct) =>
+        new(RevenueReport.ByMonth(await ReceiptsSinceAsync(db, start, ct)), RevenueReport.MonthlyRecurring(await ActiveAsync(db, ct)));
+
+    private static Task<List<Receipt>> ReceiptsSinceAsync(FinancialsContext db, DateTime start, CancellationToken ct) =>
+        db.Receipts.AsNoTracking().Where(r => r.PaidAtUtc >= start)
             .Select(r => new Receipt(r.PaidAtUtc, r.Amount, r.Currency))
             .ToListAsync(ct);
-        var active = await db.Subscriptions.AsNoTracking().Where(s => s.Status == SubscriptionStatus.Active)
+
+    private static Task<List<ActiveSubscription>> ActiveAsync(FinancialsContext db, CancellationToken ct) =>
+        db.Subscriptions.AsNoTracking().Where(s => s.Status == SubscriptionStatus.Active)
             .Select(s => new ActiveSubscription(s.UserId, s.Plan, s.Interval, s.Amount, s.Currency, s.CancelAtPeriodEnd))
             .ToListAsync(ct);
-        return new IncomeDto(RevenueReport.ByMonth(receipts), RevenueReport.MonthlyRecurring(active));
-    }
 
-    private static async Task<Results<Ok<RevenueReportDto>, NotFound>> ReportAsync(HttpContext http, ClaimsPrincipal user, IConfiguration config,
-        FinancialsContext db, Members members, TimeProvider time, int days = 30, CancellationToken ct = default)
+    private static async Task<Ok<RevenueReportDto>> ReportAsync(HttpContext http, FinancialsContext db, Members members, TimeProvider time,
+        int days = 30, CancellationToken ct = default)
     {
-        if (!AppAdmins.Is(user, config))
-        {
-            return TypedResults.NotFound();
-        }
-
         var to = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         var from = to.AddDays(-(Math.Clamp(days, 1, MaxReportDays) - 1));
         var start = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -93,14 +70,10 @@ public static class RevenueApi
         // The accounts are Identity's to count; without its answer the report shows the money and no accounts.
         var summary = await members.AccountsAsync(http.Request.Headers.Authorization.ToString(), to.DayNumber - from.DayNumber + 1, ct);
         var (accounts, onPaidPlan, newAccounts) = (summary?.Accounts ?? 0, summary?.OnPaidPlan ?? 0, summary?.NewAccounts ?? []);
-        var active = await db.Subscriptions.AsNoTracking().Where(s => s.Status == SubscriptionStatus.Active)
-            .Select(s => new ActiveSubscription(s.UserId, s.Plan, s.Interval, s.Amount, s.Currency, s.CancelAtPeriodEnd))
-            .ToListAsync(ct);
+        var active = await ActiveAsync(db, ct);
         var started = await db.Subscriptions.Where(s => s.CreatedAtUtc >= start).Select(s => s.CreatedAtUtc).ToListAsync(ct);
         var ended = await db.Subscriptions.CountAsync(s => s.EndedAtUtc != null && s.EndedAtUtc >= start, ct);
-        var receipts = await db.Receipts.AsNoTracking().Where(r => r.PaidAtUtc >= start)
-            .Select(r => new Receipt(r.PaidAtUtc, r.Amount, r.Currency))
-            .ToListAsync(ct);
+        var receipts = await ReceiptsSinceAsync(db, start, ct);
         var checkouts = await db.CheckoutSessions.AsNoTracking().Where(c => c.CreatedAtUtc >= start)
             .Select(c => c.CompletedAtUtc != null)
             .ToListAsync(ct);
@@ -126,7 +99,7 @@ public static class RevenueReport
         var paying = active.Select(s => s.UserId).Distinct().Count();
         var monthly = MonthlyRecurring(active);
         var received = receipts.GroupBy(r => r.Currency.ToUpperInvariant())
-            .Select(g => new RevenueMoneyDto(g.Key, g.Sum(r => r.Amount)))
+            .Select(g => new Money(g.Key, g.Sum(r => r.Amount)))
             .OrderBy(m => m.Currency, StringComparer.Ordinal)
             .ToList();
         var planOrder = Plans.All.ToList();
@@ -149,18 +122,18 @@ public static class RevenueReport
     /// <summary>
     /// What the running subscriptions bring in a month, by currency; a yearly plan counts as a twelfth.
     /// </summary>
-    public static List<RevenueMoneyDto> MonthlyRecurring(IReadOnlyList<ActiveSubscription> active) =>
+    public static List<Money> MonthlyRecurring(IReadOnlyList<ActiveSubscription> active) =>
         active.GroupBy(s => s.Currency.ToUpperInvariant())
-            .Select(g => new RevenueMoneyDto(g.Key, Math.Round(g.Sum(s => s.Interval == PlanPrices.Year ? s.Amount / 12 : s.Amount), 2)))
+            .Select(g => new Money(g.Key, Math.Round(g.Sum(s => s.Interval == PlanPrices.Year ? s.Amount / 12 : s.Amount), 2)))
             .OrderBy(m => m.Currency, StringComparer.Ordinal)
             .ToList();
 
     /// <summary>
     /// Payments by the month they were received in (UTC) and currency, newest month first.
     /// </summary>
-    public static List<IncomeMonthDto> ByMonth(IReadOnlyList<Receipt> receipts) =>
+    public static List<IncomeMonth> ByMonth(IReadOnlyList<Receipt> receipts) =>
         receipts.GroupBy(r => (Month: new DateOnly(r.PaidAtUtc.Year, r.PaidAtUtc.Month, 1), Currency: r.Currency.ToUpperInvariant()))
-            .Select(g => new IncomeMonthDto(g.Key.Month, g.Key.Currency, g.Sum(r => r.Amount), g.Count()))
+            .Select(g => new IncomeMonth(g.Key.Month, g.Key.Currency, g.Sum(r => r.Amount), g.Count()))
             .OrderByDescending(m => m.Month).ThenBy(m => m.Currency, StringComparer.Ordinal)
             .ToList();
 

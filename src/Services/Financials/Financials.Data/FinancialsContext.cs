@@ -195,8 +195,7 @@ public class FinancialsContext(DbContextOptions<FinancialsContext> options) : Db
             entity.Property(e => e.EventId).HasMaxLength(128);
         });
 
-        // Written by Catalog.API (affiliate links), the one place it writes: clicks aren't shows, so the sync worker stays
-        // the only writer of the catalog itself.
+        // One row per where-to-watch click, as Catalog.API reported it (OutboundClickedHandler).
         modelBuilder.Entity<OutboundClick>(entity =>
         {
             entity.Property(c => c.Id).ValueGeneratedNever();

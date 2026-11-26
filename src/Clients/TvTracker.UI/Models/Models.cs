@@ -1434,10 +1434,9 @@ public record FinancialRow(DateOnly Month, decimal Subscriptions, decimal Affili
 public record FinancialBook(string Currency, IReadOnlyList<FinancialRow> Months, FinancialRow Total, decimal Recurring, decimal RunningCosts,
     decimal RunRate, IReadOnlyList<FinancialCategory> CostsByCategory);
 
-/// <param name="SubscriptionsKnown">False when the subscription figures couldn't be fetched, so they're missing.</param>
-/// <param name="Affiliates">"on", "off" (affiliate links are switched off) or "unknown" (the figures couldn't be fetched).</param>
+/// <param name="AffiliatesOff">Affiliate links are switched off, so there is no commission in the figures.</param>
 public record FinancialStatement(DateOnly From, DateOnly To, decimal FeePercent, decimal FeeFixed, IReadOnlyList<FinancialBook> Books,
-    IReadOnlyList<string> Categories, bool SubscriptionsKnown, string Affiliates);
+    IReadOnlyList<string> Categories, bool AffiliatesOff);
 
 public record RevenueReport(DateOnly From, DateOnly To, int Accounts, int NewAccounts, int PayingAccounts, int OnPaidPlan, double PaidShare,
     IReadOnlyList<Money> MonthlyRecurring, IReadOnlyList<Money> Received, int CheckoutsStarted, int CheckoutsCompleted, int NewSubscriptions,

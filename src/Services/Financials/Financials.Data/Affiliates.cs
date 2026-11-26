@@ -40,7 +40,7 @@ public class OutboundClick
     public required string Region { get; set; }
 
     /// <summary>
-    /// Where in the app the link was (<see cref="OutboundSurfaces"/>).
+    /// Where in the app the link was (<c>OutboundSurfaces</c>).
     /// </summary>
     public required string Surface { get; set; }
 

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using TvTracker.EventBus;
 using TvTracker.IntegrationEvents;
 using TvTracker.Tests;
 
@@ -24,43 +25,37 @@ public sealed class ErasureTests(PostgresServer server)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public Task Tracking_forgets_a_deleted_member() => ErasedAsync<Tracking.Data.TrackingContext>(o => new Tracking.Data.TrackingContext(o),
-        (db, e) => new Tracking.API.IntegrationEvents.UserDeletedHandler(db).HandleAsync(e, Ct));
+    public Task Tracking_forgets_a_deleted_member() => ErasedAsync<Tracking.Data.TrackingContext>(db => new Tracking.API.IntegrationEvents.UserDeletedHandler(db));
 
     [Fact]
-    public Task Ratings_forgets_a_deleted_member() => ErasedAsync<Ratings.Data.RatingsContext>(o => new Ratings.Data.RatingsContext(o),
-        (db, e) => new Ratings.API.IntegrationEvents.UserDeletedHandler(db).HandleAsync(e, Ct));
+    public Task Ratings_forgets_a_deleted_member() => ErasedAsync<Ratings.Data.RatingsContext>(db => new Ratings.API.IntegrationEvents.UserDeletedHandler(db));
 
     [Fact]
-    public Task Social_forgets_a_deleted_member() => ErasedAsync<Social.Data.SocialContext>(o => new Social.Data.SocialContext(o),
-        (db, e) => new Social.API.IntegrationEvents.ProfileEventHandlers(db, new FakeTimeProvider()).HandleAsync(e, Ct));
+    public Task Social_forgets_a_deleted_member() => ErasedAsync<Social.Data.SocialContext>(db => new Social.API.IntegrationEvents.ProfileEventHandlers(db, new FakeTimeProvider()));
 
     [Fact]
-    public Task Recommendations_forgets_a_deleted_member() => ErasedAsync<Recommendations.Data.RecommendationsContext>(o => new Recommendations.Data.RecommendationsContext(o),
-        (db, e) => new Recommendations.API.IntegrationEvents.UserDeletedHandler(db).HandleAsync(e, Ct));
+    public Task Recommendations_forgets_a_deleted_member() => ErasedAsync<Recommendations.Data.RecommendationsContext>(db => new Recommendations.API.IntegrationEvents.UserDeletedHandler(db));
 
     [Fact]
-    public Task Notifications_forgets_a_deleted_member() => ErasedAsync<Notifications.Data.NotificationsContext>(o => new Notifications.Data.NotificationsContext(o),
-        (db, e) => new Notifications.API.IntegrationEvents.UserEventHandlers(db,
+    public Task Notifications_forgets_a_deleted_member() => ErasedAsync<Notifications.Data.NotificationsContext>(
+        db => new Notifications.API.IntegrationEvents.UserEventHandlers(db,
             // No notification hub is configured, so devices are only forgotten here.
             new Notifications.API.Services.NotificationHubPush(db, new ConfigurationBuilder().Build(),
                 NullLogger<Notifications.API.Services.NotificationHubPush>.Instance),
-            new FakeTimeProvider()).HandleAsync(e, Ct));
+            new FakeTimeProvider()));
 
     [Fact]
-    public Task Research_forgets_a_deleted_member() => ErasedAsync<Research.Data.ResearchContext>(o => new Research.Data.ResearchContext(o),
-        (db, e) => new Research.API.IntegrationEvents.UserDeletedHandler(db).HandleAsync(e, Ct));
+    public Task Research_forgets_a_deleted_member() => ErasedAsync<Research.Data.ResearchContext>(db => new Research.API.IntegrationEvents.UserDeletedHandler(db));
 
     [Fact]
-    public Task Analytics_forgets_a_deleted_member() => ErasedAsync<Analytics.Data.AnalyticsContext>(o => new Analytics.Data.AnalyticsContext(o),
-        (db, e) => new Analytics.Worker.IntegrationEvents.UserDeletedHandler(db).HandleAsync(e, Ct));
+    public Task Analytics_forgets_a_deleted_member() => ErasedAsync<Analytics.Data.AnalyticsContext>(db => new Analytics.Worker.IntegrationEvents.UserDeletedHandler(db));
 
     [Fact]
-    public Task Financials_forgets_a_deleted_member() => ErasedAsync<Financials.Data.FinancialsContext>(o => new Financials.Data.FinancialsContext(o),
-        (db, e) => new Financials.API.IntegrationEvents.UserDeletedHandler(db,
+    public Task Financials_forgets_a_deleted_member() => ErasedAsync<Financials.Data.FinancialsContext>(
+        db => new Financials.API.IntegrationEvents.UserDeletedHandler(db,
             // No provider is registered, so there is nowhere to stop a subscription: only the records go.
             new Financials.API.Payments.PaymentProviders([], Options.Create(new Financials.API.Payments.PaymentOptions())),
-            NullLogger<Financials.API.IntegrationEvents.UserDeletedHandler>.Instance).HandleAsync(e, Ct));
+            NullLogger<Financials.API.IntegrationEvents.UserDeletedHandler>.Instance));
 
     /// <summary>
     /// A moderator who deletes their account: what they did stays in the log, and on the corrections of other members
@@ -104,10 +99,46 @@ public sealed class ErasureTests(PostgresServer server)
     // Short enough for every column that holds a member's id or, with "name-" before it, their name.
     private static string Member(string who) => $"{who}-{Guid.NewGuid():N}"[..(who.Length + 13)];
 
-    private async Task ErasedAsync<TContext>(Func<DbContextOptions<TContext>, TContext> create, Func<TContext, UserDeletedIntegrationEvent, Task> erase)
-        where TContext : DbContext
+    /// <summary>
+    /// Every text column that might be about a person has been looked at: it's a member's id or name (and so searched
+    /// for above), or it's listed here as being about something else. A column added to any service under a new name
+    /// fails this until someone decides which.
+    /// </summary>
+    [Fact]
+    public void Every_column_that_might_name_a_person_has_been_decided()
+    {
+        // About a show, an episode, a provider, a program or a thing, not a person.
+        HashSet<string> notAboutAMember =
+        [
+            "Name", "ExternalId", "ShowExternalId", "ImdbId", "TvdbId", "TmdbId", "WikidataId", "GifId", "PlaceId", "EventId", "TransactionId",
+            "ProviderSubscriptionId", "ProviderPaymentId", "PersonName", "ProviderName", "ShowName", "NetworkName", "Title", "EventTypeName",
+            // The admin who last saved the payment settings, by username. It is the deployment's own record of who set
+            // its keys; an account's deletion names an id, not a username, so it can't be found from one and is kept.
+            "UpdatedBy"
+        ];
+        DbContext[] models =
+        [
+            Model<Tracking.Data.TrackingContext>(), Model<Ratings.Data.RatingsContext>(), Model<Social.Data.SocialContext>(),
+            Model<Recommendations.Data.RecommendationsContext>(), Model<Notifications.Data.NotificationsContext>(),
+            Model<Research.Data.ResearchContext>(), Model<Analytics.Data.AnalyticsContext>(), Model<Financials.Data.FinancialsContext>()
+        ];
+
+        var undecided = models.SelectMany(db => MemberData.Undecided(db, notAboutAMember).Select(c => $"{db.GetType().Name}: {c}")).ToList();
+
+        Assert.True(undecided.Count == 0, "Is each of these a member's id or name (add its pattern to MemberData), or about something else (list it here)?\n  "
+            + string.Join("\n  ", undecided));
+    }
+
+    // The model only: nothing is connected to.
+    private static TContext Model<TContext>() where TContext : DbContext => Create(new DbContextOptionsBuilder<TContext>().UseNpgsql("Host=unused").Options);
+
+    private static TContext Create<TContext>(DbContextOptions<TContext> options) where TContext : DbContext =>
+        (TContext)Activator.CreateInstance(typeof(TContext), options)!;
+
+    private async Task ErasedAsync<TContext>(Func<TContext, IIntegrationEventHandler<UserDeletedIntegrationEvent>> handler) where TContext : DbContext
     {
         var options = new DbContextOptionsBuilder<TContext>().UseNpgsql(await server.CreateDatabaseAsync()).Options;
+        TContext create(DbContextOptions<TContext> o) => Create(o);
         var (leaving, staying) = (Member("leaving"), Member("staying"));
         await using (var db = create(options))
         {
@@ -129,7 +160,7 @@ public sealed class ErasureTests(PostgresServer server)
 
         await using (var db = create(options))
         {
-            await erase(db, new UserDeletedIntegrationEvent(leaving));
+            await handler(db).HandleAsync(new UserDeletedIntegrationEvent(leaving), Ct);
         }
 
         await using (var after = create(options))
