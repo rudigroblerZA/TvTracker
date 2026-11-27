@@ -857,17 +857,18 @@ a.chip { text-decoration: none; }
    auto-fit, so with one hidden (a flag off, or signed out) the rest fill the row. */
 .feature-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 4px 0 28px; }
 .feature-cards:not(:has(*)) { display: none; }
-.feature-card { --tone: var(--accent); position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 168px;
+/* The drawing has its own row above the words, so a long name or a plan tag wraps under it, never across it. */
+.feature-card { --tone: var(--accent); position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 168px;
     padding: 18px; overflow: hidden; color: inherit; text-decoration: none; border-radius: var(--radius); box-shadow: var(--shadow-sm);
     border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--border));
     background: linear-gradient(140deg, color-mix(in srgb, var(--tone) 16%, var(--surface)), var(--surface) 72%);
     transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease); }
 .feature-card:hover, .feature-card:focus-visible { text-decoration: none; transform: translateY(-3px); box-shadow: var(--shadow-md);
     border-color: color-mix(in srgb, var(--tone) 60%, var(--border)); }
-.feature-card-art { position: absolute; top: 14px; right: 14px; width: 112px; color: var(--tone); transition: transform 0.3s var(--ease); }
+.feature-card-art { align-self: flex-end; width: 112px; margin: -4px -4px 0 0; color: var(--tone); transition: transform 0.3s var(--ease); }
 .feature-card-art svg { display: block; width: 100%; height: auto; }
 .feature-card:hover .feature-card-art, .feature-card:focus-visible .feature-card-art { transform: scale(1.06) rotate(-2deg); }
-.feature-card-text { position: relative; display: flex; flex-direction: column; gap: 4px; max-width: 30ch; }
+.feature-card-text { display: flex; flex-direction: column; gap: 4px; max-width: 34ch; }
 .feature-card-text strong { font-size: 1.25rem; letter-spacing: -0.01em; color: var(--tone); }
 .feature-card-text .muted { font-size: 0.92rem; line-height: 1.4; }
 .feature-card-locked .feature-card-art { opacity: 0.45; }
@@ -880,7 +881,7 @@ a.chip { text-decoration: none; }
 @media (max-width: 520px) {
     .feature-cards { grid-template-columns: 1fr; gap: 8px; margin-bottom: 18px; }
     .feature-card { min-height: 0; padding: 12px 84px 12px 14px; justify-content: center; }
-    .feature-card-art { top: 50%; right: 12px; width: 60px; translate: 0 -50%; }
+    .feature-card-art { position: absolute; top: 50%; right: 12px; width: 60px; margin: 0; translate: 0 -50%; }
     .feature-card-text strong { font-size: 1.05rem; }
     .feature-card-text .muted { font-size: 0.85rem; }
 }
