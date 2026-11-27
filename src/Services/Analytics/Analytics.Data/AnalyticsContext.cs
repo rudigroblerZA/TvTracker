@@ -207,6 +207,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             entity.Property(m => m.FriendDisplayName).HasMaxLength(64);
             entity.Property(m => m.GuestKey).HasMaxLength(32);
             entity.Property(m => m.Result).HasColumnType("jsonb");
+            entity.Property(m => m.Version).IsRowVersion();
             // A member's matches, on either side; and the sweep of expired ones.
             entity.HasIndex(m => m.InviterUserId);
             entity.HasIndex(m => m.FriendUserId).HasFilter("\"FriendUserId\" IS NOT NULL");

@@ -7,6 +7,8 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using System.Diagnostics.Metrics;
 using TvTracker.IntegrationEvents;
@@ -33,6 +35,13 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     /// Whether Social says the two have a block between them.
     /// </summary>
     private bool blocked;
+
+    /// <summary>
+    /// Social can't be reached.
+    /// </summary>
+    private bool socialDown;
+
+    private static readonly ILogger<MatchMetrics> Log = NullLogger<MatchMetrics>.Instance;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -102,7 +111,7 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         await using var db = database.Context();
 
         var result = await TasteMatchApi.PickAsync(token, new MatchPicksRequest([Shows[0], Guid.NewGuid(), Guid.NewGuid()], null), Guest, db,
-            Catalog(), metrics, time, Ct);
+            Catalog(), Blocks(), metrics, Log, time, Ct);
 
         Assert.IsType<ProblemHttpResult>(result.Result);
         Assert.Equal("open", (await OpenAsync(token, Guest))!.State);
@@ -132,7 +141,7 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         var token = (await StartAsync()).Token;
         await using var db = database.Context();
 
-        var result = await TasteMatchApi.AcceptAsync(token, null, User(inviter, "Ines"), db, Catalog(), Blocks(), metrics, time, Ct);
+        var result = await TasteMatchApi.AcceptAsync(token, null, User(inviter, "Ines"), db, Catalog(), Blocks(), metrics, Log, time, Ct);
 
         Assert.IsType<ProblemHttpResult>(result.Result);
     }
@@ -148,6 +157,65 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         // The inviter, and a guest, are nobody's block.
         Assert.NotNull(await OpenAsync(token, User(inviter, "Ines")));
         Assert.NotNull(await OpenAsync(token, Guest));
+        // Picking shows as a guest would, while signed in, is no way round it.
+        await using var db = database.Context();
+        var picked = await TasteMatchApi.PickAsync(token, new MatchPicksRequest(Shows.Take(3).ToList(), "K"), User(member, "Kenji"), db, Catalog(),
+            Blocks(), metrics, Log, time, Ct);
+        Assert.IsType<NotFound>(picked.Result);
+        Assert.Equal("open", (await OpenAsync(token, Guest))!.State);
+    }
+
+    [Fact]
+    public async Task A_friend_who_blocks_the_inviter_afterwards_takes_the_match_from_them_too()
+    {
+        var token = (await StartAsync()).Token;
+        await AcceptAsync(token, member, "Kenji", unnamed: []);
+        Assert.Equal(member, (await OpenAsync(token, User(inviter, "Ines")))!.OtherUserId);
+
+        blocked = true;
+
+        Assert.Null(await OpenAsync(token, User(inviter, "Ines")));
+        Assert.Null(await OpenAsync(token, User(member, "Kenji")));
+    }
+
+    [Fact]
+    public async Task While_Social_cannot_be_asked_a_match_can_be_read_but_not_answered_and_nobody_is_told_who_the_other_is()
+    {
+        var done = (await StartAsync()).Token;
+        await AcceptAsync(done, member, "Kenji", unnamed: []);
+        var open = (await StartAsync()).Token;
+
+        socialDown = true;
+
+        var read = await OpenAsync(done, User(inviter, "Ines"));
+        Assert.Equal(("done", "inviter", null), (read!.State, read.You, read.OtherUserId));
+        await using var db = database.Context();
+        var accept = await TasteMatchApi.AcceptAsync(open, null, User(member, "Kenji"), db, Catalog(), Blocks(), metrics, Log, time, Ct);
+        Assert.Equal(503, Assert.IsType<ProblemHttpResult>(accept.Result).StatusCode);
+        // A guest is nobody's block: Social isn't asked, and they answer as usual.
+        Assert.Equal("done", (await PickAsync(open, Shows.Take(3).ToList(), null))!.State);
+    }
+
+    [Fact]
+    public async Task Of_two_answers_arriving_together_one_wins_and_the_inviter_is_told_once()
+    {
+        var token = (await StartAsync()).Token;
+        // Both read the match while it is open, as two requests at the same moment do.
+        await using var first = database.Context();
+        await using var second = database.Context();
+        var request = new MatchPicksRequest(Shows.Take(3).ToList(), "Robin");
+        var slow = new Gate();
+        var one = TasteMatchApi.PickAsync(token, request, Guest, first, Catalog(slow), Blocks(), metrics, Log, time, Ct);
+        var two = TasteMatchApi.PickAsync(token, request with { Name = "Mallory" }, Guest, second, Catalog(slow), Blocks(), metrics, Log, time, Ct);
+        await slow.BothWaiting;
+        slow.Open();
+
+        var results = new[] { (await one).Result, (await two).Result };
+
+        Assert.Single(results, r => r is Ok<MatchViewDto>);
+        Assert.Single(results, r => r is NotFound);
+        await using var db = database.Context();
+        Assert.Equal(1, await db.IntegrationEventLogs.CountAsync(e => e.Content.Contains(token), Ct));
     }
 
     [Fact]
@@ -192,14 +260,14 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         var signedUp = $"new-{Guid.NewGuid():N}";
 
         await using var db = database.Context();
-        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, "wrong", User(signedUp, "Robin"), db, Blocks(), metrics, time, Ct)).Result);
-        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, key, User(inviter, "Ines"), db, Blocks(), metrics, time, Ct)).Result);
-        var claimed = Assert.IsType<Ok<MatchClaimedDto>>((await TasteMatchApi.ClaimAsync(token, key, User(signedUp, "Robin"), db, Blocks(), metrics, time, Ct)).Result).Value!;
+        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, "wrong", User(signedUp, "Robin"), db, Blocks(), metrics, Log, time, Ct)).Result);
+        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, key, User(inviter, "Ines"), db, Blocks(), metrics, Log, time, Ct)).Result);
+        var claimed = Assert.IsType<Ok<MatchClaimedDto>>((await TasteMatchApi.ClaimAsync(token, key, User(signedUp, "Robin"), db, Blocks(), metrics, Log, time, Ct)).Result).Value!;
 
         Assert.Equal(("friend", inviter), (claimed.Match.You, claimed.Match.OtherUserId));
         Assert.Equal(picks, claimed.Picks.Select(p => p.ShowId));
         // The key has done its work: it claims nothing twice and deletes nothing now.
-        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, key, User(member, "Kenji"), db, Blocks(), metrics, time, Ct)).Result);
+        Assert.IsType<NotFound>((await TasteMatchApi.ClaimAsync(token, key, User(member, "Kenji"), db, Blocks(), metrics, Log, time, Ct)).Result);
         Assert.False(await DeleteAsync(token, Guest, key));
         Assert.Contains(await MineAsync(signedUp), m => m.Token == token && m.Role == "friend");
     }
@@ -248,19 +316,20 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     private async Task<MatchViewDto?> OpenAsync(string token, ClaimsPrincipal user)
     {
         await using var db = database.Context();
-        return ((await TasteMatchApi.OpenAsync(token, user, db, Blocks(), time, Ct)).Result as Ok<MatchViewDto>)?.Value;
+        return ((await TasteMatchApi.OpenAsync(token, user, db, Blocks(), Log, time, Ct)).Result as Ok<MatchViewDto>)?.Value;
     }
 
     private async Task<MatchViewDto?> PickAsync(string token, List<Guid> picks, string? name)
     {
         await using var db = database.Context();
-        return ((await TasteMatchApi.PickAsync(token, new MatchPicksRequest(picks, name), Guest, db, Catalog(), metrics, time, Ct)).Result as Ok<MatchViewDto>)?.Value;
+        return ((await TasteMatchApi.PickAsync(token, new MatchPicksRequest(picks, name), Guest, db, Catalog(), Blocks(), metrics, Log, time, Ct))
+            .Result as Ok<MatchViewDto>)?.Value;
     }
 
     private async Task<MatchViewDto?> AcceptAsync(string token, string userId, string name, List<Guid> unnamed)
     {
         await using var db = database.Context();
-        return ((await TasteMatchApi.AcceptAsync(token, new MatchUnnamedRequest(unnamed), User(userId, name), db, Catalog(), Blocks(), metrics, time, Ct))
+        return ((await TasteMatchApi.AcceptAsync(token, new MatchUnnamedRequest(unnamed), User(userId, name), db, Catalog(), Blocks(), metrics, Log, time, Ct))
             .Result as Ok<MatchViewDto>)?.Value;
     }
 
@@ -277,16 +346,50 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     }
 
     // The catalog says the two are fairly alike and suggests the last three shows.
-    private static CatalogMatchClient Catalog() => new(Scripted(JsonSerializer.Serialize(
-        new { alike = 0.6, usableFirst = 5, usableSecond = 3, together = Shows.Skip(9), loose = false })));
+    private static CatalogMatchClient Catalog(Gate? gate = null) => new(Scripted(JsonSerializer.Serialize(
+        new { alike = 0.6, usableFirst = 5, usableSecond = 3, together = Shows.Skip(9), loose = false }), gate: gate));
 
-    private SocialBlocksClient Blocks() => new(Scripted(JsonSerializer.Serialize(new { blocked })));
+    private SocialBlocksClient Blocks() => new(Scripted(JsonSerializer.Serialize(new { blocked }), down: socialDown));
 
-    private static HttpClient Scripted(string json) => new(new Answering(json)) { BaseAddress = new Uri("http://scripted/") };
+    private static HttpClient Scripted(string json, bool down = false, Gate? gate = null) =>
+        new(new Answering(json, down, gate)) { BaseAddress = new Uri("http://scripted/") };
 
-    private sealed class Answering(string json) : HttpMessageHandler
+    /// <summary>
+    /// Holds two calls until both have arrived, so two requests are sure to overlap.
+    /// </summary>
+    private sealed class Gate
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") });
+        private readonly TaskCompletionSource open = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource both = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int waiting;
+
+        public Task BothWaiting => both.Task;
+
+        public void Open() => open.SetResult();
+
+        public Task WaitAsync()
+        {
+            if (Interlocked.Increment(ref waiting) == 2)
+            {
+                both.SetResult();
+            }
+            return open.Task;
+        }
+    }
+
+    private sealed class Answering(string json, bool down, Gate? gate) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (down)
+            {
+                throw new HttpRequestException("Connection refused");
+            }
+            if (gate is not null)
+            {
+                await gate.WaitAsync();
+            }
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+        }
     }
 }

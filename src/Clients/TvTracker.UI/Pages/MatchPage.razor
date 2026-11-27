@@ -25,6 +25,17 @@ else if (match.Result is { } result)
 {
     <MatchResult Result="result" Inviter="@InviterName" Friend="@FriendName" />
 
+    @if (CanKeep)
+    {
+        @* Asked, never done on arrival: a link with a key in it must not put a match on the account of whoever opens it. *@
+        <div class="panel">
+            <p><strong>Is this the match you just answered?</strong> Keep it on your account, with the shows you picked.</p>
+            <div class="actions">
+                <button class="btn" type="button" @onclick="KeepAsync" disabled="@busy">Keep this match</button>
+            </div>
+        </div>
+    }
+
     @if (claimed is { Count: > 0 })
     {
         <div class="panel">
@@ -173,9 +184,13 @@ else
     private readonly HashSet<Guid> unnamed = [];
     private IReadOnlyList<MatchShow>? claimed;
     private bool followedPicks;
+    private bool kept;
 
     // Back to this match after signing in or up, with the key that lets a guest keep it.
     private string AfterSignIn => guestKey is null ? "/match" : $"/match/{Token}?key={Uri.EscapeDataString(guestKey)}";
+
+    // A guest back from making an account, with the key they were given: they may keep the match, if they say so.
+    private bool CanKeep => claimed is null && !kept && match is { Result: not null, You: null } && Session.IsSignedIn && !string.IsNullOrEmpty(Key);
 
     private string Link => $"{Platform.PublicWebAddress}match/{Token}";
 
@@ -193,12 +208,6 @@ else
         await RunAsync(async () =>
         {
             match = await Analytics.GetMatchAsync(Token);
-            // Back from making an account: the guest who answered keeps the match, and is offered their picks.
-            if (match is { Result: not null, You: null } && Session.IsSignedIn && !string.IsNullOrEmpty(Key)
-                && await Analytics.ClaimMatchAsync(Token, Key) is { } kept)
-            {
-                (match, claimed) = (kept.Match, kept.Picks);
-            }
             if (match is { Result: null } && !Session.IsSignedIn)
             {
                 popular = await Catalog.GetTrendingAsync() ?? [];
@@ -238,6 +247,19 @@ else
     });
 
     private Task AcceptAsync() => RunAsync(async () => match = await Analytics.AcceptMatchAsync(Token, unnamed) ?? await Analytics.GetMatchAsync(Token));
+
+    private Task KeepAsync() => RunAsync(async () =>
+    {
+        kept = true;
+        if (await Analytics.ClaimMatchAsync(Token, Key!) is { } mine)
+        {
+            (match, claimed) = (mine.Match, mine.Picks);
+        }
+        else
+        {
+            error = "This match can't be kept: it is already on an account, or the link isn't the one you answered from.";
+        }
+    });
 
     private Task FollowPicksAsync() => RunAsync(async () =>
     {
