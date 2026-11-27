@@ -28,6 +28,10 @@ builder.Services.AddHttpClient("logos", client => client.Timeout = TimeSpan.From
 builder.Services.AddServiceToken("Internal", IdentitySettings.InternalClient);
 builder.Services.AddHttpClient<CatalogMatchClient>(http => http.BaseAddress = new Uri("https+http://catalog-api/"))
     .AddHttpMessageHandler<ServiceTokenHandler>();
+// Posters for Taste Match's share card: one quick try each, and the card is drawn without any that don't come.
+#pragma warning disable EXTEXP0001
+builder.Services.AddHttpClient(TasteMatchApi.PosterClient, client => client.Timeout = TimeSpan.FromSeconds(5)).RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 

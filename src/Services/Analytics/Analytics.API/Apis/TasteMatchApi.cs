@@ -6,6 +6,7 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
 
 namespace Analytics.API.Apis;
@@ -39,6 +40,8 @@ public record MatchUnnamedRequest(IReadOnlyList<Guid> Unnamed);
 /// by address, as shared lists' links are. An unknown, expired or deleted token all read the same: 404.</item>
 /// <item><b>One answer.</b> The first answer makes the match done; the result is stored and never recomputed.</item>
 /// <item><b>Sides aren't stored</b> for members: they are read when the friend answers.</item>
+/// <item><b>The card</b> is the result as a picture (<see cref="MatchCard"/>): drawn on first request and kept in memory
+/// for a day, since a result never changes. It is only served while its match exists.</item>
 /// <item><b>Expiry:</b> an open link after 30 days, a done match after a year. Expired matches read as gone at once and
 /// are deleted the next time anyone starts a match.</item>
 /// </list>
@@ -74,6 +77,7 @@ public static class TasteMatchApi
         api.MapGet("/{token}", OpenAsync);
         api.MapPost("/{token}/picks", PickAsync);
         api.MapDelete("/{token}", DeleteAsync);
+        api.MapGet("/{token}/card.png", CardAsync);
     }
 
     private static async Task<Results<Ok<MatchStartedDto>, ProblemHttpResult>> StartAsync(
@@ -251,6 +255,75 @@ public static class TasteMatchApi
         db.TasteMatches.Remove(match);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
+    }
+
+    /// <summary>
+    /// A done match's share card. <paramref name="size"/> is "story" (1080×1920) or "link" (1200×630, the default: what a
+    /// pasted link shows). 404 for a match that isn't done, as for one that doesn't exist.
+    /// </summary>
+    private static async Task<Results<FileContentHttpResult, NotFound>> CardAsync(
+        string token, AnalyticsContext db, HybridCache cache, IHttpClientFactory clients, Branding brand, TimeProvider time, HttpContext http,
+        string? size = null, CancellationToken ct = default)
+    {
+        // Read every time, so a deleted match's card stops being served at once; only the drawing is kept.
+        if (await FindAsync(db, token, time, ct) is not { Result: not null } match || ResultOf(match) is not { } result)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var shape = string.Equals(size, "story", StringComparison.OrdinalIgnoreCase) ? MatchCardSize.Story : MatchCardSize.Link;
+        var png = await cache.GetOrCreateAsync($"analytics:match-card:{match.Token}:{shape}:{brand.AppName}", async cancel =>
+            {
+                // What the two share when there is any; else what they could watch together. Never one side's own shows.
+                var (shows, label) = result.BothLove.Count > 0
+                    ? (result.BothLove.Select(s => s.PosterUrl), "You both love")
+                    : (result.WatchTogether.Select(s => s.PosterUrl), "Watch together");
+                var posters = await Task.WhenAll(shows.OfType<string>().Take(MatchCard.MaxPosters).Select(url => PosterAsync(clients, url, cancel)));
+                var drawn = posters.OfType<byte[]>().ToList();
+                return MatchCard.Render(new MatchCardContent(match.InviterDisplayName ?? "A friend", match.FriendDisplayName ?? "A friend",
+                    result.Score, result.Line, drawn, drawn.Count > 0 ? label : null, brand.AppName), shape);
+            },
+            new HybridCacheEntryOptions { Expiration = CardKeptFor, LocalCacheExpiration = CardKeptFor }, cancellationToken: ct);
+
+        // Short, so a deleted match's card doesn't outlive it by long in a browser or a preview service.
+        http.Response.Headers.CacheControl = "public, max-age=600";
+        return TypedResults.File(png, "image/png");
+    }
+
+    private static readonly TimeSpan CardKeptFor = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// The largest poster read for a card.
+    /// </summary>
+    private const int MaxPosterBytes = 4 * 1024 * 1024;
+
+    public const string PosterClient = "match-posters";
+
+    /// <summary>
+    /// A poster's bytes, or null when it can't be had quickly: the card is drawn without it. Only https addresses are
+    /// fetched (they come from the catalog's provider, and nothing else should be reachable from here).
+    /// </summary>
+    private static async Task<byte[]?> PosterAsync(IHttpClientFactory clients, string url, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var address) || address.Scheme != Uri.UriSchemeHttps)
+        {
+            return null;
+        }
+        try
+        {
+            using var response = await clients.CreateClient(PosterClient).GetAsync(address, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaxPosterBytes
+                || response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.Ordinal) != true)
+            {
+                return null;
+            }
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            return bytes.Length <= MaxPosterBytes ? bytes : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     /// <summary>

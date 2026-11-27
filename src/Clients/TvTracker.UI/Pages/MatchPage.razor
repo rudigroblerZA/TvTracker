@@ -24,6 +24,11 @@ else if (match.Result is { } result)
 {
     <MatchResult Result="result" Inviter="@InviterName" Friend="@FriendName" />
 
+    <div class="match-card">
+        <img src="@CardUrl("link")" alt="@($"{InviterName} and {FriendName}: {result.Score}% match")" width="1200" height="630" loading="lazy" />
+        <a class="btn btn-quiet small" href="@CardUrl("story")" download="taste-match.png">Save the picture for stories</a>
+    </div>
+
     <div class="actions">
         <button class="btn" type="button" @onclick="ShareAsync">@(copied ? "Copied" : "Share this match")</button>
         <a class="btn btn-quiet" href="match">Match with someone else</a>
@@ -134,6 +139,10 @@ else
     private readonly HashSet<Guid> unnamed = [];
 
     private string Link => $"{Platform.PublicWebAddress}match/{Token}";
+
+    // The card is the site's to serve (it is also what a pasted link shows), so its address is absolute: in the mobile
+    // app a relative one would point at the app itself.
+    private string CardUrl(string size) => $"{Link}/card.png?size={size}";
 
     // "You" for whoever is looking, when the match knows which of the two they are.
     private string InviterName => match?.You == "inviter" ? "You" : match?.InviterName ?? "Your friend";

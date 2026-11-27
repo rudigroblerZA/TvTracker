@@ -1476,3 +1476,5 @@ h1:focus, h2:focus { outline: none; }
 .match-tap.picked .poster { outline: 3px solid var(--accent); outline-offset: 2px; }
 .match-tap.picked .show-card-title { color: var(--accent); }
 .match-answer { position: sticky; bottom: 0; z-index: 2; padding: 10px 0; background: var(--bg); }
+.match-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 20px 0 8px; }
+.match-card img { width: 100%; max-width: 560px; height: auto; border-radius: var(--radius); border: 1px solid var(--border); }

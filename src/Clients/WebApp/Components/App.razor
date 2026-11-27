@@ -7,6 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <title>@Brand.AppName</title>
+    @if (MatchToken is { } match)
+    {
+        @* A Taste Match link: what a pasted link shows is its card. The page itself is drawn after the browser connects,
+           so the preview's tags are written here. Anyone with the link can read a match; search engines are asked not to. *@
+        <meta name="robots" content="noindex" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="@Brand.AppName" />
+        <meta property="og:title" content="TV taste match" />
+        <meta property="og:description" content="How well do your TV tastes match? Pick a few shows and find out." />
+        <meta property="og:image" content="@($"{Origin}/match/{match}/card.png")" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+    }
     <script src="@Assets["_content/TvTracker.UI/theme.js"]"></script>
     <link rel="stylesheet" href="@Assets["_content/TvTracker.UI/app.css"]" />
     <HeadOutlet @rendermode="RenderMode" />
@@ -24,6 +38,17 @@
     // Static render of the host page: the browser's own request, so its address is real. Behind a reverse proxy,
     // configure ForwardedHeaders so this is the client's address rather than the proxy's.
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string Origin => $"{HttpContext?.Request.Scheme}://{HttpContext?.Request.Host}";
+
+    /// <summary>
+    /// The token when the page asked for is a Taste Match link (/match/{token}, 32 hex characters); null otherwise.
+    /// </summary>
+    private string? MatchToken =>
+        HttpContext?.Request.Path.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) is ["match", { Length: 32 } token]
+        && token.All(Uri.IsHexDigit)
+            ? token
+            : null;
 
     // No prerendering: pages load their data once, after the circuit (and the user's token) is available.
     private static readonly IComponentRenderMode RenderMode = new InteractiveServerRenderMode(prerender: false);

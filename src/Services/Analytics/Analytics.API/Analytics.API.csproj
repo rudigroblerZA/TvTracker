@@ -5,12 +5,19 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\TvTracker.ServiceDefaults\TvTracker.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\..\TvTracker.UserPlans\TvTracker.UserPlans.csproj" />
     <ProjectReference Include="..\Analytics.Data\Analytics.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The share card's typeface (Inter, SIL Open Font License; Fonts/Inter-LICENSE.txt): a container has no fonts of its own. -->
+    <EmbeddedResource Include="Fonts\*.ttf" />
   </ItemGroup>
 
   <ItemGroup>
