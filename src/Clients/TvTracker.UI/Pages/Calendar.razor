@@ -1,7 +1,7 @@
 @page "/calendar"
 @inject NavigationManager Navigation
 
-@* The calendar is a view of My shows now; this keeps old links and bookmarks working. *@
+@* The old address of the calendar view of My shows, kept so links and bookmarks to it work. *@
 
 @code {
     protected override void OnInitialized() => Navigation.NavigateTo(MyShows.CalendarHref, replace: true);

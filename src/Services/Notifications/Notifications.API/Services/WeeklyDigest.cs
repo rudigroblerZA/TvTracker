@@ -107,7 +107,7 @@ public sealed class WeeklyDigest(NotificationsContext db, CatalogSchedule schedu
             }).ToList();
             if (coming.Count > MaxComingUp)
             {
-                lines.Add(new DigestLine($"and {coming.Count - MaxComingUp} more", "/calendar"));
+                lines.Add(new DigestLine($"and {coming.Count - MaxComingUp} more", "/shows?view=calendar"));
             }
             sections.Add(new DigestSection("Coming up this week", lines));
         }
