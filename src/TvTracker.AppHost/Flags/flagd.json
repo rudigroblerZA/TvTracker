@@ -397,6 +397,12 @@
       "metadata": { "description": "While you wait: for each show you're caught up on, a finished show you can watch whole before it's back, chosen for how alike they are (/while-you-wait).", "name": "While you wait", "plans": "plus,family" },
       "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
+    "taste-match": {
+      "state": "ENABLED",
+      "variants": { "on": true, "off": false },
+      "defaultVariant": "off",
+      "metadata": { "description": "Taste Match: a member sends a friend a link, the friend picks a few shows (no account needed), and both see how well their TV tastes match (/match)." }
+    },
     "mixtape": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },

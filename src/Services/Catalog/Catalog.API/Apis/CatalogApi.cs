@@ -32,6 +32,7 @@ public static class CatalogApi
         api.MapHolidayApi();
         api.MapPuzzleApi();
         api.MapDegreesApi();
+        api.MapTasteMatchApi();
         api.MapAfterwardsApi();
         api.MapQuotesApi();
         api.MapWhoSaidItApi();

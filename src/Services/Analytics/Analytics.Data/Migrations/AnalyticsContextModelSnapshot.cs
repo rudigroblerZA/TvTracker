@@ -228,6 +228,69 @@ namespace Analytics.Data.Migrations
                     b.ToTable("show_insights", (string)null);
                 });
 
+            modelBuilder.Entity("Analytics.Data.TasteMatchRow", b =>
+                {
+                    b.Property<string>("Token")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DoneAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FriendDisplayName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.PrimitiveCollection<List<Guid>>("FriendUnnamed")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<string>("FriendUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("GuestKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.PrimitiveCollection<List<Guid>>("GuestPicks")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<string>("InviterDisplayName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.PrimitiveCollection<List<Guid>>("InviterUnnamed")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
+                    b.Property<string>("InviterUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Token");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("FriendUserId")
+                        .HasFilter("\"FriendUserId\" IS NOT NULL");
+
+                    b.HasIndex("InviterUserId");
+
+                    b.ToTable("taste_matches", (string)null);
+                });
+
             modelBuilder.Entity("Analytics.Data.TopEpisodeRow", b =>
                 {
                     b.Property<string>("Genre")
@@ -318,25 +381,6 @@ namespace Analytics.Data.Migrations
                     b.HasIndex("ShowId");
 
                     b.ToTable("user_follows", (string)null);
-                });
-
-            modelBuilder.Entity("Analytics.Data.UserPlanCopy", b =>
-                {
-                    b.Property<string>("UserId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset>("ChangedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("user_plans", (string)null);
                 });
 
             modelBuilder.Entity("Analytics.Data.UserService", b =>
@@ -704,6 +748,25 @@ namespace Analytics.Data.Migrations
                     b.HasKey("EventId", "Handler");
 
                     b.ToTable("processed_integration_events", (string)null);
+                });
+
+            modelBuilder.Entity("TvTracker.Persistence.UserPlanCopy", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_plans", (string)null);
                 });
 #pragma warning restore 612, 618
         }

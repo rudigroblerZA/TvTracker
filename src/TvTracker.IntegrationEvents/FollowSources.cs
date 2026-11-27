@@ -12,6 +12,7 @@ public static class FollowSources
 {
     public const string Blend = "blend";
     public const string Mixtape = "mixtape";
+    public const string Match = "match";
 
     /// <summary>
     /// A follow that started anywhere else: search, a list, the show's own address.
@@ -23,7 +24,7 @@ public static class FollowSources
     /// </summary>
     public const string Parameter = "from";
 
-    private static readonly HashSet<string> Known = [Blend, Mixtape];
+    private static readonly HashSet<string> Known = [Blend, Mixtape, Match];
 
     /// <summary>
     /// The source to count a follow under: <paramref name="from"/> when it names a known one, <see cref="Direct"/>

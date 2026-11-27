@@ -466,5 +466,7 @@ public sealed class UserDeletedHandler(AnalyticsContext db) : IIntegrationEventH
         await db.Plans.Where(p => p.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.UserServices.Where(s => s.UserId == e.UserId).ExecuteDeleteAsync(ct);
         await db.SeasonCalls.Where(c => c.UserId == e.UserId).ExecuteDeleteAsync(ct);
+        // On either side: the other person loses the result, which is the right way round.
+        await db.TasteMatches.Where(m => m.InviterUserId == e.UserId || m.FriendUserId == e.UserId).ExecuteDeleteAsync(ct);
     }
 }

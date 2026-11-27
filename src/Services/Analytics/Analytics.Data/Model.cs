@@ -42,6 +42,72 @@ public class UserService
 }
 
 /// <summary>
+/// A Taste Match: an invitation from a member to compare TV taste with one friend, and, once the friend has answered,
+/// the result. Read by anyone who has the <see cref="Token"/>, which is the only secret, so the result holds only what
+/// may be shown (see the engine's <c>TasteMatch</c>). Neither side's shows are stored for a member: they are read when
+/// the friend answers, and only the result is kept. A guest friend's picks are kept with the match and go with it.
+/// </summary>
+public class TasteMatchRow
+{
+    /// <summary>
+    /// 32 random hex characters: the link.
+    /// </summary>
+    public required string Token { get; set; }
+
+    public required string InviterUserId { get; set; }
+
+    /// <summary>
+    /// The inviter's first name as it was when they started the match; shown to whoever opens the link.
+    /// </summary>
+    public string? InviterDisplayName { get; set; }
+
+    /// <summary>
+    /// The friend, when they answered signed in; null for a guest and while the match is open.
+    /// </summary>
+    public string? FriendUserId { get; set; }
+
+    /// <summary>
+    /// The friend's first name: a member's, or what a guest typed (optional).
+    /// </summary>
+    public string? FriendDisplayName { get; set; }
+
+    /// <summary>
+    /// A guest friend's picks; empty for a member.
+    /// </summary>
+    public List<Guid> GuestPicks { get; set; } = [];
+
+    /// <summary>
+    /// Given to a guest when they answer, so the device that made the picks can delete the match. Null for a member.
+    /// </summary>
+    public string? GuestKey { get; set; }
+
+    /// <summary>
+    /// Shows the inviter asked not to have named in the result; scored all the same.
+    /// </summary>
+    public List<Guid> InviterUnnamed { get; set; } = [];
+
+    public List<Guid> FriendUnnamed { get; set; } = [];
+
+    /// <summary>
+    /// The result (the engine's <c>TasteMatchDto</c>, as JSON), once the friend has answered: a record of that day,
+    /// never recomputed. Null while the match is open.
+    /// </summary>
+    public string? Result { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime? DoneAtUtc { get; set; }
+
+    /// <summary>
+    /// When the match is deleted: an open link after <see cref="OpenFor"/>, a done match after <see cref="KeptFor"/>.
+    /// </summary>
+    public DateTime ExpiresAtUtc { get; set; }
+
+    public static readonly TimeSpan OpenFor = TimeSpan.FromDays(30);
+    public static readonly TimeSpan KeptFor = TimeSpan.FromDays(365);
+}
+
+/// <summary>
 /// "Call it": a user's prediction of a season's average episode rating, made before it premieres. Written by
 /// Analytics.API (the user's call, with the forecast model's as it stood then), scored by Analytics.Worker once the
 /// season is over.
