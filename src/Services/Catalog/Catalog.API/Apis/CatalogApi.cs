@@ -75,13 +75,18 @@ public static class CatalogApi
     /// A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search. Ignored while the nanogenres
     /// flag is off for the caller, as the UI then has no way to show or clear it.
     /// </param>
+    /// <param name="import">
+    /// False searches the catalog as it is, without first asking the provider for matches it doesn't have: for callers
+    /// that measure search (<c>tvtracker-import search-eval</c>) and mustn't change the catalog by doing so.
+    /// </param>
     /// <param name="tags">
     /// Comma-separated tag keys from Analytics ("bingeable,fan-favorite"); shows must have all of them. Tags are part of
     /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
     /// </param>
     private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
         ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, ShowSearch shows, CachedFlags features, string? search,
-        string? genre, ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
+        string? genre, ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, bool import = true,
+        CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
         {
@@ -94,7 +99,7 @@ public static class CatalogApi
             nanogenre = null;
         }
 
-        if (page <= 1 && !string.IsNullOrWhiteSpace(search))
+        if (import && page <= 1 && !string.IsNullOrWhiteSpace(search))
         {
             // Pulls in matching shows the catalog doesn't have yet, so they appear in the results.
             await importer.ImportSearchMatchesAsync(search, ct);

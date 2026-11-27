@@ -130,9 +130,19 @@ var mixEval = new Command("mix-eval", "Check Blend and Mixtape against a fixed l
 mixEval.SetAction((parse, ct) => MixEval.RunAsync(parse.GetValue(catalogUrlOption)!, parse.GetValue(casesOption)!, parse.GetValue(outOption),
     parse.GetValue(baselineOption), parse.GetValue(tokenOption), ct));
 
+// search-eval: measures search by meaning against the fixed list of searches, through the public endpoint.
+var queriesOption = new Option<string>("--cases") { Description = "The searches to run", DefaultValueFactory = _ => "docs/design/search-queries.json" };
+var failUnderOption = new Option<double?>("--fail-under") { Description = "Exit code 1 when the mean reciprocal rank is under this (0 to 1)" };
+var searchEval = new Command("search-eval", "Measure search by meaning against a fixed list of searches: where the show each describes comes, and whether unrelated searches find nothing")
+{
+    catalogUrlOption, queriesOption, outOption, baselineOption, failUnderOption
+};
+searchEval.SetAction((parse, ct) => SearchEval.RunAsync(parse.GetValue(catalogUrlOption)!, parse.GetValue(queriesOption)!, parse.GetValue(outOption),
+    parse.GetValue(baselineOption), parse.GetValue(failUnderOption), ct));
+
 var root = new RootCommand("Bulk import shows into the catalog from its provider (TVmaze, Wikidata or TheTVDB), through the sync worker")
 {
-    titles, ids, top, status, cancel, wikidata, mixEval, urlOption, keycloakOption, secretOption, detachOption
+    titles, ids, top, status, cancel, wikidata, mixEval, searchEval, urlOption, keycloakOption, secretOption, detachOption
 };
 
 try

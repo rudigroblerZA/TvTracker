@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -30,7 +29,7 @@ public static class MixEval
 {
     public const int Top = 10;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private static readonly JsonSerializerOptions Json = EvalHttp.Json;
 
     /// <param name="token">A member's access token, for a mix their plan decides (Mixtape is a Pro insight); none asks signed out.</param>
     public static async Task<int> RunAsync(string catalogUrl, string casesFile, string? outFile, string? baselineFile, string? token, CancellationToken ct)
@@ -40,11 +39,7 @@ public static class MixEval
             ? []
             : (JsonSerializer.Deserialize<MixResult[]>(await File.ReadAllTextAsync(baselineFile, ct), Json) ?? []).ToDictionary(r => r.Name);
 
-        using var http = new HttpClient { BaseAddress = new Uri(catalogUrl.TrimEnd('/') + "/") };
-        if (!string.IsNullOrWhiteSpace(token))
-        {
-            http.DefaultRequestHeaders.Authorization = new("Bearer", token);
-        }
+        using var http = EvalHttp.Client(catalogUrl, token);
         var results = new List<MixResult>();
         foreach (var mix in cases)
         {
@@ -109,7 +104,7 @@ public static class MixEval
         var ids = new List<Guid>();
         foreach (var title in mix.Shows)
         {
-            var suggestions = await GetAsync<List<Suggestion>>(http, $"api/v1/shows/suggest?q={Uri.EscapeDataString(title)}", ct)
+            var suggestions = await EvalHttp.GetAsync<List<Suggestion>>(http, $"api/v1/shows/suggest?q={Uri.EscapeDataString(title)}", ct)
                 ?? throw new CliException($"No catalog at {http.BaseAddress}: is the address right?");
             if (suggestions.FirstOrDefault(s => string.Equals(s.Title, title, StringComparison.OrdinalIgnoreCase)) is not { } show)
             {
@@ -119,8 +114,8 @@ public static class MixEval
         }
 
         var answer = ids.Count == 2
-            ? await GetAsync<Answer>(http, $"api/v1/shows/blend?a={ids[0]}&b={ids[1]}", ct)
-            : await GetAsync<Answer>(http, $"api/v1/shows/mixtape?ids={string.Join(',', ids)}", ct);
+            ? await EvalHttp.GetAsync<Answer>(http, $"api/v1/shows/blend?a={ids[0]}&b={ids[1]}", ct)
+            : await EvalHttp.GetAsync<Answer>(http, $"api/v1/shows/mixtape?ids={string.Join(',', ids)}", ct);
         if (answer is null)
         {
             // Off, or a plan's insight asked for without a member on that plan.
@@ -133,26 +128,6 @@ public static class MixEval
 
         var titles = answer.Matches.Take(Top).Select(m => m.Show.Title).ToArray();
         return new MixResult(mix.Name, titles, answer.Loose, Judge(mix, titles, answer.Loose));
-    }
-
-    // The endpoints are rate limited as search is; a 429 says how long to wait. Null when there is nothing at the path.
-    private static async Task<T?> GetAsync<T>(HttpClient http, string path, CancellationToken ct)
-    {
-        while (true)
-        {
-            using var response = await http.GetAsync(path, ct);
-            if (response.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                await Task.Delay(response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5), ct);
-                continue;
-            }
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return default;
-            }
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<T>(Json, ct);
-        }
     }
 
     private static string Describe(MixResult result, MixResult? before)
