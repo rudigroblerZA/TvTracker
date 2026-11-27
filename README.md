@@ -1387,16 +1387,16 @@ read-only, without signing in or having an account.
 
 ### Navigation
 
-- **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Calendar, Discover, For you,
+- **Main sections only:** signed in, the top navigation is Home, Up Next, My shows, Discover, For you,
   Insights, Feed, Search and Inbox. Each section's tools are cards at the top of its page:
   - Up Next: backlog, waiting room, Tonight's plan and time off.
-  - My shows: lists.
+  - My shows: lists, and the calendar as its second view (`/shows?view=calendar`; `/calendar` still leads there).
   - Discover: Prestige picks, Blend, Mixtape, Guess the show, Six degrees, Universes, nanogenres and network report cards.
   - For you: reunion radar and taste twins.
   - Insights: the time machine and holiday episodes.
   - Stats: Year in TV.
 - **On a phone** the cards show only their names, two to a row, so the page's own content starts on the first screen.
-- **Signed out,** the navigation is Home, Calendar, Search, Discover, Blend and Universes.
+- **Signed out,** the navigation is Home, Search, Discover, Blend and Universes.
 
 ### Mail for password reset
 
