@@ -215,7 +215,11 @@ reciprocal rank; and how many unrelated searches found nothing by meaning.
 
 - `--out` saves a run; `--baseline` compares with a saved run and marks each search whose rank changed.
 - `--fail-under 0.7` exits 1 when the mean reciprocal rank is lower.
-- A search whose expected show isn't in the catalog is skipped and not counted.
+- The expected show is found by title, and by the year it started where the list gives one (The Office, Doctor Who),
+  and ranked by its id, so another show with the same title is not it. A search whose expected show isn't in the
+  catalog, or could be more than one show, is skipped and not counted.
+- With `--fail-under` and nothing to measure, it exits 2: neither a pass nor a worse search.
+- With `--baseline`, the two scores printed are over the searches that ran both times.
 - It asks with `import=false`, a switch on the search endpoint that skips the import from the provider, so measuring
   search doesn't add shows to the catalog.
 
