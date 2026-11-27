@@ -65,9 +65,9 @@
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.158.0" />
   </ItemGroup>
   <ItemGroup Label="Feature flags (OpenFeature)">
-    <PackageVersion Include="OpenFeature" Version="2.14.1" />
+    <PackageVersion Include="OpenFeature" Version="2.14.2" />
     <PackageVersion Include="OpenFeature.Hosting" Version="2.14.1" />
-    <PackageVersion Include="OpenFeature.Providers.Flagd" Version="0.8.1" />
+    <PackageVersion Include="OpenFeature.Providers.Flagd" Version="0.8.2" />
   </ItemGroup>
   <ItemGroup Label="Tests">
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
