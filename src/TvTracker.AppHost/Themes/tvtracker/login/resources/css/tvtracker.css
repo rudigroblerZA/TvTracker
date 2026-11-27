@@ -10,9 +10,10 @@
     --muted: light-dark(#57534e, #a8a29e);
     --border: light-dark(#e7e5e4, #292524);
     --field-border: light-dark(#a8a29e, #57534e);
-    --accent: light-dark(#2563eb, #7cb0ff);
-    --accent-text: light-dark(#ffffff, #0c0a09);
-    --accent-2: light-dark(#4f46e5, #a5b4fc);
+    --accent: light-dark(#c2410c, #fb923c);
+    --accent-fill: light-dark(#f97316, #fb923c);
+    --accent-2: light-dark(#ea580c, #f97316);
+    --accent-text: light-dark(#1c1917, #0c0a09);
     --tint: color-mix(in srgb, var(--text) 6%, transparent);
     --danger: light-dark(#b91c1c, #f87171);
     --good: light-dark(#166534, #4ade80);
@@ -67,7 +68,7 @@ body, body#keycloak-bg {
     text-transform: none; white-space: normal; padding: 0;
 }
 #kc-header-wrapper::before, #kc-header-wrapper::after { content: ""; width: 32px; height: 32px; flex: none; }
-#kc-header-wrapper::before { border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.2); }
+#kc-header-wrapper::before { border-radius: 10px; background: linear-gradient(135deg, var(--accent-fill), var(--accent-2)); box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.2); }
 #kc-header-wrapper::after { position: absolute; left: 0; top: 50%; transform: translateY(-50%); background: var(--accent-text); clip-path: polygon(38% 28%, 38% 72%, 74% 50%); }
 
 /* The card. */
@@ -144,7 +145,7 @@ a:hover, .pf-v5-c-button.pf-m-link:hover { color: var(--accent); text-decoration
 }
 .pf-v5-c-button::after { display: none; }
 .pf-v5-c-button.pf-m-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-text);
+    background: linear-gradient(135deg, var(--accent-fill), var(--accent-2)); color: var(--accent-text);
     border: 0; box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.18);
 }
 .pf-v5-c-button.pf-m-primary:hover:not(:disabled) { filter: brightness(1.07); box-shadow: var(--shadow-md), inset 0 1px 0 rgb(255 255 255 / 0.18); color: var(--accent-text); text-decoration: none; }
