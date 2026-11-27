@@ -1,6 +1,7 @@
 using Catalog.API.Services;
 using Catalog.Data;
 using Catalog.Embeddings;
+using Catalog.Mixes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using TvTracker;

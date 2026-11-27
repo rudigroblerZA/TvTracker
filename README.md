@@ -462,7 +462,7 @@ address holds the shows, so a mixtape can be shared, and it works signed out.
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
 Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
 genres it takes from each. The address holds the blend, so it can be shared, and it works signed out.
-- **How:** the same engine as Mixtape (`ShowMixer`), for two shows with a lean: it mixes the two shows' search
+- **How:** the same engine as Mixtape (`ShowMixer`, in `Catalog.Mixes`), for two shows with a lean: it mixes the two shows' search
   vectors, gathers the shows nearest the mix and nearest each of the two, keeps the same kinds of show, and ranks them
   by their distance to the farther of the two, so a show close to only one of them ranks low. Design:
   [docs/design/blend.md](docs/design/blend.md).

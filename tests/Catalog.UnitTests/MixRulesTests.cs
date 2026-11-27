@@ -1,4 +1,4 @@
-using Catalog.API.Services;
+using Catalog.Mixes;
 
 namespace Catalog.UnitTests;
 

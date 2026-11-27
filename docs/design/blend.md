@@ -77,7 +77,7 @@ So a show can be blended once the sync worker has embedded it, normally within a
 
 `GET /api/v1/shows/blend?a={id}&b={id}&lean=50` on Catalog.API (`BlendApi.cs`), behind the `blend` flag and search's
 rate limit. The endpoint checks the input and shapes the answer; the work is `ShowMixer.MixAsync`, which Mixtape calls
-too, with the rules in `MixRules` (both in `Services/ShowMix.cs`). A blend is a mix of two shows with weights
+too, with the rules in `MixRules` (both in the `Catalog.Mixes` project). A blend is a mix of two shows with weights
 `w = lean / 100` and `1 − w`; a mixtape is a mix of three to five with equal weights.
 
 1. `a == b` is a validation error ("Pick two different shows."). `lean` is clamped to 0-100.
@@ -184,7 +184,8 @@ the page needs no further call to draw a card.
 Blend and Mixtape were two endpoints with two copies of the same idea, and had drifted: Mixtape had the wider
 candidate pool, the same-kinds rule and the rate limit, and Blend had none of them. Neither had a test.
 
-- **One engine.** `MixRules` (pure: mix, score, rank, loose, percentages, kinds) and `ShowMixer` (the queries). Blend
+- **One engine, in a module of its own:** the `Catalog.Mixes` project. `MixRules` (pure: mix, score, rank, loose,
+  percentages, kinds) and `ShowMixer` (the queries). It has no HTTP, flag or rate-limit code; the endpoints keep those. Blend
   gained the wider pool, the same-kinds rule and the rate limit by moving onto it. The two answers' shapes did not
   change.
 - **Tests.** `MixRulesTests` (Catalog.UnitTests) covers the maths; `ShowMixerTests` (Catalog.IntegrationTests) runs
@@ -225,7 +226,7 @@ Neither has been run against the production catalog yet.
 | What | Where |
 |---|---|
 | Endpoint and DTOs | `src/Services/Catalog/Catalog.API/Apis/BlendApi.cs` |
-| Rules and queries, shared with Mixtape | `MixRules` and `ShowMixer` in `src/Services/Catalog/Catalog.API/Services/ShowMix.cs` |
+| Rules and queries, shared with Mixtape | `MixRules` and `ShowMixer` in `src/Services/Catalog/Catalog.Mixes` |
 | The fixed list of mixes, and the command that runs it | `docs/design/mix-pairs.json`; `mix-eval` in `src/Tools/Catalog.ImportCli` |
 | Follows by source | `FollowSources` in `src/TvTracker.IntegrationEvents`; `FollowMetrics` in Tracking.API |
 | Vectors and their index | `ShowEmbedding` in `src/Services/Catalog/Catalog.Data/Model.cs`, mapped in `CatalogContext.cs` |

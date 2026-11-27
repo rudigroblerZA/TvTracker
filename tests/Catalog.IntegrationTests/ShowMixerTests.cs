@@ -1,4 +1,4 @@
-using Catalog.API.Services;
+using Catalog.Mixes;
 using Catalog.Data;
 using Catalog.Embeddings;
 using Pgvector;
