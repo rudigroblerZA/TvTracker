@@ -114,7 +114,7 @@ public static class FeatureFlags
     [
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Universes, Social, ListLinks,
         Plans, Payments, FamilyPlan, Affiliates,
-        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, HolidayEpisodes, Nanogenres, Research, ShowDna, Streaks, WeeklyDigest, WorthIt,
+        AwardsShelf, BacklogTriage, Blend, CallIt, Endings, EpisodeGrid, GetsGood, HolidayEpisodes, Nanogenres, Research, ShowDna, Streaks, WeeklyDigest, WorthIt,
         CharacterVoting,
         .. PaidInsights,
     ]);
