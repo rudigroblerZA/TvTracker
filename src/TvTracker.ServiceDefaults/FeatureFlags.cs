@@ -97,8 +97,8 @@ public static class FeatureFlags
     /// </summary>
     public static readonly IReadOnlySet<string> PaidInsights = new HashSet<string>
     {
-        CatchUp, DnaTwins, EssentialCut, Forecasts, MakersForYou, Mixtape, Refresher, ReunionRadar, SpoilerWatch, TasteTwins,
-        TonightPlan, TonightTogether, TvClock, TvLife, WhileYouWait, YearInTv, YourServices,
+        CatchUp, DnaTwins, EssentialCut, Forecasts, MakersForYou, Milestones, Mixtape, NetworkReports, Refresher, ReunionRadar, SpoilerWatch,
+        TasteTwins, TonightPlan, TonightTogether, TvAtlas, TvClock, TvLife, WhileYouWait, YearInTv, YourServices,
     };
 
     /// <summary>
@@ -114,7 +114,7 @@ public static class FeatureFlags
     [
         HistoryImport, SpoilerShield, WatchNow, WaitingRoom, Universes, Social, ListLinks,
         Plans, Payments, FamilyPlan, Affiliates,
-        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, TvAtlas, WeeklyDigest, WorthIt, CharacterVoting,
+        AwardsShelf, Blend, CallIt, Endings, EpisodeGrid, GetsGood, Nanogenres, Research, ShowDna, WeeklyDigest, WorthIt, CharacterVoting,
         .. PaidInsights,
     ]);
 
