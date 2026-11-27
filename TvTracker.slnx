@@ -9,6 +9,7 @@
     <Project Path="src/Services/Catalog/Catalog.Data/Catalog.Data.csproj" />
     <Project Path="src/Services/Catalog/Catalog.Embeddings/Catalog.Embeddings.csproj" />
     <Project Path="src/Services/Catalog/Catalog.Mixes/Catalog.Mixes.csproj" />
+    <Project Path="src/Services/Catalog/Catalog.Search/Catalog.Search.csproj" />
     <Project Path="src/Services/Catalog/Catalog.SyncWorker/Catalog.SyncWorker.csproj" />
   </Folder>
   <Folder Name="/Services/Financials/">

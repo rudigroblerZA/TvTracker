@@ -2,10 +2,11 @@ using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Pgvector;
 using Pgvector.EntityFrameworkCore;
 
-namespace Catalog.API.Services;
+namespace Catalog.Search;
 
 /// <summary>
 /// Finds shows whose title, genres and summary are close in meaning to a search term ("stranded in space",

@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using Catalog.API.Services;
 using Catalog.Data;
+using Catalog.Search;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -67,9 +68,8 @@ public static class CatalogApi
     }
 
     /// <summary>
-    /// Shows whose title contains the search term (best match first; see <see cref="TitleSearch"/>), then, when few
-    /// do, titles spelled nearly like it, followed by shows similar in meaning (closest first; see
-    /// <see cref="SemanticSearch"/>). Genre, status, nanogenre and tags filter all three.
+    /// Search, as <see cref="ShowSearch"/> does it: titles that contain the term, then titles spelled nearly like it,
+    /// then shows similar in meaning. Genre, status, nanogenre and tags narrow what is searched.
     /// </summary>
     /// <param name="nanogenre">
     /// A nanogenre's slug (see <see cref="NanogenreApi"/>); public, like the rest of search. Ignored while the nanogenres
@@ -80,7 +80,7 @@ public static class CatalogApi
     /// Insights, which are for signed-in users, so filtering by them needs a token (401 without); the rest of search doesn't.
     /// </param>
     private static async Task<Results<Ok<PagedResult<ShowSummaryDto>>, UnauthorizedHttpResult>> SearchShowsAsync(
-        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, SemanticSearch semantic, CachedFlags features, string? search,
+        ClaimsPrincipal user, CatalogContext db, CatalogImportClient importer, ShowSearch shows, CachedFlags features, string? search,
         string? genre, ShowStatus? status, string? tags = null, string? nanogenre = null, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(tags) && user.Identity?.IsAuthenticated != true)
@@ -100,7 +100,7 @@ public static class CatalogApi
             await importer.ImportSearchMatchesAsync(search, ct);
         }
 
-        return await QueryShowsAsync(db, semantic, search, genre, status, page, pageSize, ct, tags, nanogenre);
+        return await QueryShowsAsync(db, shows, search, genre, status, page, pageSize, ct, tags, nanogenre);
     }
 
     /// <summary>
@@ -108,22 +108,8 @@ public static class CatalogApi
     /// any do, titles spelled nearly like it. Unlike search it doesn't import from the provider or match by meaning, so
     /// it's cheap enough for every keystroke.
     /// </summary>
-    private static async Task<List<ShowSummaryDto>> SuggestShowsAsync(CatalogContext db, string? q, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
-        {
-            return [];
-        }
-
-        const int take = 8;
-        var all = db.Shows.AsNoTracking();
-        var shows = await TitleSearch.Ranked(TitleSearch.Matching(all, q), q).Take(take).ToListAsync(ct);
-        if (shows.Count < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(q))
-        {
-            shows.AddRange(await TitleSearch.NearlySpelled(TitleSearch.NotMatching(all, q), q).Take(take - shows.Count).ToListAsync(ct));
-        }
-        return shows.Select(s => s.ToSummary()).ToList();
-    }
+    private static async Task<List<ShowSummaryDto>> SuggestShowsAsync(CatalogContext db, string? q, CancellationToken ct) =>
+        (await ShowSearch.SuggestAsync(db.Shows.AsNoTracking(), q, ct)).Select(s => s.ToSummary()).ToList();
 
     /// <summary>
     /// Up to 6 cast members whose name contains the term (or, when none does, is spelled nearly like it), those in the most
@@ -171,21 +157,8 @@ public static class CatalogApi
             .ToList();
     }
 
-    /// <summary>
-    /// The shows with these ids, in the ids' order.
-    /// </summary>
-    private static async Task<List<Show>> InOrderAsync(CatalogContext db, IReadOnlyCollection<Guid> ids, CancellationToken ct)
-    {
-        if (ids.Count == 0)
-        {
-            return [];
-        }
-        var found = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
-        return ids.Where(found.ContainsKey).Select(id => found[id]).ToList();
-    }
-
     private static async Task<Ok<PagedResult<ShowSummaryDto>>> QueryShowsAsync(
-        CatalogContext db, SemanticSearch? semantic, string? search, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct,
+        CatalogContext db, ShowSearch search, string? term, string? genre, ShowStatus? status, int page, int pageSize, CancellationToken ct,
         string? tags = null, string? nanogenre = null)
     {
         (page, pageSize) = Normalize(page, pageSize);
@@ -208,36 +181,8 @@ public static class CatalogApi
             filtered = filtered.Where(s => s.Nanogenres.Contains(nanogenre));
         }
 
-        var searching = !string.IsNullOrWhiteSpace(search);
-        var titleMatches = searching ? TitleSearch.Matching(filtered, search!) : filtered;
-        var ordered = searching
-            ? TitleSearch.Ranked(titleMatches, search!)
-            : titleMatches.OrderByDescending(s => s.Popularity).ThenBy(s => s.Title);
-
-        // Title matches fill the first pages; near-spelled titles and then the similar shows come after the last of them.
-        var titleTotal = await titleMatches.CountAsync(ct);
-        List<Guid> after = [];
-        var nearlySpelled = 0;
-        if (searching)
-        {
-            var others = TitleSearch.NotMatching(filtered, search!);
-            if (titleTotal < TitleSearch.FuzzyBelow && TitleSearch.AllowsNearSpelling(search!))
-            {
-                after = await TitleSearch.NearlySpelled(others, search!).Select(s => s.Id).Take(12).ToListAsync(ct);
-                nearlySpelled = after.Count;
-            }
-            if (semantic is not null)
-            {
-                after.AddRange((await semantic.FindSimilarAsync(others, db, search!, ct)).Except(after));
-            }
-        }
-
-        var skip = (page - 1) * pageSize;
-        var shows = skip < titleTotal ? await ordered.Skip(skip).Take(pageSize).ToListAsync(ct) : [];
-        shows.AddRange(await InOrderAsync(db, after.Skip(Math.Max(0, skip - titleTotal)).Take(pageSize - shows.Count).ToList(), ct));
-
-        return TypedResults.Ok(new PagedResult<ShowSummaryDto>(
-            shows.Select(s => s.ToSummary()).ToList(), page, pageSize, titleTotal + after.Count, searching ? titleTotal + nearlySpelled : null));
+        var found = await search.PageAsync(db, filtered, term, page, pageSize, ct);
+        return TypedResults.Ok(new PagedResult<ShowSummaryDto>(found.Shows.Select(s => s.ToSummary()).ToList(), page, pageSize, found.Total, found.TitleCount));
     }
 
     /// <summary>
@@ -511,8 +456,8 @@ public static class CatalogApi
     }
 
     private static Task<Ok<PagedResult<ShowSummaryDto>>> GetShowsByGenreAsync(
-        string genre, CatalogContext db, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
-        QueryShowsAsync(db, semantic: null, search: null, genre, status: null, page, pageSize, ct);
+        string genre, CatalogContext db, ShowSearch shows, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
+        QueryShowsAsync(db, shows, term: null, genre, status: null, page, pageSize, ct);
 
     private static (int Page, int PageSize) Normalize(int page, int pageSize) =>
         (Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
