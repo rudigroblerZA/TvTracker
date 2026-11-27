@@ -136,11 +136,12 @@ public static class EmbeddingModels
     /// </summary>
     public static IReadOnlyDictionary<string, EmbeddingModel> BuiltIn { get; } = new Dictionary<string, EmbeddingModel>
     {
-        // ~90 MB; the default. Related shows land around 0.3-0.64 ("cooking competition" → The Great British Bake Off at 0.62),
+        // ~90 MB, run in-process; what's used when no model is configured. Related shows land around 0.3-0.64 ("cooking competition" → The Great British Bake Off at 0.62),
         // unrelated ones from about 0.66.
         [MiniLm] = new()
         {
             Id = MiniLm,
+            Source = EmbeddingSource.Onnx,
             BaseUrl = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/",
             OnnxSha256 = "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
             VocabSha256 = "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
@@ -156,6 +157,7 @@ public static class EmbeddingModels
         [BgeSmall] = new()
         {
             Id = BgeSmall,
+            Source = EmbeddingSource.Onnx,
             BaseUrl = "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/5c38ec7c405ec4b44b94cc5a9bb96e735b38267a/",
             OnnxSha256 = "828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35",
             VocabSha256 = "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
