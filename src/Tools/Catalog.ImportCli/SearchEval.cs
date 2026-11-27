@@ -7,12 +7,13 @@ namespace Catalog.ImportCli;
 /// about something no show is about, which should find nothing by meaning.
 /// </summary>
 /// <param name="Expect">The show's title, as the catalog has it.</param>
-public sealed record SearchCase(string Query, string? Expect = null);
+/// <param name="Year">The year it started, to tell it from another show with the same title (The Office, Doctor Who).</param>
+public sealed record SearchCase(string Query, string? Expect = null, int? Year = null);
 
 /// <param name="Rank">Where the expected show came in the results as a member sees them, from 1; null when it wasn't there.</param>
 /// <param name="ByMeaning">How many results matched by meaning and not by title.</param>
 /// <param name="First">The first results' titles.</param>
-/// <param name="Skipped">Why it wasn't run (the expected show isn't in the catalog).</param>
+/// <param name="Skipped">Why it wasn't run (the expected show isn't in the catalog, or several shows could be it).</param>
 public sealed record SearchResult(string Query, string? Expect, int? Rank, int ByMeaning, string[] First, string? Skipped = null);
 
 /// <param name="Searches">Searches with an expected show that were run.</param>
@@ -40,7 +41,13 @@ public static class SearchEval
 
     private static readonly JsonSerializerOptions Json = EvalHttp.Json;
 
-    /// <param name="failUnder">Exit code 1 when the mean reciprocal rank is under this.</param>
+    /// <summary>
+    /// The exit code when a floor was asked for and no search with an expected show could be run: nothing was measured,
+    /// which is neither a pass nor a worse search.
+    /// </summary>
+    public const int NothingMeasured = 2;
+
+    /// <param name="failUnder">Exit code 1 when the mean reciprocal rank is under this; <see cref="NothingMeasured"/> when there was nothing to measure.</param>
     public static async Task<int> RunAsync(string catalogUrl, string casesFile, string? outFile, string? baselineFile, double? failUnder, CancellationToken ct)
     {
         var cases = JsonSerializer.Deserialize<SearchCase[]>(await File.ReadAllTextAsync(casesFile, ct), Json) ?? [];
@@ -67,13 +74,25 @@ public static class SearchEval
         Console.WriteLine(Describe(score));
         if (results.Count(r => r.Skipped is not null) is > 0 and var skipped)
         {
-            Console.WriteLine($"{skipped} skipped: the expected show isn't in this catalog.");
+            Console.WriteLine($"{skipped} skipped: the expected show isn't in this catalog, or several shows could be it.");
         }
         if (baseline.Count > 0)
         {
-            Console.WriteLine($"Baseline: {Describe(Score(baseline.Values.Where(b => results.Any(r => r.Query == b.Query && r.Skipped is null)).ToList()))}");
+            // Like for like: only the searches that ran both times.
+            var both = results.Where(r => r.Skipped is null && baseline.GetValueOrDefault(r.Query) is { Skipped: null }).ToList();
+            Console.WriteLine($"Of the {both.Count} searches run both times. Now: {Describe(Score(both))}");
+            Console.WriteLine($"Baseline: {Describe(Score(both.Select(r => baseline[r.Query]).ToList()))}");
         }
-        return failUnder is { } floor && score.Mrr < floor ? 1 : 0;
+        if (failUnder is not { } floor)
+        {
+            return 0;
+        }
+        if (score.Searches == 0)
+        {
+            Console.WriteLine("Nothing to measure: none of the expected shows is in this catalog.");
+            return NothingMeasured;
+        }
+        return score.Mrr < floor ? 1 : 0;
     }
 
     public static SearchScore Score(IReadOnlyCollection<SearchResult> results)
@@ -92,36 +111,46 @@ public static class SearchEval
     }
 
     /// <summary>
-    /// Where <paramref name="expect"/> comes in <paramref name="titles"/>, from 1; null when it isn't there.
+    /// Where the show <paramref name="expect"/> comes in <paramref name="results"/>, from 1; null when it isn't there.
+    /// By id: another show with the same title is not it.
     /// </summary>
-    public static int? RankOf(IReadOnlyList<string> titles, string expect)
+    public static int? RankOf(List<Guid> results, Guid expect) => results.IndexOf(expect) is >= 0 and var index ? index + 1 : null;
+
+    /// <summary>
+    /// The one show among <paramref name="suggestions"/> that a case means: titled so, and from that year when the case
+    /// gives one. Null when there is none, or more than one (the case then needs a year).
+    /// </summary>
+    public static Guid? Expected(IEnumerable<(Guid Id, string Title, int? Year)> suggestions, string title, int? year)
     {
-        for (var i = 0; i < titles.Count; i++)
-        {
-            if (string.Equals(titles[i], expect, StringComparison.OrdinalIgnoreCase))
-            {
-                return i + 1;
-            }
-        }
-        return null;
+        var matches = suggestions
+            .Where(s => string.Equals(s.Title, title, StringComparison.OrdinalIgnoreCase) && (year is null || s.Year == year))
+            .Select(s => s.Id)
+            .Distinct()
+            .ToList();
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     private static async Task<SearchResult> RunAsync(HttpClient http, SearchCase search, CancellationToken ct)
     {
+        Guid? expected = null;
         if (search.Expect is { } expect)
         {
             var suggestions = await EvalHttp.GetAsync<List<Show>>(http, $"api/v1/shows/suggest?q={Uri.EscapeDataString(expect)}", ct)
                 ?? throw new CliException($"No catalog at {http.BaseAddress}: is the address right?");
-            if (!suggestions.Any(s => string.Equals(s.Title, expect, StringComparison.OrdinalIgnoreCase)))
+            expected = Expected(suggestions.Select(s => (s.Id, s.Title, s.Year)), expect, search.Year);
+            if (expected is null)
             {
-                return new SearchResult(search.Query, expect, null, 0, [], $"{expect} isn't in the catalog");
+                var named = suggestions.Count(s => string.Equals(s.Title, expect, StringComparison.OrdinalIgnoreCase));
+                return new SearchResult(search.Query, expect, null, 0, [], named > 1
+                    ? $"{named} shows are titled {expect}: give the case a year"
+                    : $"{expect}{(search.Year is { } y ? $" ({y})" : "")} isn't in the catalog");
             }
         }
 
         var page = await EvalHttp.GetAsync<Page>(http, $"api/v1/shows?search={Uri.EscapeDataString(search.Query)}&pageSize={PageSize}&import=false", ct)
             ?? throw new CliException($"No catalog at {http.BaseAddress}: is the address right?");
         var titles = page.Items.Select(s => s.Title).ToList();
-        return new SearchResult(search.Query, search.Expect, search.Expect is null ? null : RankOf(titles, search.Expect),
+        return new SearchResult(search.Query, search.Expect, expected is { } id ? RankOf(page.Items.Select(s => s.Id).ToList(), id) : null,
             page.TotalCount - (page.TitleCount ?? 0), titles.Take(3).ToArray());
     }
 
@@ -150,7 +179,7 @@ public static class SearchEval
             : $"MISS  {result.Query} → {result.Expect}{was}; first {string.Join(", ", result.First)}";
     }
 
-    private sealed record Show(string Title);
+    private sealed record Show(Guid Id, string Title, int? Year);
 
     private sealed record Page(List<Show> Items, int TotalCount, int? TitleCount);
 }

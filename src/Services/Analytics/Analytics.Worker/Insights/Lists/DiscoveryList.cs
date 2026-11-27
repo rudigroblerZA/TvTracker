@@ -71,16 +71,13 @@ public sealed class DiscoveryList : IListInsight
         }
 
         /// <summary>
-        /// Each fully aired season's last episode, when it's rated and the season has enough rated episodes.
+        /// Each fully aired regular season's finale (the last to air, as the show's own patterns have it), when it's
+        /// rated and the season has enough rated episodes.
         /// </summary>
-        private static IEnumerable<EpisodeCopy> FinalesOf(ShowInsightContext show)
-        {
-            var bySeason = show.Episodes.ToLookup(e => e.SeasonNumber);
-            return show.Seasons
-                .Where(s => s.Stats.AiredCount > 0 && s.Stats.AiredCount == s.Stats.EpisodeCount && s.RatingCounts)
-                .Select(s => bySeason[s.Stats.Number].MaxBy(e => e.EpisodeNumber)!)
-                .Where(e => e.ExternalRating is not null);
-        }
+        private static IEnumerable<EpisodeCopy> FinalesOf(ShowInsightContext show) => show.Seasons
+            .Where(s => s.Stats.Number > 0 && s.Stats.AiredCount > 0 && s.Stats.AiredCount == s.Stats.EpisodeCount && s.RatingCounts)
+            .Select(s => show.FinaleOf(s.Stats.Number)!)
+            .Where(e => e.ExternalRating is not null);
 
         protected override IReadOnlyCollection<DiscoveryRow> Rows()
         {

@@ -79,6 +79,36 @@ public class EssentialCutTests
     }
 
     [Fact]
+    public void A_kept_part_does_not_bring_back_a_different_story_next_to_it()
+    {
+        var show = Show();
+        // Two two-parters back to back; the season's last episode is always kept.
+        var e = Season(show, 1, First, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 6.0, 6.0, 6.0, 8.0);
+        e[6].Title = "Storm, Part 1";
+        e[7].Title = "Storm, Part 2";
+        e[8].Title = "Endgame, Part 1";
+        e[9].Title = "Endgame, Part 2";
+
+        var cut = Decide(show, e);
+
+        Assert.Equal((true, "two-parter"), cut[e[8].EpisodeId]);
+        Assert.False(cut[e[6].EpisodeId].Keep);
+        Assert.False(cut[e[7].EpisodeId].Keep);
+    }
+
+    [Theory]
+    [InlineData("Blood, Part 1", "Blood, Part 2", true)]
+    [InlineData("Blood (1)", "Blood (2)", true)]
+    [InlineData("Part One", "Part Two", true)]
+    [InlineData("Siege, Part 2", "Siege, Part 3", true)]
+    [InlineData("Storm, Part 2", "Endgame, Part 1", false)]
+    [InlineData("Storm, Part 1", "Storm, Part 1", false)]
+    [InlineData("Part 2", "Part 1", false)]
+    [InlineData("Storm, Part 1", "The Calm", false)]
+    public void Neighbours_are_one_story_only_when_they_say_so(string first, string second, bool same) =>
+        Assert.Equal(same, EssentialCut.SameStory(first, second));
+
+    [Fact]
     public void An_evenly_rated_season_loses_nothing_to_noise()
     {
         var show = Show();
