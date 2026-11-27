@@ -89,7 +89,9 @@ public static class SearchEval
         }
         if (score.Searches == 0)
         {
-            Console.WriteLine("Nothing to measure: none of the expected shows is in this catalog.");
+            Console.WriteLine(results.Any(r => r.Skipped is not null)
+                ? "Nothing to measure: every search with an expected show was skipped, for the reasons above."
+                : "Nothing to measure: no search in the list names an expected show.");
             return NothingMeasured;
         }
         return score.Mrr < floor ? 1 : 0;
@@ -130,6 +132,22 @@ public static class SearchEval
         return matches.Count == 1 ? matches[0] : null;
     }
 
+    /// <summary>
+    /// Why a case's expected show couldn't be told: what the catalog has under that title against what the case asked for.
+    /// </summary>
+    /// <param name="years">The start year of each show in the catalog with that title.</param>
+    public static string WhySkipped(string title, int? year, IReadOnlyList<int?> years)
+    {
+        var found = string.Join(", ", years.Select(y => y?.ToString() ?? "no year"));
+        return (years.Count, year) switch
+        {
+            (0, _) => $"{title} isn't in the catalog",
+            (_, { } wanted) when !years.Contains(wanted) => $"no show titled {title} started in {wanted} (the catalog has: {found})",
+            (_, { } wanted) => $"{years.Count(y => y == wanted)} shows titled {title} started in {wanted}",
+            _ => $"{years.Count} shows are titled {title} ({found}): give the case a year"
+        };
+    }
+
     private static async Task<SearchResult> RunAsync(HttpClient http, SearchCase search, CancellationToken ct)
     {
         Guid? expected = null;
@@ -140,10 +158,8 @@ public static class SearchEval
             expected = Expected(suggestions.Select(s => (s.Id, s.Title, s.Year)), expect, search.Year);
             if (expected is null)
             {
-                var named = suggestions.Count(s => string.Equals(s.Title, expect, StringComparison.OrdinalIgnoreCase));
-                return new SearchResult(search.Query, expect, null, 0, [], named > 1
-                    ? $"{named} shows are titled {expect}: give the case a year"
-                    : $"{expect}{(search.Year is { } y ? $" ({y})" : "")} isn't in the catalog");
+                var titled = suggestions.Where(s => string.Equals(s.Title, expect, StringComparison.OrdinalIgnoreCase)).ToList();
+                return new SearchResult(search.Query, expect, null, 0, [], WhySkipped(expect, search.Year, titled.Select(s => s.Year).ToList()));
             }
         }
 

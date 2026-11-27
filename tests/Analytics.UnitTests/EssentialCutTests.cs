@@ -101,6 +101,10 @@ public class EssentialCutTests
     [InlineData("Blood (1)", "Blood (2)", true)]
     [InlineData("Part One", "Part Two", true)]
     [InlineData("Siege, Part 2", "Siege, Part 3", true)]
+    // Parts with titles of their own: the numbers say they're one story.
+    [InlineData("Summit (1)", "Last Stand (2)", true)]
+    [InlineData("Part 1: The Beginning", "Part 2: The End", true)]
+    [InlineData("Storm, Part 1", "Storm, Part 3", false)]
     [InlineData("Storm, Part 2", "Endgame, Part 1", false)]
     [InlineData("Storm, Part 1", "Storm, Part 1", false)]
     [InlineData("Part 2", "Part 1", false)]

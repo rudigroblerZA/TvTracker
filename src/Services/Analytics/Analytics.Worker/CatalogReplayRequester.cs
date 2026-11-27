@@ -43,12 +43,20 @@ public sealed class CatalogReplayRequester(
                     : "Catalog replay started; shows and episodes arrive as catalog events");
                 return;
             }
-            // Not reachable yet: refused or failed, timed out (the client's own timeout, or the resilience handler's),
-            // or the circuit is open. Anything else is a fault of ours and is left to surface.
-            catch (Exception ex) when (ex is HttpRequestException or ExecutionRejectedException
-                                       || (ex is OperationCanceledException && !stoppingToken.IsCancellationRequested))
+            // Nothing but being stopped ends this early: a fault here must not take the worker, and its event handlers,
+            // down. Not reachable yet (refused or failed, timed out, the circuit open) is expected while the stack
+            // starts and is logged quietly; anything else is said aloud, and tried again all the same, since some of it
+            // passes too (Keycloak not knowing the service client until Identity has started).
+            catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
             {
-                logger.LogDebug(ex, "Catalog sync worker not reachable yet (attempt {Attempt})", attempt);
+                if (ex is HttpRequestException or ExecutionRejectedException or OperationCanceledException)
+                {
+                    logger.LogDebug(ex, "Catalog sync worker not reachable yet (attempt {Attempt})", attempt);
+                }
+                else
+                {
+                    logger.LogWarning(ex, "Asking the catalog sync worker for a replay failed (attempt {Attempt}); trying again", attempt);
+                }
                 await Task.Delay(RetryDelay, stoppingToken);
             }
         }
@@ -65,11 +73,12 @@ public sealed class CatalogReplayRequester(
         {
             return (await response.Content.ReadFromJsonAsync<ReplayResult>(ct))?.Started == false;
         }
-        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException or HttpRequestException)
+        // A body that isn't the JSON expected, in any of the ways reading it can fail.
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException or InvalidOperationException or HttpRequestException)
         {
             return false;
         }
     }
 
-    private sealed record ReplayResult(bool Started);
+    private sealed record ReplayResult(bool? Started);
 }
