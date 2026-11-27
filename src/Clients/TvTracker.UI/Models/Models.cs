@@ -148,7 +148,7 @@ public record MatchStarted(string Token, IReadOnlyList<MatchShow> Nameable);
 /// <param name="You">"inviter" or "friend" when signed in as one of the two.</param>
 /// <param name="OtherUserId">The other member, when both are members and the caller is one of them.</param>
 public record MatchView(string Token, string State, string? InviterName, string? FriendName, string? You, TasteMatchResult? Result,
-    IReadOnlyList<MatchShow>? Nameable, string? GuestKey, string? OtherUserId = null);
+    IReadOnlyList<MatchShow>? Nameable, string? GuestKey, string? OtherUserId = null, int MinPicks = 3, int MaxPicks = 8);
 
 /// <param name="Picks">The shows a guest picked, offered as follows once they have an account.</param>
 public record MatchClaimed(MatchView Match, IReadOnlyList<MatchShow> Picks);

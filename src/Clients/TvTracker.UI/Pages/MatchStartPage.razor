@@ -2,6 +2,7 @@
 @attribute [RequiresFeature(FeatureFlags.TasteMatch)]
 @inject AnalyticsClient Analytics
 @inject IPlatformServices Platform
+@inject UserSession Session
 
 <PageTitle>Taste Match · @Brand.AppName</PageTitle>
 
@@ -27,21 +28,7 @@
                     <input class="list-link-url" readonly value="@LinkFor(started.Token)" aria-label="Your match link" />
                     <button class="btn" type="button" @onclick="() => ShareAsync(started.Token)">@(copied ? "Copied" : "Share link")</button>
                 </div>
-                @if (started.Nameable.Count > 0)
-                {
-                    <p class="small">The result only names shows you both love. These are yours that it could name; untick any you'd rather it didn't. They still count towards the score.</p>
-                    <ul class="match-nameable">
-                        @foreach (var show in started.Nameable)
-                        {
-                            <li @key="show.ShowId">
-                                <label>
-                                    <input type="checkbox" checked="@(!unnamed.Contains(show.ShowId))" @onchange="e => ToggleAsync(show.ShowId, e.Value is true)" />
-                                    @show.Title
-                                </label>
-                            </li>
-                        }
-                    </ul>
-                }
+                <MatchNameable Shows="started.Nameable" Unnamed="unnamed" Changed="SaveUnnamedAsync" />
             </div>
         }
 
@@ -76,15 +63,13 @@
     private bool copied;
     private string? error;
 
-    [CascadingParameter] private Task<AuthenticationState>? Authentication { get; set; }
-
     protected override async Task OnInitializedAsync()
     {
-        if (Authentication is null || (await Authentication).User.Identity?.IsAuthenticated != true)
+        await Session.EnsureLoadedAsync();
+        if (Session.IsSignedIn)
         {
-            return;
+            await RunAsync(async () => matches = await Analytics.GetMyMatchesAsync() ?? []);
         }
-        await RunAsync(async () => matches = await Analytics.GetMyMatchesAsync() ?? []);
     }
 
     private Task StartAsync() => RunAsync(async () =>
@@ -93,18 +78,7 @@
         matches = await Analytics.GetMyMatchesAsync() ?? [];
     });
 
-    private Task ToggleAsync(Guid showId, bool named) => RunAsync(async () =>
-    {
-        if (named)
-        {
-            unnamed.Remove(showId);
-        }
-        else
-        {
-            unnamed.Add(showId);
-        }
-        await Analytics.SetMatchUnnamedAsync(started!.Token, unnamed);
-    });
+    private Task SaveUnnamedAsync() => RunAsync(() => Analytics.SetMatchUnnamedAsync(started!.Token, unnamed));
 
     private string LinkFor(string token) => $"{Platform.PublicWebAddress}match/{token}";
 

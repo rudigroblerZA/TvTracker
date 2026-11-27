@@ -24,8 +24,10 @@ public record MatchStartedDto(string Token, IReadOnlyList<MatchShowDto> Nameable
 /// account made afterwards.</param>
 /// <param name="OtherUserId">The other member, told only to the two of them and only when both are members: for planning an
 /// evening together.</param>
+/// <param name="MinPicks">How many shows a guest must pick, and may at most: the page's picker goes by these.</param>
 public record MatchViewDto(string Token, string State, string? InviterName, string? FriendName, string? You, TasteMatchDto? Result,
-    IReadOnlyList<MatchShowDto>? Nameable = null, string? GuestKey = null, string? OtherUserId = null);
+    IReadOnlyList<MatchShowDto>? Nameable = null, string? GuestKey = null, string? OtherUserId = null,
+    int MinPicks = TasteMatch.MinPicks, int MaxPicks = TasteMatch.MaxPicks);
 
 /// <param name="Picks">The shows the guest picked, for offering as follows.</param>
 public record MatchClaimedDto(MatchViewDto Match, IReadOnlyList<MatchShowDto> Picks);
