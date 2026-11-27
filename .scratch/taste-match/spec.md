@@ -1,8 +1,8 @@
 # Taste Match: spec
 
-Status: slices 1 to 5 and part of 7 are built, behind the `taste-match` flag, which is off. See "Built so far" at the
-end for what exists, what differs from this spec, and what is left. Numbers marked "start at" were starting points;
-section 6.1 has been superseded by what the code does, described there.
+Status: built, behind the `taste-match` flag, which is off. Section 15 says what exists, where it differs from the
+spec above, and the three things left out on purpose. Section 6.1's numbers were superseded by what the code does,
+described there.
 
 ## 1. Summary
 
@@ -261,27 +261,36 @@ A usable test with real friends exists after slice 4.
   headless browser is a decision with operational cost either way.
 - **Moderation of guest names.** A block list, or no free-text name at all for guests?
 
-## 15. Built so far (27 November 2026)
+## 15. Built (27 November 2026)
 
-Built and tried in the running app:
+Everything below was tried in the running app with the flag on.
 
 - **The rules** (`TasteMatch` in the engine): sides, the three parts, the score with its bounds, the lines, what may be
   named, the suggestions' reasons. 16 unit tests.
 - **The catalog half** (`TasteRules`, `TasteMatcher` in `Catalog.Mixes`; `POST /api/v1/shows/taste-match`, services
   only): alike by meaning, and the suggestions from the mix engine. 6 unit tests.
 - **Matches** in Analytics (`taste_matches`, `TasteMatchApi`): start, list, set the shows not to name, open by link,
-  answer as a guest, accept as a member, delete (inviter, member friend, or the guest's device). Erasure and the data
-  export cover the table; the privacy tests pass.
-- **Pages:** `/match` (start, the link, the shows that could be named, your matches) and `/match/{token}` (the guest
-  picker with search and tap-to-pick, a member's accept, waiting, the result). An entry on For you.
-- **The follow source** `match` on the suggestions.
+  answer as a guest, accept as a member, claim (a guest who made an account), delete. Erasure and the data export
+  cover the table. 18 tests against a real database (`TasteMatchApiTests`).
 - **The card** (5.1): `MatchCard` draws it in process with SkiaSharp and an embedded typeface (Inter, SIL Open Font
   License), in both sizes, with up to four posters of what the two both love, or else of what they could watch
   together. `GET /api/v1/matches/{token}/card.png?size=story|link` on Analytics, passed on by the web app at
   `/match/{token}/card.png`. The drawing is kept in memory for a day; the match is read on every request, so a deleted
-  match's card stops at once (browsers and preview services may keep theirs for ten minutes). The result page shows
-  the card and a link to save the stories-sized one. A `/match/{token}` page's head carries the link-preview tags and
-  asks search engines not to index it.
+  match's card stops at once (browsers and preview services may keep theirs for ten minutes). A `/match/{token}`
+  page's head carries the link-preview tags and asks search engines not to index it. 6 unit tests.
+- **The inviter is told** (4.1): answering stores `TasteMatchAnsweredIntegrationEvent` with the result, in the same
+  save. Analytics.API has no event bus, so the worker's outbox publisher sends it, within a minute; Notifications
+  turns it into an inbox item linking to the match. Inbox only: no push or email.
+- **Blocks** (R-P8): before a signed-in member opens, answers or claims a match, Analytics asks Social (services-only
+  `internal/blocks/between`) whether there is a block between them and the inviter; if so the match reads as gone.
+- **A guest who signs up** (4.2, R-P5): the sign-up link carries their key back to the match; signed in, they attach
+  the match to their account (it then shows in their matches, and they can delete it), and are offered their picks as
+  follows. Nothing is followed unless they press the button.
+- **Tonight for two** (5): each of two members is told the other's id (nobody else is), and the result links to
+  planning an evening together when that feature is on. The page it opens applies its own visibility rule.
+- **Pages:** `/match` and `/match/{token}`; entries on For you and under a Blend's results.
+- **Measures** (11): counters `matches.started`, `matches.answered` (guest or member) and `matches.claimed` (meter
+  `TvTracker.Analytics.TasteMatch`), and the follow source `match` on the suggestions and on followed picks.
 
 Where the code differs from the spec above:
 
@@ -294,18 +303,22 @@ Where the code differs from the spec above:
 - **Expiry** is enforced on read, and expired matches are deleted whenever anyone starts a match, not by a timer.
 - **Rate limiting** reuses the shared-list link policy for every anonymous call; there is no tighter limit on submit
   beyond the global limit on writes.
-- **A guest's delete key** lives in the page's memory only: closing the tab loses the ability to delete.
+- **A guest's key** lives in the page's memory and in the sign-up link: closing the tab without signing up loses the
+  ability to delete or claim the match.
 - **The card's names** are the stored first names ("A friend" when none was given), never "You": the picture is the
   same for everyone. A name in a script the embedded typeface lacks is drawn as boxes.
 - **The link preview's title and description are generic**: the page is drawn after the browser connects, so only the
   picture is specific to the match.
+- **Blocks need Social to answer.** If it can't be reached, a signed-in member's open or answer fails rather than
+  going ahead unchecked; guests are unaffected.
 
-Not built:
+Left out on purpose:
 
-- **Blocks** (R-P8): Analytics doesn't know who has blocked whom.
-- **The inviter being told** when the friend answers (inbox or push). They see it on `/match` and on the link.
-- **Picks becoming follows** when a guest signs up, and attaching their result to the new account.
-- **Adult-rated shows left out** for guests (R-P10): the catalog has no such flag.
-- **The Tonight for two block** on a result for two members who follow each other.
-- **Entry points** on the profile and at the end of a Blend, and the measures in section 11 beyond the follow source.
-- **Tests** of the Analytics endpoints against a database, and of the pages.
+- **Adult-rated shows left out for guests** (R-P10): the catalog has no such flag to go by.
+- **An entry on the profile** (4.1): there is no page of one's own profile to put it on; For you and Blend have it.
+- **The funnel's later steps** (11, items 2 to 4: accounts made within a day, still tracking a month on, repeat
+  use): they need joining counts over time, which is a dashboard's job, not the app's. The counters above are what
+  it would read.
+
+Not tested automatically: the pages (walked through by hand and with a browser script), and how real services draw
+the link preview, which needs a public address.

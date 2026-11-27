@@ -1214,7 +1214,7 @@ the rest off (built and documented below, but hidden, with their endpoints answe
 | `network-reports` | `/networks`, its Discover link, and its endpoint |
 | `year-in-tv` | `/year`, its Stats link, and its endpoint |
 | `mixtape` | `/mixtape`, its Discover card and Blend link, and its endpoint |
-| `taste-match` | Taste Match: `/match` (start one, your matches), `/match/{token}` (a friend's answer and the result), its For you link and its endpoints. Off by default; free. Spec and what is built: `.scratch/taste-match/spec.md` |
+| `taste-match` | Taste Match: `/match` (start one, your matches), `/match/{token}` (a friend's answer and the result), its share card (`/match/{token}/card.png`), its For you and Blend links, the inbox item that tells the inviter, and its endpoints. Off by default; free. Spec and what is built: `.scratch/taste-match/spec.md` |
 | `your-services` | Logos and prices on network report cards, `/services`, and its endpoints |
 | `family-plan` | The Family plan's invites and members: `/settings/family`, `/family/join/{token}`, and their endpoints |
 | `list-links` | A list's link (`/l/{token}`), its section on the list page, and its endpoints |
