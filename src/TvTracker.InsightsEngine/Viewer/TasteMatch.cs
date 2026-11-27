@@ -38,7 +38,7 @@ public sealed record MatchPickDto(Guid ShowId, string Title, string? PosterUrl, 
 /// <item><b>Order doesn't matter:</b> the score, the shared shows and the genres are the same whichever side is first;
 /// only <see cref="MatchDifferenceDto"/> and the picks' reasons say who is who.</item>
 /// </list>
-/// The weights and bands are starting points, to be tuned on real pairs.
+/// The weights, the curve and the bands were set on local test members and want checking on real pairs.
 /// </summary>
 public static class TasteMatch
 {
@@ -71,6 +71,14 @@ public static class TasteMatch
     public const double AlikeWeight = 0.5;
     public const double KindsWeight = 0.3;
     public const double SharedWeight = 0.2;
+
+    /// <summary>
+    /// The weighted parts are raised to this before they become a percentage. Two people with quite similar taste
+    /// still differ on most individual shows, so the parts run low: untouched, like-minded pairs landed around 60 and
+    /// everyone else on the floor. With it, on the 48 local test members, pairs who watch the same kinds of show score
+    /// 59 to 89 (median 76) and pairs who don't, 31 or under. Tuned on those members only.
+    /// </summary>
+    public const double Curve = 0.6;
 
     public const int MaxBothLove = 4;
     public const int MaxBothInto = 3;
@@ -168,7 +176,7 @@ public static class TasteMatch
 
     /// <param name="alike">How close the two sets are in meaning, 0-1, from the catalog.</param>
     public static int Score(double alike, double kinds, double shared) =>
-        Math.Clamp((int)Math.Round(100 * (AlikeWeight * alike + KindsWeight * kinds + SharedWeight * shared)), MinScore, MaxScore);
+        Math.Clamp((int)Math.Round(100 * Math.Pow(AlikeWeight * alike + KindsWeight * kinds + SharedWeight * shared, Curve)), MinScore, MaxScore);
 
     /// <summary>
     /// The sentence for a score: one of its band's, picked by the match's token so a pair always sees the same one.

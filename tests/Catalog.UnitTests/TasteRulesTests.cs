@@ -19,12 +19,21 @@ public class TasteRulesTests
     }
 
     [Fact]
-    public void Closeness_runs_from_the_same_show_to_the_models_cutoff()
+    public void Closeness_runs_from_the_same_show_to_how_far_apart_unrelated_shows_are()
     {
         Assert.Equal(1, TasteRules.Closeness(0, 0.46));
         Assert.Equal(0.5, TasteRules.Closeness(0.23, 0.46), 6);
         Assert.Equal(0, TasteRules.Closeness(0.46, 0.46));
         Assert.Equal(0, TasteRules.Closeness(0.9, 0.46));
+        Assert.Equal(0, TasteRules.Closeness(0.2, 0));
+    }
+
+    [Fact]
+    public void The_reference_is_the_median_distance_between_pairs()
+    {
+        // Three pairs: crime to comedy 1, and each to the crime comedy about 0.29.
+        Assert.Equal(0.293, TasteRules.ReferenceDistance([Crime, Comedy, CrimeComedy]), 3);
+        Assert.Equal(0, TasteRules.ReferenceDistance([Crime]));
     }
 
     [Fact]

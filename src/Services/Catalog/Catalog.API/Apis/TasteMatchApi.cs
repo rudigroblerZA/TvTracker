@@ -2,6 +2,7 @@ using Catalog.Data;
 using Catalog.Embeddings;
 using Catalog.Mixes;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Hosting;
 
 namespace Catalog.API.Apis;
@@ -27,11 +28,13 @@ public static class TasteMatchApi
 
     private const int MaxKnown = 5000;
 
+    private static readonly TimeSpan ReferenceFor = TimeSpan.FromHours(6);
+
     public static void MapTasteMatchApi(this RouteGroupBuilder api) =>
         api.MapPost("/shows/taste-match", CompareAsync).RequireAuthorization(AuthenticationExtensions.InternalPolicy);
 
     private static async Task<Results<Ok<TasteComparison>, ValidationProblem>> CompareAsync(
-        TasteCompareRequest request, CatalogContext db, EmbeddingModel model, CancellationToken ct)
+        TasteCompareRequest request, CatalogContext db, EmbeddingModel model, HybridCache cache, CancellationToken ct)
     {
         if (new[] { request.First, request.Second }.Any(s => s.Loved.Count > MaxLoved || s.Known.Count > MaxKnown)
             || request.SeedsPerSide is < 1 or > 5 || request.MaxTogether is < 0 or > 40)
@@ -43,7 +46,12 @@ public static class TasteMatchApi
             side.Loved.Where(l => l.Weight > 0).GroupBy(l => l.ShowId).ToDictionary(g => g.Key, g => g.Max(l => l.Weight)),
             side.Known.ToHashSet());
 
-        return TypedResults.Ok(await TasteMatcher.CompareAsync(db, model, Side(request.First), Side(request.Second),
+        // How far apart unrelated shows are moves only with the catalog and the model: measured once in a while.
+        var reference = await cache.GetOrCreateAsync($"catalog:taste-reference:{model.Id}",
+            async token => await TasteMatcher.ReferenceDistanceAsync(db, model, token),
+            new HybridCacheEntryOptions { Expiration = ReferenceFor, LocalCacheExpiration = ReferenceFor }, cancellationToken: ct);
+
+        return TypedResults.Ok(await TasteMatcher.CompareAsync(db, model, reference, Side(request.First), Side(request.Second),
             request.SeedsPerSide, request.MaxTogether, ct));
     }
 }

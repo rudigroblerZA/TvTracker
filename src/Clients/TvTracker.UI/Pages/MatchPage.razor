@@ -90,7 +90,8 @@ else
         </div>
     }
 
-    <div class="actions">
+    @* Stays in reach while the grid below is scrolled. *@
+    <div class="actions match-answer">
         <input type="text" maxlength="30" placeholder="Your first name (optional)" aria-label="Your first name" @bind="name" />
         <button class="btn" type="button" @onclick="AnswerAsync" disabled="@(busy || picks.Count < MinPicks)">
             @(picks.Count < MinPicks ? $"Pick {MinPicks - picks.Count} more" : "See your match")

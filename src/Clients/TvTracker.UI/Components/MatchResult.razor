@@ -26,7 +26,7 @@
         }
         @if (Result.Differ is { } differ)
         {
-            <p class="muted">@Inviter brings the @differ.Inviter.ToLowerInvariant(); @Friend brings the @differ.Friend.ToLowerInvariant().</p>
+            <p class="muted">@Brings(Inviter, differ.Inviter, first: true); @Brings(Friend, differ.Friend, first: false).</p>
         }
     </div>
 }
@@ -61,14 +61,22 @@
 
     [Parameter, EditorRequired] public string Friend { get; set; } = "";
 
+    // "You" is whoever is looking: "You bring the comedy", "Crime from you".
+    private static bool IsYou(string who) => who == "You";
+
+    private static string Brings(string who, string genre, bool first) =>
+        $"{(first ? who : Whom(who))} {(IsYou(who) ? "bring" : "brings")} the {genre.ToLowerInvariant()}";
+
+    private static string Whom(string who) => IsYou(who) ? "you" : who;
+
     /// <summary>
     /// "Crime like Sam's · Comedy like yours": the genres a suggestion takes from each.
     /// </summary>
     private string Reason(MatchPick pick)
     {
         var parts = new List<string>();
-        if (pick.FromInviter.Count > 0) parts.Add($"{string.Join(", ", pick.FromInviter)} from {Inviter}");
-        if (pick.FromFriend.Count > 0) parts.Add($"{string.Join(", ", pick.FromFriend)} from {Friend}");
+        if (pick.FromInviter.Count > 0) parts.Add($"{string.Join(", ", pick.FromInviter)} from {Whom(Inviter)}");
+        if (pick.FromFriend.Count > 0) parts.Add($"{string.Join(", ", pick.FromFriend)} from {Whom(Friend)}");
         if (parts.Count == 0 && pick.FromBoth.Count > 0) parts.Add($"{string.Join(", ", pick.FromBoth)}, like both");
         return string.Join(" · ", parts);
     }

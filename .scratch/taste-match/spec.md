@@ -1,7 +1,8 @@
 # Taste Match: spec
 
-Status: proposed. Nothing here is built. Numbers marked "start at" are starting points to tune on real pairs before
-launch, not findings.
+Status: slices 1 to 5 and part of 7 are built, behind the `taste-match` flag, which is off. See "Built so far" at the
+end for what exists, what differs from this spec, and what is left. Numbers marked "start at" were starting points;
+section 6.1 has been superseded by what the code does, described there.
 
 ## 1. Summary
 
@@ -259,3 +260,42 @@ A usable test with real friends exists after slice 4.
 - **Card rendering.** Server-rendered images are new to this codebase. Whether to draw them in process or with a
   headless browser is a decision with operational cost either way.
 - **Moderation of guest names.** A block list, or no free-text name at all for guests?
+
+## 15. Built so far (27 November 2026)
+
+Built and tried in the running app:
+
+- **The rules** (`TasteMatch` in the engine): sides, the three parts, the score with its bounds, the lines, what may be
+  named, the suggestions' reasons. 16 unit tests.
+- **The catalog half** (`TasteRules`, `TasteMatcher` in `Catalog.Mixes`; `POST /api/v1/shows/taste-match`, services
+  only): alike by meaning, and the suggestions from the mix engine. 6 unit tests.
+- **Matches** in Analytics (`taste_matches`, `TasteMatchApi`): start, list, set the shows not to name, open by link,
+  answer as a guest, accept as a member, delete (inviter, member friend, or the guest's device). Erasure and the data
+  export cover the table; the privacy tests pass.
+- **Pages:** `/match` (start, the link, the shows that could be named, your matches) and `/match/{token}` (the guest
+  picker with search and tap-to-pick, a member's accept, waiting, the result). An entry on For you.
+- **The follow source** `match` on the suggestions.
+
+Where the code differs from the spec above:
+
+- **The score (6.1).** The spec's "alike" scaled closeness to search's cutoff. On the 48 local test members that put
+  the median pair on the floor. Closeness is now measured against how far apart two unrelated shows are in the
+  catalog (the median distance between pairs of its 200 most popular shows, so it follows the model), and the
+  weighted parts are raised to 0.6 before becoming a percentage. On those members, pairs who watch the same kinds of
+  show score 59 to 89 (median 76) and pairs who don't, 31 or under. Tuned on that sample only.
+- **No avatar** on the invitation: first name only. Showing it would put the inviter's user id in a public answer.
+- **Expiry** is enforced on read, and expired matches are deleted whenever anyone starts a match, not by a timer.
+- **Rate limiting** reuses the shared-list link policy for every anonymous call; there is no tighter limit on submit
+  beyond the global limit on writes.
+- **A guest's delete key** lives in the page's memory only: closing the tab loses the ability to delete.
+
+Not built:
+
+- **The card** (5.1) and the link-preview image. Sharing sends the link.
+- **Blocks** (R-P8): Analytics doesn't know who has blocked whom.
+- **The inviter being told** when the friend answers (inbox or push). They see it on `/match` and on the link.
+- **Picks becoming follows** when a guest signs up, and attaching their result to the new account.
+- **Adult-rated shows left out** for guests (R-P10): the catalog has no such flag.
+- **The Tonight for two block** on a result for two members who follow each other.
+- **Entry points** on the profile and at the end of a Blend, and the measures in section 11 beyond the follow source.
+- **Tests** of the Analytics endpoints against a database, and of the pages.

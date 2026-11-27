@@ -27,8 +27,11 @@ public class TasteMatchTests
     [Fact]
     public void The_score_is_the_weighted_parts_within_its_bounds()
     {
-        Assert.Equal(50, TasteMatch.Score(alike: 0.5, kinds: 0.5, shared: 0.5));
-        Assert.Equal(65, TasteMatch.Score(alike: 0.8, kinds: 0.7, shared: 0.2));
+        // 0.5 of each is 0.5 in all, which the curve lifts: 0.5^0.6.
+        Assert.Equal(66, TasteMatch.Score(alike: 0.5, kinds: 0.5, shared: 0.5));
+        // 0.4 + 0.21 + 0.04 = 0.65.
+        Assert.Equal(77, TasteMatch.Score(alike: 0.8, kinds: 0.7, shared: 0.2));
+        Assert.True(TasteMatch.Score(0.3, 0.3, 0) < TasteMatch.Score(0.4, 0.3, 0));
         // Nothing in common is not an insult, and nobody is a perfect match.
         Assert.Equal(TasteMatch.MinScore, TasteMatch.Score(0, 0, 0));
         Assert.Equal(TasteMatch.MaxScore, TasteMatch.Score(1, 1, 1));
