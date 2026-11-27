@@ -3,10 +3,7 @@ using Catalog.Data;
 using Catalog.Embeddings;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using Pgvector;
-using Pgvector.EntityFrameworkCore;
 using TvTracker;
-using TvTracker.IntegrationEvents;
 
 namespace Catalog.API.Apis;
 
@@ -29,26 +26,14 @@ public record MixtapeMatchDto(ShowSummaryDto Show, int Fit, IReadOnlyList<Mixtap
 public record MixtapeLinkDto(Guid ShowId, int Closeness, IReadOnlyList<string> SharedGenres);
 
 /// <summary>
-/// Mixtape: three to five shows in, the shows that fit all of them out. Blend for more than two: the shows' meaning
-/// vectors (the ones semantic search uses) are averaged, and candidates are ranked by their distance to the farthest
-/// of the mixtape's shows, so a show close to just one of them ranks low however close it is.
-/// <list type="bullet">
-/// <item><b>Candidates:</b> the shows nearest the mix, plus each show's own nearest, in one query (a UNION ALL of
-/// nearest-neighbour scans). pgvector's HNSW scan returns at most <c>ef_search</c> (40) rows a query, and with three or
-/// more shows the best common ground isn't always among the 40 nearest the average.</item>
-/// <item><b>Excluded:</b> the mixtape's shows, and shows titled like any of them (a remake, the classic Doctor Who).</item>
-/// <item><b>Same kinds only:</b> a pick's kind (scripted, animation, reality, …, from the catalog's keywords) must be one of
-/// the mixtape's. Ted Lasso + Succession + Breaking Bad brought in The Amazing Race, close enough in summary words.
-/// Mixing in an animated show lets animation in.</item>
-/// </list>
+/// Mixtape: three to five shows in, the shows that fit all of them out. Blend for more than two: an even mix
+/// (<see cref="ShowMixer"/>), so a show close to just one of them ranks low however close it is.
 /// </summary>
 public static class MixtapeApi
 {
     public const int MinShows = 3;
     public const int MaxShows = 5;
     public const int MaxMatches = 24;
-
-    private const int CandidatesPerQuery = 40;
 
     public static void MapMixtapeApi(this RouteGroupBuilder api) =>
         api.MapGet("/shows/mixtape", GetMixtapeAsync).RequireRateLimiting(SearchRateLimiting.Policy).RequireFeature(FeatureFlags.Mixtape);
@@ -68,105 +53,29 @@ public static class MixtapeApi
             });
         }
 
-        var shows = await db.Shows.AsNoTracking().Where(s => showIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
-        if (shows.Count != showIds.Count)
+        if (await ShowMixer.MixAsync(db, model, showIds, MixRules.EvenWeights(showIds.Count), MaxMatches, ct) is not { } mix)
         {
             return TypedResults.NotFound();
         }
-        var inputs = showIds.Select(id => shows[id]).ToList();
-        var summaries = inputs.Select(s => s.ToSummary()).ToList();
-        var sharedGenres = inputs.SelectMany(s => s.Genres.Distinct())
+
+        var sharedGenres = mix.Inputs.SelectMany(s => s.Genres.Distinct())
             .GroupBy(g => g)
             .Where(g => g.Count() >= 2)
             .OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
             .Select(g => g.Key)
             .ToList();
 
-        var vectors = await db.ShowEmbeddings.AsNoTracking()
-            .Where(e => showIds.Contains(e.ShowId) && e.Model == model.Id)
-            .ToDictionaryAsync(e => e.ShowId, e => e.Embedding.ToArray(), ct);
-        if (vectors.Count != showIds.Count)
-        {
-            // Just imported (e.g. found by search a moment ago): the sync worker embeds it within a minute.
-            return TypedResults.Ok(new MixtapeDto(summaries, false, sharedGenres, []));
-        }
-
-        var kinds = inputs.Select(s => ShowKinds.Of(s.Keywords)).OfType<string>().ToHashSet();
-        var inputVectors = showIds.Select(id => vectors[id]).ToList();
-        var mix = Normalize(Enumerable.Range(0, inputVectors[0].Length)
-            .Select(i => inputVectors.Sum(v => v[i]) / inputVectors.Count)
-            .ToArray());
-
-        // Same-titled shows aren't part of the mix.
-        var titles = inputs.Select(s => s.Title).ToList();
-        var eligible = db.ShowEmbeddings.AsNoTracking()
-            .Where(e => e.Model == model.Id && !showIds.Contains(e.ShowId))
-            .Where(e => db.Shows.Any(s => s.Id == e.ShowId && !titles.Contains(s.Title)));
-
-        var nearest = inputVectors.Prepend(mix)
-            .Select(query => new Vector(query))
-            .Select(vector => eligible.OrderBy(e => e.Embedding.CosineDistance(vector)).Take(CandidatesPerQuery).Select(e => e.ShowId))
-            .Aggregate((all, next) => all.Concat(next));
-        var candidateIds = (await nearest.ToListAsync(ct)).ToHashSet();
-
-        // A show of another kind than the mixtape's is left out; one with no kind tag stays.
-        var candidateKinds = await db.Shows.AsNoTracking().Where(s => candidateIds.Contains(s.Id))
-            .Select(s => new { s.Id, s.Keywords })
-            .ToDictionaryAsync(s => s.Id, s => ShowKinds.Of(s.Keywords), ct);
-        candidateIds.RemoveWhere(id => kinds.Count > 0 && candidateKinds.GetValueOrDefault(id) is { } kind && !kinds.Contains(kind));
-
-        // Vectors are L2-normalised, so cosine distance is 1 − the dot product.
-        var candidates = await eligible.Where(e => candidateIds.Contains(e.ShowId))
-            .Select(e => new { e.ShowId, e.Embedding })
-            .ToListAsync(ct);
-        var ranked = candidates
-            .Select(c =>
-            {
-                var v = c.Embedding.ToArray();
-                var distances = inputVectors.Select(input => 1 - Dot(v, input)).ToList();
-                return (c.ShowId, Distances: distances, Score: distances.Max());
-            })
-            .OrderBy(c => c.Score)
-            .Take(MaxMatches)
-            .ToList();
-
-        var matchIds = ranked.Select(r => r.ShowId).ToList();
-        var matches = await db.Shows.AsNoTracking().Where(s => matchIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
-
         return TypedResults.Ok(new MixtapeDto(
-            summaries,
-            true,
+            mix.Inputs.Select(s => s.ToSummary()).ToList(),
+            mix.Indexed,
             sharedGenres,
-            ranked
-                .Where(r => matches.ContainsKey(r.ShowId))
-                .Select(r =>
-                {
-                    var show = matches[r.ShowId];
-                    return new MixtapeMatchDto(
-                        show.ToSummary(),
-                        Percent(r.Score),
-                        inputs.Select((input, i) => new MixtapeLinkDto(input.Id, Percent(r.Distances[i]),
-                            show.Genres.Intersect(input.Genres).ToList())).ToList());
-                })
+            mix.Matches
+                .Select(m => new MixtapeMatchDto(
+                    m.Show.ToSummary(),
+                    MixRules.Percent(m.Score),
+                    mix.Inputs.Select((input, i) => new MixtapeLinkDto(input.Id, MixRules.Percent(m.Distances[i]),
+                        m.Show.Genres.Intersect(input.Genres).ToList())).ToList()))
                 .ToList(),
-            Loose: ranked.Count == 0 || ranked[0].Score > model.MaxDistance));
-    }
-
-    private static int Percent(double distance) => (int)Math.Round(100 * Math.Clamp(1 - distance, 0, 1));
-
-    private static double Dot(float[] a, float[] b)
-    {
-        var sum = 0.0;
-        for (var i = 0; i < a.Length; i++)
-        {
-            sum += a[i] * b[i];
-        }
-        return sum;
-    }
-
-    private static float[] Normalize(float[] vector)
-    {
-        var norm = MathF.Sqrt(vector.Sum(x => x * x));
-        return norm > 0 ? vector.Select(x => x / norm).ToArray() : vector;
+            mix.Loose));
     }
 }
