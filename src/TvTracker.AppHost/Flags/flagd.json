@@ -88,8 +88,9 @@
     "time-machine": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "TV time machine: /time-machine (this week in TV history, or any date's week), its teaser on Home and link on Insights." }
+      "defaultVariant": "on",
+      "metadata": { "description": "TV time machine: /time-machine (this week in TV history, or any date's week), its teaser on Home and link on Insights.", "name": "TV time machine", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "endings": {
       "state": "ENABLED",
@@ -169,7 +170,7 @@
     "holiday-episodes": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Holiday episodes: Halloween, Thanksgiving, Christmas, New Year's and Valentine's episodes of the user's shows and across the catalog." }
     },
     "milestones": {
@@ -194,7 +195,7 @@
     "streaks": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Streaks: days and weeks in a row of watching, and shows kept up with (each new episode within a week of airing)." }
     },
     "far-from-home": {
