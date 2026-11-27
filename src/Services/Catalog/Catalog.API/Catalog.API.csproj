@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\..\TvTracker.EventBus.RabbitMQ\TvTracker.EventBus.RabbitMQ.csproj" />
     <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
     <ProjectReference Include="..\Catalog.Mixes\Catalog.Mixes.csproj" />
+    <ProjectReference Include="..\Catalog.Search\Catalog.Search.csproj" />
   </ItemGroup>
 
   <ItemGroup>

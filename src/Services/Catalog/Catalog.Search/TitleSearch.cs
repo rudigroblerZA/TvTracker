@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using Catalog.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace Catalog.API.Services;
+namespace Catalog.Search;
 
 /// <summary>
 /// Finding shows and people by name: what was typed anywhere in the name, best matches first, and, when little

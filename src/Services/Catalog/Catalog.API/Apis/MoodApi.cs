@@ -1,5 +1,6 @@
 using Catalog.API.Services;
 using Catalog.Data;
+using Catalog.Search;
 using Microsoft.AspNetCore.Http.HttpResults;
 using TvTracker;
 

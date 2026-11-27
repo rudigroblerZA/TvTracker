@@ -50,8 +50,8 @@ about:
 | `Catalog.Embeddings` | library | The model: which one, how to call it, how close counts as a match |
 | `ShowEmbeddingIndexer` | Catalog.SyncWorker | Keeps one vector per show current |
 | `show_embeddings` | catalog database | The vectors, with an index for nearest-neighbour search |
-| `SemanticSearch` | Catalog.API | Embeds a term and finds the nearest shows |
-| Search endpoint | Catalog.API (`CatalogApi.cs`) | Merges title matches, near-spellings and similar shows into pages |
+| `Catalog.Search` | library | `TitleSearch` (by title), `SemanticSearch` (embeds a term and finds the nearest shows), and `ShowSearch`, which puts title matches, near-spellings and similar shows into pages |
+| Search endpoint | Catalog.API (`CatalogApi.cs`) | Filters, the import from the provider, the rate limit and the answer's shape |
 
 Both services load the same model from the same configuration; the AppHost passes its whole `Embeddings` section to
 each. A vector records which model made it, and vectors from different models are never compared.
@@ -115,6 +115,8 @@ address).
    popular first within each. These fill the first pages.
 4. **Near-spellings.** When fewer than 5 titles contain the term and it is at least 4 characters, up to 12 titles
    spelled nearly like it (Postgres trigrams): "breakng bad".
+Steps 3 to 6 are `ShowSearch.PageAsync` in `Catalog.Search`; the endpoint does 1 and 2 and hands it the shows to search.
+
 5. **Similar in meaning**, from shows whose title does *not* contain the term (`SemanticSearch.FindSimilarAsync`):
    - Terms under 3 characters are skipped: too little meaning to compare.
    - The term is embedded as a query (the model's query prefix in front).
@@ -215,9 +217,12 @@ searches. The two sets are not comparable with each other: different searches, d
   in-process models were found to stop the service at start-up).
 - `ShowMixerTests`: the vector queries Blend and Mixtape make, against a real database.
 - `TitleSearchTests`: the title half of search.
+- `ShowSearchTests` (11, against a real database with a scripted model): the order of the three kinds of match, the
+  cutoff, a show with no vector, a misspelling counted once, paging across the boundary, the model being down, a
+  term too short to embed, the term embedded as a query, searching only the shows handed in, and suggestions.
 
-There is no test of `SemanticSearch`, of the indexer (what it re-embeds and what it skips), of either generator
-(pooling, truncation, the outage pause), or of how the endpoint merges and pages the three kinds of match.
+There is no test of the indexer (what it re-embeds and what it skips) or of either generator (pooling, truncation,
+the outage pause).
 
 ## 11. Decisions
 
@@ -236,8 +241,8 @@ There is no test of `SemanticSearch`, of the indexer (what it re-embeds and what
 1. **The test searches are not in the repository.** The 41 and 42 searches and their expected shows exist only as
    results quoted in the README. Nobody can re-run them, so a new model, a change to the embedded text or a new cutoff
    can't be checked against the old numbers. Blend and Mixtape now have `mix-eval` and a list; search has neither.
-2. **Mostly untested** (section 10). The in-process path was broken at start-up without anyone noticing until it was
-   needed.
+2. **The indexer and the generators are untested** (section 10). The in-process path was broken at start-up without
+   anyone noticing until it was needed.
 3. **Whether the vector index is used by search is not verified.** The search query joins a filtered set of shows to
    their vectors, filters on distance and then orders. Postgres may answer that with an exact scan instead of the HNSW
    index. That is correct, and fast at hundreds of shows; nobody has looked at the plan or timed it on a large catalog.
@@ -258,8 +263,8 @@ There is no test of `SemanticSearch`, of the indexer (what it re-embeds and what
 1. Put the test searches in the repository with a command that runs them (recall at 1 and 3, MRR, and how many
    unrelated searches return nothing), as `mix-eval` does for mixes. Everything else on this list needs it.
 2. Run all four models on that one set, so the default is chosen against the in-process models too.
-3. Test `SemanticSearch` and the indexer against a real database with seeded vectors, and the merge and paging in the
-   endpoint.
+3. Test the indexer against a real database, and the generators. (Search itself is covered since it moved into
+   `Catalog.Search`.)
 4. Look at the query plan on a catalog of 10,000 or more shows before it matters.
 5. Try a richer embedded text (cast and keywords) and measure it with 1.
 
@@ -273,9 +278,10 @@ There is no test of `SemanticSearch`, of the indexer (what it re-embeds and what
 | In-process model | `Catalog.Embeddings/LocalEmbeddingGenerator.cs` |
 | Indexer and the embedded text | `src/Services/Catalog/Catalog.SyncWorker/ShowEmbeddingIndexer.cs` |
 | Storage | `ShowEmbedding` in `src/Services/Catalog/Catalog.Data/Model.cs`; mapping in `CatalogContext.cs` |
-| Finding similar shows | `src/Services/Catalog/Catalog.API/Services/SemanticSearch.cs` |
-| The search endpoint and its merge | `SearchShowsAsync` and `QueryShowsAsync` in `Catalog.API/Apis/CatalogApi.cs` |
-| Title matching | `Catalog.API/Services/TitleSearch.cs` |
+| Finding similar shows | `src/Services/Catalog/Catalog.Search/SemanticSearch.cs` |
+| The three kinds of match put into pages; suggestions | `Catalog.Search/ShowSearch.cs` |
+| Title matching | `Catalog.Search/TitleSearch.cs` |
+| The search endpoint | `SearchShowsAsync` and `QueryShowsAsync` in `Catalog.API/Apis/CatalogApi.cs` |
 | Rate limit | `Catalog.API/Services/SearchRateLimiting.cs` |
 | The model server container | `src/TvTracker.AppHost/AppHost.cs` (the `model-runner` resource) |
 | Search page | `src/Clients/TvTracker.UI/Pages/Search.razor` |

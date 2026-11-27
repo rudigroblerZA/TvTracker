@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Finding shows: by title (TitleSearch), by meaning (SemanticSearch), and the two put together into pages
+       (ShowSearch). No HTTP, flags, rate limits or imports from the provider: those are the endpoints' in Catalog.API,
+       which hand this module the shows to search among. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
+  </ItemGroup>
+
+</Project>

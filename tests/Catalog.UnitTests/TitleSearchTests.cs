@@ -1,4 +1,4 @@
-using Catalog.API.Services;
+using Catalog.Search;
 
 namespace Catalog.UnitTests;
 

@@ -1624,7 +1624,9 @@ A release is a signed app bundle (`.aab`) built for one deployment: its host is 
 | Catalog.Data / Catalog.API | `src/Services/Catalog` | Shows, seasons, episodes, cast and people (actor pages), where to watch, search (title and semantic), schedule |
 | Catalog.ImportCli | `src/Tools` | `tvtracker-import`: bulk import by titles, TVmaze ids or top N, through the sync worker |
 | TvTracker.LoadGen | `src/Tools` | `tvtracker-load`: load-test users browsing (and tracking) through the Mobile BFF, with a per-endpoint report |
-| Catalog.Embeddings | `src/Services/Catalog` | Local text embeddings (all-MiniLM-L6-v2 via ONNX Runtime) for semantic search |
+| Catalog.Embeddings | `src/Services/Catalog` | Text embeddings for semantic search: the model (served by Docker Model Runner by default, or in-process with ONNX Runtime) and how close counts as a match |
+| Catalog.Search | `src/Services/Catalog` | Search: by title and near-spelling, by meaning, and the three put into pages |
+| Catalog.Mixes | `src/Services/Catalog` | Blend and Mixtape: the shows that sit between two or more others |
 | Catalog.SyncWorker | `src/Services/Catalog` | Imports/refreshes shows from the provider (including search matches for Catalog.API), embeds shows for semantic search, detects changes, publishes events, detects aired episodes |
 | Tracking.API | `src/Services/Tracking` | Follows, statuses, watched episodes, progress, Up Next, calendar, lists, stats |
 | Ratings.API | `src/Services/Ratings` | Ratings, summaries, spoiler-safe comments, reactions, viewers' tips, flags, corrections and moderation |
