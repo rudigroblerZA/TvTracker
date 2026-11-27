@@ -876,7 +876,7 @@ a.chip { text-decoration: none; }
 .more-tools { margin-top: 32px; padding-top: 8px; border-top: 1px solid var(--border); }
 .more-tools:not(:has(.tool-link)) { display: none; }
 .more-tools h2 { font-size: 1.05rem; }
-@media (prefers-reduced-motion: reduce) { .feature-card, .feature-card-art { transition: none; } .feature-card:hover, .feature-card:hover .feature-card-art { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .feature-card, .feature-card-art { transition: none; } .feature-card:hover, .feature-card:focus-visible, .feature-card:hover .feature-card-art, .feature-card:focus-visible .feature-card-art { transform: none; } }
 /* On a phone, three short rows: the name and a line about it, the drawing small at the side. */
 @media (max-width: 520px) {
     .feature-cards { grid-template-columns: 1fr; gap: 8px; margin-bottom: 18px; }

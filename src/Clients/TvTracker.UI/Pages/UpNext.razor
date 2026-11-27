@@ -42,9 +42,16 @@
                 <FeatureCard Href="backlog" Title="Your backlog" Tone="mix-0">
                     <Art>
                         <svg viewBox="0 0 120 80">
-                            <rect x="50" y="6" width="44" height="58" rx="6" fill="currentColor" opacity="0.18" transform="rotate(-10 72 35)" />
-                            <rect x="58" y="10" width="44" height="58" rx="6" fill="currentColor" opacity="0.35" transform="rotate(4 80 39)" />
-                            <rect x="64" y="14" width="44" height="58" rx="6" fill="var(--surface)" />
+                            @* The cards behind are cut away where the one in front covers them (the card is a gradient, so there is no
+                               one colour to paint over them with). *@
+                            <mask id="backlog-behind">
+                                <rect width="120" height="80" fill="#fff" />
+                                <rect x="64" y="14" width="44" height="58" rx="6" fill="#000" />
+                            </mask>
+                            <g mask="url(#backlog-behind)">
+                                <rect x="50" y="6" width="44" height="58" rx="6" fill="currentColor" opacity="0.18" transform="rotate(-10 72 35)" />
+                                <rect x="58" y="10" width="44" height="58" rx="6" fill="currentColor" opacity="0.35" transform="rotate(4 80 39)" />
+                            </g>
                             <rect x="64" y="14" width="44" height="58" rx="6" fill="currentColor" opacity="0.25" />
                             <rect x="64" y="14" width="44" height="58" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
                             <path d="M76 44l8 8 14-18" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
