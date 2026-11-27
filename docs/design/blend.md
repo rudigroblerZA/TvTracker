@@ -91,8 +91,8 @@ Four queries: the two shows, the two vectors, the candidates (the only one that 
 ### 3.3 Why rank by the farther show
 
 Nearness to the mixed vector alone is not enough. The midpoint of two unlike shows sits in a sparse part of the space,
-and the nearest things to it are often shows very close to one parent and far from the other: NCIS × Friends returned
-NCIS spin-offs. Ranking by the *larger* of the two distances asks the right question, "how far is this from the show it
+and the nearest things to it can be shows very close to one parent and far from the other: an NCIS spin-off, for
+NCIS × Friends. Ranking by the *larger* of the two distances asks the right question, "how far is this from the show it
 is least like?", so a spin-off of one parent drops however close it is to that parent.
 
 The lean weights that question. At 50 both weights are 1 and a match must be close to both. At 80 the weights are 1.6
@@ -164,11 +164,11 @@ Found while writing this; none is fixed yet.
 1. **No tests.** Nothing in `tests/` mentions Blend. The ranking rule, the lean weighting, the loose cutoff and the
    genre attribution are all untested, and all sit inside the endpoint where a unit test can't reach them.
 2. **No rate limit.** Mixtape and search carry `SearchRateLimiting.Policy`; Blend does not, though it is public and
-   runs a vector scan per call. A slider drag is up to seven calls.
+   runs a vector scan per call.
 3. **The candidate pool can run short.** The query asks for the 40 nearest the mix, and pgvector's HNSW scan returns
    at most `ef_search` (40) rows *before* the title and model filters apply. For lopsided pairs the best common ground
    is not always among the 40 nearest the average either. Mixtape already works round both by also taking each show's
-   own nearest in one UNION ALL; Blend was written first and never got it.
+   own nearest in one UNION ALL; Blend does not.
 4. **No "same kinds" rule.** Mixtape requires a pick to be the same kind of show as the inputs (scripted, animation,
    reality) after Ted Lasso + Succession + Breaking Bad brought in The Amazing Race. Blend can make the same mistake.
 5. **Quality depends on catalog size.** On the 290-show local catalog most pairs come back loose. This is expected,
@@ -197,7 +197,7 @@ plus the pairs named in the README) before they ship.
   useful and less shareable; a toggle on the page, applied client-side from data the page can already get, would keep
   the endpoint viewer-free.
 - Should a blend be saveable as a list? The matches are already show summaries.
-- Is the slider worth its seven-position range, or would three (more A, even, more B) say the same with fewer calls?
+- Is the slider worth its seven positions, or would three (more A, even, more B) say the same?
 - How is Blend judged? There is no measure today. Follows that start from a blend result (a `from=blend` marker on the
   card link) would be the obvious first one.
 
