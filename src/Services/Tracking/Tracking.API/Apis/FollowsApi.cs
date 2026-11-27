@@ -83,9 +83,10 @@ public static class FollowsApi
     }
 
     private static async Task<Ok<FollowDto>> FollowAsync(
-        Guid showId, FollowRequest? request, ClaimsPrincipal user, TrackingService tracking, TrackingContext db, TimeProvider time, CancellationToken ct)
+        Guid showId, FollowRequest? request, ClaimsPrincipal user, TrackingService tracking, TrackingContext db, TimeProvider time, CancellationToken ct,
+        string? from = null)
     {
-        var follow = await tracking.FollowAsync(user.GetUserId(), showId, request?.Status ?? WatchStatus.Watching, ct);
+        var follow = await tracking.FollowAsync(user.GetUserId(), showId, request?.Status ?? WatchStatus.Watching, ct, from);
         return TypedResults.Ok(await ToDtoAsync(follow, db, time, ct));
     }
 

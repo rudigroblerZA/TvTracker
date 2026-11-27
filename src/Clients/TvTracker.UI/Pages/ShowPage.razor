@@ -357,6 +357,11 @@ else
 
     [Parameter] public Guid Id { get; set; }
 
+    /// <summary>
+    /// The tool the show was opened from (<see cref="FollowSources"/>), passed on with a follow.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = FollowSources.Parameter)] public string? From { get; set; }
+
     private ShowDetail? show;
     private bool notFound;
     private Follow? follow;
@@ -452,7 +457,7 @@ else
 
     private Task FollowAsync(WatchStatus status) => RunAsync(async () =>
     {
-        follow = await Tracking.FollowAsync(Id, status) ?? new Follow(Id, show?.Title, show?.PosterUrl, show?.Status, status, 0, 0, DateTime.UtcNow);
+        follow = await Tracking.FollowAsync(Id, status, from: From) ?? new Follow(Id, show?.Title, show?.PosterUrl, show?.Status, status, 0, 0, DateTime.UtcNow);
     });
 
     private Task UnfollowAsync() => RunAsync(async () =>

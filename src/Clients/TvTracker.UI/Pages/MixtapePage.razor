@@ -79,7 +79,7 @@ else if (picked.Count >= MinShows)
         <div class="card-grid">
             @foreach (var match in mixtape.Matches)
             {
-                <ShowCard @key="match.Show.Id" ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl"
+                <ShowCard @key="match.Show.Id" ShowId="match.Show.Id" Title="@match.Show.Title" PosterUrl="@match.Show.PosterUrl" From="@FollowSources.Mixtape"
                           Subtitle="@(string.Join(" · ", new[] { match.Show.Year?.ToString(), match.Show.Network }.Where(s => !string.IsNullOrEmpty(s))))">
                     <div class="mixtape-bar" title="@Mix(match)">
                         @for (var i = 0; i < match.Links.Count; i++)

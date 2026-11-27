@@ -1,7 +1,7 @@
 @implements IDisposable
 @inject ShowTagStore Tags
 
-<a class="show-card" href="shows/@ShowId">
+<a class="show-card" href="@(From is null ? $"shows/{ShowId}" : $"shows/{ShowId}?{FollowSources.Parameter}={From}")">
     <Poster Title="@Title" Url="@PosterUrl" />
     <div class="show-card-body">
         <div class="show-card-title">@Title</div>
@@ -28,6 +28,12 @@
     [Parameter] public string? PosterUrl { get; set; }
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// The tool whose results this card is in (one of <see cref="FollowSources"/>), so a follow from the show page is
+    /// counted as started there.
+    /// </summary>
+    [Parameter] public string? From { get; set; }
 
     /// <summary>
     /// A tag key to show first when the show has it, e.g. the tag search results are filtered by.

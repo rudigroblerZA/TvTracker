@@ -1,3 +1,4 @@
+using TvTracker.IntegrationEvents;
 using TvTracker.UI.Models;
 
 namespace TvTracker.UI.Services;
@@ -415,8 +416,10 @@ public sealed class TrackingClient(IHttpClientFactory f, IAccessTokenProvider t,
     public Task<Follow?> GetFollowAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<Follow>(ApiClients.Tracking, $"api/v1/follows/{showId}", ct, cacheForOffline: true);
 
-    public Task<Follow?> FollowAsync(Guid showId, WatchStatus status = WatchStatus.Watching, CancellationToken ct = default) =>
-        SendAsync<Follow>(ApiClients.Tracking, HttpMethod.Post, $"api/v1/follows/{showId}", new { status }, ct, queueIfOffline: true);
+    /// <param name="from">Where the follow started (<see cref="FollowSources"/>), when the show was opened from a tool's results.</param>
+    public Task<Follow?> FollowAsync(Guid showId, WatchStatus status = WatchStatus.Watching, CancellationToken ct = default, string? from = null) =>
+        SendAsync<Follow>(ApiClients.Tracking, HttpMethod.Post,
+            from is null ? $"api/v1/follows/{showId}" : $"api/v1/follows/{showId}?{FollowSources.Parameter}={Uri.EscapeDataString(from)}", new { status }, ct, queueIfOffline: true);
 
     public Task UnfollowAsync(Guid showId, CancellationToken ct = default) =>
         SendAsync(ApiClients.Tracking, HttpMethod.Delete, $"api/v1/follows/{showId}", null, ct, queueIfOffline: true);
