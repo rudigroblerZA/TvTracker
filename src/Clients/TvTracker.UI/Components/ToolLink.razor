@@ -1,4 +1,4 @@
-@* A card linking to a tool from a hub page (Up Next, Discover, For you, ...). Put them in a <div class="tool-links">,
+@* A card linking to a tool from a hub page (Up Next, Discover, Insights, ...), among the tools at its foot. Put them in a <div class="tool-links">,
    each in its own <Feature> when the tool has a flag; a hidden one leaves no gap. In <Feature ShowLocked>, a tool that's
    part of a plan the user isn't on stays, marked with that plan, and its page offers the plan. *@
 <a class="tool-link @(Lock is null ? "" : "tool-link-locked")" href="@Href">
