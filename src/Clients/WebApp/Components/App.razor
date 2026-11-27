@@ -1,4 +1,5 @@
 @inject TvTracker.UI.Services.Branding Brand
+@inject IConfiguration Configuration
 <!DOCTYPE html>
 <html lang="en">
 
@@ -39,7 +40,10 @@
     // configure ForwardedHeaders so this is the client's address rather than the proxy's.
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
-    private string Origin => $"{HttpContext?.Request.Scheme}://{HttpContext?.Request.Host}";
+    // The site's public address where one is configured (behind a proxy the request's own scheme and host are the
+    // proxy's view, not the visitor's, unless forwarded headers are set up); else the address the request came to.
+    private string Origin => WebApp.Services.SignInThroughWebApp.PublicUrl(Configuration)?.GetLeftPart(UriPartial.Authority)
+        ?? $"{HttpContext?.Request.Scheme}://{HttpContext?.Request.Host}";
 
     /// <summary>
     /// The token when the page asked for is a Taste Match link (/match/{token}, 32 hex characters); null otherwise.

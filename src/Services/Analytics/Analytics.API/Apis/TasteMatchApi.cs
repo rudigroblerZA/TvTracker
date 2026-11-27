@@ -46,9 +46,13 @@ public record MatchUnnamedRequest(IReadOnlyList<Guid> Unnamed);
 /// <list type="bullet">
 /// <item><b>The link is the key.</b> Opening a match and answering it as a guest need no sign-in; they are rate limited
 /// by address, as shared lists' links are. An unknown, expired or deleted token all read the same: 404.</item>
-/// <item><b>One answer.</b> The first answer makes the match done; the result is stored and never recomputed.</item>
-/// <item><b>Blocks:</b> a member can't open or answer a match of someone they have blocked, or who blocked them; it
-/// reads as gone. Social knows who has blocked whom (<see cref="SocialBlocksClient"/>). A guest is nobody to block.</item>
+/// <item><b>One answer.</b> The first answer makes the match done; the result is stored and never recomputed. Two
+/// answers at once can't both win: the row carries a version, and the one saved second finds the link gone.</item>
+/// <item><b>Blocks:</b> a signed-in caller can't open, answer or claim a match when there is a block between them and
+/// either of its two people; it reads as gone, to the inviter too once the friend has blocked them. Social knows who
+/// has blocked whom (<see cref="SocialBlocksClient"/>). When Social can't be asked, a match can still be read (without
+/// telling either who the other is), but not answered or claimed: that is tried again. A signed-out guest is nobody
+/// to block.</item>
 /// <item><b>The inviter is told</b> when the friend answers: an event stored with the result, which the worker's outbox
 /// sends and Notifications turns into an inbox item.</item>
 /// <item><b>Sides aren't stored</b> for members: they are read when the friend answers.</item>
@@ -159,9 +163,16 @@ public static class TasteMatchApi
     }
 
     internal static async Task<Results<Ok<MatchViewDto>, NotFound>> OpenAsync(
-        string token, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, TimeProvider time, CancellationToken ct)
+        string token, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, ILogger<MatchMetrics> logger, TimeProvider time,
+        CancellationToken ct)
     {
-        if (await FindAsync(db, token, time, ct) is not { } match || await BlockedAsync(blocks, match, UserIdOf(user), ct))
+        if (await FindAsync(db, token, time, ct) is not { } match)
+        {
+            return TypedResults.NotFound();
+        }
+        // Reading goes ahead when Social can't say; the view then tells neither of the two who the other is.
+        var blocked = await BlockedAsync(blocks, match, UserIdOf(user), logger, ct);
+        if (blocked == true)
         {
             return TypedResults.NotFound();
         }
@@ -172,19 +183,24 @@ public static class TasteMatchApi
         {
             nameable = await NameableAsync(db, TasteMatch.Side((await ReunionsApi.LoveAsync(db, userId, ct)).Loved), ct);
         }
-        return TypedResults.Ok(View(match, user, nameable));
+        return TypedResults.Ok(View(match, user, nameable, tellOther: blocked == false));
     }
 
     /// <summary>
     /// A guest's answer: the shows they picked, and a first name if they gave one.
     /// </summary>
     internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> PickAsync(
-        string token, MatchPicksRequest request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, MatchMetrics metrics,
-        TimeProvider time, CancellationToken ct)
+        string token, MatchPicksRequest request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, SocialBlocksClient blocks,
+        MatchMetrics metrics, ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
     {
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
         {
             return TypedResults.NotFound();
+        }
+        // Picking shows instead of using one's own doesn't get a signed-in member round a block.
+        if (await BlockedAsync(blocks, match, UserIdOf(user), logger, ct) is not false and var blocked)
+        {
+            return blocked == true ? TypedResults.NotFound() : TryAgain();
         }
 
         var asked = request.ShowIds.Distinct().Take(TasteMatch.MaxPicks).ToList();
@@ -206,7 +222,10 @@ public static class TasteMatchApi
         match.GuestKey = NewToken();
         match.FriendDisplayName = FirstName(request.Name);
         Finish(db, match, result, time);
-        await db.SaveChangesAsync(ct);
+        if (!await SaveIfUnchangedAsync(db, ct))
+        {
+            return TypedResults.NotFound();
+        }
         metrics.Answered(guest: true);
         return TypedResults.Ok(View(match, user) with { GuestKey = match.GuestKey });
     }
@@ -216,12 +235,16 @@ public static class TasteMatchApi
     /// </summary>
     internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> AcceptAsync(
         string token, MatchUnnamedRequest? request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, SocialBlocksClient blocks,
-        MatchMetrics metrics, TimeProvider time, CancellationToken ct)
+        MatchMetrics metrics, ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match || await BlockedAsync(blocks, match, userId, ct))
+        if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
         {
             return TypedResults.NotFound();
+        }
+        if (await BlockedAsync(blocks, match, userId, logger, ct) is not false and var blocked)
+        {
+            return blocked == true ? TypedResults.NotFound() : TryAgain();
         }
         if (match.InviterUserId == userId)
         {
@@ -244,9 +267,12 @@ public static class TasteMatchApi
         match.FriendUserId = userId;
         match.FriendDisplayName = FirstName(user.GetDisplayName());
         Finish(db, match, result, time);
-        await db.SaveChangesAsync(ct);
+        if (!await SaveIfUnchangedAsync(db, ct))
+        {
+            return TypedResults.NotFound();
+        }
         metrics.Answered(guest: false);
-        return TypedResults.Ok(View(match, user));
+        return TypedResults.Ok(View(match, user, tellOther: true));
     }
 
     /// <summary>
@@ -254,27 +280,34 @@ public static class TasteMatchApi
     /// answered signed in, and are handed their picks to follow if they wish. Needs the key they were given when they
     /// answered. Nothing else is carried over: the picks stay picks until they follow them.
     /// </summary>
-    internal static async Task<Results<Ok<MatchClaimedDto>, NotFound>> ClaimAsync(
+    internal static async Task<Results<Ok<MatchClaimedDto>, NotFound, ProblemHttpResult>> ClaimAsync(
         string token, [FromQuery] string key, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, MatchMetrics metrics,
-        TimeProvider time, CancellationToken ct)
+        ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: not null, FriendUserId: null, GuestKey: { } guestKey } match
-            || !SameKey(guestKey, key) || match.InviterUserId == userId || await BlockedAsync(blocks, match, userId, ct))
+            || !SameKey(guestKey, key) || match.InviterUserId == userId)
         {
             return TypedResults.NotFound();
+        }
+        if (await BlockedAsync(blocks, match, userId, logger, ct) is not false and var blocked)
+        {
+            return blocked == true ? TypedResults.NotFound() : TryAgain();
         }
 
         match.FriendUserId = userId;
         // The device that answered is now signed in: the key has done its work.
         match.GuestKey = null;
-        await db.SaveChangesAsync(ct);
+        if (!await SaveIfUnchangedAsync(db, ct))
+        {
+            return TypedResults.NotFound();
+        }
         metrics.Claimed();
 
         var picks = match.GuestPicks;
         var shows = await db.Shows.AsNoTracking().Where(s => picks.Contains(s.ShowId))
             .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
-        return TypedResults.Ok(new MatchClaimedDto(View(match, user),
+        return TypedResults.Ok(new MatchClaimedDto(View(match, user, tellOther: true),
             picks.Where(shows.ContainsKey).Select(id => new MatchShowDto(id, shows[id].Title, shows[id].PosterUrl)).ToList()));
     }
 
@@ -326,7 +359,7 @@ public static class TasteMatchApi
                     : (result.WatchTogether.Select(s => s.PosterUrl), "Watch together");
                 var posters = await Task.WhenAll(shows.OfType<string>().Take(MatchCard.MaxPosters).Select(url => PosterAsync(clients, url, cancel)));
                 var drawn = posters.OfType<byte[]>().ToList();
-                return MatchCard.Render(new MatchCardContent(match.InviterDisplayName ?? "A friend", match.FriendDisplayName ?? "A friend",
+                return MatchCard.Render(new MatchCardContent(MatchCard.NameOr(match.InviterDisplayName, "A friend"), MatchCard.NameOr(match.FriendDisplayName, "A friend"),
                     result.Score, result.Line, drawn, drawn.Count > 0 ? label : null, brand.AppName), shape);
             },
             new HybridCacheEntryOptions { Expiration = CardKeptFor, LocalCacheExpiration = CardKeptFor }, cancellationToken: ct);
@@ -363,8 +396,20 @@ public static class TasteMatchApi
             {
                 return null;
             }
-            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
-            return bytes.Length <= MaxPosterBytes ? bytes : null;
+            // Read no further than the cap: a body with no declared length can be any size.
+            await using var body = await response.Content.ReadAsStreamAsync(ct);
+            using var kept = new MemoryStream();
+            var buffer = new byte[81920];
+            int read;
+            while ((read = await body.ReadAsync(buffer, ct)) > 0)
+            {
+                if (kept.Length + read > MaxPosterBytes)
+                {
+                    return null;
+                }
+                kept.Write(buffer, 0, read);
+            }
+            return kept.ToArray();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
@@ -410,11 +455,54 @@ public static class TasteMatchApi
     }
 
     /// <summary>
-    /// Whether a signed-in caller and the match's inviter have a block between them. A guest, and the inviter
-    /// themselves, never do.
+    /// Whether there is a block between a signed-in caller and either of the match's two people (other than themselves):
+    /// so the inviter is checked against a member friend as the friend is against the inviter. False for a guest. Null
+    /// when Social couldn't be asked: the caller decides what may still go ahead.
     /// </summary>
-    private static async Task<bool> BlockedAsync(SocialBlocksClient blocks, TasteMatchRow match, string? userId, CancellationToken ct) =>
-        userId is not null && userId != match.InviterUserId && await blocks.BlockedBetweenAsync(match.InviterUserId, userId, ct);
+    private static async Task<bool?> BlockedAsync(SocialBlocksClient blocks, TasteMatchRow match, string? userId, ILogger logger, CancellationToken ct)
+    {
+        if (userId is null)
+        {
+            return false;
+        }
+        try
+        {
+            foreach (var other in new[] { match.InviterUserId, match.FriendUserId }.OfType<string>().Where(id => id != userId))
+            {
+                if (await blocks.BlockedBetweenAsync(other, userId, ct))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // Anything but the caller going away: Social down or slow, its circuit open, the service token refused.
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Couldn't ask Social about blocks for a taste match");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Saves, unless someone else changed the match first (two answers at once): then nothing is saved, and the caller
+    /// treats the link as gone.
+    /// </summary>
+    private static async Task<bool> SaveIfUnchangedAsync(AnalyticsContext db, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+    }
+
+    private static ProblemHttpResult TryAgain() =>
+        TypedResults.Problem("Couldn't check that just now. Try again in a moment.", statusCode: StatusCodes.Status503ServiceUnavailable, title: "Try again");
 
     private static bool SameKey(string expected, string given) =>
         CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(given));
@@ -437,14 +525,16 @@ public static class TasteMatchApi
         return await matches.SingleOrDefaultAsync(m => m.Token == token && m.ExpiresAtUtc >= now, ct);
     }
 
-    private static MatchViewDto View(TasteMatchRow match, ClaimsPrincipal user, IReadOnlyList<MatchShowDto>? nameable = null)
+    /// <param name="tellOther">Whether each of two members may be told who the other is: only once it's known there is no
+    /// block between them.</param>
+    private static MatchViewDto View(TasteMatchRow match, ClaimsPrincipal user, IReadOnlyList<MatchShowDto>? nameable = null, bool tellOther = false)
     {
         var userId = UserIdOf(user);
         var you = userId is null ? null : userId == match.InviterUserId ? "inviter" : userId == match.FriendUserId ? "friend" : null;
         // Each of two members is told who the other is; nobody else is, and a guest has no id to tell.
         var other = you switch { "inviter" => match.FriendUserId, "friend" => match.InviterUserId, _ => null };
         return new MatchViewDto(match.Token, StateOf(match), match.InviterDisplayName, match.FriendDisplayName, you, ResultOf(match), nameable,
-            OtherUserId: match.Result is null ? null : other);
+            OtherUserId: match.Result is null || !tellOther ? null : other);
     }
 
     private static string StateOf(TasteMatchRow match) => match.Result is null ? "open" : "done";

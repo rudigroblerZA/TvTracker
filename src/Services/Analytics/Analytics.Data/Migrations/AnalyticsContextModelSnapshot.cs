@@ -279,6 +279,12 @@ namespace Analytics.Data.Migrations
                     b.Property<string>("Result")
                         .HasColumnType("jsonb");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Token");
 
                     b.HasIndex("ExpiresAtUtc");

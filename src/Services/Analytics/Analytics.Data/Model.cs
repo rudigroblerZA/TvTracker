@@ -103,6 +103,11 @@ public class TasteMatchRow
     /// </summary>
     public DateTime ExpiresAtUtc { get; set; }
 
+    /// <summary>
+    /// Changes with every save of the row (Postgres's own xmin), so of two answers arriving together only one is saved.
+    /// </summary>
+    public uint Version { get; set; }
+
     public static readonly TimeSpan OpenFor = TimeSpan.FromDays(30);
     public static readonly TimeSpan KeptFor = TimeSpan.FromDays(365);
 }

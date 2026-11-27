@@ -218,6 +218,20 @@ public static class MatchCard
     }
 
     /// <summary>
+    /// <paramref name="name"/> when the card's typeface can draw all of it; <paramref name="otherwise"/> when it can't
+    /// (a script or an emoji Inter lacks would come out as boxes) or there is none.
+    /// </summary>
+    public static string NameOr(string? name, string otherwise)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return otherwise;
+        }
+        using var font = new SKFont(SemiBold.Value, 64);
+        return font.ContainsGlyphs(name) ? name : otherwise;
+    }
+
+    /// <summary>
     /// <paramref name="text"/>, cut short with an ellipsis when it is wider than <paramref name="maxWidth"/>.
     /// </summary>
     internal static string Fit(string text, SKTypeface typeface, float size, float maxWidth)
@@ -227,12 +241,18 @@ public static class MatchCard
         {
             return text;
         }
-        var cut = text;
-        while (cut.Length > 1 && font.MeasureText(cut + "…") > maxWidth)
+        // By whole characters as a reader sees them, so a pair of code units is never cut in half.
+        var elements = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+        var kept = new List<string>();
+        while (elements.MoveNext())
         {
-            cut = cut[..^1];
+            kept.Add(elements.GetTextElement());
         }
-        return cut.TrimEnd() + "…";
+        while (kept.Count > 1 && font.MeasureText(string.Concat(kept) + "…") > maxWidth)
+        {
+            kept.RemoveAt(kept.Count - 1);
+        }
+        return string.Concat(kept).TrimEnd() + "…";
     }
 
     internal static SKTypeface Typeface(string weight) => weight switch { "regular" => Regular.Value, "semibold" => SemiBold.Value, _ => ExtraBold.Value };

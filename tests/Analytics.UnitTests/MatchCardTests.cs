@@ -52,6 +52,27 @@ public class MatchCardTests
         Assert.Equal("Not much overlap, which is where the good recommendations come from.", string.Join(' ', wrapped));
     }
 
+    [Theory]
+    [InlineData("Robin", "Robin")]
+    [InlineData("Zoë", "Zoë")]
+    [InlineData("美咲", "A friend")]
+    [InlineData("Sam🎬", "A friend")]
+    [InlineData("", "A friend")]
+    [InlineData(null, "A friend")]
+    public void A_name_the_typeface_cannot_draw_is_not_drawn_as_boxes(string? name, string shown) =>
+        Assert.Equal(shown, MatchCard.NameOr(name, "A friend"));
+
+    [Fact]
+    public void Cutting_a_name_short_never_splits_a_character()
+    {
+        var fitted = MatchCard.Fit(string.Concat(Enumerable.Repeat("👩‍👩‍👧", 30)), MatchCard.Typeface("semibold"), 64, 300);
+
+        Assert.EndsWith("…", fitted);
+        Assert.True(System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(fitted)) == fitted);
+        Assert.DoesNotContain('\uFFFD', new string(fitted.Normalize().ToCharArray()));
+        Assert.All(new System.Globalization.StringInfo(fitted[..^1]).String.EnumerateRunes(), _ => { });
+    }
+
     /// <summary>
     /// A poster-shaped picture of one colour.
     /// </summary>

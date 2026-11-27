@@ -227,9 +227,14 @@ app.MapGet("/match/{token}/card.png", async (string token, string? size, HttpCon
 {
     try
     {
-        var response = await clients.CreateClient(ApiClients.Analytics).GetAsync(
-            $"api/v1/matches/{Uri.EscapeDataString(token)}/card.png?size={Uri.EscapeDataString(size ?? "link")}",
-            HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/matches/{Uri.EscapeDataString(token)}/card.png?size={Uri.EscapeDataString(size ?? "link")}");
+        // The visitor's address, so each is rate limited on their own and not all of them together as this site.
+        if (http.Connection.RemoteIpAddress is { } address)
+        {
+            request.Headers.TryAddWithoutValidation("X-Forwarded-For", address.ToString());
+        }
+        var response = await clients.CreateClient(ApiClients.Analytics).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
         http.Response.RegisterForDispose(response);
         if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType != "image/png")
         {

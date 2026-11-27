@@ -17,7 +17,8 @@ builder.AddNpgsqlDbContext<AnalyticsContext>("analyticsdb", configureSettings: s
 builder.Services.AddDatabaseInitializer<AnalyticsContext>();
 
 // In memory only: the time machine's weeks, the same for everyone in a time zone on a given day.
-builder.Services.AddHybridCache();
+// Room for Taste Match's share cards (PNGs of up to about a megabyte), which the default limit would leave uncached.
+builder.Services.AddHybridCache(options => options.MaximumPayloadBytes = 4 * 1024 * 1024);
 builder.Services.AddSingleton(TimeProvider.System);
 // Service logos (ServicesApi): one try each, without ServiceDefaults' retries, so a slow or refusing favicon service
 // doesn't hold the directory up.
