@@ -8,10 +8,13 @@ namespace TvTracker.IntegrationEvents;
 /// A subscription started, or came back after ending: the member has paid for <paramref name="Plan"/>. Not published at
 /// each renewal.
 /// </summary>
-public record SubscriptionStartedIntegrationEvent(string UserId, string Plan, DateTimeOffset StartedAtUtc) : IntegrationEvent;
+/// <param name="SubscriptionId">Which subscription, so its ending can be told from another's; null from publishers
+/// that predate it.</param>
+public record SubscriptionStartedIntegrationEvent(string UserId, string Plan, DateTimeOffset StartedAtUtc, Guid? SubscriptionId = null) : IntegrationEvent;
 
 /// <summary>
 /// A subscription ended (cancelled, lapsed or stopped at the provider) and nothing else of the member's is running: they
 /// no longer pay for <paramref name="Plan"/>.
 /// </summary>
-public record SubscriptionEndedIntegrationEvent(string UserId, string Plan, DateTimeOffset EndedAtUtc) : IntegrationEvent;
+/// <param name="SubscriptionId">Which subscription ended; null from publishers that predate it.</param>
+public record SubscriptionEndedIntegrationEvent(string UserId, string Plan, DateTimeOffset EndedAtUtc, Guid? SubscriptionId = null) : IntegrationEvent;

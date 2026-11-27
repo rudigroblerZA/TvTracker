@@ -1249,7 +1249,7 @@ without an account gets:
 
 | Who | Gets |
 | --- | --- |
-| **Not registered** | The catalog: shows, episodes, people, search, the calendar and Universes. No insights: those need an account (the services refuse a signed-out caller) |
+| **Not registered** | The catalog: shows, episodes, people, search and Universes. No insights: those need an account (the services refuse a signed-out caller) |
 | **Free** (registered) | Tracking, ratings, lists, history import, following people, and the basic insights: a show's Insights panel, the Insights and Discover pages, stats, the waiting room, the spoiler shield |
 | **Pro** | Every insight that's turned on: Free's, plus Tonight's plan, the essential cut and forecasts today |
 | **Family** | The same features as Pro, for the owner and up to 5 people they invite |

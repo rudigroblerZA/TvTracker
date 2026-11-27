@@ -265,4 +265,18 @@ public class AffiliateTests
         // Version 7 by its digit, with a time past the year 9999: made up, not made by Catalog.
         Assert.Null(AffiliateApi.MadeAt(Guid.Parse("ffffffff-ffff-7000-8000-000000000000")));
     }
+
+    [Fact]
+    public void Only_a_click_made_in_the_last_moments_is_waited_for()
+    {
+        var now = new DateTimeOffset(2026, 11, 27, 12, 0, 0, TimeSpan.Zero);
+
+        Assert.True(AffiliateApi.InFlight(Guid.CreateVersion7(now.AddSeconds(-3)), now));
+        // Catalog's clock a little ahead of this one.
+        Assert.True(AffiliateApi.InFlight(Guid.CreateVersion7(now.AddSeconds(2)), now));
+        Assert.False(AffiliateApi.InFlight(Guid.CreateVersion7(now.AddMinutes(-5)), now));
+        // Dated centuries ahead, or not one of Catalog's ids at all: made up, and answered at once.
+        Assert.False(AffiliateApi.InFlight(Guid.Parse("0fffffff-ffff-7000-8000-000000000000"), now));
+        Assert.False(AffiliateApi.InFlight(Guid.Parse("11111111-2222-4333-8444-555555555555"), now));
+    }
 }

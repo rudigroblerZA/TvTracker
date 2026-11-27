@@ -271,6 +271,11 @@ public static partial class AffiliateApi
     private static readonly TimeSpan ClickInFlight = TimeSpan.FromSeconds(15);
 
     /// <summary>
+    /// How far Catalog.API's clock may run ahead of this one.
+    /// </summary>
+    private static readonly TimeSpan ClockSkew = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// The click a postback names, sent through this program. The click comes from Catalog.API as an event, so a sale
     /// reported within moments of the click (the test network's page) may be a beat ahead of it. Only then is it waited
     /// for, a few seconds: the click's id says when it was made (<see cref="MadeAt"/>), and an older or foreign id is
@@ -278,7 +283,7 @@ public static partial class AffiliateApi
     /// </summary>
     private static async Task<bool> ClickKnownAsync(FinancialsContext db, Guid clickId, string program, TimeProvider time, CancellationToken ct)
     {
-        var waits = MadeAt(clickId) is { } made && time.GetUtcNow() - made < ClickInFlight ? ClickWaits : 0;
+        var waits = InFlight(clickId, time.GetUtcNow()) ? ClickWaits : 0;
         for (var attempt = 0; ; attempt++)
         {
             if (await db.OutboundClicks.AnyAsync(c => c.Id == clickId && c.Program == program, ct))
@@ -292,6 +297,13 @@ public static partial class AffiliateApi
             await Task.Delay(ClickWait, time, ct);
         }
     }
+
+    /// <summary>
+    /// Whether a click may still be on its way here: made in the last moments, by its id's own account. One dated ahead
+    /// of now (a made-up id) isn't, any more than an old one.
+    /// </summary>
+    internal static bool InFlight(Guid clickId, DateTimeOffset now) =>
+        MadeAt(clickId) is { } made && now - made is var age && age > -ClockSkew && age < ClickInFlight;
 
     /// <summary>
     /// When a click id was made: Catalog.API makes them as version 7 ids, whose first 48 bits are the time in
