@@ -1,5 +1,5 @@
 @* The main sections only; each section's tools are linked from its page (Up Next: backlog, tonight, waiting room;
-   Discover: blend, universes, nanogenres; Insights: call it, streaks, time machine; My shows: its calendar and lists).
+   Discover: blend, universes, nanogenres; Insights: call it, streaks, time machine; My shows: its calendar, the feed, the inbox and lists).
    Signed out, the public tools are linked here, since their hubs need sign-in. *@
 <nav class="nav" aria-label="Main">
     <NavLink href="" Match="NavLinkMatch.All">Home</NavLink>
@@ -10,9 +10,7 @@
             <NavLink href="discover">Discover</NavLink>
             <NavLink href="for-you">For you</NavLink>
             <NavLink href="insights">Insights</NavLink>
-            <Feature Flag="@FeatureFlags.Social"><NavLink href="feed">Feed</NavLink></Feature>
             <NavLink href="search">Search</NavLink>
-            <NavLink href="inbox">Inbox</NavLink>
         </Authorized>
         <NotAuthorized>
             <NavLink href="search">Search</NavLink>
