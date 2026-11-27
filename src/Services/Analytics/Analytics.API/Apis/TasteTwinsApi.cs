@@ -34,7 +34,7 @@ public static class TasteTwinsApi
                 select new { UserId = g.Key, Shared = g.Count(), Difference = g.Average(d => (double)d) })
             .ToListAsync(ct);
         var twins = TasteTwins.Twins(candidates.Select(c => (c.UserId, c.Shared, c.Difference)));
-        if (twins.Count < InsightRules.MinUsersToShow)
+        if (!TasteTwins.Enough(twins))
         {
             return TypedResults.Ok(TasteTwins.TooFewTwins(mine.Count));
         }

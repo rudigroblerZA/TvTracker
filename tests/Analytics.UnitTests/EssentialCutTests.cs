@@ -65,6 +65,20 @@ public class EssentialCutTests
     }
 
     [Fact]
+    public void A_three_parter_is_kept_whole_when_only_its_last_part_would_be()
+    {
+        var show = Show();
+        var e = Season(show, 1, First, 8.0, 6.0, 6.0, 9.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0);
+        e[1].Title = "Siege, Part 1";
+        e[2].Title = "Siege, Part 2";
+        e[3].Title = "Siege, Part 3";
+
+        var cut = Decide(show, e);
+
+        Assert.All(new[] { e[1], e[2], e[3] }, part => Assert.True(cut[part.EpisodeId].Keep));
+    }
+
+    [Fact]
     public void An_evenly_rated_season_loses_nothing_to_noise()
     {
         var show = Show();

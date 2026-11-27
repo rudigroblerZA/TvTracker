@@ -108,17 +108,19 @@ public static class YearInTv
     /// <param name="aired">Their aired regular episodes.</param>
     /// <param name="allWatches">Every watch of the viewer's, bulk marks included (a bulk-marked show is finished all the same).</param>
     internal static (List<Guid> Finished, List<Guid> CaughtUp, List<Guid> LeftBehind) Progress(IReadOnlyCollection<Guid> ids,
-        ILookup<Guid, (Guid EpisodeId, DateTimeOffset? AirsAtUtc)> aired, IEnumerable<(Guid ShowId, Guid EpisodeId, DateTime WatchedAtUtc)> allWatches,
+        ILookup<Guid, (Guid EpisodeId, DateTimeOffset? AirsAtUtc, int Season, int Number)> aired, IEnumerable<(Guid ShowId, Guid EpisodeId, DateTime WatchedAtUtc)> allWatches,
         IReadOnlyDictionary<Guid, ShowCopy> shows, IReadOnlyCollection<Watch> inYear, DateTime asOf)
     {
-        var watched = allWatches.Where(w => ids.Contains(w.ShowId)).ToLookup(w => w.ShowId);
+        var wanted = ids.ToHashSet();
+        var watched = allWatches.Where(w => wanted.Contains(w.ShowId)).ToLookup(w => w.ShowId);
         var minutes = inYear.GroupBy(w => w.ShowId).ToDictionary(g => g.Key, g => g.Sum(w => w.Minutes));
         var yearEpisodes = inYear.Select(w => w.EpisodeId).ToHashSet();
 
         List<Guid> finished = [], caughtUp = [], leftBehind = [];
         foreach (var id in ids.OrderByDescending(id => minutes.GetValueOrDefault(id)))
         {
-            var episodes = aired[id].OrderBy(e => e.AirsAtUtc).ToList();
+            // In air order; a season dropped at once goes by number, so its last episode is the same one every time.
+            var episodes = aired[id].OrderBy(e => e.AirsAtUtc).ThenBy(e => e.Season).ThenBy(e => e.Number).ToList();
             if (episodes.Count == 0)
             {
                 continue;

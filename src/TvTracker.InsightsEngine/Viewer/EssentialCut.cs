@@ -181,16 +181,22 @@ public static class EssentialCut
                 .Select(e => e.EpisodeId)
                 .ToHashSet();
 
-            // Two-parters go together: keep both if either half is kept.
-            for (var i = 0; i + 1 < list.Count; i++)
+            // Multi-parters go together: keep every part if any is kept. Repeated until nothing changes, so a kept
+            // part 3 brings back part 2 and then part 1.
+            for (var changed = true; changed;)
             {
-                if (PartPattern.IsMatch(list[i].Title) && PartPattern.IsMatch(list[i + 1].Title)
-                    && skip.Contains(list[i].EpisodeId) != skip.Contains(list[i + 1].EpisodeId))
+                changed = false;
+                for (var i = 0; i + 1 < list.Count; i++)
                 {
-                    skip.Remove(list[i].EpisodeId);
-                    skip.Remove(list[i + 1].EpisodeId);
-                    protectedWhy.TryAdd(list[i].EpisodeId, "two-parter");
-                    protectedWhy.TryAdd(list[i + 1].EpisodeId, "two-parter");
+                    if (PartPattern.IsMatch(list[i].Title) && PartPattern.IsMatch(list[i + 1].Title)
+                        && skip.Contains(list[i].EpisodeId) != skip.Contains(list[i + 1].EpisodeId))
+                    {
+                        skip.Remove(list[i].EpisodeId);
+                        skip.Remove(list[i + 1].EpisodeId);
+                        protectedWhy.TryAdd(list[i].EpisodeId, "two-parter");
+                        protectedWhy.TryAdd(list[i + 1].EpisodeId, "two-parter");
+                        changed = true;
+                    }
                 }
             }
 
