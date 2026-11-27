@@ -1,61 +1,85 @@
 @page "/shows"
 @inject TrackingClient Tracking
 
-<PageTitle>My shows · @Brand.AppName</PageTitle>
+<PageTitle>@(Calendar ? "Calendar · " : "")My shows · @Brand.AppName</PageTitle>
 
 <h1>My shows</h1>
 
 <AuthorizeView>
     <Authorized>
-        <div class="tool-links">
-            <ToolLink Href="lists" Title="Lists">Your own lists of shows, to keep or share.</ToolLink>
-        </div>
-        <div class="tabs" role="tablist">
-            <button role="tab" class="@(filter is null ? "active" : "")" @onclick="() => SetFilterAsync(null)">All</button>
-            @foreach (var status in Enum.GetValues<WatchStatus>())
-            {
-                <button role="tab" class="@(filter == status ? "active" : "")" @onclick="() => SetFilterAsync(status)">@Format.WatchStatusLabel(status)</button>
-            }
+        @* Two views of the shows you follow: the shows themselves, and when their episodes air. The address holds which,
+           so the calendar can be linked to and bookmarked. *@
+        <div class="segmented" role="group" aria-label="View">
+            <a class="btn @(Calendar ? "btn-quiet" : "")" href="shows" aria-current="@(Calendar ? null : "page")">Shows</a>
+            <a class="btn @(Calendar ? "" : "btn-quiet")" href="@CalendarHref" aria-current="@(Calendar ? "page" : null)">Calendar</a>
         </div>
 
-        <ErrorNotice Message="@error" OnRetry="LoadAsync" />
-
-        @if (follows is null)
+        @if (Calendar)
         {
-            <p class="muted">Loading…</p>
-        }
-        else if (follows.Count == 0)
-        {
-            <p class="muted">No shows here yet.</p>
+            <CalendarView />
         }
         else
         {
-            <div class="card-grid">
-                @foreach (var f in follows)
+            <div class="tool-links">
+                <ToolLink Href="lists" Title="Lists">Your own lists of shows, to keep or share.</ToolLink>
+            </div>
+            <div class="tabs" role="tablist">
+                <button role="tab" class="@(filter is null ? "active" : "")" @onclick="() => SetFilterAsync(null)">All</button>
+                @foreach (var status in Enum.GetValues<WatchStatus>())
                 {
-                    <ShowCard ShowId="f.ShowId" Title="@(f.Title ?? "Loading show…")" PosterUrl="@f.PosterUrl"
-                              Subtitle="@Format.WatchStatusLabel(f.Status)">
-                        @if (f.AiredCount > 0)
-                        {
-                            <progress max="@f.AiredCount" value="@f.WatchedCount"></progress>
-                            <div class="muted small">@f.WatchedCount / @f.AiredCount</div>
-                        }
-                    </ShowCard>
+                    <button role="tab" class="@(filter == status ? "active" : "")" @onclick="() => SetFilterAsync(status)">@Format.WatchStatusLabel(status)</button>
                 }
             </div>
+
+            <ErrorNotice Message="@error" OnRetry="LoadAsync" />
+
+            @if (follows is null)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (follows.Count == 0)
+            {
+                <p class="muted">No shows here yet.</p>
+            }
+            else
+            {
+                <div class="card-grid">
+                    @foreach (var f in follows)
+                    {
+                        <ShowCard ShowId="f.ShowId" Title="@(f.Title ?? "Loading show…")" PosterUrl="@f.PosterUrl"
+                                  Subtitle="@Format.WatchStatusLabel(f.Status)">
+                            @if (f.AiredCount > 0)
+                            {
+                                <progress max="@f.AiredCount" value="@f.WatchedCount"></progress>
+                                <div class="muted small">@f.WatchedCount / @f.AiredCount</div>
+                            }
+                        </ShowCard>
+                    }
+                </div>
+            }
         }
     </Authorized>
     <NotAuthorized>
-        <SignInPrompt Message="Sign in to see the shows you follow." />
+        <SignInPrompt Message="@(Calendar ? "Sign in to see when your shows air, in your timezone." : "Sign in to see the shows you follow.")" />
     </NotAuthorized>
 </AuthorizeView>
 
 @code {
+    /// <summary>
+    /// Where the calendar view is, for links to it.
+    /// </summary>
+    public const string CalendarHref = "shows?view=calendar";
+
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+
+    private bool Calendar => string.Equals(View, "calendar", StringComparison.OrdinalIgnoreCase);
+
     private List<Follow>? follows;
     private WatchStatus? filter;
     private string? error;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    // The shows are fetched when their view is first shown: someone who came for the calendar may never look at them.
+    protected override Task OnParametersSetAsync() => Calendar || follows is not null ? Task.CompletedTask : LoadAsync();
 
     private Task SetFilterAsync(WatchStatus? status)
     {
