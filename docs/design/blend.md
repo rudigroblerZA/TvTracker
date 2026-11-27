@@ -1,6 +1,7 @@
 # Blend: design
 
-Status: as built (on by default, free). Last checked against the code on 27 November 2026.
+Status: as built (on by default, free). Last checked against the code on 27 November 2026, after Blend and Mixtape
+were moved onto one engine (section 7).
 
 Blend takes two shows and returns the shows that sit between them: Breaking Bad × The Office gives The Gentlemen,
 Brooklyn Nine-Nine and BEEF. This document records how it works, why it works that way, where it is weak, and what
@@ -28,7 +29,7 @@ free, works signed out, and is one of the three cards pinned to the top of Disco
 ### Not goals
 
 - Personalisation. A blend is the same for everyone; it does not read what the viewer follows, watched or rated.
-- More than two shows. That is Mixtape (`/mixtape`, three to five shows, Pro), which shares the idea but not the code.
+- More than two shows. That is Mixtape (`/mixtape`, three to five shows, Pro). Both are answered by the same engine.
 - Explaining similarity beyond genres. The vectors carry more than genre, but nothing else is shown.
 
 ## 2. How a member meets it
@@ -74,19 +75,28 @@ So a show can be blended once the sync worker has embedded it, normally within a
 
 ### 3.2 The request
 
-`GET /api/v1/shows/blend?a={id}&b={id}&lean=50` on Catalog.API (`BlendApi.cs`), behind the `blend` flag.
+`GET /api/v1/shows/blend?a={id}&b={id}&lean=50` on Catalog.API (`BlendApi.cs`), behind the `blend` flag and search's
+rate limit. The endpoint checks the input and shapes the answer; the work is `ShowMixer.MixAsync`, which Mixtape calls
+too, with the rules in `MixRules` (both in `Services/ShowMix.cs`). A blend is a mix of two shows with weights
+`w = lean / 100` and `1 − w`; a mixtape is a mix of three to five with equal weights.
 
 1. `a == b` is a validation error ("Pick two different shows."). `lean` is clamped to 0-100.
-2. Load both shows; either missing is a 404.
-3. Load both vectors for the current model. Either missing returns `Indexed: false` with no matches (the "still being
+2. Load the shows; any missing is a 404.
+3. Load their vectors for the current model. Any missing returns `Indexed: false` with no matches (the "still being
    indexed" notice), not an error.
-4. **Mix.** With `w = lean / 100`: `mix = normalize(w·A + (1 − w)·B)`.
-5. **Candidates.** The 40 shows nearest `mix` by cosine distance, leaving out A, B, and any show with the same title as
-   either (a remake, or the classic Doctor Who beside the new one). For each, also fetch its distance to A and to B.
-6. **Rank.** `score = max(2w · dA, 2(1 − w) · dB)`, lowest first, top 20.
-7. Load the 20 shows and build the answer.
+4. **Mix.** `mix = normalize(Σ wᵢ·vᵢ)`.
+5. **Candidates.** The 40 shows nearest `mix`, plus the 40 nearest each show, in one query, leaving out the mix's own
+   shows and any show with the same title as one of them (a remake, or the classic Doctor Who beside the new one).
+   pgvector's HNSW scan returns at most 40 rows a query, and the best common ground isn't always among the 40 nearest
+   the mix.
+6. **Same kinds only.** A candidate of another kind (scripted, animation, reality, …) than every show of the mix is
+   dropped; one with no known kind stays.
+7. **Rank.** `score = max(n · wᵢ · dᵢ)` over the mix's `n` shows, lowest first, top 20. For a blend that is
+   `max(2w · dA, 2(1 − w) · dB)`; for an even mix it is the distance to the farthest show.
+8. Load the matches and build the answer.
 
-Four queries: the two shows, the two vectors, the candidates (the only one that uses the vector index), the matches.
+Five queries: the shows, their vectors, the candidate ids (the only one that uses the vector index), the candidates'
+kinds and vectors, and the matches.
 
 ### 3.3 Why rank by the farther show
 
@@ -156,40 +166,49 @@ the page needs no further call to draw a card.
 | Show loose blends with a notice | Refuse them | An empty page for two picks the viewer chose is worse than honest weak results. |
 | Genres as the reason | A generated sentence | Deterministic, free, and never wrong about what the catalog says. |
 | No personalisation | Drop shows the viewer has seen | Keeps a blend a shareable fact, and keeps Catalog free of viewer data. |
+| One engine for two and for many | An endpoint each | Two copies of the idea drifted apart. |
 
 ## 6. Gaps
 
-Found while writing this; none is fixed yet.
-
-1. **No tests.** Nothing in `tests/` mentions Blend. The ranking rule, the lean weighting, the loose cutoff and the
-   genre attribution are all untested, and all sit inside the endpoint where a unit test can't reach them.
-2. **No rate limit.** Mixtape and search carry `SearchRateLimiting.Policy`; Blend does not, though it is public and
-   runs a vector scan per call.
-3. **The candidate pool can run short.** The query asks for the 40 nearest the mix, and pgvector's HNSW scan returns
-   at most `ef_search` (40) rows *before* the title and model filters apply. For lopsided pairs the best common ground
-   is not always among the 40 nearest the average either. Mixtape already works round both by also taking each show's
-   own nearest in one UNION ALL; Blend does not.
-4. **No "same kinds" rule.** Mixtape requires a pick to be the same kind of show as the inputs (scripted, animation,
-   reality) after Ted Lasso + Succession + Breaking Bad brought in The Amazing Race. Blend can make the same mistake.
-5. **Quality depends on catalog size.** On the 290-show local catalog most pairs come back loose. This is expected,
+1. **Quality depends on catalog size.** On the 290-show local catalog most pairs come back loose. This is expected,
    but it means Blend can't be judged on a small catalog, and a demo environment needs a few thousand shows.
-6. **Depends on the embedding model being up at index time only.** If the model server is down, shows imported
-   meanwhile stay "still being indexed" until it returns; the notice says "a minute", which is then wrong.
-7. **`Fit` is unused** by any client.
+2. **Depends on the embedding model being up at index time.** If the model server is down, shows imported meanwhile
+   stay "still being indexed" until it returns; the notice says "a minute", which is then wrong.
+3. **`Fit` is unused** by any client: show it (a "strong / fair / loose" word per card) or drop it from the contract.
+4. **The list of mixes is short on expectations.** `mix-pairs.json` has 16 mixes; only the ones the README already
+   named say what must come back. The rest say what must not, or nothing yet. They need filling in from a first run
+   on the production catalog.
 
-## 7. Proposed changes, in order
+## 7. What changed on 27 November 2026, and how Blend is judged
 
-1. **Move the maths out of the endpoint** into a small pure class (mix, score, fit, like-A, loose, genre split), with
-   unit tests in `Catalog.UnitTests`. Add one integration test that seeds a handful of vectors and checks that a
-   one-sided show ranks below a two-sided one. This is the prerequisite for changing anything else safely.
-2. **Add the rate limit** Mixtape has.
-3. **Share candidate gathering with Mixtape**: the mix's nearest plus each parent's nearest, in one query. Blend is
-   then Mixtape's rule for two shows with a lean, and the two endpoints stop drifting apart.
-4. **Apply the same-kinds rule**, shared with Mixtape.
-5. Decide `Fit`: show it (a "strong / fair / loose" word per card) or drop it from the contract.
+Blend and Mixtape were two endpoints with two copies of the same idea, and had drifted: Mixtape had the wider
+candidate pool, the same-kinds rule and the rate limit, and Blend had none of them. Neither had a test.
 
-Items 3 and 4 change results, so they want a before-and-after on a fixed list of pairs (the four examples on the page,
-plus the pairs named in the README) before they ship.
+- **One engine.** `MixRules` (pure: mix, score, rank, loose, percentages, kinds) and `ShowMixer` (the queries). Blend
+  gained the wider pool, the same-kinds rule and the rate limit by moving onto it. The two answers' shapes did not
+  change.
+- **Tests.** `MixRulesTests` (Catalog.UnitTests) covers the maths; `ShowMixerTests` (Catalog.IntegrationTests) runs
+  mixes against a real database with seeded vectors: the exclusions, the kinds, another model's vectors, an unembedded
+  show.
+- **Results changed** for blends of scripted shows: documentaries and reality shows no longer appear between them.
+  Locally, four of the first five for Shetland × Murdoch Mysteries were true-crime documentaries (Killer in My
+  Village first); it now leads with The Northumbria Mysteries and Death in Paradise.
+
+Two measures now exist where there was none:
+
+- **A fixed list of mixes**, `docs/design/mix-pairs.json`: for each, titles of which at least one must be in the first
+  10 (`expect`), title prefixes that must not be (`never`, for spin-offs of an input), and whether the answer should
+  be marked loose. `tvtracker-import mix-eval` runs them through the public endpoints, prints pass or fail with the
+  first five of each answer, and exits 1 on a failure. `--out` saves a run; `--baseline` compares against a saved run
+  and says which titles left and joined each answer. Mixtape is a Pro insight, so its mixes are skipped without
+  `--token`. A change to the ranking should come with a before-and-after from this.
+- **Follows that start from a mix.** Result cards link to `shows/{id}?from=blend` (or `mixtape`); the show page passes
+  that on with a follow, and Tracking counts new follows by source in the `follows.started` metric (meter
+  `TvTracker.Tracking`, tag `source`: `blend`, `mixtape` or `direct`). It is a count: nothing about who followed what
+  is stored, and an unknown source counts as direct. Compared with requests to the blend endpoint, it says how often a
+  blend ends in a follow.
+
+Neither has been run against the production catalog yet.
 
 ## 8. Open questions
 
@@ -205,7 +224,10 @@ plus the pairs named in the README) before they ship.
 
 | What | Where |
 |---|---|
-| Endpoint, ranking, DTOs | `src/Services/Catalog/Catalog.API/Apis/BlendApi.cs` |
+| Endpoint and DTOs | `src/Services/Catalog/Catalog.API/Apis/BlendApi.cs` |
+| Rules and queries, shared with Mixtape | `MixRules` and `ShowMixer` in `src/Services/Catalog/Catalog.API/Services/ShowMix.cs` |
+| The fixed list of mixes, and the command that runs it | `docs/design/mix-pairs.json`; `mix-eval` in `src/Tools/Catalog.ImportCli` |
+| Follows by source | `FollowSources` in `src/TvTracker.IntegrationEvents`; `FollowMetrics` in Tracking.API |
 | Vectors and their index | `ShowEmbedding` in `src/Services/Catalog/Catalog.Data/Model.cs`, mapped in `CatalogContext.cs` |
 | Keeping vectors current | `src/Services/Catalog/Catalog.SyncWorker/ShowEmbeddingIndexer.cs` |
 | Models and the "similar" cutoff | `src/Services/Catalog/Catalog.Embeddings/EmbeddingModel.cs` |
