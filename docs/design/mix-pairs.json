@@ -1,0 +1,18 @@
+[
+  { "shows": ["Breaking Bad", "The Office"], "expect": ["The Gentlemen", "Brooklyn Nine-Nine", "BEEF"], "never": ["Better Call Saul", "El Camino"], "loose": false },
+  { "shows": ["NCIS", "Friends"], "expect": ["Scrubs", "Brooklyn Nine-Nine"], "never": ["NCIS:"] },
+  { "shows": ["Game of Thrones", "Friends"] },
+  { "shows": ["Squid Game", "Love Is Blind"] },
+  { "shows": ["Stranger Things", "The Great British Bake Off"], "loose": true },
+  { "shows": ["Breaking Bad", "Better Call Saul"], "loose": false },
+  { "shows": ["Law & Order", "Parks and Recreation"], "never": ["Law & Order:"] },
+  { "shows": ["Star Trek: The Next Generation", "The West Wing"], "never": ["Star Trek:"] },
+  { "shows": ["The Sopranos", "Succession"], "loose": false },
+  { "shows": ["Doctor Who", "Sherlock"], "never": ["Doctor Who"] },
+  { "shows": ["The Simpsons", "Breaking Bad"] },
+  { "shows": ["Ted Lasso", "Succession"], "never": ["The Amazing Race"] },
+  { "shows": ["Breaking Bad", "Ozark", "Better Call Saul"], "expect": ["The Lincoln Lawyer", "Bosch", "Criminal Minds"], "loose": false },
+  { "shows": ["Stranger Things", "Severance", "Black Mirror"], "expect": ["Travelers", "Westworld", "The Expanse"] },
+  { "shows": ["The Office", "Superstore", "Abbott Elementary"], "expect": ["Seinfeld", "The Good Place", "Brooklyn Nine-Nine"], "loose": false },
+  { "shows": ["Ted Lasso", "Succession", "Breaking Bad"], "never": ["The Amazing Race"] }
+]

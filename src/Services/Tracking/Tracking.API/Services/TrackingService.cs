@@ -8,12 +8,14 @@ namespace Tracking.API.Services;
 /// <summary>
 /// Write operations on follows and watched episodes, with their events.
 /// </summary>
-public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox outbox, UserCache cache, TimeProvider time)
+public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox outbox, UserCache cache, TimeProvider time, FollowMetrics? metrics = null)
 {
-    public async Task<Follow> FollowAsync(string userId, Guid showId, WatchStatus status, CancellationToken ct)
+    /// <param name="from">Where the follow started (<see cref="FollowSources"/>), for the count of new follows by source.</param>
+    public async Task<Follow> FollowAsync(string userId, Guid showId, WatchStatus status, CancellationToken ct, string? from = null)
     {
         var now = time.GetUtcNow().UtcDateTime;
         var follow = await db.Follows.FindAsync([userId, showId], ct);
+        var isNew = follow is null;
 
         if (follow is null)
         {
@@ -28,6 +30,10 @@ public sealed class TrackingService(TrackingContext db, IIntegrationEventOutbox 
         }
 
         await SaveAsync(userId, ct);
+        if (isNew)
+        {
+            metrics?.Started(from);
+        }
         return follow;
     }
 

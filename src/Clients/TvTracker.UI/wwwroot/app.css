@@ -1054,7 +1054,9 @@ h1:focus, h2:focus { outline: none; }
 .gap-fill.scheduled { background: repeating-linear-gradient(45deg, var(--accent), var(--accent) 4px, transparent 4px, transparent 8px); }
 
 /* TV atlas */
-.segmented { display: inline-flex; gap: 4px; margin: 4px 0 12px; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; }
+.segmented .count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent-fill); color: var(--accent-text); font-size: 0.8em; font-variant-numeric: tabular-nums; }
+.segmented .btn:not(.btn-quiet) .count { background: var(--accent-text); color: var(--accent-fill); }
 .atlas-switches { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .standins { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
 .world-map { width: 100%; height: auto; display: block; margin: 8px 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }

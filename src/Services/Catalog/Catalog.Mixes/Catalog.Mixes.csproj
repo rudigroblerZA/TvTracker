@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Mixes: several shows in, the shows that sit between all of them out. Blend (two shows and a lean) and Mixtape
+       (three to five) both answer from here. MixRules is the maths, with no database; ShowMixer runs a mix against the
+       catalog's vectors. No HTTP, flags or rate limits: those are the endpoints' in Catalog.API. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Catalog.Data\Catalog.Data.csproj" />
+    <ProjectReference Include="..\Catalog.Embeddings\Catalog.Embeddings.csproj" />
+  </ItemGroup>
+
+</Project>

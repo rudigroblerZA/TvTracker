@@ -462,8 +462,15 @@ address holds the shows, so a mixtape can be shared, and it works signed out.
 Breaking Bad × The Office gives The Gentlemen, Brooklyn Nine-Nine and BEEF; NCIS × Friends gives Scrubs and
 Brooklyn Nine-Nine. A slider leans the blend towards either show. Each match shows where it sits between the two and the
 genres it takes from each. The address holds the blend, so it can be shared, and it works signed out.
-- **How:** it mixes the two shows' search vectors, takes the 40 catalog shows nearest the mix, and ranks them by
-  their distance to the farther of the two, so a show close to only one of them ranks low.
+- **How:** the same engine as Mixtape (`ShowMixer`, in `Catalog.Mixes`), for two shows with a lean: it mixes the two shows' search
+  vectors, gathers the shows nearest the mix and nearest each of the two, keeps the same kinds of show, and ranks them
+  by their distance to the farther of the two, so a show close to only one of them ranks low. Design:
+  [docs/design/blend.md](docs/design/blend.md).
+- **Checking a change:** `dotnet run --project src/Tools/Catalog.ImportCli -- mix-eval` runs the fixed list of mixes in
+  `docs/design/mix-pairs.json` against the running app (what each must and must not return); `--out` saves the
+  answers and `--baseline` compares a later run with them. Mixtapes need `--token` of a member on Pro.
+- **Follows from a blend:** a result links to the show with `?from=blend` (`mixtape` from Mixtape), and Tracking counts
+  new follows by that source in the `follows.started` metric. A count only.
 - **Loose blends:** when even the best match is farther from one show than search's cutoff for "similar"
   (Stranger Things × The Great British Bake Off), the page says the two have little in common.
 - **API:** `GET /api/v1/shows/blend?a={id}&b={id}&lean=50` (lean 0-100, how much like the first show). The pickers use

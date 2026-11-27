@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,12 +25,36 @@ public sealed class TrackingServiceTests(TrackingDatabase database) : IClassFixt
     private readonly RecordingEventBus bus = new();
     private readonly string userId = $"user-{Guid.NewGuid():N}";
     private readonly Guid showId = Guid.NewGuid();
+    private FollowMetrics? metrics;
 
     private TrackingService Service(TrackingContext db)
     {
         var services = new ServiceCollection().AddHybridCache().Services.BuildServiceProvider();
         var outbox = new IntegrationEventOutbox<TrackingContext>(db, bus, NullLogger<IntegrationEventOutbox<TrackingContext>>.Instance);
-        return new TrackingService(db, outbox, new UserCache(services.GetRequiredService<HybridCache>()), time);
+        return new TrackingService(db, outbox, new UserCache(services.GetRequiredService<HybridCache>()), time, metrics);
+    }
+
+    /// <summary>
+    /// Counts this test's follows by source from here on: its own meter, so another test's follows aren't heard.
+    /// </summary>
+    private List<string> ListenForFollows()
+    {
+        var meters = new ServiceCollection().AddMetrics().BuildServiceProvider().GetRequiredService<IMeterFactory>();
+        metrics = new FollowMetrics(meters);
+        var sources = new List<string>();
+        var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, l) =>
+            {
+                if (instrument.Meter.Scope == meters && instrument.Name == "follows.started")
+                {
+                    l.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) => sources.Add((string)tags.ToArray().Single(t => t.Key == "source").Value!));
+        listener.Start();
+        return sources;
     }
 
     private async Task<List<EpisodeCopy>> SeedShowAsync(ShowStatus status, int aired, int unaired = 0)
@@ -69,6 +94,23 @@ public sealed class TrackingServiceTests(TrackingDatabase database) : IClassFixt
         var follow = await FollowOfAsync();
         Assert.Equal((WatchStatus.PlanToWatch, Now.UtcDateTime), (follow!.Status, follow.FollowedAtUtc));
         Assert.Equal(showId, Assert.Single(bus.Of<ShowFollowedIntegrationEvent>(), e => e.UserId == userId).ShowId);
+    }
+
+    [Fact]
+    public async Task A_new_follow_is_counted_under_the_tool_it_started_from_and_a_repeat_is_not_counted()
+    {
+        var sources = ListenForFollows();
+
+        await using (var db = database.Context())
+        {
+            await Service(db).FollowAsync(userId, showId, WatchStatus.PlanToWatch, Ct, from: "blend");
+            await Service(db).FollowAsync(userId, showId, WatchStatus.Watching, Ct, from: "mixtape");
+            await Service(db).FollowAsync(userId, Guid.NewGuid(), WatchStatus.Watching, Ct);
+            // The address is anyone's to write: a source that isn't one of ours is no source.
+            await Service(db).FollowAsync(userId, Guid.NewGuid(), WatchStatus.Watching, Ct, from: "made-up");
+        }
+
+        Assert.Equal(["blend", "direct", "direct"], sources);
     }
 
     [Fact]

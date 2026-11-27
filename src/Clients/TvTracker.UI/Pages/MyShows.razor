@@ -1,39 +1,102 @@
 @page "/shows"
+@inject NotificationsClient Notifications
 
-<PageTitle>@(ShowingCalendar ? "Calendar · " : "")My shows · @Brand.AppName</PageTitle>
+<PageTitle>@(Current switch { Calendar => "Calendar · ", Feed => "Feed · ", Inbox => "Inbox · ", _ => "" })My shows · @Brand.AppName</PageTitle>
 
 <h1>My shows</h1>
 
 <AuthorizeView>
     <Authorized>
-        @* Two views of the shows you follow: the shows themselves, and when their episodes air. The address holds which,
-           so the calendar can be linked to and bookmarked. Each view loads its own data when it is shown. *@
+        @* Four views of the shows you follow: the shows themselves, when their episodes air, what the people you
+           follow did with theirs, and what you've been told about them. The address holds which, so each can be
+           linked to and bookmarked. Each view loads its own data when it is shown. *@
         <div class="segmented" role="group" aria-label="View">
-            <a class="btn @(ShowingCalendar ? "btn-quiet" : "")" href="shows" aria-current="@(ShowingCalendar ? null : "page")">Shows</a>
-            <a class="btn @(ShowingCalendar ? "" : "btn-quiet")" href="@CalendarHref" aria-current="@(ShowingCalendar ? "page" : null)">Calendar</a>
+            <a class="btn @Quiet(Shows)" href="shows" aria-current="@Page(Shows)">Shows</a>
+            <a class="btn @Quiet(Calendar)" href="@CalendarHref" aria-current="@Page(Calendar)">Calendar</a>
+            <Feature Flag="@FeatureFlags.Social">
+                <a class="btn @Quiet(Feed)" href="@FeedHref" aria-current="@Page(Feed)">Feed</a>
+            </Feature>
+            <a class="btn @Quiet(Inbox)" href="@InboxHref" aria-current="@Page(Inbox)">
+                <span>Inbox</span>
+                @if (unread > 0)
+                {
+                    <span class="count" aria-label="@($"{unread} unread")">@unread</span>
+                }
+            </a>
         </div>
 
-        @if (ShowingCalendar)
+        @switch (Current)
         {
-            <CalendarView />
-        }
-        else
-        {
-            <FollowedShowsView />
+            case Calendar:
+                <CalendarView />
+                break;
+            case Feed:
+                <Feature Flag="@FeatureFlags.Social"><FeedView /></Feature>
+                break;
+            case Inbox:
+                <InboxView UnreadChanged="count => unread = count" />
+                break;
+            default:
+                <FollowedShowsView />
+                break;
         }
     </Authorized>
     <NotAuthorized>
-        <SignInPrompt Message="@(ShowingCalendar ? "Sign in to see when your shows air, in your timezone." : "Sign in to see the shows you follow.")" />
+        <SignInPrompt Message="@(Current switch
+        {
+            Calendar => "Sign in to see when your shows air, in your timezone.",
+            Feed => "Sign in to follow people and see what they watch.",
+            Inbox => "Sign in to see your notifications.",
+            _ => "Sign in to see the shows you follow."
+        })" />
     </NotAuthorized>
 </AuthorizeView>
 
 @code {
+    private const string Shows = "shows", Calendar = "calendar", Feed = "feed", Inbox = "inbox";
+
     /// <summary>
     /// Where the calendar view is, for links to it.
     /// </summary>
     public const string CalendarHref = "shows?view=calendar";
 
+    /// <summary>
+    /// Where the feed view is, for links to it.
+    /// </summary>
+    public const string FeedHref = "shows?view=feed";
+
+    /// <summary>
+    /// Where the inbox view is, for links to it.
+    /// </summary>
+    public const string InboxHref = "shows?view=inbox";
+
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
 
-    private bool ShowingCalendar => string.Equals(View, "calendar", StringComparison.OrdinalIgnoreCase);
+    [CascadingParameter] private Task<AuthenticationState>? Authentication { get; set; }
+
+    // Shown on the Inbox button, since the inbox is no longer in the menu. The inbox view keeps it current.
+    private int unread;
+
+    private string Current => View?.ToLowerInvariant() switch { Calendar => Calendar, Feed => Feed, Inbox => Inbox, _ => Shows };
+
+    private string Quiet(string view) => Current == view ? "" : "btn-quiet";
+
+    private string? Page(string view) => Current == view ? "page" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The inbox view loads the inbox itself and reports the count.
+        if (Current == Inbox || Authentication is null || (await Authentication).User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+        try
+        {
+            unread = (await Notifications.GetInboxAsync(unreadOnly: true))?.UnreadCount ?? 0;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            // The count is a hint; the inbox view says what went wrong.
+        }
+    }
 }

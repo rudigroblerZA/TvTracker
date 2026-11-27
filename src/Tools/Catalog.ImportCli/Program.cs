@@ -109,9 +109,30 @@ var wikidata = new Command("wikidata", "Run the jobs that add Wikidata's data to
     wikidataRun, wikidataStatus, researchUrlOption
 };
 
+// mix-eval: checks Blend and Mixtape against the fixed list of mixes, through the public endpoints (no sign-in).
+var catalogUrlOption = new Option<string>("--catalog-url")
+{
+    Description = "Catalog.API's address as clients reach it: the Mobile BFF's /catalog (or set TVTRACKER_CATALOG_URL)",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_CATALOG_URL") ?? "http://localhost:5110/catalog"
+};
+var casesOption = new Option<string>("--cases") { Description = "The mixes to check", DefaultValueFactory = _ => "docs/design/mix-pairs.json" };
+var outOption = new Option<string?>("--out") { Description = "Save this run's answers here, to compare a later run against" };
+var baselineOption = new Option<string?>("--baseline") { Description = "An earlier run's saved answers: says what changed since" };
+var tokenOption = new Option<string?>("--token")
+{
+    Description = "A member's access token, for Mixtape, which is a Pro insight (or set TVTRACKER_TOKEN); without one, mixtapes are skipped",
+    DefaultValueFactory = _ => Environment.GetEnvironmentVariable("TVTRACKER_TOKEN")
+};
+var mixEval = new Command("mix-eval", "Check Blend and Mixtape against a fixed list of mixes: what each must and must not return (exit code 1 when one fails)")
+{
+    catalogUrlOption, casesOption, outOption, baselineOption, tokenOption
+};
+mixEval.SetAction((parse, ct) => MixEval.RunAsync(parse.GetValue(catalogUrlOption)!, parse.GetValue(casesOption)!, parse.GetValue(outOption),
+    parse.GetValue(baselineOption), parse.GetValue(tokenOption), ct));
+
 var root = new RootCommand("Bulk import shows into the catalog from its provider (TVmaze, Wikidata or TheTVDB), through the sync worker")
 {
-    titles, ids, top, status, cancel, wikidata, urlOption, keycloakOption, secretOption, detachOption
+    titles, ids, top, status, cancel, wikidata, mixEval, urlOption, keycloakOption, secretOption, detachOption
 };
 
 try
