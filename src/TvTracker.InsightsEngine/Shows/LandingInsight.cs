@@ -60,7 +60,7 @@ public sealed class LandingInsight : IShowInsight
         // The seasons that count (3+ rated episodes; see SeasonSummary), specials left out. Every verdict says
         // something about the final season, so the final season must count: otherwise there's no verdict at all. With
         // only the final season counting, it's the whole show and can't be weak; it's ranked only among three or more.
-        var seasons = show.RatedSeasons.Where(s => s.Number > 0).ToList();
+        var seasons = show.RatedSeasons;
         var finalSeason = seasons.FirstOrDefault(s => s.Number == aired[^1].SeasonNumber);
         if (finalSeason == default)
         {

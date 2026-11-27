@@ -42,7 +42,9 @@ public sealed class CatalogReplayRequester(
                     : "Catalog replay started; shows and episodes arrive as catalog events");
                 return;
             }
-            catch (HttpRequestException ex)
+            // Anything but being stopped: the resilience handler's timeouts and open circuit, and a body that isn't
+            // what's expected, are no more reason to take the worker down than a refused connection is.
+            catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
             {
                 logger.LogDebug(ex, "Catalog sync worker not reachable yet (attempt {Attempt})", attempt);
                 await Task.Delay(RetryDelay, stoppingToken);

@@ -466,6 +466,11 @@ genres it takes from each. The address holds the blend, so it can be shared, and
   vectors, gathers the shows nearest the mix and nearest each of the two, keeps the same kinds of show, and ranks them
   by their distance to the farther of the two, so a show close to only one of them ranks low. Design:
   [docs/design/blend.md](docs/design/blend.md).
+- **Checking search by meaning:** `dotnet run --project src/Tools/Catalog.ImportCli -- search-eval` runs the
+  descriptions in `docs/design/search-queries.json` against the running app and reports where the show each
+  describes comes (first, top three, MRR) and whether unrelated searches find nothing. `--out` and `--baseline`
+  compare runs. It searches with `import=false`, so it adds nothing to the catalog. Write-up:
+  [docs/design/semantic-search.md](docs/design/semantic-search.md).
 - **Checking a change:** `dotnet run --project src/Tools/Catalog.ImportCli -- mix-eval` runs the fixed list of mixes in
   `docs/design/mix-pairs.json` against the running app (what each must and must not return); `--out` saves the
   answers and `--baseline` compares a later run with them. Mixtapes need `--token` of a member on Pro.

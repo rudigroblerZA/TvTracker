@@ -13,7 +13,7 @@ public sealed class SeasonsInsight : IShowInsight
 
     public ShowInsights Apply(ShowInsightContext show, ShowInsights insights)
     {
-        var (best, worst) = BestAndWorst(show.Seasons);
+        var (best, worst) = BestAndWorst(show);
         return insights with { Seasons = show.SeasonStats, BestSeason = best, WorstSeason = worst, Trend = Trend(show.SeasonSlope) };
     }
 
@@ -21,15 +21,12 @@ public sealed class SeasonsInsight : IShowInsight
     /// Best and worst season by the provider's ratings, or by ours when the provider has none.
     /// Needs two seasons with enough rated episodes; worst is omitted when it would equal best.
     /// </summary>
-    private static (SeasonHighlight? Best, SeasonHighlight? Worst) BestAndWorst(IReadOnlyList<SeasonSummary> seasons)
+    private static (SeasonHighlight? Best, SeasonHighlight? Worst) BestAndWorst(ShowInsightContext show)
     {
-        var byExternal = seasons
-            .Where(s => s.Stats.Rating.External is not null && s.RatingCounts)
-            .Select(s => (s.Stats.Number, Rating: s.Stats.Rating.External!.Value))
-            .ToList();
+        var byExternal = show.RatedSeasons.ToList();
         var (source, ranked) = byExternal.Count >= 2
             ? ("external", byExternal)
-            : ("ours", seasons.Where(s => s.Stats.Rating.Ours is not null).Select(s => (s.Stats.Number, Rating: s.Stats.Rating.Ours!.Value)).ToList());
+            : ("ours", show.Seasons.Where(s => s.Stats.Number > 0 && s.Stats.Rating.Ours is not null).Select(s => (s.Stats.Number, Rating: s.Stats.Rating.Ours!.Value)).ToList());
 
         if (ranked.Count < 2)
         {

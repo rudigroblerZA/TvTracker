@@ -11,7 +11,6 @@ namespace Analytics.API.Apis;
 /// </summary>
 public static class StreaksApi
 {
-    private const int MaxShows = 12;
 
     public static void MapStreaksApi(this RouteGroupBuilder api) =>
         api.MapGet("/me/streaks", GetAsync).RequireFeature(FeatureFlags.Streaks);
@@ -45,15 +44,10 @@ public static class StreaksApi
 
         // Titles and posters for the shows with a streak, not every show the caller ever watched.
         var shown = keptUp.Select(k => k.ShowId).Concat(due.Select(d => d.ShowId)).Concat(best is null ? [] : new[] { best.ShowId }).Distinct().ToList();
-        var shows = await db.Shows.AsNoTracking().Where(s => shown.Contains(s.ShowId))
-            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
-        KeptUpDto Name(KeptUpDto k) => k with { Title = shows[k.ShowId].Title, PosterUrl = shows[k.ShowId].PosterUrl };
+        var names = await db.Shows.AsNoTracking().Where(s => shown.Contains(s.ShowId))
+            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, s => (s.Title, s.PosterUrl), ct);
+        var (shownKeptUp, shownDue, shownBest) = Streaks.Shown(keptUp, due, best, names);
 
-        return TypedResults.Ok(new StreaksDto(Streaks.KeptUpDays, rows.Count - watches.Count, dayStreak, weekStreak,
-            keptUp.Where(k => shows.ContainsKey(k.ShowId)).Select(Name)
-                .OrderByDescending(k => k.Current).ThenBy(k => k.Title, StringComparer.Ordinal).Take(MaxShows).ToList(),
-            due.Where(d => shows.ContainsKey(d.ShowId)).Select(d => d with { Title = shows[d.ShowId].Title, PosterUrl = shows[d.ShowId].PosterUrl })
-                .OrderBy(d => d.WatchBy).ThenByDescending(d => d.Streak).ThenBy(d => d.Season).ThenBy(d => d.Episode).Take(MaxShows).ToList(),
-            best is not null && shows.ContainsKey(best.ShowId) ? Name(best) : null));
+        return TypedResults.Ok(new StreaksDto(Streaks.KeptUpDays, rows.Count - watches.Count, dayStreak, weekStreak, shownKeptUp, shownDue, shownBest));
     }
 }

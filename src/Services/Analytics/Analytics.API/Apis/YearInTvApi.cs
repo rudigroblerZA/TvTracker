@@ -56,9 +56,9 @@ public static class YearInTvApi
         var ids = inYear.Select(w => w.ShowId).Distinct().Where(shows.ContainsKey).ToList();
         var aired = (await db.Episodes.AsNoTracking().AiredRegular(now)
                 .Where(e => ids.Contains(e.ShowId))
-                .Select(e => new { e.ShowId, e.EpisodeId, e.AirsAtUtc })
+                .Select(e => new { e.ShowId, e.EpisodeId, e.AirsAtUtc, e.SeasonNumber, e.EpisodeNumber })
                 .ToListAsync(ct))
-            .ToLookup(e => e.ShowId, e => (e.EpisodeId, e.AirsAtUtc));
+            .ToLookup(e => e.ShowId, e => (e.EpisodeId, e.AirsAtUtc, e.SeasonNumber, e.EpisodeNumber));
         var progress = YearInTv.Progress(ids, aired, rows.Select(r => (r.ShowId, r.EpisodeId, r.WatchedAtUtc)), shows, inYear,
             YearInTv.AsOf(shown, today, now));
 

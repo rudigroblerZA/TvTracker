@@ -7,13 +7,11 @@ namespace Analytics.Worker;
 /// Scores "Call it" predictions (<see cref="SeasonCall"/>) once their season is over: the season's average provider
 /// rating over its aired regular episodes, as the season stats and verdict compute it. Over means the season verdict
 /// called it (see <c>SeasonVerdictInsight</c>), a later season has aired, or the show has ended. A season needs
-/// <see cref="MinRatedEpisodes"/> rated episodes to be scored; until then its calls wait. Run after each insights run,
+/// <see cref="SeasonSummary.MinRatedEpisodes"/> rated episodes to be scored; until then its calls wait. Run after each insights run,
 /// so the verdicts it reads are the latest.
 /// </summary>
 public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILogger<SeasonCallScorer> logger)
 {
-    private const int MinRatedEpisodes = 3;
-
     private sealed record VerdictRow(Guid ShowId, int? Season);
 
     public async Task ScoreAsync(CancellationToken ct)
@@ -50,7 +48,7 @@ public sealed class SeasonCallScorer(AnalyticsContext db, TimeProvider time, ILo
                 || ended.Contains(season.ShowId);
             var ratings = aired.Where(e => e.SeasonNumber == season.SeasonNumber && e.ExternalRating is not null)
                 .Select(e => e.ExternalRating!.Value).ToList();
-            if (!over || ratings.Count < MinRatedEpisodes)
+            if (!over || ratings.Count < SeasonSummary.MinRatedEpisodes)
             {
                 continue;
             }

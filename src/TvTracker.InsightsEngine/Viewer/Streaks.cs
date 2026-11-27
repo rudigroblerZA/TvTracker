@@ -131,8 +131,33 @@ public static class Streaks
     }
 
     /// <summary>
+    /// How many shows the kept-up list and the due list each show at most.
+    /// </summary>
+    public const int MaxShows = 12;
+
+    /// <summary>
+    /// What is shown of <see cref="AcrossShows"/>' answer, with the shows named: the kept-up shows longest current run
+    /// first (then by title), and what's due soonest first (then the longer run, then the earlier episode), each up to
+    /// <see cref="MaxShows"/>. A show that's gone from the catalog is left out.
+    /// </summary>
+    /// <param name="names">Title and poster of the shows with a streak.</param>
+    internal static (List<KeptUpDto> KeptUp, List<StreakDueDto> Due, KeptUpDto? Best) Shown(IEnumerable<KeptUpDto> keptUp, IEnumerable<StreakDueDto> due,
+        KeptUpDto? best, IReadOnlyDictionary<Guid, (string Title, string? PosterUrl)> names)
+    {
+        KeptUpDto Name(KeptUpDto k) => k with { Title = names[k.ShowId].Title, PosterUrl = names[k.ShowId].PosterUrl };
+        return (
+            keptUp.Where(k => names.ContainsKey(k.ShowId)).Select(Name)
+                .OrderByDescending(k => k.Current).ThenBy(k => k.Title, StringComparer.Ordinal).ThenBy(k => k.ShowId).Take(MaxShows).ToList(),
+            due.Where(d => names.ContainsKey(d.ShowId))
+                .Select(d => d with { Title = names[d.ShowId].Title, PosterUrl = names[d.ShowId].PosterUrl })
+                .OrderBy(d => d.WatchBy).ThenByDescending(d => d.Streak).ThenBy(d => d.Season).ThenBy(d => d.Episode).ThenBy(d => d.ShowId)
+                .Take(MaxShows).ToList(),
+            best is not null && names.ContainsKey(best.ShowId) ? Name(best) : null);
+    }
+
+    /// <summary>
     /// Every show's kept-up record (<see cref="KeptUp"/>): the runs of <see cref="MinKeptUp"/> or more still alive, what's
-    /// due to keep them, and the longest run ever. Titles and posters are left for the caller to fill in.
+    /// due to keep them, and the longest run ever. Unordered and unnamed: <see cref="Shown"/> does both.
     /// </summary>
     internal static (List<KeptUpDto> KeptUp, List<StreakDueDto> Due, KeptUpDto? Best) AcrossShows(IEnumerable<Aired> aired,
         IReadOnlyDictionary<Guid, DateTimeOffset> watchedAt, DateTimeOffset now, TimeZoneInfo zone)

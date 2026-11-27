@@ -203,6 +203,24 @@ Two comparisons are recorded, both by hand-written test searches with one expect
 So the default was chosen against nomic only, and the best in-process model was never compared with it on the same
 searches. The two sets are not comparable with each other: different searches, different catalogs.
 
+### 8.1 Measuring it now
+
+`docs/design/search-queries.json` holds 46 descriptions, each with the show it should find, and 8 searches about
+nothing a show is about ("best mortgage rates"). The first six are the ones the README names; the rest were written
+for this list.
+
+`tvtracker-import search-eval` runs them through the public search endpoint and reports, for each, where the expected
+show came in the results as a member sees them, then: how many came first, in the first three, and at all; the mean
+reciprocal rank; and how many unrelated searches found nothing by meaning.
+
+- `--out` saves a run; `--baseline` compares with a saved run and marks each search whose rank changed.
+- `--fail-under 0.7` exits 1 when the mean reciprocal rank is lower.
+- A search whose expected show isn't in the catalog is skipped and not counted.
+- It asks with `import=false`, a switch on the search endpoint that skips the import from the provider, so measuring
+  search doesn't add shows to the catalog.
+
+On the 297-show local catalog only 6 of the 46 shows are present, so its numbers there say nothing about the model.
+
 ## 9. Cost
 
 - A search costs one embedding (about 130 ms on a CPU with the default model) plus one vector query. Paging to page 2
@@ -238,9 +256,10 @@ the outage pause).
 
 ## 12. Gaps
 
-1. **The test searches are not in the repository.** The 41 and 42 searches and their expected shows exist only as
-   results quoted in the README. Nobody can re-run them, so a new model, a change to the embedded text or a new cutoff
-   can't be checked against the old numbers. Blend and Mixtape now have `mix-eval` and a list; search has neither.
+1. **The original test searches are lost.** The 41 and 42 searches behind section 8 exist only as results quoted in
+   the README. A new list is now in the repository (`docs/design/search-queries.json`, section 8.1), but it is not
+   those searches, so its numbers can't be compared with the old ones, and it has not yet been run on a catalog that
+   has its shows.
 2. **The indexer and the generators are untested** (section 10). The in-process path was broken at start-up without
    anyone noticing until it was needed.
 3. **Whether the vector index is used by search is not verified.** The search query joins a filtered set of shows to
@@ -260,8 +279,8 @@ the outage pause).
 
 ## 13. What I would do next, in order
 
-1. Put the test searches in the repository with a command that runs them (recall at 1 and 3, MRR, and how many
-   unrelated searches return nothing), as `mix-eval` does for mixes. Everything else on this list needs it.
+1. Run `search-eval` on the production catalog and save the answers as the baseline. (The list and the command
+   exist; section 8.1.)
 2. Run all four models on that one set, so the default is chosen against the in-process models too.
 3. Test the indexer against a real database, and the generators. (Search itself is covered since it moved into
    `Catalog.Search`.)
@@ -283,6 +302,7 @@ the outage pause).
 | Title matching | `Catalog.Search/TitleSearch.cs` |
 | The search endpoint | `SearchShowsAsync` and `QueryShowsAsync` in `Catalog.API/Apis/CatalogApi.cs` |
 | Rate limit | `Catalog.API/Services/SearchRateLimiting.cs` |
+| The list of searches, and the command that runs it | `docs/design/search-queries.json`; `search-eval` in `src/Tools/Catalog.ImportCli` |
 | The model server container | `src/TvTracker.AppHost/AppHost.cs` (the `model-runner` resource) |
 | Search page | `src/Clients/TvTracker.UI/Pages/Search.razor` |
 | Other users of the vectors | `src/Services/Catalog/Catalog.Mixes`; `Catalog.SyncWorker/Nanogenres`; `Catalog.API/Apis/MoodApi.cs` |

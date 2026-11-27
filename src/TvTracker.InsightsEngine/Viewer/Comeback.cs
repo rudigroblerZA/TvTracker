@@ -60,11 +60,6 @@ public static class Comeback
     private const double Margin = 0.3;
 
     /// <summary>
-    /// A difference of at least <see cref="Margin"/>, allowing for floating point (8.1 − 7.8 is 0.2999…).
-    /// </summary>
-    private static bool Reaches(double difference) => difference >= Margin - 1e-9;
-
-    /// <summary>
     /// Whether the show is worth going back to, for a viewer who dropped it; null when they didn't (nothing left, or
     /// watched within <see cref="InsightRules.StoppedAfterDays"/> days).
     /// </summary>
@@ -107,7 +102,7 @@ public static class Comeback
             foreach (var season in ahead.GroupBy(e => e.SeasonNumber))
             {
                 var ratings = season.Select(rating).OfType<double>().ToList();
-                if (ratings.Count >= MinRated && Reaches(ratings.Average() - bar))
+                if (ratings.Count >= MinRated && InsightMath.Reaches(ratings.Average() - bar, Margin))
                 {
                     betterFrom = new ComebackFromDto(season.Key, season.Key == stoppedAt.SeasonNumber, Math.Round(ratings.Average(), 1));
                     break;
@@ -118,7 +113,7 @@ public static class Comeback
         var verdict = turnAhead is not null ? "gets-good"
             : baseline is null || aheadAverage is null ? "unknown"
             : betterFrom is not null ? "better"
-            : Reaches(baseline.Value - aheadAverage.Value) ? "worse"
+            : InsightMath.Reaches(baseline.Value - aheadAverage.Value, Margin) ? "worse"
             : "same";
 
         return new ComebackDto(

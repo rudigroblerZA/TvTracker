@@ -73,7 +73,9 @@ public static class FinishOutlook
                 var left = ordered.Where(e => !watched.Contains(e.EpisodeId)).ToList();
                 var last = watches[p.ShowId].Max(w => w.WatchedAtUtc);
                 var days = (now.UtcDateTime - last).TotalDays;
-                var perWeek = Math.Round(watches[p.ShowId].Count(w => w.WatchedAtUtc >= since) / (PaceDays / 7.0), 1);
+                // Rounded for showing only: the finish date is worked out from the pace itself.
+                var pace = watches[p.ShowId].Count(w => w.WatchedAtUtc >= since) / (PaceDays / 7.0);
+                var perWeek = Math.Round(pace, 1);
                 var share = (double)p.Watched / p.Aired;
 
                 var comparable = started.Where(o => o.ShowId != p.ShowId && (double)o.Watched / o.Aired >= share).ToList();
@@ -99,7 +101,7 @@ public static class FinishOutlook
                     days <= OnTrackDays ? "on-track" : days <= InsightRules.StoppedAfterDays ? "slowing" : "stalled",
                     last,
                     perWeek,
-                    perWeek > 0 ? DateOnly.FromDateTime(now.UtcDateTime.AddDays(Math.Ceiling(left.Count / perWeek * 7))) : null,
+                    pace > 0 ? DateOnly.FromDateTime(now.UtcDateTime.AddDays(Math.Ceiling(left.Count / pace * 7))) : null,
                     record,
                     ahead,
                     getsGood);

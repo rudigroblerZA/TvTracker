@@ -82,8 +82,17 @@ public static class TasteTwins
         .Select(c => new Twin(c.UserId, c.Shared, 1 - c.Difference / 4.0))
         .Where(t => t.Agreement >= MinAgreement)
         .OrderByDescending(t => t.Agreement * t.Shared / (t.Shared + 3.0))
+        // People who agree equally are common, and they come from the database in no order: without this, which 25
+        // are the twins (and so the picks) could change between two requests.
+        .ThenBy(t => t.UserId, StringComparer.Ordinal)
         .Take(MaxTwins)
         .ToList();
+
+    /// <summary>
+    /// Whether there are enough twins to say anything: under <see cref="InsightRules.MinUsersToShow"/>, nothing is
+    /// shown, not even how many.
+    /// </summary>
+    internal static bool Enough(IReadOnlyCollection<Twin> twins) => twins.Count >= InsightRules.MinUsersToShow;
 
     /// <summary>
     /// What the twins loved that the viewer doesn't know (the picks, best first) and what they and the viewer both
@@ -115,10 +124,11 @@ public static class TasteTwins
     }
 
     /// <summary>
-    /// The answer, with the chosen shows named; one that's gone from the catalog is left out.
+    /// The answer, with the chosen shows named; one that's gone from the catalog is left out. With too few twins
+    /// (<see cref="Enough"/>) it is <see cref="TooFewTwins"/>, whatever was chosen.
     /// </summary>
     internal static TasteTwinsDto Of(int rated, IReadOnlyCollection<Twin> twins, IReadOnlyCollection<Pick> picks, IEnumerable<Guid> agreeOn,
-        IReadOnlyDictionary<Guid, ShowCopy> shows) => new(
+        IReadOnlyDictionary<Guid, ShowCopy> shows) => !Enough(twins) ? TooFewTwins(rated) : new(
         rated,
         twins.Count,
         Math.Round(twins.Average(t => t.Agreement), 2),

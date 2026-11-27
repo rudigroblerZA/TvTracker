@@ -33,6 +33,9 @@ public static class InsightSourcesLoader
                 .ToDictionary(g => g.Key, g => g
                     .Select(c => (Creative: c, Career: careers[c.PersonId]))
                     .OrderByDescending(x => x.Career.Shows)
+                    // Makers with as many shows are common, and the rows come in no order: the tag names the maker, so
+                    // without this it could name a different one from run to run.
+                    .ThenBy(x => x.Creative.PersonId)
                     .First()),
             EpisodeRatings = await db.EpisodeRatings.AsNoTracking()
                 .GroupBy(r => r.EpisodeId)

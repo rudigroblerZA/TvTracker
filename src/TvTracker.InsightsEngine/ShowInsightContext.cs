@@ -101,13 +101,21 @@ public sealed class ShowInsightContext(InsightSources sources, ShowCopy show, Li
     public IReadOnlyList<SeasonStats> RegularSeasonStats => field ??= SeasonStats.Where(s => s.Number > 0).ToList();
 
     /// <summary>
-    /// The provider's ratings of the seasons that count (<see cref="SeasonSummary.RatingCounts"/>), in season order:
-    /// the points behind the trend, the arc and the DNA's trajectory and peak.
+    /// The provider's ratings of the regular seasons that count (<see cref="SeasonSummary.RatingCounts"/>), in season
+    /// order: the points behind the trend, the arc, the best and worst season, the verdicts and the DNA's trajectory
+    /// and peak. Specials (season 0) are never among them, however many are rated: they aren't a season of the show.
     /// </summary>
     public IReadOnlyList<(int Number, double Rating)> RatedSeasons => field ??= Seasons
-        .Where(s => s.Stats.Rating.External is not null && s.RatingCounts)
+        .Where(s => s.Stats.Number > 0 && s.Stats.Rating.External is not null && s.RatingCounts)
         .Select(s => (s.Stats.Number, s.Stats.Rating.External!.Value))
         .ToList();
+
+    /// <summary>
+    /// A season's finale: its last episode to air, even if one was held back or numbered out of order; episodes that
+    /// aired together (a streaming drop) go by number. Null for a season with nothing aired.
+    /// </summary>
+    public EpisodeCopy? FinaleOf(int season) =>
+        Aired.Where(e => e.SeasonNumber == season).OrderBy(e => e.AirsAtUtc).ThenBy(e => e.EpisodeNumber).LastOrDefault();
 
     /// <summary>
     /// The distinct UTC dates a season's aired episodes came out on, in order: one date means the whole season dropped at

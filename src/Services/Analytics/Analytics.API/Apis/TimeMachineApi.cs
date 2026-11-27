@@ -40,9 +40,8 @@ public static class TimeMachineApi
             CacheFor, cancellationToken: ct);
 
         var ids = machine.Premieres.Concat(machine.Finales).Concat(machine.BestEpisodes).Select(e => e.EpisodeId).Distinct().ToList();
-        var watched = user.FindFirst("sub")?.Value is { } userId
-            ? (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet()
-            : [];
+        var userId = user.GetUserId();
+        var watched = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && ids.Contains(w.EpisodeId)).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
         List<TimeMachineEpisodeDto> Mark(IEnumerable<TimeMachineEpisodeDto> list) => list.Select(e => e with { Watched = watched.Contains(e.EpisodeId) }).ToList();
 
         return TypedResults.Ok(machine with { Premieres = Mark(machine.Premieres), Finales = Mark(machine.Finales), BestEpisodes = Mark(machine.BestEpisodes) });

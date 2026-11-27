@@ -38,10 +38,8 @@ public static class EssentialCutApi
         var rating = await RatingsAsync(db, showId, ct);
         var notes = await NotesAsync(db, showId, ct);
 
-        var userId = user.FindFirst("sub")?.Value;
-        var watched = userId is null
-            ? []
-            : (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
+        var userId = user.GetUserId();
+        var watched = (await db.Watches.AsNoTracking().Where(w => w.UserId == userId && w.ShowId == showId).Select(w => w.EpisodeId).ToListAsync(ct)).ToHashSet();
 
         return TypedResults.Ok(EssentialCut.Of(show, level, episodes, rating, notes, watched, now));
     }
