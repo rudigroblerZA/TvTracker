@@ -121,7 +121,7 @@
     "backlog-triage": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
+      "defaultVariant": "on",
       "metadata": { "description": "Backlog triage: /backlog ranks followed shows not started by how much they're worth your time, with verdicts." }
     },
     "time-off": {
