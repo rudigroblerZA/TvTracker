@@ -655,6 +655,34 @@ public sealed class RecommendationsClient(IHttpClientFactory f, IAccessTokenProv
 /// </summary>
 public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t, IOfflineStore o, ConnectionState c, ClientInfo i) : ApiClientBase(f, t, o, c, i)
 {
+    // ---- Taste Match. Opening a match and answering it as a guest need no sign-in: the link is the key.
+
+    public Task<MatchStarted?> StartMatchAsync(CancellationToken ct = default) =>
+        SendAsync<MatchStarted>(ApiClients.Analytics, HttpMethod.Post, "api/v1/me/matches", null, ct);
+
+    public Task<List<MyMatch>?> GetMyMatchesAsync(CancellationToken ct = default) =>
+        GetAsync<List<MyMatch>>(ApiClients.Analytics, "api/v1/me/matches", ct);
+
+    public Task SetMatchUnnamedAsync(string token, IReadOnlyCollection<Guid> unnamed, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Analytics, HttpMethod.Put, $"api/v1/me/matches/{Uri.EscapeDataString(token)}/unnamed", new { unnamed }, ct);
+
+    /// <summary>
+    /// Null when the link is unknown, expired or deleted.
+    /// </summary>
+    public Task<MatchView?> GetMatchAsync(string token, CancellationToken ct = default) =>
+        GetAsync<MatchView>(ApiClients.Analytics, $"api/v1/matches/{Uri.EscapeDataString(token)}", ct);
+
+    public Task<MatchView?> AnswerMatchAsGuestAsync(string token, IReadOnlyCollection<Guid> showIds, string? name, CancellationToken ct = default) =>
+        SendAsync<MatchView>(ApiClients.Analytics, HttpMethod.Post, $"api/v1/matches/{Uri.EscapeDataString(token)}/picks", new { showIds, name }, ct);
+
+    public Task<MatchView?> AcceptMatchAsync(string token, IReadOnlyCollection<Guid> unnamed, CancellationToken ct = default) =>
+        SendAsync<MatchView>(ApiClients.Analytics, HttpMethod.Post, $"api/v1/matches/{Uri.EscapeDataString(token)}/accept", new { unnamed }, ct);
+
+    /// <param name="guestKey">What a guest was given when they answered; a member needs none.</param>
+    public Task DeleteMatchAsync(string token, string? guestKey = null, CancellationToken ct = default) =>
+        SendAsync(ApiClients.Analytics, HttpMethod.Delete,
+            $"api/v1/matches/{Uri.EscapeDataString(token)}{(guestKey is null ? "" : $"?key={Uri.EscapeDataString(guestKey)}")}", null, ct);
+
     public Task<ShowInsights?> GetShowInsightsAsync(Guid showId, CancellationToken ct = default) =>
         GetAsync<ShowInsights>(ApiClients.Analytics, $"api/v1/shows/{showId}/insights", ct, cacheForOffline: true);
 

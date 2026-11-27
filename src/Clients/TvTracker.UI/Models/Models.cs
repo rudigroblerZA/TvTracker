@@ -129,6 +129,29 @@ public record WatchOrderEpisode(Guid Id, Guid ShowId, int SeasonNumber, int Epis
     int? RuntimeMinutes, string? Crossover);
 
 /// <summary>
+/// A Taste Match's result (see the engine's TasteMatch): how well two people's TV tastes match and what may be said of it.
+/// </summary>
+public record TasteMatchResult(int Score, string Line, IReadOnlyList<MatchShow> BothLove, IReadOnlyList<string> BothInto, MatchDifference? Differ,
+    IReadOnlyList<MatchPick> WatchTogether, bool Loose);
+
+public record MatchShow(Guid ShowId, string Title, string? PosterUrl);
+
+public record MatchDifference(string Inviter, string Friend);
+
+public record MatchPick(Guid ShowId, string Title, string? PosterUrl, IReadOnlyList<string> FromInviter, IReadOnlyList<string> FromFriend,
+    IReadOnlyList<string> FromBoth);
+
+/// <param name="Nameable">The caller's shows a result could name: what they may take out before their side is used.</param>
+public record MatchStarted(string Token, IReadOnlyList<MatchShow> Nameable);
+
+/// <param name="State">"open" or "done".</param>
+/// <param name="You">"inviter" or "friend" when signed in as one of the two.</param>
+public record MatchView(string Token, string State, string? InviterName, string? FriendName, string? You, TasteMatchResult? Result,
+    IReadOnlyList<MatchShow>? Nameable, string? GuestKey);
+
+public record MyMatch(string Token, string State, string Role, string? OtherName, int? Score, DateTime CreatedAtUtc, DateTime? DoneAtUtc);
+
+/// <summary>
 /// Shows between two others (see Catalog.API's BlendApi).
 /// </summary>
 public record Blend(ShowSummary A, ShowSummary B, int Lean, bool Indexed, IReadOnlyList<BlendMatch> Matches, bool Loose);

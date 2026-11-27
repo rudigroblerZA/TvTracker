@@ -20,6 +20,11 @@
                 <FeatureCard Href="taste-twins" Title="Taste twins" Tone="mix-2">What people who rate like you loved, that you haven't seen.</FeatureCard>
             </Feature>
         </div>
+        <Feature Flag="@FeatureFlags.TasteMatch">
+            <div class="tool-links">
+                <ToolLink Href="match" Title="Taste Match">Send a friend a link and see how well your TV tastes match.</ToolLink>
+            </div>
+        </Feature>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
 
         @if (picks is null)

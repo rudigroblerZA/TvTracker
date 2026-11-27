@@ -1,0 +1,131 @@
+@page "/match"
+@attribute [RequiresFeature(FeatureFlags.TasteMatch)]
+@inject AnalyticsClient Analytics
+@inject IPlatformServices Platform
+
+<PageTitle>Taste Match · @Brand.AppName</PageTitle>
+
+<h1>Taste Match</h1>
+<p class="muted">Send a friend a link. They pick a few shows they love, no account needed, and you both see how well your TV tastes match and what to watch together.</p>
+
+<AuthorizeView>
+    <Authorized>
+        <ErrorNotice Message="@error" />
+
+        @if (started is null)
+        {
+            <div class="actions">
+                <button class="btn" type="button" @onclick="StartAsync" disabled="@busy">Start a match</button>
+                <span class="muted small">Uses the shows you rate highly, follow and watch.</span>
+            </div>
+        }
+        else
+        {
+            <div class="panel">
+                <p><strong>Send this link to one friend.</strong> It works for 30 days.</p>
+                <div class="actions">
+                    <input class="list-link-url" readonly value="@LinkFor(started.Token)" aria-label="Your match link" />
+                    <button class="btn" type="button" @onclick="() => ShareAsync(started.Token)">@(copied ? "Copied" : "Share link")</button>
+                </div>
+                @if (started.Nameable.Count > 0)
+                {
+                    <p class="small">The result only names shows you both love. These are yours that it could name; untick any you'd rather it didn't. They still count towards the score.</p>
+                    <ul class="match-nameable">
+                        @foreach (var show in started.Nameable)
+                        {
+                            <li @key="show.ShowId">
+                                <label>
+                                    <input type="checkbox" checked="@(!unnamed.Contains(show.ShowId))" @onchange="e => ToggleAsync(show.ShowId, e.Value is true)" />
+                                    @show.Title
+                                </label>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        @if (matches is { Count: > 0 })
+        {
+            <h2>Your matches</h2>
+            <ul class="match-list">
+                @foreach (var match in matches)
+                {
+                    <li @key="match.Token">
+                        <a class="panel" href="match/@match.Token">
+                            <span class="strong">@(match.OtherName ?? (match.State == "done" ? "A friend" : "Waiting for a friend"))</span>
+                            <span class="muted small">
+                                @(match.State == "done" ? $"{match.Score}% match · {Format.Relative(match.DoneAtUtc ?? match.CreatedAtUtc)}" : $"sent {Format.Relative(match.CreatedAtUtc)}")
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <SignInPrompt Message="Sign in to start a match. Opening a friend's link needs no account." />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private MatchStarted? started;
+    private List<MyMatch>? matches;
+    private readonly HashSet<Guid> unnamed = [];
+    private bool busy;
+    private bool copied;
+    private string? error;
+
+    [CascadingParameter] private Task<AuthenticationState>? Authentication { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Authentication is null || (await Authentication).User.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+        await RunAsync(async () => matches = await Analytics.GetMyMatchesAsync() ?? []);
+    }
+
+    private Task StartAsync() => RunAsync(async () =>
+    {
+        started = await Analytics.StartMatchAsync();
+        matches = await Analytics.GetMyMatchesAsync() ?? [];
+    });
+
+    private Task ToggleAsync(Guid showId, bool named) => RunAsync(async () =>
+    {
+        if (named)
+        {
+            unnamed.Remove(showId);
+        }
+        else
+        {
+            unnamed.Add(showId);
+        }
+        await Analytics.SetMatchUnnamedAsync(started!.Token, unnamed);
+    });
+
+    private string LinkFor(string token) => $"{Platform.PublicWebAddress}match/{token}";
+
+    private async Task ShareAsync(string token) =>
+        copied = await Platform.ShareLinkAsync($"Match your TV taste with mine on {Brand.AppName}", LinkFor(token));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        busy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

@@ -334,5 +334,5 @@ public static class TasteMatchApi
     private static string NewToken() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
 
     private static ProblemHttpResult Problem(string code, string detail) =>
-        TypedResults.Problem(detail, statusCode: StatusCodes.Status422UnprocessableEntity, title: "Not yet", extensions: new Dictionary<string, object?> { ["code"] = code });
+        TypedResults.Problem(detail, statusCode: StatusCodes.Status409Conflict, title: "Not yet", extensions: new Dictionary<string, object?> { ["code"] = code });
 }

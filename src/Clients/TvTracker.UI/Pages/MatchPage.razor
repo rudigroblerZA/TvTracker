@@ -1,0 +1,214 @@
+@page "/match/{Token}"
+@attribute [RequiresFeature(FeatureFlags.TasteMatch)]
+@inject AnalyticsClient Analytics
+@inject CatalogClient Catalog
+@inject IPlatformServices Platform
+@inject NavigationManager Navigation
+@inject UserSession Session
+
+<PageTitle>@(match?.Result is { } r ? $"{r.Score}% match" : "Taste Match") · @Brand.AppName</PageTitle>
+
+<ErrorNotice Message="@error" />
+
+@if (!loaded)
+{
+    <p class="muted">Loading…</p>
+}
+else if (match is null)
+{
+    <h1>Taste Match</h1>
+    <p>This match is no longer open: the link has expired or the match was deleted.</p>
+    <p><a class="btn" href="match">Start one of your own</a></p>
+}
+else if (match.Result is { } result)
+{
+    <MatchResult Result="result" Inviter="@InviterName" Friend="@FriendName" />
+
+    <div class="actions">
+        <button class="btn" type="button" @onclick="ShareAsync">@(copied ? "Copied" : "Share this match")</button>
+        <a class="btn btn-quiet" href="match">Match with someone else</a>
+        @if (match.You is not null || guestKey is not null)
+        {
+            <button class="link small" type="button" @onclick="DeleteAsync">Delete this match</button>
+        }
+    </div>
+    @if (!Session.IsSignedIn)
+    {
+        <p class="panel">
+            <strong>Keep track of what you watch.</strong> @Brand.AppName remembers where you are in every show and tells you when they're back.
+            <a href="account/login?returnUrl=@Uri.EscapeDataString("/match")">Make an account</a>
+        </p>
+    }
+}
+else if (match.You == "inviter")
+{
+    <h1>Waiting for your friend</h1>
+    <p class="muted">The result appears here as soon as they've answered.</p>
+    <div class="actions">
+        <input class="list-link-url" readonly value="@Link" aria-label="Your match link" />
+        <button class="btn" type="button" @onclick="ShareAsync">@(copied ? "Copied" : "Share link")</button>
+        <button class="link small" type="button" @onclick="DeleteAsync">Cancel this match</button>
+    </div>
+}
+else if (Session.IsSignedIn)
+{
+    <h1>@InviterName wants to match TV taste with you</h1>
+    <p>Use the shows you rate highly, follow and watch? You both get a score, what you have in common, and shows to watch together.</p>
+    @if (match.Nameable is { Count: > 0 } nameable)
+    {
+        <p class="small">The result only names shows you both love. These are yours that it could name; untick any you'd rather it didn't.</p>
+        <ul class="match-nameable">
+            @foreach (var show in nameable)
+            {
+                <li @key="show.ShowId">
+                    <label>
+                        <input type="checkbox" checked="@(!unnamed.Contains(show.ShowId))" @onchange="e => Toggle(unnamed, show.ShowId, e.Value is not true)" />
+                        @show.Title
+                    </label>
+                </li>
+            }
+        </ul>
+    }
+    <div class="actions">
+        <button class="btn" type="button" @onclick="AcceptAsync" disabled="@busy">See your match</button>
+    </div>
+}
+else
+{
+    <h1>@InviterName wants to match TV taste with you</h1>
+    <p>Pick @(MinPicks) or more shows you love. No account needed.</p>
+
+    <ShowPicker Label="Search for a show" Selected="null" SelectedChanged="Add" ExcludeAll="picks.Select(p => p.Id).ToList()" />
+
+    @if (picks.Count > 0)
+    {
+        <div class="tags match-picks" aria-label="Your picks">
+            @foreach (var pick in picks)
+            {
+                <button class="tag" type="button" @key="pick.Id" @onclick="() => Remove(pick)" title="Remove">@pick.Title ✕</button>
+            }
+        </div>
+    }
+
+    <div class="actions">
+        <input type="text" maxlength="30" placeholder="Your first name (optional)" aria-label="Your first name" @bind="name" />
+        <button class="btn" type="button" @onclick="AnswerAsync" disabled="@(busy || picks.Count < MinPicks)">
+            @(picks.Count < MinPicks ? $"Pick {MinPicks - picks.Count} more" : "See your match")
+        </button>
+        <a class="small" href="account/login?returnUrl=@Uri.EscapeDataString($"/match/{Token}")">Already a member? Sign in</a>
+    </div>
+
+    @if (popular is { Count: > 0 })
+    {
+        <h2>Or tap the ones you love</h2>
+        <div class="card-grid match-popular">
+            @foreach (var show in popular)
+            {
+                var picked = picks.Any(p => p.Id == show.Id);
+                <button class="show-card match-tap @(picked ? "picked" : "")" type="button" @key="show.Id" aria-pressed="@picked"
+                        @onclick="() => { if (picked) { Remove(show); } else { Add(show); } }">
+                    <Poster Title="@show.Title" Url="@show.PosterUrl" />
+                    <span class="show-card-title">@(picked ? "✓ " : "")@show.Title</span>
+                </button>
+            }
+        </div>
+    }
+}
+
+@code {
+    private const int MinPicks = 3;
+    private const int MaxPicks = 8;
+
+    [Parameter] public string Token { get; set; } = "";
+
+    private MatchView? match;
+    private bool loaded;
+    private bool busy;
+    private bool copied;
+    private string? error;
+    private string? name;
+    private string? guestKey;
+    private List<ShowSummary>? popular;
+    private readonly List<ShowSummary> picks = [];
+    private readonly HashSet<Guid> unnamed = [];
+
+    private string Link => $"{Platform.PublicWebAddress}match/{Token}";
+
+    // "You" for whoever is looking, when the match knows which of the two they are.
+    private string InviterName => match?.You == "inviter" ? "You" : match?.InviterName ?? "Your friend";
+    private string FriendName => match?.You == "friend" || guestKey is not null ? "You" : match?.FriendName ?? "A friend";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await RunAsync(async () =>
+        {
+            match = await Analytics.GetMatchAsync(Token);
+            if (match is { Result: null } && !Session.IsSignedIn)
+            {
+                popular = await Catalog.GetTrendingAsync() ?? [];
+            }
+        });
+        loaded = true;
+    }
+
+    private void Add(ShowSummary? show)
+    {
+        if (show is not null && picks.Count < MaxPicks && picks.All(p => p.Id != show.Id))
+        {
+            picks.Add(show);
+        }
+    }
+
+    private void Remove(ShowSummary show) => picks.RemoveAll(p => p.Id == show.Id);
+
+    private static void Toggle(HashSet<Guid> set, Guid id, bool add)
+    {
+        if (add)
+        {
+            set.Add(id);
+        }
+        else
+        {
+            set.Remove(id);
+        }
+    }
+
+    private Task AnswerAsync() => RunAsync(async () =>
+    {
+        var answered = await Analytics.AnswerMatchAsGuestAsync(Token, picks.Select(p => p.Id).ToList(), name);
+        guestKey = answered?.GuestKey;
+        // Someone else answered first, or the link has gone: show what's there now.
+        match = answered ?? await Analytics.GetMatchAsync(Token);
+    });
+
+    private Task AcceptAsync() => RunAsync(async () => match = await Analytics.AcceptMatchAsync(Token, unnamed) ?? await Analytics.GetMatchAsync(Token));
+
+    private Task DeleteAsync() => RunAsync(async () =>
+    {
+        await Analytics.DeleteMatchAsync(Token, guestKey);
+        Navigation.NavigateTo(Session.IsSignedIn ? "match" : "");
+    });
+
+    private async Task ShareAsync() =>
+        copied = await Platform.ShareLinkAsync(
+            match?.Result is { } result ? $"{result.Score}% TV taste match on {Brand.AppName}" : $"Match your TV taste with mine on {Brand.AppName}", Link);
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        error = null;
+        busy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SignInRequiredException)
+        {
+            error = ErrorNotice.Describe(ex);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

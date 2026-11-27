@@ -1461,3 +1461,17 @@ h1:focus, h2:focus { outline: none; }
     .settings-page .table-scroll th:first-child, .settings-page .table-scroll td:first-child { position: sticky; left: 0; z-index: 1; max-width: 9.5rem; white-space: normal; overflow-wrap: anywhere; background: var(--bg); box-shadow: 6px 0 8px -6px rgb(0 0 0 / 0.35); }
     .settings-page .panel .table-scroll th:first-child, .settings-page .panel .table-scroll td:first-child { background: var(--surface); }
 }
+
+/* Taste Match */
+.match-result { text-align: center; padding: 28px 16px 20px; margin: 8px 0 20px; border-radius: var(--radius); background: var(--accent-soft); }
+.match-names { margin: 0; font-weight: 600; color: var(--muted); }
+.match-score { margin: 6px 0 4px; font-size: 1.1rem; font-weight: 600; }
+.match-score span { display: block; font-size: clamp(3rem, 14vw, 5.5rem); line-height: 1; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.match-line { margin: 8px auto 0; max-width: 32ch; font-size: 1.15rem; }
+.match-nameable { list-style: none; padding: 0; margin: 8px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; }
+.match-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.match-list a { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin: 0; text-decoration: none; color: inherit; }
+.match-picks .tag { cursor: pointer; font: inherit; font-size: 0.85rem; color: var(--text); }
+.match-tap { border: 0; padding: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.match-tap.picked .poster { outline: 3px solid var(--accent); outline-offset: 2px; }
+.match-tap.picked .show-card-title { color: var(--accent); }
