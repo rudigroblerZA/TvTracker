@@ -72,6 +72,13 @@
     }
 }
 
+@if (blend is { Indexed: true })
+{
+    <Feature Flag="@FeatureFlags.TasteMatch">
+        <p class="small">Blending shows is one thing. <a href="match">Match your whole taste with a friend's</a>.</p>
+    </Feature>
+}
+
 @code {
     [SupplyParameterFromQuery(Name = "a")] public Guid? A { get; set; }
     [SupplyParameterFromQuery(Name = "b")] public Guid? B { get; set; }

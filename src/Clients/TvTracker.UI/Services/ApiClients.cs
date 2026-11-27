@@ -678,6 +678,14 @@ public sealed class AnalyticsClient(IHttpClientFactory f, IAccessTokenProvider t
     public Task<MatchView?> AcceptMatchAsync(string token, IReadOnlyCollection<Guid> unnamed, CancellationToken ct = default) =>
         SendAsync<MatchView>(ApiClients.Analytics, HttpMethod.Post, $"api/v1/matches/{Uri.EscapeDataString(token)}/accept", new { unnamed }, ct);
 
+    /// <summary>
+    /// A guest who answered and has since signed in attaches the match to their account. Null when it can't be (already
+    /// attached, the wrong key, their own match).
+    /// </summary>
+    public Task<MatchClaimed?> ClaimMatchAsync(string token, string guestKey, CancellationToken ct = default) =>
+        SendAsync<MatchClaimed>(ApiClients.Analytics, HttpMethod.Post,
+            $"api/v1/matches/{Uri.EscapeDataString(token)}/claim?key={Uri.EscapeDataString(guestKey)}", null, ct);
+
     /// <param name="guestKey">What a guest was given when they answered; a member needs none.</param>
     public Task DeleteMatchAsync(string token, string? guestKey = null, CancellationToken ct = default) =>
         SendAsync(ApiClients.Analytics, HttpMethod.Delete,

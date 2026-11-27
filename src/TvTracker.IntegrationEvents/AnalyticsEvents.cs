@@ -58,3 +58,12 @@ public record SeasonVerdictIntegrationEvent(
     int? Started,
     int? Finished,
     Guid VerdictId = default) : IntegrationEvent;
+
+// Published by Analytics.API (stored with the match; Analytics.Worker's outbox publisher sends it)
+
+/// <summary>
+/// A friend answered a Taste Match, so its result is ready: the inviter is told. Carries only what the notice says.
+/// </summary>
+/// <param name="Token">The match's link.</param>
+/// <param name="FriendName">The friend's first name, when they gave one.</param>
+public record TasteMatchAnsweredIntegrationEvent(string InviterUserId, string Token, string? FriendName, int Score) : IntegrationEvent;
