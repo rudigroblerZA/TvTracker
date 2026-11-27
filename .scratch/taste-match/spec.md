@@ -282,9 +282,12 @@ Everything below was tried in the running app with the flag on.
   save. Analytics.API has no event bus, so the worker's outbox publisher sends it, within a minute; Notifications
   turns it into an inbox item linking to the match. Inbox only: no push or email.
 - **Blocks** (R-P8): before a signed-in member opens, answers or claims a match, Analytics asks Social (services-only
-  `internal/blocks/between`) whether there is a block between them and the inviter; if so the match reads as gone.
-- **A guest who signs up** (4.2, R-P5): the sign-up link carries their key back to the match; signed in, they attach
-  the match to their account (it then shows in their matches, and they can delete it), and are offered their picks as
+  `internal/blocks/between`) whether there is a block between them and either of the match's two people; if so the
+  match reads as gone, to the inviter too once a member friend has blocked them. A signed-in member can't get round
+  it by picking shows as a guest would.
+- **A guest who signs up** (4.2, R-P5): the sign-up link carries their key back to the match; signed in, they are asked
+  whether to keep it (a link with a key in it never puts a match on the account of whoever opens it), and on saying
+  yes attach the match to their account (it then shows in their matches, and they can delete it), and are offered their picks as
   follows. Nothing is followed unless they press the button.
 - **Tonight for two** (5): each of two members is told the other's id (nobody else is), and the result links to
   planning an evening together when that feature is on. The page it opens applies its own visibility rule.
@@ -306,11 +309,15 @@ Where the code differs from the spec above:
 - **A guest's key** lives in the page's memory and in the sign-up link: closing the tab without signing up loses the
   ability to delete or claim the match.
 - **The card's names** are the stored first names ("A friend" when none was given), never "You": the picture is the
-  same for everyone. A name in a script the embedded typeface lacks is drawn as boxes.
+  same for everyone.
 - **The link preview's title and description are generic**: the page is drawn after the browser connects, so only the
   picture is specific to the match.
-- **Blocks need Social to answer.** If it can't be reached, a signed-in member's open or answer fails rather than
-  going ahead unchecked; guests are unaffected.
+- **When Social can't be asked about blocks**, a signed-in member can still read a match, but neither of the two is
+  told who the other is, and answering or claiming is refused with "try again". Guests are unaffected.
+- **Two answers at once:** the row carries a version (Postgres's xmin), so only the first to save wins; the other
+  finds the link gone and the inviter is told once.
+- **A name the card's typeface can't draw** (another script, an emoji) is replaced by "A friend" on the card; the
+  page still shows it.
 
 Left out on purpose:
 
