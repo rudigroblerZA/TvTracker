@@ -36,9 +36,7 @@ public static class WhileYouWaitApi
         }
 
         var (pace, assumedBecause) = WhileYouWait.PaceFor(await CatchUpApi.PaceDetailsAsync(db, userId, now, ct));
-        var candidates = (await TimeOffApi.CandidatesAsync(db, cache, userId, now, ct, room.Started))
-            .Where(c => c.Assessment.Value >= WhileYouWait.MinValue)
-            .ToList();
+        var candidates = await TimeOffApi.CandidatesAsync(db, cache, userId, now, ct, room.Started);
 
         var waits = WhileYouWait.Plan(waiting, candidates, pace, today,
             id => room.Copies.TryGetValue(id, out var copy) ? copy.Genres : [],

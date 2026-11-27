@@ -97,7 +97,7 @@ internal static class WhileYouWait
                 var genres = genresOf(wait.ShowId);
                 var dna = dnaOf(wait.ShowId);
                 var picks = candidates
-                    .Where(c => !taken.Contains(c.Show.ShowId) && c.Show.Minutes <= budget)
+                    .Where(c => c.Assessment.Value >= MinValue && !taken.Contains(c.Show.ShowId) && c.Show.Minutes <= budget)
                     .Select(c =>
                     {
                         var alike = Alike(genres, dna, c.Show);

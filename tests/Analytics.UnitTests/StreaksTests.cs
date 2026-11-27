@@ -122,4 +122,30 @@ public class StreaksTests
 
     private static Dictionary<Guid, DateTimeOffset> Watched(params (Aired Episode, double DaysLater)[] marks) =>
         marks.ToDictionary(m => m.Episode.EpisodeId, m => m.Episode.AirsAtUtc.AddDays(m.DaysLater));
+
+    [Fact]
+    public void Whats_shown_is_named_ordered_and_cut_to_the_limit_and_a_show_gone_from_the_catalog_is_left_out()
+    {
+        var gone = Guid.NewGuid();
+        var ids = Enumerable.Range(0, Streaks.MaxShows + 3).Select(_ => Guid.NewGuid()).ToList();
+        var names = ids.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => ((string Title, string? PosterUrl))($"Show {x.i:00}", null));
+        var keptUp = ids.Select((id, i) => new KeptUpDto(id, "", null, Current: i == 5 ? 9 : 3, Longest: 9, 1, 1)).Append(new KeptUpDto(gone, "", null, 20, 20, 1, 1)).Reverse();
+        var day = new DateOnly(2026, 11, 3);
+        var due = new[]
+        {
+            new StreakDueDto(ids[0], "", null, 1, 4, day.AddDays(2), 3),
+            new StreakDueDto(ids[1], "", null, 1, 2, day, 3),
+            new StreakDueDto(ids[2], "", null, 1, 2, day, 7),
+            new StreakDueDto(gone, "", null, 1, 1, day.AddDays(-1), 20)
+        };
+
+        var (shownKeptUp, shownDue, best) = Streaks.Shown(keptUp, due, new KeptUpDto(gone, "", null, 20, 20, 1, 1), names);
+
+        // The longest current run first, then by title.
+        Assert.Equal(["Show 05", "Show 00", "Show 01"], shownKeptUp.Take(3).Select(k => k.Title));
+        Assert.Equal(Streaks.MaxShows, shownKeptUp.Count);
+        // Soonest first; on the same day, the longer run.
+        Assert.Equal([ids[2], ids[1], ids[0]], shownDue.Select(d => d.ShowId));
+        Assert.Null(best);
+    }
 }
