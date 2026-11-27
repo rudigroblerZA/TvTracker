@@ -26,7 +26,7 @@
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
     <!-- Community Toolkit: flagd, the OpenFeature flag server. -->
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="13.6.1" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Flagd" Version="17.0.0" />
   </ItemGroup>
   <ItemGroup Label="Aspire client integrations (services)">
     <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.5" />
