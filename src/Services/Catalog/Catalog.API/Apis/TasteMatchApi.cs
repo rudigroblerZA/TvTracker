@@ -7,12 +7,10 @@ using Microsoft.Extensions.Hosting;
 
 namespace Catalog.API.Apis;
 
-public record TasteSideRequest(IReadOnlyList<WeightedShowDto> Loved, IReadOnlyList<Guid> Known);
-
 public record WeightedShowDto(Guid ShowId, double Weight);
 
-/// <param name="SeedsPerSide">How many of each side's heaviest shows seed the suggestions.</param>
-public record TasteCompareRequest(TasteSideRequest First, TasteSideRequest Second, int SeedsPerSide, int MaxTogether);
+/// <param name="First">One person's shows to compare, each with how much it counts; at most <see cref="TasteRules.MaxLoved"/>.</param>
+public record TasteCompareRequest(IReadOnlyList<WeightedShowDto> First, IReadOnlyList<WeightedShowDto> Second);
 
 /// <summary>
 /// Taste Match's catalog half: how alike two sets of shows are in meaning, and what sits between them
@@ -21,13 +19,6 @@ public record TasteCompareRequest(TasteSideRequest First, TasteSideRequest Secon
 /// </summary>
 public static class TasteMatchApi
 {
-    /// <summary>
-    /// The most shows a side may send; more is a caller's mistake.
-    /// </summary>
-    private const int MaxLoved = 100;
-
-    private const int MaxKnown = 5000;
-
     private static readonly TimeSpan ReferenceFor = TimeSpan.FromHours(6);
 
     public static void MapTasteMatchApi(this RouteGroupBuilder api) =>
@@ -36,22 +27,19 @@ public static class TasteMatchApi
     private static async Task<Results<Ok<TasteComparison>, ValidationProblem>> CompareAsync(
         TasteCompareRequest request, CatalogContext db, EmbeddingModel model, HybridCache cache, CancellationToken ct)
     {
-        if (new[] { request.First, request.Second }.Any(s => s.Loved.Count > MaxLoved || s.Known.Count > MaxKnown)
-            || request.SeedsPerSide is < 1 or > 5 || request.MaxTogether is < 0 or > 40)
+        if (request.First.Count > TasteRules.MaxLoved || request.Second.Count > TasteRules.MaxLoved)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ["Too many shows, seeds or suggestions asked for."] });
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["request"] = [$"A side has at most {TasteRules.MaxLoved} shows."] });
         }
 
-        static TasteSide Side(TasteSideRequest side) => new(
-            side.Loved.Where(l => l.Weight > 0).GroupBy(l => l.ShowId).ToDictionary(g => g.Key, g => g.Max(l => l.Weight)),
-            side.Known.ToHashSet());
+        static Dictionary<Guid, double> Side(IReadOnlyList<WeightedShowDto> side) =>
+            side.Where(l => l.Weight > 0).GroupBy(l => l.ShowId).ToDictionary(g => g.Key, g => g.Max(l => l.Weight));
 
         // How far apart unrelated shows are moves only with the catalog and the model: measured once in a while.
         var reference = await cache.GetOrCreateAsync($"catalog:taste-reference:{model.Id}",
             async token => await TasteMatcher.ReferenceDistanceAsync(db, model, token),
             new HybridCacheEntryOptions { Expiration = ReferenceFor, LocalCacheExpiration = ReferenceFor }, cancellationToken: ct);
 
-        return TypedResults.Ok(await TasteMatcher.CompareAsync(db, model, reference, Side(request.First), Side(request.Second),
-            request.SeedsPerSide, request.MaxTogether, ct));
+        return TypedResults.Ok(await TasteMatcher.CompareAsync(db, model, reference, Side(request.First), Side(request.Second), ct));
     }
 }

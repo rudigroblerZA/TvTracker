@@ -40,14 +40,12 @@ public class MatchCardTests
     [Fact]
     public void A_very_long_name_is_cut_short_to_fit_and_a_long_line_is_wrapped()
     {
-        var typeface = MatchCard.Typeface("semibold");
-
-        var fitted = MatchCard.Fit(new string('W', 80), typeface, 64, 900);
-        var wrapped = MatchCard.Wrap("Not much overlap, which is where the good recommendations come from.", MatchCard.Typeface("regular"), 52, 880);
+        var fitted = MatchCard.Fit(new string('W', 80), 64, 900);
+        var wrapped = MatchCard.Wrap("Not much overlap, which is where the good recommendations come from.", 52, 880);
 
         Assert.EndsWith("…", fitted);
         Assert.True(fitted.Length < 80);
-        Assert.Equal("Tess × Robin", MatchCard.Fit("Tess × Robin", typeface, 64, 900));
+        Assert.Equal("Tess × Robin", MatchCard.Fit("Tess × Robin", 64, 900));
         Assert.True(wrapped.Count >= 2);
         Assert.Equal("Not much overlap, which is where the good recommendations come from.", string.Join(' ', wrapped));
     }
@@ -65,12 +63,11 @@ public class MatchCardTests
     [Fact]
     public void Cutting_a_name_short_never_splits_a_character()
     {
-        var fitted = MatchCard.Fit(string.Concat(Enumerable.Repeat("👩‍👩‍👧", 30)), MatchCard.Typeface("semibold"), 64, 300);
+        var fitted = MatchCard.Fit(string.Concat(Enumerable.Repeat("👩‍👩‍👧", 30)), 64, 300);
 
         Assert.EndsWith("…", fitted);
-        Assert.True(System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(fitted)) == fitted);
-        Assert.DoesNotContain('\uFFFD', new string(fitted.Normalize().ToCharArray()));
-        Assert.All(new System.Globalization.StringInfo(fitted[..^1]).String.EnumerateRunes(), _ => { });
+        // Half a surrogate pair doesn't survive a round trip through UTF-8.
+        Assert.Equal(fitted, System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(fitted)));
     }
 
     /// <summary>
@@ -83,19 +80,5 @@ public class MatchCardTests
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
-    }
-
-    [Fact]
-    public void Sample()
-    {
-        if (Environment.GetEnvironmentVariable("CARD_SAMPLES") is not { Length: > 0 } directory)
-        {
-            return;
-        }
-        var posters = Directory.GetFiles(directory, "poster*.jpg").Order().Select(File.ReadAllBytes).ToList();
-        var content = Content with { Posters = posters, PostersLabel = "You both love" };
-        File.WriteAllBytes(Path.Combine(directory, "card-story.png"), MatchCard.Render(content, MatchCardSize.Story));
-        File.WriteAllBytes(Path.Combine(directory, "card-link.png"), MatchCard.Render(content, MatchCardSize.Link));
-        File.WriteAllBytes(Path.Combine(directory, "card-link-plain.png"), MatchCard.Render(Content with { Score = 28, Line = "Two very different watchlists: twice as much to discover." }, MatchCardSize.Link));
     }
 }

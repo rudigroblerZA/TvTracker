@@ -57,7 +57,7 @@ public record MatchUnnamedRequest(IReadOnlyList<Guid> Unnamed);
 /// sends and Notifications turns into an inbox item.</item>
 /// <item><b>Sides aren't stored</b> for members: they are read when the friend answers.</item>
 /// <item><b>The card</b> is the result as a picture (<see cref="MatchCard"/>): drawn on first request and kept in memory
-/// for a day, since a result never changes. It is only served while its match exists.</item>
+/// for an hour (a result never changes, but a card is asked for in a burst and then hardly again). It is only served while its match exists.</item>
 /// <item><b>Expiry:</b> an open link after 30 days, a done match after a year. Expired matches read as gone at once and
 /// are deleted the next time anyone starts a match.</item>
 /// </list>
@@ -71,7 +71,26 @@ public static class TasteMatchApi
 
     private const int MaxNameLength = 30;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
+
+    private const string LogCategory = "Analytics.API.TasteMatch";
+
+    /// <summary>
+    /// What Social says of a caller and a match's two people.
+    /// </summary>
+    private enum Blocks
+    {
+        /// <summary>
+        /// No block between them, or the caller is a guest.
+        /// </summary>
+        Clear,
+        Blocked,
+
+        /// <summary>
+        /// Social couldn't be asked.
+        /// </summary>
+        Unknown
+    }
 
     /// <summary>
     /// The calls that need a member; mapped inside the signed-in group.
@@ -163,7 +182,7 @@ public static class TasteMatchApi
     }
 
     internal static async Task<Results<Ok<MatchViewDto>, NotFound>> OpenAsync(
-        string token, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, ILogger<MatchMetrics> logger, TimeProvider time,
+        string token, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, ILoggerFactory loggers, TimeProvider time,
         CancellationToken ct)
     {
         if (await FindAsync(db, token, time, ct) is not { } match)
@@ -171,8 +190,8 @@ public static class TasteMatchApi
             return TypedResults.NotFound();
         }
         // Reading goes ahead when Social can't say; the view then tells neither of the two who the other is.
-        var blocked = await BlockedAsync(blocks, match, UserIdOf(user), logger, ct);
-        if (blocked == true)
+        var between = await BlocksAsync(blocks, match, UserIdOf(user), loggers, ct);
+        if (between == Blocks.Blocked)
         {
             return TypedResults.NotFound();
         }
@@ -183,7 +202,7 @@ public static class TasteMatchApi
         {
             nameable = await NameableAsync(db, TasteMatch.Side((await ReunionsApi.LoveAsync(db, userId, ct)).Loved), ct);
         }
-        return TypedResults.Ok(View(match, user, nameable, tellOther: blocked == false));
+        return TypedResults.Ok(View(match, user, nameable, tellOther: between == Blocks.Clear));
     }
 
     /// <summary>
@@ -191,16 +210,17 @@ public static class TasteMatchApi
     /// </summary>
     internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> PickAsync(
         string token, MatchPicksRequest request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, SocialBlocksClient blocks,
-        MatchMetrics metrics, ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
+        MatchMetrics metrics, ILoggerFactory loggers, TimeProvider time, CancellationToken ct)
     {
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
         {
             return TypedResults.NotFound();
         }
         // Picking shows instead of using one's own doesn't get a signed-in member round a block.
-        if (await BlockedAsync(blocks, match, UserIdOf(user), logger, ct) is not false and var blocked)
+        switch (await BlocksAsync(blocks, match, UserIdOf(user), loggers, ct))
         {
-            return blocked == true ? TypedResults.NotFound() : TryAgain();
+            case Blocks.Blocked: return TypedResults.NotFound();
+            case Blocks.Unknown: return TryAgain();
         }
 
         var asked = request.ShowIds.Distinct().Take(TasteMatch.MaxPicks).ToList();
@@ -213,7 +233,7 @@ public static class TasteMatchApi
         }
 
         var side = TasteMatch.Picked(picks);
-        if (await ResultAsync(db, catalog, match, side, picks, ct) is not { } result)
+        if (await ResultAsync(db, catalog, match, side, picks.ToHashSet(), ct) is not { } result)
         {
             return Problem("pick-another", "One of those is too new to compare yet. Pick one more show.");
         }
@@ -221,8 +241,7 @@ public static class TasteMatchApi
         match.GuestPicks = picks;
         match.GuestKey = NewToken();
         match.FriendDisplayName = FirstName(request.Name);
-        Finish(db, match, result, time);
-        if (!await SaveIfUnchangedAsync(db, ct))
+        if (!await FinishAsync(db, match, result, time, ct))
         {
             return TypedResults.NotFound();
         }
@@ -235,16 +254,17 @@ public static class TasteMatchApi
     /// </summary>
     internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> AcceptAsync(
         string token, MatchUnnamedRequest? request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, SocialBlocksClient blocks,
-        MatchMetrics metrics, ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
+        MatchMetrics metrics, ILoggerFactory loggers, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
         {
             return TypedResults.NotFound();
         }
-        if (await BlockedAsync(blocks, match, userId, logger, ct) is not false and var blocked)
+        switch (await BlocksAsync(blocks, match, userId, loggers, ct))
         {
-            return blocked == true ? TypedResults.NotFound() : TryAgain();
+            case Blocks.Blocked: return TypedResults.NotFound();
+            case Blocks.Unknown: return TryAgain();
         }
         if (match.InviterUserId == userId)
         {
@@ -266,8 +286,7 @@ public static class TasteMatchApi
 
         match.FriendUserId = userId;
         match.FriendDisplayName = FirstName(user.GetDisplayName());
-        Finish(db, match, result, time);
-        if (!await SaveIfUnchangedAsync(db, ct))
+        if (!await FinishAsync(db, match, result, time, ct))
         {
             return TypedResults.NotFound();
         }
@@ -282,7 +301,7 @@ public static class TasteMatchApi
     /// </summary>
     internal static async Task<Results<Ok<MatchClaimedDto>, NotFound, ProblemHttpResult>> ClaimAsync(
         string token, [FromQuery] string key, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, MatchMetrics metrics,
-        ILogger<MatchMetrics> logger, TimeProvider time, CancellationToken ct)
+        ILoggerFactory loggers, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: not null, FriendUserId: null, GuestKey: { } guestKey } match
@@ -290,9 +309,10 @@ public static class TasteMatchApi
         {
             return TypedResults.NotFound();
         }
-        if (await BlockedAsync(blocks, match, userId, logger, ct) is not false and var blocked)
+        switch (await BlocksAsync(blocks, match, userId, loggers, ct))
         {
-            return blocked == true ? TypedResults.NotFound() : TryAgain();
+            case Blocks.Blocked: return TypedResults.NotFound();
+            case Blocks.Unknown: return TryAgain();
         }
 
         match.FriendUserId = userId;
@@ -304,11 +324,7 @@ public static class TasteMatchApi
         }
         metrics.Claimed();
 
-        var picks = match.GuestPicks;
-        var shows = await db.Shows.AsNoTracking().Where(s => picks.Contains(s.ShowId))
-            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
-        return TypedResults.Ok(new MatchClaimedDto(View(match, user, tellOther: true),
-            picks.Where(shows.ContainsKey).Select(id => new MatchShowDto(id, shows[id].Title, shows[id].PosterUrl)).ToList()));
+        return TypedResults.Ok(new MatchClaimedDto(View(match, user, tellOther: true), await ShowsAsync(db, match.GuestPicks, ct)));
     }
 
     /// <summary>
@@ -353,11 +369,8 @@ public static class TasteMatchApi
         var shape = string.Equals(size, "story", StringComparison.OrdinalIgnoreCase) ? MatchCardSize.Story : MatchCardSize.Link;
         var png = await cache.GetOrCreateAsync($"analytics:match-card:{match.Token}:{shape}:{brand.AppName}", async cancel =>
             {
-                // What the two share when there is any; else what they could watch together. Never one side's own shows.
-                var (shows, label) = result.BothLove.Count > 0
-                    ? (result.BothLove.Select(s => s.PosterUrl), "You both love")
-                    : (result.WatchTogether.Select(s => s.PosterUrl), "Watch together");
-                var posters = await Task.WhenAll(shows.OfType<string>().Take(MatchCard.MaxPosters).Select(url => PosterAsync(clients, url, cancel)));
+                var (shows, label) = TasteMatch.CardShows(result);
+                var posters = await Task.WhenAll(shows.Select(s => s.PosterUrl).OfType<string>().Select(url => PosterAsync(clients, url, cancel)));
                 var drawn = posters.OfType<byte[]>().ToList();
                 return MatchCard.Render(new MatchCardContent(MatchCard.NameOr(match.InviterDisplayName, "A friend"), MatchCard.NameOr(match.FriendDisplayName, "A friend"),
                     result.Score, result.Line, drawn, drawn.Count > 0 ? label : null, brand.AppName), shape);
@@ -369,7 +382,9 @@ public static class TasteMatchApi
         return TypedResults.File(png, "image/png");
     }
 
-    private static readonly TimeSpan CardKeptFor = TimeSpan.FromDays(1);
+    // Not for long: a card is asked for in a burst (the page, a pasted link's preview) and then hardly again, and each
+    // is up to a megabyte held in this process.
+    private static readonly TimeSpan CardKeptFor = TimeSpan.FromHours(1);
 
     /// <summary>
     /// The largest poster read for a card.
@@ -422,29 +437,33 @@ public static class TasteMatchApi
     /// vector leaves a side with too few).
     /// </summary>
     private static async Task<TasteMatchDto?> ResultAsync(AnalyticsContext db, CatalogMatchClient catalog, TasteMatchRow match,
-        IReadOnlyDictionary<Guid, double> friend, IReadOnlyCollection<Guid> friendKnown, CancellationToken ct)
+        IReadOnlyDictionary<Guid, double> friend, IReadOnlySet<Guid> friendKnown, CancellationToken ct)
     {
         var (inviterKnown, inviterLoved) = await ReunionsApi.LoveAsync(db, match.InviterUserId, ct);
         var inviter = TasteMatch.Side(inviterLoved);
 
-        var compared = await catalog.CompareAsync((inviter, inviterKnown), (friend, friendKnown), ct);
+        var compared = await catalog.CompareAsync(inviter, friend, ct);
         if (compared.Alike is not { } alike)
         {
             return null;
         }
 
-        var ids = inviter.Keys.Concat(friend.Keys).Concat(compared.Together).Distinct().ToList();
+        // What either already knows is no suggestion: the catalog was told only what they love.
+        var together = compared.Together.Where(id => !inviterKnown.Contains(id) && !friendKnown.Contains(id)).ToList();
+        var ids = inviter.Keys.Concat(friend.Keys).Concat(together).Distinct().ToList();
         var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.ShowId))
             .Select(s => new { s.ShowId, s.Title, s.PosterUrl, s.Genres })
             .ToDictionaryAsync(s => s.ShowId, s => new MatchShow(s.Title, s.PosterUrl, s.Genres), ct);
         return TasteMatch.Of(match.Token, inviter, friend, match.InviterUnnamed.Concat(match.FriendUnnamed).ToHashSet(), alike,
-            compared.Together, compared.Loose, shows);
+            compared.SeedsFirst, compared.SeedsSecond, together, compared.Loose, shows);
     }
 
     /// <summary>
     /// Makes the match done, and stores the news for the inviter with it: saved together, sent by the worker's outbox.
+    /// False, with nothing saved, when someone else changed the match first (two answers at once): the caller then
+    /// treats the link as gone.
     /// </summary>
-    private static void Finish(AnalyticsContext db, TasteMatchRow match, TasteMatchDto result, TimeProvider time)
+    private static async Task<bool> FinishAsync(AnalyticsContext db, TasteMatchRow match, TasteMatchDto result, TimeProvider time, CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
         match.Result = JsonSerializer.Serialize(result, Json);
@@ -452,35 +471,31 @@ public static class TasteMatchApi
         match.ExpiresAtUtc = now + TasteMatchRow.KeptFor;
         db.IntegrationEventLogs.Add(IntegrationEventLogEntry.For(
             new TasteMatchAnsweredIntegrationEvent(match.InviterUserId, match.Token, match.FriendDisplayName, result.Score)));
+        return await SaveIfUnchangedAsync(db, ct);
     }
 
     /// <summary>
     /// Whether there is a block between a signed-in caller and either of the match's two people (other than themselves):
-    /// so the inviter is checked against a member friend as the friend is against the inviter. False for a guest. Null
-    /// when Social couldn't be asked: the caller decides what may still go ahead.
+    /// so the inviter is checked against a member friend as the friend is against the inviter. Clear for a guest.
+    /// Unknown when Social couldn't be asked: the caller decides what may still go ahead.
     /// </summary>
-    private static async Task<bool?> BlockedAsync(SocialBlocksClient blocks, TasteMatchRow match, string? userId, ILogger logger, CancellationToken ct)
+    private static async Task<Blocks> BlocksAsync(SocialBlocksClient blocks, TasteMatchRow match, string? userId, ILoggerFactory loggers, CancellationToken ct)
     {
         if (userId is null)
         {
-            return false;
+            return Blocks.Clear;
         }
         try
         {
-            foreach (var other in new[] { match.InviterUserId, match.FriendUserId }.OfType<string>().Where(id => id != userId))
-            {
-                if (await blocks.BlockedBetweenAsync(other, userId, ct))
-                {
-                    return true;
-                }
-            }
-            return false;
+            var others = new[] { match.InviterUserId, match.FriendUserId }.OfType<string>().Where(id => id != userId);
+            var answers = await Task.WhenAll(others.Select(other => blocks.BlockedBetweenAsync(other, userId, ct)));
+            return answers.Contains(true) ? Blocks.Blocked : Blocks.Clear;
         }
         // Anything but the caller going away: Social down or slow, its circuit open, the service token refused.
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Couldn't ask Social about blocks for a taste match");
-            return null;
+            loggers.CreateLogger(LogCategory).LogWarning(ex, "Couldn't ask Social about blocks for a taste match");
+            return Blocks.Unknown;
         }
     }
 
@@ -507,9 +522,14 @@ public static class TasteMatchApi
     private static bool SameKey(string expected, string given) =>
         CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(given));
 
-    private static async Task<List<MatchShowDto>> NameableAsync(AnalyticsContext db, IReadOnlyDictionary<Guid, double> side, CancellationToken ct)
+    private static Task<List<MatchShowDto>> NameableAsync(AnalyticsContext db, IReadOnlyDictionary<Guid, double> side, CancellationToken ct) =>
+        ShowsAsync(db, TasteMatch.Nameable(side), ct);
+
+    /// <summary>
+    /// These shows by name, in the order given; one that's gone from the catalog is left out.
+    /// </summary>
+    private static async Task<List<MatchShowDto>> ShowsAsync(AnalyticsContext db, IReadOnlyList<Guid> ids, CancellationToken ct)
     {
-        var ids = TasteMatch.Nameable(side);
         var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.ShowId))
             .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
         return ids.Where(shows.ContainsKey).Select(id => new MatchShowDto(id, shows[id].Title, shows[id].PosterUrl)).ToList();

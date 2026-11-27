@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using Catalog.Embeddings;
 using TvTracker.IntegrationEvents;
 
 namespace Catalog.SyncWorker.Nanogenres;
@@ -100,8 +101,8 @@ public static partial class NanogenreDiscovery
             for (var q = p + 1; q < embedded.Count; q++)
             {
                 var (a, b) = (embedded[p], embedded[q]);
-                var text = 1 - Dot(shows[a].Embedding!, shows[b].Embedding!);
-                var kind = 1 - Dot(features[a], features[b]);
+                var text = Vectors.Distance(shows[a].Embedding!, shows[b].Embedding!);
+                var kind = Vectors.Distance(features[a], features[b]);
                 distances[p, q] = distances[q, p] = (1 - GenreWeight) * text * scale + GenreWeight * kind;
             }
         }
@@ -115,7 +116,7 @@ public static partial class NanogenreDiscovery
         foreach (var core in Split(embedded, Distance, Cut))
         {
             var members = core.ToHashSet();
-            var typical = Median(core.Select(i => core.Where(j => j != i).Average(j => Distance(i, j))).ToList());
+            var typical = Vectors.Median(core.Select(i => core.Where(j => j != i).Average(j => Distance(i, j))).ToList());
             foreach (var other in embedded.Where(o => !members.Contains(o)))
             {
                 if (core.Average(j => Distance(other, j)) <= typical)
@@ -346,22 +347,6 @@ public static partial class NanogenreDiscovery
             var length = MathF.Sqrt(v.Sum(x => x * x));
             return length == 0 ? v : v.Select(x => x / length).ToArray();
         }).ToArray();
-    }
-
-    private static double Dot(float[] a, float[] b)
-    {
-        var sum = 0.0;
-        for (var i = 0; i < a.Length; i++)
-        {
-            sum += a[i] * b[i];
-        }
-        return sum;
-    }
-
-    private static double Median(List<double> values)
-    {
-        values.Sort();
-        return values.Count % 2 == 1 ? values[values.Count / 2] : (values[values.Count / 2 - 1] + values[values.Count / 2]) / 2;
     }
 
     private static string Capitalize(string name) => char.ToUpperInvariant(name[0]) + name[1..];

@@ -61,16 +61,14 @@ public static class ShowMixer
             .Aggregate((all, next) => all.Concat(next));
         var candidateIds = (await nearest.ToListAsync(ct)).ToHashSet();
 
+        // The candidates' vectors and kinds in one go; those of another kind than the mix's are left out.
         var kinds = inputs.Select(s => ShowKinds.Of(s.Keywords)).OfType<string>().ToHashSet();
-        var candidateKinds = await db.Shows.AsNoTracking().Where(s => candidateIds.Contains(s.Id))
-            .Select(s => new { s.Id, s.Keywords })
-            .ToDictionaryAsync(s => s.Id, s => ShowKinds.Of(s.Keywords), ct);
-        candidateIds.RemoveWhere(id => !MixRules.FitsKinds(kinds, candidateKinds.GetValueOrDefault(id)));
-
         var candidates = await eligible.Where(e => candidateIds.Contains(e.ShowId))
-            .Select(e => new { e.ShowId, e.Embedding })
+            .Join(db.Shows, e => e.ShowId, s => s.Id, (e, s) => new { e.ShowId, e.Embedding, s.Keywords })
             .ToListAsync(ct);
-        var ranked = MixRules.Rank(candidates.Select(c => (c.ShowId, c.Embedding.ToArray())), vectors, weights, maxMatches);
+        var ranked = MixRules.Rank(
+            candidates.Where(c => MixRules.FitsKinds(kinds, ShowKinds.Of(c.Keywords))).Select(c => (c.ShowId, c.Embedding.ToArray())),
+            vectors, weights, maxMatches);
 
         var matchIds = ranked.Select(r => r.ShowId).ToList();
         var matches = await db.Shows.AsNoTracking().Where(s => matchIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);

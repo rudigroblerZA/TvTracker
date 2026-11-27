@@ -41,7 +41,7 @@ public static class MatchCard
     private static readonly Lazy<SKTypeface> SemiBold = new(() => Load("Inter-SemiBold.ttf"));
     private static readonly Lazy<SKTypeface> ExtraBold = new(() => Load("Inter-ExtraBold.ttf"));
 
-    public static (int Width, int Height) Dimensions(MatchCardSize size) => size == MatchCardSize.Story ? (1080, 1920) : (1200, 630);
+    private static (int Width, int Height) Dimensions(MatchCardSize size) => size == MatchCardSize.Story ? (1080, 1920) : (1200, 630);
 
     public static byte[] Render(MatchCardContent content, MatchCardSize size)
     {
@@ -75,11 +75,11 @@ public static class MatchCard
     {
         var centre = width / 2f;
         Draw(canvas, "TV TASTE MATCH", centre, 250, SemiBold.Value, 40, Accent, SKTextAlign.Center, spacing: 6);
-        Draw(canvas, Fit($"{content.Inviter} × {content.Friend}", SemiBold.Value, 64, width - 160), centre, 370, SemiBold.Value, 64, Text, SKTextAlign.Center);
+        Draw(canvas, Fit($"{content.Inviter} × {content.Friend}", 64, width - 160), centre, 370, SemiBold.Value, 64, Text, SKTextAlign.Center);
         Draw(canvas, $"{content.Score}%", centre, 760, ExtraBold.Value, 380, Accent, SKTextAlign.Center);
         Draw(canvas, "match", centre, 860, SemiBold.Value, 64, Text, SKTextAlign.Center);
         var y = 1000f;
-        foreach (var line in Wrap(content.Line, Regular.Value, 52, width - 200))
+        foreach (var line in Wrap(content.Line, 52, width - 200))
         {
             Draw(canvas, line, centre, y, Regular.Value, 52, Text, SKTextAlign.Center);
             y += 70;
@@ -101,10 +101,10 @@ public static class MatchCard
         // The posters take the right-hand side when there are any; the text keeps the left.
         var textWidth = content.Posters.Count > 0 ? 600f : width - 2 * left;
         Draw(canvas, "TV TASTE MATCH", left, 110, SemiBold.Value, 26, Accent, SKTextAlign.Left, spacing: 4);
-        Draw(canvas, Fit($"{content.Inviter} × {content.Friend}", SemiBold.Value, 44, textWidth), left, 180, SemiBold.Value, 44, Text, SKTextAlign.Left);
+        Draw(canvas, Fit($"{content.Inviter} × {content.Friend}", 44, textWidth), left, 180, SemiBold.Value, 44, Text, SKTextAlign.Left);
         Draw(canvas, $"{content.Score}%", left - 8, 400, ExtraBold.Value, 230, Accent, SKTextAlign.Left);
         var y = 470f;
-        foreach (var line in Wrap(content.Line, Regular.Value, 32, textWidth).Take(2))
+        foreach (var line in Wrap(content.Line, 32, textWidth).Take(2))
         {
             Draw(canvas, line, left, y, Regular.Value, 32, Text, SKTextAlign.Left);
             y += 44;
@@ -190,11 +190,12 @@ public static class MatchCard
     }
 
     /// <summary>
-    /// <paramref name="text"/> in lines no wider than <paramref name="maxWidth"/>, broken between words.
+    /// <paramref name="text"/> (the line, in the regular weight) in lines no wider than <paramref name="maxWidth"/>, broken
+    /// between words.
     /// </summary>
-    internal static List<string> Wrap(string text, SKTypeface typeface, float size, float maxWidth)
+    internal static List<string> Wrap(string text, float size, float maxWidth)
     {
-        using var font = new SKFont(typeface, size);
+        using var font = new SKFont(Regular.Value, size);
         var lines = new List<string>();
         var line = "";
         foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
@@ -232,11 +233,12 @@ public static class MatchCard
     }
 
     /// <summary>
-    /// <paramref name="text"/>, cut short with an ellipsis when it is wider than <paramref name="maxWidth"/>.
+    /// <paramref name="text"/> (the names, in the semi-bold weight), cut short with an ellipsis when it is wider than
+    /// <paramref name="maxWidth"/>.
     /// </summary>
-    internal static string Fit(string text, SKTypeface typeface, float size, float maxWidth)
+    internal static string Fit(string text, float size, float maxWidth)
     {
-        using var font = new SKFont(typeface, size);
+        using var font = new SKFont(SemiBold.Value, size);
         if (font.MeasureText(text) <= maxWidth)
         {
             return text;
@@ -254,8 +256,6 @@ public static class MatchCard
         }
         return string.Concat(kept).TrimEnd() + "…";
     }
-
-    internal static SKTypeface Typeface(string weight) => weight switch { "regular" => Regular.Value, "semibold" => SemiBold.Value, _ => ExtraBold.Value };
 
     private static SKTypeface Load(string file)
     {

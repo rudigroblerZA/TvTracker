@@ -60,11 +60,6 @@ public static class TasteMatch
     /// </summary>
     public const int MaxNameable = 8;
 
-    /// <summary>
-    /// A side's heaviest shows that seed the suggestions.
-    /// </summary>
-    public const int SeedsPerSide = 3;
-
     public const int MinScore = 15;
     public const int MaxScore = 99;
 
@@ -81,6 +76,11 @@ public static class TasteMatch
     public const double Curve = 0.6;
 
     public const int MaxBothLove = 4;
+
+    /// <summary>
+    /// Shows pictured on the share card.
+    /// </summary>
+    public const int MaxCardShows = 4;
     public const int MaxBothInto = 3;
     public const int MaxWatchTogether = 6;
 
@@ -115,28 +115,33 @@ public static class TasteMatch
     /// <summary>
     /// The shows of a side that are scored: its heaviest <see cref="MaxScored"/>, heaviest first.
     /// </summary>
-    public static Dictionary<Guid, double> Side(IEnumerable<KeyValuePair<Guid, double>> loved) => loved
-        .Where(l => l.Value > 0)
-        .OrderByDescending(l => l.Value).ThenBy(l => l.Key)
-        .Take(MaxScored)
-        .ToDictionary(l => l.Key, l => l.Value);
+    public static Dictionary<Guid, double> Side(IEnumerable<KeyValuePair<Guid, double>> loved) =>
+        Heaviest(loved.Where(l => l.Value > 0), MaxScored).ToDictionary(l => l.Key, l => l.Value);
+
+    /// <summary>
+    /// The heaviest shows, heaviest first; shows that weigh the same go by id, so the pick is the same every time.
+    /// </summary>
+    private static IEnumerable<KeyValuePair<Guid, double>> Heaviest(IEnumerable<KeyValuePair<Guid, double>> shows, int count) =>
+        shows.OrderByDescending(l => l.Value).ThenBy(l => l.Key).Take(count);
 
     /// <summary>
     /// A guest's side: each pick counts fully.
     /// </summary>
-    public static Dictionary<Guid, double> Picked(IEnumerable<Guid> picks) => picks.Distinct().Take(MaxPicks).ToDictionary(id => id, _ => 1.0);
+    public static Dictionary<Guid, double> Picked(IEnumerable<Guid> picks) => picks.Distinct().ToDictionary(id => id, _ => 1.0);
 
     /// <summary>
     /// The shows of a side that a result could name, heaviest first: what a member is shown before their side is used.
     /// </summary>
     public static List<Guid> Nameable(IReadOnlyDictionary<Guid, double> side) =>
-        side.OrderByDescending(l => l.Value).ThenBy(l => l.Key).Take(MaxNameable).Select(l => l.Key).ToList();
+        Heaviest(side, MaxNameable).Select(l => l.Key).ToList();
 
     /// <summary>
-    /// A side's heaviest shows, to seed the suggestions.
+    /// The shows a result's share card pictures, and what it calls them: what the two both love when there is any, else
+    /// what they could watch together. Never one side's own shows.
     /// </summary>
-    public static List<Guid> Seeds(IReadOnlyDictionary<Guid, double> side) =>
-        side.OrderByDescending(l => l.Value).ThenBy(l => l.Key).Take(SeedsPerSide).Select(l => l.Key).ToList();
+    public static (IReadOnlyList<MatchShowDto> Shows, string Label) CardShows(TasteMatchDto result) => result.BothLove.Count > 0
+        ? (result.BothLove.Take(MaxCardShows).ToList(), "You both love")
+        : (result.WatchTogether.Take(MaxCardShows).Select(p => new MatchShowDto(p.ShowId, p.Title, p.PosterUrl)).ToList(), "Watch together");
 
     /// <summary>
     /// Each genre's share of a side's love: a show's weight goes to each of its genres, and the shares add up to 1.
@@ -195,10 +200,13 @@ public static class TasteMatch
     /// <param name="inviter">The inviter's scored side (<see cref="Side"/>).</param>
     /// <param name="friend">The friend's.</param>
     /// <param name="unnamed">Shows either asked not to have named; scored all the same.</param>
+    /// <param name="inviterSeeds">The inviter's shows the catalog seeded the suggestions with: what a suggestion can be said
+    /// to take from them.</param>
     /// <param name="suggested">The catalog's suggestions, best first, none known to either.</param>
     /// <param name="shows">Title, poster and genres of every show involved; one that's missing is not named.</param>
     public static TasteMatchDto Of(string token, IReadOnlyDictionary<Guid, double> inviter, IReadOnlyDictionary<Guid, double> friend,
-        IReadOnlySet<Guid> unnamed, double alike, IReadOnlyList<Guid> suggested, bool loose, IReadOnlyDictionary<Guid, MatchShow> shows)
+        IReadOnlySet<Guid> unnamed, double alike, IReadOnlyCollection<Guid> inviterSeeds, IReadOnlyCollection<Guid> friendSeeds,
+        IReadOnlyList<Guid> suggested, bool loose, IReadOnlyDictionary<Guid, MatchShow> shows)
     {
         IReadOnlyList<string> GenresOf(Guid id) => shows.TryGetValue(id, out var show) ? show.Genres : [];
         var (inviterGenres, friendGenres) = (GenreShares(inviter, GenresOf), GenreShares(friend, GenresOf));
@@ -219,8 +227,8 @@ public static class TasteMatch
             .ToList();
 
         // The seeds' genres say what a suggestion takes from each side.
-        var inviterSeedGenres = Seeds(inviter).SelectMany(GenresOf).ToHashSet(StringComparer.Ordinal);
-        var friendSeedGenres = Seeds(friend).SelectMany(GenresOf).ToHashSet(StringComparer.Ordinal);
+        var inviterSeedGenres = inviterSeeds.SelectMany(GenresOf).ToHashSet(StringComparer.Ordinal);
+        var friendSeedGenres = friendSeeds.SelectMany(GenresOf).ToHashSet(StringComparer.Ordinal);
         var together = suggested
             .Where(id => shows.ContainsKey(id) && !inviter.ContainsKey(id) && !friend.ContainsKey(id))
             .Take(MaxWatchTogether)
