@@ -87,15 +87,21 @@ public static class EssentialCut
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Whether two episodes next to each other are parts of one story: both are titled as a part, of the same story (the
-    /// title without its part marker), and the second isn't a part 1. "Storm, Part 2" and "Endgame, Part 1" are
-    /// neighbours, not a pair.
+    /// Whether two episodes next to each other are parts of one story: both are titled as a part, and the second is
+    /// the part after the first ("Summit (1)" then "Last Stand (2)": parts often have titles of their own). Where a
+    /// number can't be read, they must be titled alike without their part markers. "Storm, Part 2" and "Endgame,
+    /// Part 1" are neighbours, not a pair.
     /// </summary>
     internal static bool SameStory(string first, string second)
     {
         var (a, b) = (PartPattern.Match(first), PartPattern.Match(second));
-        return a.Success && b.Success && PartNumber(b.Value) != 1
-            && string.Equals(Story(first, a), Story(second, b), StringComparison.OrdinalIgnoreCase);
+        if (!a.Success || !b.Success)
+        {
+            return false;
+        }
+        return (PartNumber(a.Value), PartNumber(b.Value)) is ({ } one, { } next)
+            ? next == one + 1
+            : string.Equals(Story(first, a), Story(second, b), StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Story(string title, Match part) => title.Remove(part.Index, part.Length).Trim(' ', ',', ':', ';', '-', '–', '—', '.');
