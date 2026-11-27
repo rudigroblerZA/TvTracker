@@ -1,0 +1,12 @@
+@* The rest of a hub page's tools, at its foot under the page's own content: ToolLinks, each in its own <Feature> when
+   the tool has a flag. With every one hidden the heading goes too. *@
+<section class="more-tools">
+    <h2>@Title</h2>
+    <div class="tool-links">@ChildContent</div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
