@@ -1,0 +1,133 @@
+@* The small drawing on a pinned tool's card (FeatureCard), by the tool's address. Each draws in currentColor, which is
+   the card's tone; an address with no drawing leaves the space empty. Where one shape sits in front of another, the one
+   behind is cut away with a mask (the card is a gradient, so there is no one colour to paint over it with); the mask's
+   id is this instance's own, so the same drawing can be on a page twice. *@
+<svg viewBox="0 0 120 80">
+    @switch (Name)
+    {
+        case "blend":
+            <circle cx="46" cy="40" r="28" fill="currentColor" opacity="0.22" />
+            <circle cx="74" cy="40" r="28" fill="currentColor" opacity="0.22" />
+            <path d="M60 15.8a28 28 0 0 1 0 48.4a28 28 0 0 1 0-48.4z" fill="currentColor" opacity="0.55" />
+            <circle cx="46" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="74" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="1.5" />
+            break;
+        case "universes":
+            <path d="M14 58 42 30 70 46 104 16M42 30 34 66M70 46 92 68" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.55" />
+            <circle cx="14" cy="58" r="4" fill="currentColor" />
+            <circle cx="42" cy="30" r="7" fill="currentColor" />
+            <circle cx="70" cy="46" r="5" fill="currentColor" />
+            <circle cx="104" cy="16" r="6" fill="currentColor" />
+            <circle cx="34" cy="66" r="3" fill="currentColor" opacity="0.6" />
+            <circle cx="92" cy="68" r="4" fill="currentColor" opacity="0.6" />
+            break;
+        case "nanogenres":
+            <rect x="8" y="8" width="52" height="16" rx="8" fill="currentColor" opacity="0.8" />
+            <rect x="66" y="8" width="38" height="16" rx="8" fill="currentColor" opacity="0.3" />
+            <rect x="20" y="32" width="34" height="16" rx="8" fill="currentColor" opacity="0.3" />
+            <rect x="60" y="32" width="52" height="16" rx="8" fill="currentColor" opacity="0.55" />
+            <rect x="8" y="56" width="44" height="16" rx="8" fill="currentColor" opacity="0.55" />
+            <rect x="58" y="56" width="30" height="16" rx="8" fill="currentColor" opacity="0.8" />
+            break;
+        case "calls":
+            <path d="M8 70h104" stroke="currentColor" stroke-width="1.5" opacity="0.35" />
+            <path d="M10 56 30 44 50 50 70 30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M70 30 98 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="1 7" />
+            <circle cx="10" cy="56" r="3.5" fill="currentColor" />
+            <circle cx="30" cy="44" r="3.5" fill="currentColor" />
+            <circle cx="50" cy="50" r="3.5" fill="currentColor" />
+            <circle cx="70" cy="30" r="3.5" fill="currentColor" />
+            <circle cx="98" cy="16" r="10" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="98" cy="16" r="3.5" fill="currentColor" />
+            break;
+        case "streaks":
+            @for (var row = 0; row < Days.Length; row++)
+            {
+                @for (var day = 0; day < Days[row].Length; day++)
+                {
+                    <rect x="@(6 + day * 18)" y="@(12 + row * 21)" width="14" height="14" rx="4" fill="currentColor" opacity="@Days[row][day].ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                }
+            }
+            break;
+        case "holidays":
+            <path d="M78 6 62 30h8L54 52h10L48 72h60L92 52h10L86 30h8z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <circle cx="72" cy="40" r="3" fill="currentColor" />
+            <circle cx="86" cy="46" r="3" fill="currentColor" />
+            <circle cx="66" cy="62" r="3" fill="currentColor" />
+            <circle cx="82" cy="60" r="3" fill="currentColor" />
+            <circle cx="96" cy="64" r="3" fill="currentColor" />
+            <path d="M22 40c-9 0-14 6-14 14s5 14 14 14 14-6 14-14-5-14-14-14zM22 40v-7" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            <path d="M22 41c-4 3-4 23 0 26M22 41c4 3 4 23 0 26" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.6" />
+            break;
+        case "tonight":
+            <path d="M84 8a32 32 0 1 0 28 46A26 26 0 0 1 84 8z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M70 30v20l16-10z" fill="currentColor" />
+            <path d="M24 14v10M19 19h10M40 52v8M36 56h8M12 44v6M9 47h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+            break;
+        case "while-you-wait":
+            <path d="M62 8h44M62 72h44" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            <path d="M68 8c0 18 16 22 16 32s-16 14-16 32h32c0-18-16-22-16-32s16-14 16-32z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M74 20h20c-3 8-10 11-10 20c0-9-7-12-10-20zM72 72c2-10 8-12 12-16c4 4 10 6 12 16z" fill="currentColor" />
+            <path d="M14 30h30M22 44h22M30 58h14" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.35" />
+            break;
+        case "backlog":
+            <mask id="@mask">
+                <rect width="120" height="80" fill="#fff" />
+                <rect x="64" y="14" width="44" height="58" rx="6" fill="#000" />
+            </mask>
+            <g mask="@($"url(#{mask})")">
+                <rect x="50" y="6" width="44" height="58" rx="6" fill="currentColor" opacity="0.18" transform="rotate(-10 72 35)" />
+                <rect x="58" y="10" width="44" height="58" rx="6" fill="currentColor" opacity="0.35" transform="rotate(4 80 39)" />
+            </g>
+            <rect x="64" y="14" width="44" height="58" rx="6" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="1.5" />
+            <path d="M76 44l8 8 14-18" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M10 26h24M10 40h30M10 54h18" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.35" />
+            break;
+        case "reunions":
+            <circle cx="72" cy="40" r="34" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="72" cy="40" r="22" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
+            <circle cx="72" cy="40" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
+            <path d="M72 40 98 18A34 34 0 0 1 106 40z" fill="currentColor" opacity="0.3" />
+            <path d="M72 40 98 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <path d="M56 28 86 54" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" stroke-linecap="round" />
+            <circle cx="56" cy="28" r="5" fill="currentColor" />
+            <circle cx="86" cy="54" r="5" fill="currentColor" />
+            <circle cx="72" cy="40" r="2.5" fill="currentColor" />
+            break;
+        case "makers":
+            <rect x="44" y="30" width="66" height="42" rx="6" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.5" />
+            <path d="M44 30 106 12l2 9-62 18z" fill="currentColor" opacity="0.35" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M58 26l4 9M72 22l4 9M86 18l4 9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            <path d="M54 46h32M54 56h22" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+            break;
+        case "taste-twins":
+            <mask id="@mask">
+                <rect width="120" height="80" fill="#fff" />
+                <circle cx="88" cy="26" r="15" fill="#000" />
+                <path d="M64 74c0-16 11-26 24-26s24 10 24 26z" fill="#000" />
+            </mask>
+            <g mask="@($"url(#{mask})")">
+                <circle cx="56" cy="26" r="13" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5" />
+                <path d="M34 72c0-14 10-22 22-22s22 8 22 22z" fill="currentColor" opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            </g>
+            <circle cx="88" cy="26" r="13" fill="currentColor" fill-opacity="0.55" stroke="currentColor" stroke-width="1.5" />
+            <path d="M66 72c0-14 10-22 22-22s22 8 22 22z" fill="currentColor" opacity="0.55" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M16 20l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" fill="currentColor" />
+            <path d="M22 46l1.8 3.8 4.2.6-3 2.9.7 4.1-3.7-2-3.7 2 .7-4.1-3-2.9 4.2-.6z" fill="currentColor" opacity="0.6" />
+            break;
+    }
+</svg>
+
+@code {
+    /// <summary>
+    /// The tool's address, as its card links to it ("blend", "while-you-wait").
+    /// </summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+
+    /// <summary>
+    /// The streak drawing's days, a row a week: how full each is.
+    /// </summary>
+    private static readonly double[][] Days = [[0.2, 0.2, 0.5, 0.2, 0.2, 0.5], [0.5, 0.2, 1, 1, 1, 1], [1, 1, 1, 0.2]];
+
+    private readonly string mask = $"art-{Guid.NewGuid():N}";
+}

@@ -11,63 +11,13 @@
         @* The page's three tools, pinned as on Discover, Insights and Up Next. There are no others, so nothing at the foot. *@
         <div class="feature-cards">
             <Feature Flag="@FeatureFlags.ReunionRadar" ShowLocked>
-                <FeatureCard Href="reunions" Title="Reunion radar" Tone="mix-3">
-                    <Art>
-                        <svg viewBox="0 0 120 80">
-                            <circle cx="72" cy="40" r="34" fill="currentColor" opacity="0.12" />
-                            <circle cx="72" cy="40" r="34" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
-                            <circle cx="72" cy="40" r="22" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
-                            <circle cx="72" cy="40" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
-                            <path d="M72 40 98 18A34 34 0 0 1 106 40z" fill="currentColor" opacity="0.3" />
-                            <path d="M72 40 98 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                            <path d="M56 28 86 54" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4" stroke-linecap="round" />
-                            <circle cx="56" cy="28" r="5" fill="currentColor" />
-                            <circle cx="86" cy="54" r="5" fill="currentColor" />
-                            <circle cx="72" cy="40" r="2.5" fill="currentColor" />
-                        </svg>
-                    </Art>
-                    <ChildContent>Where actors from shows you love work together again.</ChildContent>
-                </FeatureCard>
+                <FeatureCard Href="reunions" Title="Reunion radar" Tone="mix-3">Where actors from shows you love work together again.</FeatureCard>
             </Feature>
             <Feature Flag="@FeatureFlags.MakersForYou" ShowLocked>
-                <FeatureCard Href="makers" Title="From the makers you love" Tone="mix-1">
-                    <Art>
-                        <svg viewBox="0 0 120 80">
-                            <rect x="44" y="30" width="66" height="42" rx="6" fill="currentColor" opacity="0.2" />
-                            <rect x="44" y="30" width="66" height="42" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" />
-                            <path d="M44 30 106 12l2 9-62 18z" fill="currentColor" opacity="0.35" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-                            <path d="M58 26l4 9M72 22l4 9M86 18l4 9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-                            <path d="M54 46h32M54 56h22" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.6" />
-                        </svg>
-                    </Art>
-                    <ChildContent>What the creators of your favourites made next, and before.</ChildContent>
-                </FeatureCard>
+                <FeatureCard Href="makers" Title="From the makers you love" Tone="mix-1">What the creators of your favourites made next, and before.</FeatureCard>
             </Feature>
             <Feature Flag="@FeatureFlags.TasteTwins" ShowLocked>
-                <FeatureCard Href="taste-twins" Title="Taste twins" Tone="mix-2">
-                    <Art>
-                        <svg viewBox="0 0 120 80">
-                            @* The figure behind is cut away where the one in front covers it: the card behind them is a gradient, so
-                               there is no one colour to paint over it with. *@
-                            <mask id="taste-twin-behind">
-                                <rect width="120" height="80" fill="#fff" />
-                                <circle cx="88" cy="26" r="15" fill="#000" />
-                                <path d="M64 74c0-16 11-26 24-26s24 10 24 26z" fill="#000" />
-                            </mask>
-                            <g mask="url(#taste-twin-behind)">
-                                <circle cx="56" cy="26" r="13" fill="currentColor" opacity="0.3" />
-                                <circle cx="56" cy="26" r="13" fill="none" stroke="currentColor" stroke-width="1.5" />
-                                <path d="M34 72c0-14 10-22 22-22s22 8 22 22z" fill="currentColor" opacity="0.3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-                            </g>
-                            <circle cx="88" cy="26" r="13" fill="currentColor" opacity="0.55" />
-                            <circle cx="88" cy="26" r="13" fill="none" stroke="currentColor" stroke-width="1.5" />
-                            <path d="M66 72c0-14 10-22 22-22s22 8 22 22z" fill="currentColor" opacity="0.55" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-                            <path d="M16 20l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" fill="currentColor" />
-                            <path d="M22 46l1.8 3.8 4.2.6-3 2.9.7 4.1-3.7-2-3.7 2 .7-4.1-3-2.9 4.2-.6z" fill="currentColor" opacity="0.6" />
-                        </svg>
-                    </Art>
-                    <ChildContent>What people who rate like you loved, that you haven't seen.</ChildContent>
-                </FeatureCard>
+                <FeatureCard Href="taste-twins" Title="Taste twins" Tone="mix-2">What people who rate like you loved, that you haven't seen.</FeatureCard>
             </Feature>
         </div>
         <ErrorNotice Message="@error" OnRetry="LoadAsync" />
@@ -123,8 +73,7 @@
     private async Task DismissAsync(Guid showId)
     {
         // Gone at once, and back where it was if the dismissal didn't get through: it would return on the next load anyway.
-        var at = picks?.FindIndex(p => p.ShowId == showId) ?? -1;
-        if (picks is null || at < 0)
+        if (picks is null || picks.FindIndex(p => p.ShowId == showId) is not (>= 0 and var at))
         {
             return;
         }

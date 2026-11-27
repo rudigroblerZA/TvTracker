@@ -2,13 +2,7 @@
    each in its own <Feature> when the tool has a flag; a hidden one leaves no gap. In <Feature ShowLocked>, a tool that's
    part of a plan the user isn't on stays, marked with that plan, and its page offers the plan. *@
 <a class="tool-link @(Lock is null ? "" : "tool-link-locked")" href="@Href">
-    <span>
-        <strong>@Title</strong>
-        @if (Lock is { } locked)
-        {
-            @(" ")<span class="tag plan-tag">@Plans.Name(locked.Plan)</span>
-        }
-    </span>
+    <ToolTitle Title="@Title" Lock="Lock" />
     <span class="muted small">@ChildContent</span>
 </a>
 

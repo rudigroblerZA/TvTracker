@@ -1,0 +1,14 @@
+@* A tool's name on its card (ToolLink, FeatureCard), with the plan that unlocks it when the user isn't on it. *@
+<span>
+    <strong>@Title</strong>
+    @if (Lock is { } locked)
+    {
+        @(" ")<span class="tag plan-tag">@Plans.Name(locked.Plan)</span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    [Parameter] public FeatureLock? Lock { get; set; }
+}

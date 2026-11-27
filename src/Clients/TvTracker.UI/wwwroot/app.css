@@ -858,7 +858,7 @@ a.chip { text-decoration: none; }
 .feature-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 4px 0 28px; }
 .feature-cards:not(:has(*)) { display: none; }
 /* The drawing has its own row above the words, so a long name or a plan tag wraps under it, never across it. */
-.feature-card { --tone: var(--accent); position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 168px;
+.feature-card { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 168px;
     padding: 18px; overflow: hidden; color: inherit; text-decoration: none; border-radius: var(--radius); box-shadow: var(--shadow-sm);
     border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--border));
     background: linear-gradient(140deg, color-mix(in srgb, var(--tone) 16%, var(--surface)), var(--surface) 72%);
@@ -876,18 +876,23 @@ a.chip { text-decoration: none; }
 .more-tools { margin-top: 32px; padding-top: 8px; border-top: 1px solid var(--border); }
 .more-tools:not(:has(.tool-link)) { display: none; }
 .more-tools h2 { font-size: 1.05rem; }
-@media (prefers-reduced-motion: reduce) { .feature-card, .feature-card-art { transition: none; } .feature-card:hover, .feature-card:focus-visible, .feature-card:hover .feature-card-art, .feature-card:focus-visible .feature-card-art { transform: none; } }
+/* Neither kind of card moves for someone who has asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+    .tool-link, .feature-card, .feature-card-art { transition: none; }
+    .tool-link:hover, .tool-link:focus-visible, .feature-card:hover, .feature-card:focus-visible,
+    .feature-card:hover .feature-card-art, .feature-card:focus-visible .feature-card-art { transform: none; }
+}
 /* On a phone, three short rows: the name and a line about it, the drawing small at the side. */
 @media (max-width: 520px) {
     .feature-cards { grid-template-columns: 1fr; gap: 8px; margin-bottom: 18px; }
-    .feature-card { min-height: 0; padding: 12px 84px 12px 14px; justify-content: center; }
+    .feature-card { min-height: 0; padding: 12px 84px 12px 14px; }
     .feature-card-art { position: absolute; top: 50%; right: 12px; width: 60px; margin: 0; translate: 0 -50%; }
     .feature-card-text strong { font-size: 1.05rem; }
     .feature-card-text .muted { font-size: 0.85rem; }
 }
 /* A tool, or a flag, that is part of a paid plan */
 .plan-tag { color: var(--accent-text); background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-weight: 650; }
-/* On a phone the cards are just their names, so the page's own content starts on the first screen. */
+/* On a phone the tool links are just their names, so they take little room. */
 @media (max-width: 520px) {
     .tool-links { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
     .tool-link { padding: 10px 12px; justify-content: center; }
