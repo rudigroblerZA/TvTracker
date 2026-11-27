@@ -101,7 +101,7 @@ public static partial class BrandingApi
     /// </summary>
     internal static string? Problem(BrandingDto b) =>
         b.AppName is { Length: > 40 } ? "The app's name is at most 40 characters."
-        : b.AccentColor is { } colour && !HexColour().IsMatch(colour) ? "The accent colour is six hex digits after a #, like #2563eb."
+        : b.AccentColor is { } colour && !HexColour().IsMatch(colour) ? "The accent colour is six hex digits after a #, like #c2410c."
         : b.Operator is { Length: > 120 } ? "The operator's name is at most 120 characters."
         : b.ContactEmail is { } email && (email.Length > 256 || !Email().IsMatch(email)) ? "The contact address doesn't look like an email address."
         : b.OperatorAddress is { Length: > 300 } ? "The postal address is at most 300 characters."

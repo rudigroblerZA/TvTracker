@@ -6,13 +6,16 @@
 @inject BrandingLoader BrandLoader
 
 @* An accent colour set in Settings replaces the stylesheet's: as given on a light background, lightened on a dark one
-   so it stays readable, and the second colour of the gradients follows it. *@
+   so it stays readable, and the second colour of the gradients follows it. The filled things take the same colour
+   (the stylesheet's own has a brighter one for them), with white writing on a light page as a chosen colour expects. *@
 @if (Brand.AccentColor is { } accent)
 {
     <style>
         :root {
             --accent: light-dark(@accent, color-mix(in oklab, @accent 62%, white));
             --accent-2: light-dark(color-mix(in oklab, @accent 78%, #7c3aed), color-mix(in oklab, @accent 50%, #c4b5fd));
+            --accent-fill: var(--accent);
+            --accent-text: light-dark(#ffffff, #0c0a09);
         }
     </style>
 }
