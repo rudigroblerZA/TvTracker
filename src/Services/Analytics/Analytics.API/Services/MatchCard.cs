@@ -121,7 +121,10 @@ public static class MatchCard
             var top = (height - rows * posterHeight - (rows - 1) * gap) / 2;
             for (var row = 0; row < rows; row++)
             {
-                Posters(canvas, content.Posters.Skip(row * 2).Take(2).ToList(), x, top + row * (posterHeight + gap), posterWidth, posterHeight, gap);
+                // A short last row (three posters) sits in the middle, not to one side.
+                var inRow = content.Posters.Skip(row * 2).Take(2).ToList();
+                var indent = (columns - inRow.Count) * (posterWidth + gap) / 2;
+                Posters(canvas, inRow, x + indent, top + row * (posterHeight + gap), posterWidth, posterHeight, gap);
             }
         }
     }

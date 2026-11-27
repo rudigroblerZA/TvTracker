@@ -275,6 +275,13 @@ Built and tried in the running app:
 - **Pages:** `/match` (start, the link, the shows that could be named, your matches) and `/match/{token}` (the guest
   picker with search and tap-to-pick, a member's accept, waiting, the result). An entry on For you.
 - **The follow source** `match` on the suggestions.
+- **The card** (5.1): `MatchCard` draws it in process with SkiaSharp and an embedded typeface (Inter, SIL Open Font
+  License), in both sizes, with up to four posters of what the two both love, or else of what they could watch
+  together. `GET /api/v1/matches/{token}/card.png?size=story|link` on Analytics, passed on by the web app at
+  `/match/{token}/card.png`. The drawing is kept in memory for a day; the match is read on every request, so a deleted
+  match's card stops at once (browsers and preview services may keep theirs for ten minutes). The result page shows
+  the card and a link to save the stories-sized one. A `/match/{token}` page's head carries the link-preview tags and
+  asks search engines not to index it.
 
 Where the code differs from the spec above:
 
@@ -288,10 +295,13 @@ Where the code differs from the spec above:
 - **Rate limiting** reuses the shared-list link policy for every anonymous call; there is no tighter limit on submit
   beyond the global limit on writes.
 - **A guest's delete key** lives in the page's memory only: closing the tab loses the ability to delete.
+- **The card's names** are the stored first names ("A friend" when none was given), never "You": the picture is the
+  same for everyone. A name in a script the embedded typeface lacks is drawn as boxes.
+- **The link preview's title and description are generic**: the page is drawn after the browser connects, so only the
+  picture is specific to the match.
 
 Not built:
 
-- **The card** (5.1) and the link-preview image. Sharing sends the link.
 - **Blocks** (R-P8): Analytics doesn't know who has blocked whom.
 - **The inviter being told** when the friend answers (inbox or push). They see it on `/match` and on the link.
 - **Picks becoming follows** when a guest signs up, and attaching their result to the new account.
