@@ -5,6 +5,7 @@
 @inject IPlatformServices Platform
 @inject NavigationManager Navigation
 @inject UserSession Session
+@inject TrackingClient Tracking
 
 <PageTitle>@(match?.Result is { } r ? $"{r.Score}% match" : "Taste Match") · @Brand.AppName</PageTitle>
 
@@ -24,9 +25,38 @@ else if (match.Result is { } result)
 {
     <MatchResult Result="result" Inviter="@InviterName" Friend="@FriendName" />
 
+    @if (claimed is { Count: > 0 })
+    {
+        <div class="panel">
+            <p><strong>This match is now on your account.</strong> Follow the shows you picked, so @Brand.AppName keeps your place in them?</p>
+            <p class="muted small">@string.Join(", ", claimed.Select(p => p.Title))</p>
+            <div class="actions">
+                @if (followedPicks)
+                {
+                    <span>Following @claimed.Count @(claimed.Count == 1 ? "show" : "shows"). <a href="shows">See My shows</a></span>
+                }
+                else
+                {
+                    <button class="btn" type="button" @onclick="FollowPicksAsync" disabled="@busy">Follow @(claimed.Count == 1 ? "it" : $"all {claimed.Count}")</button>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="match-card">
+        <img src="@CardUrl("link")" alt="@($"{InviterName} and {FriendName}: {result.Score}% match")" width="1200" height="630" loading="lazy" />
+        <a class="btn btn-quiet small" href="@CardUrl("story")" download="taste-match.png">Save the picture for stories</a>
+    </div>
+
     <div class="actions">
         <button class="btn" type="button" @onclick="ShareAsync">@(copied ? "Copied" : "Share this match")</button>
         <a class="btn btn-quiet" href="match">Match with someone else</a>
+        @if (match.OtherUserId is { } other)
+        {
+            <Feature Flag="@FeatureFlags.TonightTogether">
+                <a class="btn btn-quiet" href="tonight?with=@Uri.EscapeDataString(other)">Plan an evening together</a>
+            </Feature>
+        }
         @if (match.You is not null || guestKey is not null)
         {
             <button class="link small" type="button" @onclick="DeleteAsync">Delete this match</button>
@@ -36,7 +66,11 @@ else if (match.Result is { } result)
     {
         <p class="panel">
             <strong>Keep track of what you watch.</strong> @Brand.AppName remembers where you are in every show and tells you when they're back.
-            <a href="account/login?returnUrl=@Uri.EscapeDataString("/match")">Make an account</a>
+            <a href="account/login?returnUrl=@Uri.EscapeDataString(AfterSignIn)">Make an account</a>
+            @if (guestKey is not null)
+            {
+                <span class="muted small">Your match and your picks come with you.</span>
+            }
         </p>
     }
 }
@@ -122,6 +156,11 @@ else
 
     [Parameter] public string Token { get; set; } = "";
 
+    /// <summary>
+    /// A guest's key, carried through sign-in so the match they answered can be attached to the account they made.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "key")] public string? Key { get; set; }
+
     private MatchView? match;
     private bool loaded;
     private bool busy;
@@ -132,8 +171,17 @@ else
     private List<ShowSummary>? popular;
     private readonly List<ShowSummary> picks = [];
     private readonly HashSet<Guid> unnamed = [];
+    private IReadOnlyList<MatchShow>? claimed;
+    private bool followedPicks;
+
+    // Back to this match after signing in or up, with the key that lets a guest keep it.
+    private string AfterSignIn => guestKey is null ? "/match" : $"/match/{Token}?key={Uri.EscapeDataString(guestKey)}";
 
     private string Link => $"{Platform.PublicWebAddress}match/{Token}";
+
+    // The card is the site's to serve (it is also what a pasted link shows), so its address is absolute: in the mobile
+    // app a relative one would point at the app itself.
+    private string CardUrl(string size) => $"{Link}/card.png?size={size}";
 
     // "You" for whoever is looking, when the match knows which of the two they are.
     private string InviterName => match?.You == "inviter" ? "You" : match?.InviterName ?? "Your friend";
@@ -145,6 +193,12 @@ else
         await RunAsync(async () =>
         {
             match = await Analytics.GetMatchAsync(Token);
+            // Back from making an account: the guest who answered keeps the match, and is offered their picks.
+            if (match is { Result: not null, You: null } && Session.IsSignedIn && !string.IsNullOrEmpty(Key)
+                && await Analytics.ClaimMatchAsync(Token, Key) is { } kept)
+            {
+                (match, claimed) = (kept.Match, kept.Picks);
+            }
             if (match is { Result: null } && !Session.IsSignedIn)
             {
                 popular = await Catalog.GetTrendingAsync() ?? [];
@@ -184,6 +238,15 @@ else
     });
 
     private Task AcceptAsync() => RunAsync(async () => match = await Analytics.AcceptMatchAsync(Token, unnamed) ?? await Analytics.GetMatchAsync(Token));
+
+    private Task FollowPicksAsync() => RunAsync(async () =>
+    {
+        foreach (var pick in claimed ?? [])
+        {
+            await Tracking.FollowAsync(pick.ShowId, from: FollowSources.Match);
+        }
+        followedPicks = true;
+    });
 
     private Task DeleteAsync() => RunAsync(async () =>
     {

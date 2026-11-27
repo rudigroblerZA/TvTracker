@@ -113,7 +113,12 @@ public enum NotificationKind
     NewSeason,
     StatusChange,
     SeasonVerdict,
-    Crossover
+    Crossover,
+
+    /// <summary>
+    /// A friend answered the member's Taste Match. About no show: the item's link is the match.
+    /// </summary>
+    TasteMatch
 }
 
 public class InboxItem

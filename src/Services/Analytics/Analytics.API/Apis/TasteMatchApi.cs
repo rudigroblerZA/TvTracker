@@ -6,7 +6,10 @@ using Analytics.Data;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using TvTracker;
+using TvTracker.IntegrationEvents;
+using TvTracker.Persistence;
 
 namespace Analytics.API.Apis;
 
@@ -17,9 +20,15 @@ public record MatchStartedDto(string Token, IReadOnlyList<MatchShowDto> Nameable
 /// <param name="You">"inviter" or "friend" when the caller is signed in as one of the two; null otherwise.</param>
 /// <param name="Result">The result, once done.</param>
 /// <param name="Nameable">For a signed-in friend on an open match: their shows a result could name. Null otherwise.</param>
-/// <param name="GuestKey">Given once, to the guest who just answered: lets that device delete the match.</param>
+/// <param name="GuestKey">Given once, to the guest who just answered: lets that device delete the match, or attach it to an
+/// account made afterwards.</param>
+/// <param name="OtherUserId">The other member, told only to the two of them and only when both are members: for planning an
+/// evening together.</param>
 public record MatchViewDto(string Token, string State, string? InviterName, string? FriendName, string? You, TasteMatchDto? Result,
-    IReadOnlyList<MatchShowDto>? Nameable = null, string? GuestKey = null);
+    IReadOnlyList<MatchShowDto>? Nameable = null, string? GuestKey = null, string? OtherUserId = null);
+
+/// <param name="Picks">The shows the guest picked, for offering as follows.</param>
+public record MatchClaimedDto(MatchViewDto Match, IReadOnlyList<MatchShowDto> Picks);
 
 /// <param name="Score">The result's score, once done.</param>
 public record MyMatchDto(string Token, string State, string Role, string? OtherName, int? Score, DateTime CreatedAtUtc, DateTime? DoneAtUtc);
@@ -38,7 +47,13 @@ public record MatchUnnamedRequest(IReadOnlyList<Guid> Unnamed);
 /// <item><b>The link is the key.</b> Opening a match and answering it as a guest need no sign-in; they are rate limited
 /// by address, as shared lists' links are. An unknown, expired or deleted token all read the same: 404.</item>
 /// <item><b>One answer.</b> The first answer makes the match done; the result is stored and never recomputed.</item>
+/// <item><b>Blocks:</b> a member can't open or answer a match of someone they have blocked, or who blocked them; it
+/// reads as gone. Social knows who has blocked whom (<see cref="SocialBlocksClient"/>). A guest is nobody to block.</item>
+/// <item><b>The inviter is told</b> when the friend answers: an event stored with the result, which the worker's outbox
+/// sends and Notifications turns into an inbox item.</item>
 /// <item><b>Sides aren't stored</b> for members: they are read when the friend answers.</item>
+/// <item><b>The card</b> is the result as a picture (<see cref="MatchCard"/>): drawn on first request and kept in memory
+/// for a day, since a result never changes. It is only served while its match exists.</item>
 /// <item><b>Expiry:</b> an open link after 30 days, a done match after a year. Expired matches read as gone at once and
 /// are deleted the next time anyone starts a match.</item>
 /// </list>
@@ -63,6 +78,7 @@ public static class TasteMatchApi
         api.MapGet("/me/matches", MineAsync).RequireFeature(FeatureFlags.TasteMatch);
         api.MapPut("/me/matches/{token}/unnamed", SetUnnamedAsync).RequireFeature(FeatureFlags.TasteMatch);
         api.MapPost("/matches/{token}/accept", AcceptAsync).RequireFeature(FeatureFlags.TasteMatch);
+        api.MapPost("/matches/{token}/claim", ClaimAsync).RequireFeature(FeatureFlags.TasteMatch);
     }
 
     /// <summary>
@@ -74,10 +90,11 @@ public static class TasteMatchApi
         api.MapGet("/{token}", OpenAsync);
         api.MapPost("/{token}/picks", PickAsync);
         api.MapDelete("/{token}", DeleteAsync);
+        api.MapGet("/{token}/card.png", CardAsync);
     }
 
-    private static async Task<Results<Ok<MatchStartedDto>, ProblemHttpResult>> StartAsync(
-        ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    internal static async Task<Results<Ok<MatchStartedDto>, ProblemHttpResult>> StartAsync(
+        ClaimsPrincipal user, AnalyticsContext db, MatchMetrics metrics, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow().UtcDateTime;
@@ -104,10 +121,11 @@ public static class TasteMatchApi
         };
         db.TasteMatches.Add(match);
         await db.SaveChangesAsync(ct);
+        metrics.Started();
         return TypedResults.Ok(new MatchStartedDto(match.Token, await NameableAsync(db, side, ct)));
     }
 
-    private static async Task<Ok<List<MyMatchDto>>> MineAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    internal static async Task<Ok<List<MyMatchDto>>> MineAsync(ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
         var now = time.GetUtcNow().UtcDateTime;
@@ -126,7 +144,7 @@ public static class TasteMatchApi
     /// <summary>
     /// The inviter's shows not to name, while the match is still open.
     /// </summary>
-    private static async Task<Results<NoContent, NotFound>> SetUnnamedAsync(
+    internal static async Task<Results<NoContent, NotFound>> SetUnnamedAsync(
         string token, MatchUnnamedRequest request, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
@@ -140,10 +158,10 @@ public static class TasteMatchApi
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<Ok<MatchViewDto>, NotFound>> OpenAsync(
-        string token, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, CancellationToken ct)
+    internal static async Task<Results<Ok<MatchViewDto>, NotFound>> OpenAsync(
+        string token, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, TimeProvider time, CancellationToken ct)
     {
-        if (await FindAsync(db, token, time, ct) is not { } match)
+        if (await FindAsync(db, token, time, ct) is not { } match || await BlockedAsync(blocks, match, UserIdOf(user), ct))
         {
             return TypedResults.NotFound();
         }
@@ -160,9 +178,9 @@ public static class TasteMatchApi
     /// <summary>
     /// A guest's answer: the shows they picked, and a first name if they gave one.
     /// </summary>
-    private static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> PickAsync(
-        string token, MatchPicksRequest request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, TimeProvider time,
-        CancellationToken ct)
+    internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> PickAsync(
+        string token, MatchPicksRequest request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, MatchMetrics metrics,
+        TimeProvider time, CancellationToken ct)
     {
         if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
         {
@@ -170,7 +188,9 @@ public static class TasteMatchApi
         }
 
         var asked = request.ShowIds.Distinct().Take(TasteMatch.MaxPicks).ToList();
-        var picks = await db.Shows.AsNoTracking().Where(s => asked.Contains(s.ShowId)).Select(s => s.ShowId).ToListAsync(ct);
+        // The ones that are shows, in the order they were picked.
+        var known = await db.Shows.AsNoTracking().Where(s => asked.Contains(s.ShowId)).Select(s => s.ShowId).ToHashSetAsync(ct);
+        var picks = asked.Where(known.Contains).ToList();
         if (picks.Count < TasteMatch.MinPicks)
         {
             return Problem("too-few-picks", $"Pick at least {TasteMatch.MinPicks} shows.");
@@ -185,20 +205,21 @@ public static class TasteMatchApi
         match.GuestPicks = picks;
         match.GuestKey = NewToken();
         match.FriendDisplayName = FirstName(request.Name);
-        Finish(match, result, time);
+        Finish(db, match, result, time);
         await db.SaveChangesAsync(ct);
+        metrics.Answered(guest: true);
         return TypedResults.Ok(View(match, user) with { GuestKey = match.GuestKey });
     }
 
     /// <summary>
     /// A member friend's answer: their own shows, less the ones they asked not to have named.
     /// </summary>
-    private static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> AcceptAsync(
-        string token, MatchUnnamedRequest? request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, TimeProvider time,
-        CancellationToken ct)
+    internal static async Task<Results<Ok<MatchViewDto>, NotFound, ProblemHttpResult>> AcceptAsync(
+        string token, MatchUnnamedRequest? request, ClaimsPrincipal user, AnalyticsContext db, CatalogMatchClient catalog, SocialBlocksClient blocks,
+        MatchMetrics metrics, TimeProvider time, CancellationToken ct)
     {
         var userId = user.GetUserId();
-        if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match)
+        if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: null } match || await BlockedAsync(blocks, match, userId, ct))
         {
             return TypedResults.NotFound();
         }
@@ -222,15 +243,45 @@ public static class TasteMatchApi
 
         match.FriendUserId = userId;
         match.FriendDisplayName = FirstName(user.GetDisplayName());
-        Finish(match, result, time);
+        Finish(db, match, result, time);
         await db.SaveChangesAsync(ct);
+        metrics.Answered(guest: false);
         return TypedResults.Ok(View(match, user));
+    }
+
+    /// <summary>
+    /// A guest who answered and then made an account attaches the match to it: they become its friend, as if they had
+    /// answered signed in, and are handed their picks to follow if they wish. Needs the key they were given when they
+    /// answered. Nothing else is carried over: the picks stay picks until they follow them.
+    /// </summary>
+    internal static async Task<Results<Ok<MatchClaimedDto>, NotFound>> ClaimAsync(
+        string token, [FromQuery] string key, ClaimsPrincipal user, AnalyticsContext db, SocialBlocksClient blocks, MatchMetrics metrics,
+        TimeProvider time, CancellationToken ct)
+    {
+        var userId = user.GetUserId();
+        if (await FindAsync(db, token, time, ct, tracked: true) is not { Result: not null, FriendUserId: null, GuestKey: { } guestKey } match
+            || !SameKey(guestKey, key) || match.InviterUserId == userId || await BlockedAsync(blocks, match, userId, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        match.FriendUserId = userId;
+        // The device that answered is now signed in: the key has done its work.
+        match.GuestKey = null;
+        await db.SaveChangesAsync(ct);
+        metrics.Claimed();
+
+        var picks = match.GuestPicks;
+        var shows = await db.Shows.AsNoTracking().Where(s => picks.Contains(s.ShowId))
+            .Select(s => new { s.ShowId, s.Title, s.PosterUrl }).ToDictionaryAsync(s => s.ShowId, ct);
+        return TypedResults.Ok(new MatchClaimedDto(View(match, user),
+            picks.Where(shows.ContainsKey).Select(id => new MatchShowDto(id, shows[id].Title, shows[id].PosterUrl)).ToList()));
     }
 
     /// <summary>
     /// Deletes a match: the inviter, the friend when signed in, or the guest from the device that answered.
     /// </summary>
-    private static async Task<Results<NoContent, NotFound>> DeleteAsync(
+    internal static async Task<Results<NoContent, NotFound>> DeleteAsync(
         string token, ClaimsPrincipal user, AnalyticsContext db, TimeProvider time, [FromQuery] string? key = null, CancellationToken ct = default)
     {
         if (await FindAsync(db, token, time, ct, tracked: true) is not { } match)
@@ -240,8 +291,7 @@ public static class TasteMatchApi
 
         var userId = UserIdOf(user);
         var allowed = (userId is not null && (userId == match.InviterUserId || userId == match.FriendUserId))
-            || (match.GuestKey is { } guestKey && key is not null
-                && CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(guestKey), System.Text.Encoding.UTF8.GetBytes(key)));
+            || (match.GuestKey is { } guestKey && key is not null && SameKey(guestKey, key));
         if (!allowed)
         {
             // The same answer as an unknown token: who may delete says nothing about whether a match exists.
@@ -251,6 +301,75 @@ public static class TasteMatchApi
         db.TasteMatches.Remove(match);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
+    }
+
+    /// <summary>
+    /// A done match's share card. <paramref name="size"/> is "story" (1080×1920) or "link" (1200×630, the default: what a
+    /// pasted link shows). 404 for a match that isn't done, as for one that doesn't exist.
+    /// </summary>
+    internal static async Task<Results<FileContentHttpResult, NotFound>> CardAsync(
+        string token, AnalyticsContext db, HybridCache cache, IHttpClientFactory clients, Branding brand, TimeProvider time, HttpContext http,
+        string? size = null, CancellationToken ct = default)
+    {
+        // Read every time, so a deleted match's card stops being served at once; only the drawing is kept.
+        if (await FindAsync(db, token, time, ct) is not { Result: not null } match || ResultOf(match) is not { } result)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var shape = string.Equals(size, "story", StringComparison.OrdinalIgnoreCase) ? MatchCardSize.Story : MatchCardSize.Link;
+        var png = await cache.GetOrCreateAsync($"analytics:match-card:{match.Token}:{shape}:{brand.AppName}", async cancel =>
+            {
+                // What the two share when there is any; else what they could watch together. Never one side's own shows.
+                var (shows, label) = result.BothLove.Count > 0
+                    ? (result.BothLove.Select(s => s.PosterUrl), "You both love")
+                    : (result.WatchTogether.Select(s => s.PosterUrl), "Watch together");
+                var posters = await Task.WhenAll(shows.OfType<string>().Take(MatchCard.MaxPosters).Select(url => PosterAsync(clients, url, cancel)));
+                var drawn = posters.OfType<byte[]>().ToList();
+                return MatchCard.Render(new MatchCardContent(match.InviterDisplayName ?? "A friend", match.FriendDisplayName ?? "A friend",
+                    result.Score, result.Line, drawn, drawn.Count > 0 ? label : null, brand.AppName), shape);
+            },
+            new HybridCacheEntryOptions { Expiration = CardKeptFor, LocalCacheExpiration = CardKeptFor }, cancellationToken: ct);
+
+        // Short, so a deleted match's card doesn't outlive it by long in a browser or a preview service.
+        http.Response.Headers.CacheControl = "public, max-age=600";
+        return TypedResults.File(png, "image/png");
+    }
+
+    private static readonly TimeSpan CardKeptFor = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// The largest poster read for a card.
+    /// </summary>
+    private const int MaxPosterBytes = 4 * 1024 * 1024;
+
+    public const string PosterClient = "match-posters";
+
+    /// <summary>
+    /// A poster's bytes, or null when it can't be had quickly: the card is drawn without it. Only https addresses are
+    /// fetched (they come from the catalog's provider, and nothing else should be reachable from here).
+    /// </summary>
+    private static async Task<byte[]?> PosterAsync(IHttpClientFactory clients, string url, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var address) || address.Scheme != Uri.UriSchemeHttps)
+        {
+            return null;
+        }
+        try
+        {
+            using var response = await clients.CreateClient(PosterClient).GetAsync(address, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaxPosterBytes
+                || response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.Ordinal) != true)
+            {
+                return null;
+            }
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            return bytes.Length <= MaxPosterBytes ? bytes : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -277,13 +396,28 @@ public static class TasteMatchApi
             compared.Together, compared.Loose, shows);
     }
 
-    private static void Finish(TasteMatchRow match, TasteMatchDto result, TimeProvider time)
+    /// <summary>
+    /// Makes the match done, and stores the news for the inviter with it: saved together, sent by the worker's outbox.
+    /// </summary>
+    private static void Finish(AnalyticsContext db, TasteMatchRow match, TasteMatchDto result, TimeProvider time)
     {
         var now = time.GetUtcNow().UtcDateTime;
         match.Result = JsonSerializer.Serialize(result, Json);
         match.DoneAtUtc = now;
         match.ExpiresAtUtc = now + TasteMatchRow.KeptFor;
+        db.IntegrationEventLogs.Add(IntegrationEventLogEntry.For(
+            new TasteMatchAnsweredIntegrationEvent(match.InviterUserId, match.Token, match.FriendDisplayName, result.Score)));
     }
+
+    /// <summary>
+    /// Whether a signed-in caller and the match's inviter have a block between them. A guest, and the inviter
+    /// themselves, never do.
+    /// </summary>
+    private static async Task<bool> BlockedAsync(SocialBlocksClient blocks, TasteMatchRow match, string? userId, CancellationToken ct) =>
+        userId is not null && userId != match.InviterUserId && await blocks.BlockedBetweenAsync(match.InviterUserId, userId, ct);
+
+    private static bool SameKey(string expected, string given) =>
+        CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(given));
 
     private static async Task<List<MatchShowDto>> NameableAsync(AnalyticsContext db, IReadOnlyDictionary<Guid, double> side, CancellationToken ct)
     {
@@ -307,7 +441,10 @@ public static class TasteMatchApi
     {
         var userId = UserIdOf(user);
         var you = userId is null ? null : userId == match.InviterUserId ? "inviter" : userId == match.FriendUserId ? "friend" : null;
-        return new MatchViewDto(match.Token, StateOf(match), match.InviterDisplayName, match.FriendDisplayName, you, ResultOf(match), nameable);
+        // Each of two members is told who the other is; nobody else is, and a guest has no id to tell.
+        var other = you switch { "inviter" => match.FriendUserId, "friend" => match.InviterUserId, _ => null };
+        return new MatchViewDto(match.Token, StateOf(match), match.InviterDisplayName, match.FriendDisplayName, you, ResultOf(match), nameable,
+            OtherUserId: match.Result is null ? null : other);
     }
 
     private static string StateOf(TasteMatchRow match) => match.Result is null ? "open" : "done";

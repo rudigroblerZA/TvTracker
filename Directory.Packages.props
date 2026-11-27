@@ -60,6 +60,9 @@
     <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="3.0.0" />
     <PackageVersion Include="Pgvector.EntityFrameworkCore" Version="0.3.0" />
+    <!-- Taste Match's share card is drawn in process; the Linux package carries its own native library (no system fonts or fontconfig needed). -->
+    <PackageVersion Include="SkiaSharp" Version="4.158.0" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.158.0" />
   </ItemGroup>
   <ItemGroup Label="Feature flags (OpenFeature)">
     <PackageVersion Include="OpenFeature" Version="2.14.1" />

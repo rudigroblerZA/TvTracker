@@ -24,7 +24,8 @@ builder.AddRabbitMQEventBus("eventbus")
     .AddSubscription<ShowUnfollowedIntegrationEvent, UserEventHandlers>()
     .AddSubscription<UserRegisteredIntegrationEvent, UserEventHandlers>()
     .AddSubscription<UserProfileUpdatedIntegrationEvent, UserEventHandlers>()
-    .AddSubscription<UserDeletedIntegrationEvent, UserEventHandlers>();
+    .AddSubscription<UserDeletedIntegrationEvent, UserEventHandlers>()
+    .AddSubscription<TasteMatchAnsweredIntegrationEvent, TasteMatchNotificationHandler>();
 builder.Services.AddIntegrationEventOutbox<NotificationsContext>();
 
 builder.Services.AddSingleton(TimeProvider.System);

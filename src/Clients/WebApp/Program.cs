@@ -221,6 +221,32 @@ app.MapGet("/go/{showId:guid}", async (Guid showId, string provider, int type, s
     return Results.Redirect($"/shows/{showId}");
 });
 
+// A Taste Match's share card, at an address of the site's own: the browser, and the services that draw a link's preview,
+// can't reach Analytics.API. Not signed in: the link is the key, as for the match itself.
+app.MapGet("/match/{token}/card.png", async (string token, string? size, HttpContext http, IHttpClientFactory clients) =>
+{
+    try
+    {
+        var response = await clients.CreateClient(ApiClients.Analytics).GetAsync(
+            $"api/v1/matches/{Uri.EscapeDataString(token)}/card.png?size={Uri.EscapeDataString(size ?? "link")}",
+            HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+        http.Response.RegisterForDispose(response);
+        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType != "image/png")
+        {
+            return Results.NotFound();
+        }
+        if (response.Headers.CacheControl is { } keep)
+        {
+            http.Response.Headers.CacheControl = keep.ToString();
+        }
+        return Results.Stream(await response.Content.ReadAsStreamAsync(http.RequestAborted), "image/png");
+    }
+    catch (HttpRequestException)
+    {
+        return Results.NotFound();
+    }
+});
+
 // People's uploaded pictures, at the path the shared UI gives an img ("avatars/{userId}?v=…"): the browser can't reach
 // Identity.API, so the picture is passed on from it. Each upload has its own v, so a picture is kept for good.
 app.MapGet("/avatars/{userId}", async (string userId, HttpContext http, IHttpClientFactory clients) =>

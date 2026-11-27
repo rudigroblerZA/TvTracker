@@ -28,6 +28,27 @@ public class IntegrationEventLogEntry
     public EventState State { get; set; }
 
     public int TimesSent { get; set; }
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// The entry for an event, not yet published. <see cref="IntegrationEventOutbox{TContext}"/> adds these and publishes
+    /// them after the save; a process with no event bus of its own (an API whose worker has the outbox) adds one to its
+    /// context directly, in the same save as the change, and the worker's <see cref="OutboxPublisher"/> sends it within
+    /// the minute.
+    /// </summary>
+    public static IntegrationEventLogEntry For(TvTracker.EventBus.IntegrationEvent @event)
+    {
+        var type = @event.GetType();
+        return new IntegrationEventLogEntry
+        {
+            EventId = @event.Id,
+            EventTypeName = type.AssemblyQualifiedName!,
+            Content = System.Text.Json.JsonSerializer.Serialize(@event, type, JsonOptions),
+            CreatedAtUtc = DateTime.UtcNow,
+            State = EventState.NotPublished
+        };
+    }
 }
 
 /// <summary>

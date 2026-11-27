@@ -42,15 +42,7 @@ public sealed class IntegrationEventOutbox<TContext>(
 
     public void Add(IntegrationEvent @event)
     {
-        var type = @event.GetType();
-        dbContext.IntegrationEventLogs.Add(new IntegrationEventLogEntry
-        {
-            EventId = @event.Id,
-            EventTypeName = type.AssemblyQualifiedName!,
-            Content = JsonSerializer.Serialize(@event, type, JsonOptions),
-            CreatedAtUtc = DateTime.UtcNow,
-            State = EventState.NotPublished
-        });
+        dbContext.IntegrationEventLogs.Add(IntegrationEventLogEntry.For(@event));
         _added.Add(@event.Id);
     }
 

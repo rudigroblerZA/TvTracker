@@ -431,6 +431,8 @@ researchApi.WithReference(catalogSync);
 catalogApi.WithReference(analyticsApi);
 // Taste Match: Analytics asks the catalog, which has the vectors, how alike two sets of shows are.
 analyticsApi.WithReference(catalogApi);
+// And Social, which keeps blocks, before one member answers another's match.
+analyticsApi.WithReference(socialApi);
 catalogApi.WithReference(researchApi);
 
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.

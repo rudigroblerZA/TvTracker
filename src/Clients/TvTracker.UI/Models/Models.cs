@@ -11,7 +11,7 @@ public enum EpisodeLabel { None, SeriesPremiere, SeasonPremiere, SeasonFinale }
 
 public enum WatchProviderType { Stream, Free, Rent, Buy }
 
-public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict, Crossover }
+public enum NotificationKind { NewEpisode, NewSeason, StatusChange, SeasonVerdict, Crossover, TasteMatch }
 
 public enum DevicePlatform { Android, iOS, Web }
 
@@ -146,8 +146,12 @@ public record MatchStarted(string Token, IReadOnlyList<MatchShow> Nameable);
 
 /// <param name="State">"open" or "done".</param>
 /// <param name="You">"inviter" or "friend" when signed in as one of the two.</param>
+/// <param name="OtherUserId">The other member, when both are members and the caller is one of them.</param>
 public record MatchView(string Token, string State, string? InviterName, string? FriendName, string? You, TasteMatchResult? Result,
-    IReadOnlyList<MatchShow>? Nameable, string? GuestKey);
+    IReadOnlyList<MatchShow>? Nameable, string? GuestKey, string? OtherUserId = null);
+
+/// <param name="Picks">The shows a guest picked, offered as follows once they have an account.</param>
+public record MatchClaimed(MatchView Match, IReadOnlyList<MatchShow> Picks);
 
 public record MyMatch(string Token, string State, string Role, string? OtherName, int? Score, DateTime CreatedAtUtc, DateTime? DoneAtUtc);
 

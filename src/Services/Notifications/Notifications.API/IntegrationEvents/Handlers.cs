@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Notifications.API.Services;
 using Notifications.Data;
@@ -210,4 +210,28 @@ public sealed class UserEventHandlers(NotificationsContext db, NotificationHubPu
         }
         return prefs;
     }
+}
+
+/// <summary>
+/// A friend answered a Taste Match: one inbox item for the member who sent it, linking to the result. In the inbox
+/// only (no push or email): it is an answer to something they just did, and there is no preference for it yet.
+/// </summary>
+public sealed class TasteMatchNotificationHandler(NotificationsContext db) : IIntegrationEventHandler<TasteMatchAnsweredIntegrationEvent>
+{
+    public Task HandleAsync(TasteMatchAnsweredIntegrationEvent e, CancellationToken ct) =>
+        db.HandleOnceAsync(e, InboxExtensions.HandlerName<TasteMatchNotificationHandler>(e), () =>
+        {
+            db.Inbox.Add(new InboxItem
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = e.InviterUserId,
+                Kind = NotificationKind.TasteMatch,
+                Title = $"{e.FriendName ?? "Your friend"} answered your taste match",
+                Body = $"{e.Score}% match. See what you have in common and what to watch together.",
+                Link = $"/match/{e.Token}",
+                SourceEventId = e.Id,
+                CreatedAtUtc = e.CreatedAt.UtcDateTime
+            });
+            return Task.CompletedTask;
+        }, ct);
 }
