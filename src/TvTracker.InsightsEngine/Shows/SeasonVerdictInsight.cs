@@ -62,7 +62,7 @@ public sealed class SeasonVerdictInsight : IShowInsight
             return null;
         }
 
-        var others = show.RatedSeasons.Where(s => s.Number > 0 && s.Number != number).Select(s => s.Rating).ToList();
+        var others = show.RatedSeasons.Where(s => s.Number != number).Select(s => s.Rating).ToList();
         var othersMedian = others.Count > 0 ? Median(others) : (double?)null;
         var higher = others.Count(r => r > rating);
         var lower = others.Count(r => r < rating);
