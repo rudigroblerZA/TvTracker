@@ -8,65 +8,54 @@
 
 <h1>Discover</h1>
 
-<div class="tool-links">
-    <Feature Flag="@FeatureFlags.AwardsShelf" ShowLocked>
-        <ToolLink Href="prestige" Title="Prestige picks">The most-awarded popular shows, less what you've started.</ToolLink>
-    </Feature>
+@* Three ways in, pinned: the rest of the tools are at the foot of the page, under the lists. *@
+<div class="feature-cards">
     <Feature Flag="@FeatureFlags.Blend" ShowLocked>
-        <ToolLink Href="blend" Title="Blend">Mix two shows and find what sits between them.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.Mixtape" ShowLocked>
-        <ToolLink Href="mixtape" Title="Mixtape">Pick three shows you love and get the shows that fit all of them.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.ShowPuzzle" ShowLocked>
-        <ToolLink Href="puzzle" Title="Guess the show">A daily puzzle: find today's show in six guesses, with a clue for each miss.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.WhoSaidIt" ShowLocked>
-        <ToolLink Href="who-said-it" Title="Who said it?">A line from a show you've watched: pick the character who said it.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.TvAtlas" ShowLocked>
-        <ToolLink Href="atlas" Title="TV atlas">Where your shows are set, on a world map, and the countries they've taken you to.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.EpisodeLengths" ShowLocked>
-        <ToolLink Href="episode-lengths" Title="Episode lengths">The shows whose episodes grew longer season after season, and the ones that got trimmed.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.SeasonGaps" ShowLocked>
-        <ToolLink Href="season-gaps" Title="Between seasons">The longest waits between seasons, the shows revived after years away, and the ones still waiting.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.CastAges" ShowLocked>
-        <ToolLink Href="cast-ages" Title="Cast ages">The casts who grew up on screen, and the youngest and oldest casts on TV.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.CharacterNames" ShowLocked>
-        <ToolLink Href="names" Title="Characters' names">Your name on TV: the characters who share it, and the names each decade loved.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.TitleFormulas" ShowLocked>
-        <ToolLink Href="title-formulas" Title="Title formulas">Shows whose episode titles follow a pattern: "The One…", "Chapter One…", "Mr. Monk…".</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.Birthdays" ShowLocked>
-        <ToolLink Href="birthdays" Title="Birthdays">Who on TV was born today, what they turn and what they're known for, and your birthday twins.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.Milestones" ShowLocked>
-        <ToolLink Href="milestones" Title="Milestones">Shows about to reach their 100th, 200th or 500th episode, and the ones that just did.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.FarFromHome" ShowLocked>
-        <ToolLink Href="far-from-home" Title="Far from home">Leads born outside the country their show is set in, and where each country's casts come from.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.Namesakes" ShowLocked>
-        <ToolLink Href="namesakes" Title="Same name">Remakes, revivals and namesakes: shows that share a title, and who came back for both.</ToolLink>
-    </Feature>
-    <Feature Flag="@FeatureFlags.SixDegrees" ShowLocked>
-        <ToolLink Href="degrees" Title="Six degrees">The shortest chain of actors between any two shows, or a challenge to guess it.</ToolLink>
+        <FeatureCard Href="blend" Title="Blend" Tone="mix-0">
+            <Art>
+                <svg viewBox="0 0 120 80">
+                    <circle cx="46" cy="40" r="28" fill="currentColor" opacity="0.22" />
+                    <circle cx="74" cy="40" r="28" fill="currentColor" opacity="0.22" />
+                    <path d="M60 15.8a28 28 0 0 1 0 48.4a28 28 0 0 1 0-48.4z" fill="currentColor" opacity="0.55" />
+                    <circle cx="46" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="1.5" />
+                    <circle cx="74" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+            </Art>
+            <ChildContent>Mix two shows and find what sits between them.</ChildContent>
+        </FeatureCard>
     </Feature>
     <Feature Flag="@FeatureFlags.Universes" ShowLocked>
-        <ToolLink Href="universes" Title="Universes">Shows that share characters, franchises and crossovers, with a watch order.</ToolLink>
+        <FeatureCard Href="universes" Title="Universes" Tone="franchise">
+            <Art>
+                <svg viewBox="0 0 120 80">
+                    <path d="M14 58 42 30 70 46 104 16M42 30 34 66M70 46 92 68" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.55" />
+                    <circle cx="14" cy="58" r="4" fill="currentColor" />
+                    <circle cx="42" cy="30" r="7" fill="currentColor" />
+                    <circle cx="70" cy="46" r="5" fill="currentColor" />
+                    <circle cx="104" cy="16" r="6" fill="currentColor" />
+                    <circle cx="34" cy="66" r="3" fill="currentColor" opacity="0.6" />
+                    <circle cx="92" cy="68" r="4" fill="currentColor" opacity="0.6" />
+                </svg>
+            </Art>
+            <ChildContent>Shows that share characters, franchises and crossovers, with a watch order.</ChildContent>
+        </FeatureCard>
     </Feature>
     <AuthorizeView>
         <Authorized>
             <Feature Flag="@FeatureFlags.Nanogenres" ShowLocked>
-                <ToolLink Href="nanogenres" Title="Browse by nanogenre">Fine-grained genres like sports comedy or cooking reality, found in the catalog.</ToolLink>
-            </Feature>
-            <Feature Flag="@FeatureFlags.NetworkReports" ShowLocked>
-                <ToolLink Href="networks" Title="Network report cards">Which networks and streamers end shows well, bring them back, and keep you waiting.</ToolLink>
+                <FeatureCard Href="nanogenres" Title="Nanogenres" Tone="mix-2">
+                    <Art>
+                        <svg viewBox="0 0 120 80">
+                            <rect x="8" y="8" width="52" height="16" rx="8" fill="currentColor" opacity="0.8" />
+                            <rect x="66" y="8" width="38" height="16" rx="8" fill="currentColor" opacity="0.3" />
+                            <rect x="20" y="32" width="34" height="16" rx="8" fill="currentColor" opacity="0.3" />
+                            <rect x="60" y="32" width="52" height="16" rx="8" fill="currentColor" opacity="0.55" />
+                            <rect x="8" y="56" width="44" height="16" rx="8" fill="currentColor" opacity="0.55" />
+                            <rect x="58" y="56" width="30" height="16" rx="8" fill="currentColor" opacity="0.8" />
+                        </svg>
+                    </Art>
+                    <ChildContent>Fine-grained genres like sports comedy or cooking reality, found in the catalog.</ChildContent>
+                </FeatureCard>
             </Feature>
         </Authorized>
     </AuthorizeView>
@@ -134,6 +123,64 @@
         <SignInPrompt Message="Sign in to discover hidden gems, bingeable shows, fan favorites and more." />
     </NotAuthorized>
 </AuthorizeView>
+
+<section class="more-tools">
+    <h2>More to explore</h2>
+    <div class="tool-links">
+        <Feature Flag="@FeatureFlags.AwardsShelf" ShowLocked>
+            <ToolLink Href="prestige" Title="Prestige picks">The most-awarded popular shows, less what you've started.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.Mixtape" ShowLocked>
+            <ToolLink Href="mixtape" Title="Mixtape">Pick three shows you love and get the shows that fit all of them.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.ShowPuzzle" ShowLocked>
+            <ToolLink Href="puzzle" Title="Guess the show">A daily puzzle: find today's show in six guesses, with a clue for each miss.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.WhoSaidIt" ShowLocked>
+            <ToolLink Href="who-said-it" Title="Who said it?">A line from a show you've watched: pick the character who said it.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.TvAtlas" ShowLocked>
+            <ToolLink Href="atlas" Title="TV atlas">Where your shows are set, on a world map, and the countries they've taken you to.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.EpisodeLengths" ShowLocked>
+            <ToolLink Href="episode-lengths" Title="Episode lengths">The shows whose episodes grew longer season after season, and the ones that got trimmed.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.SeasonGaps" ShowLocked>
+            <ToolLink Href="season-gaps" Title="Between seasons">The longest waits between seasons, the shows revived after years away, and the ones still waiting.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.CastAges" ShowLocked>
+            <ToolLink Href="cast-ages" Title="Cast ages">The casts who grew up on screen, and the youngest and oldest casts on TV.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.CharacterNames" ShowLocked>
+            <ToolLink Href="names" Title="Characters' names">Your name on TV: the characters who share it, and the names each decade loved.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.TitleFormulas" ShowLocked>
+            <ToolLink Href="title-formulas" Title="Title formulas">Shows whose episode titles follow a pattern: "The One…", "Chapter One…", "Mr. Monk…".</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.Birthdays" ShowLocked>
+            <ToolLink Href="birthdays" Title="Birthdays">Who on TV was born today, what they turn and what they're known for, and your birthday twins.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.Milestones" ShowLocked>
+            <ToolLink Href="milestones" Title="Milestones">Shows about to reach their 100th, 200th or 500th episode, and the ones that just did.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.FarFromHome" ShowLocked>
+            <ToolLink Href="far-from-home" Title="Far from home">Leads born outside the country their show is set in, and where each country's casts come from.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.Namesakes" ShowLocked>
+            <ToolLink Href="namesakes" Title="Same name">Remakes, revivals and namesakes: shows that share a title, and who came back for both.</ToolLink>
+        </Feature>
+        <Feature Flag="@FeatureFlags.SixDegrees" ShowLocked>
+            <ToolLink Href="degrees" Title="Six degrees">The shortest chain of actors between any two shows, or a challenge to guess it.</ToolLink>
+        </Feature>
+        <AuthorizeView>
+            <Authorized>
+                <Feature Flag="@FeatureFlags.NetworkReports" ShowLocked>
+                    <ToolLink Href="networks" Title="Network report cards">Which networks and streamers end shows well, bring them back, and keep you waiting.</ToolLink>
+                </Feature>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</section>
 
 @code {
     // The address holds the list and genre, so a list can be shared or bookmarked.

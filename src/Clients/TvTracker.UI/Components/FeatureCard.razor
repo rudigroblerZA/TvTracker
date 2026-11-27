@@ -1,0 +1,36 @@
+@* A large card for a tool pinned to the top of a hub page (Discover), with a small drawing beside its name. Put them
+   in a <div class="feature-cards">, each in its own <Feature> when the tool has a flag; a hidden one leaves no gap, and
+   the rest widen to fill the row. Like ToolLink, in <Feature ShowLocked> a tool that's part of a plan the user isn't
+   on stays, marked with that plan. Tone picks the card's colour: one of the CSS colour variables ("mix-0", "franchise"). *@
+<a class="feature-card @(Lock is null ? "" : "feature-card-locked")" href="@Href" style="--tone: var(--@Tone)">
+    <span class="feature-card-art" aria-hidden="true">@Art</span>
+    <span class="feature-card-text">
+        <span>
+            <strong>@Title</strong>
+            @if (Lock is { } locked)
+            {
+                @(" ")<span class="tag plan-tag">@Plans.Name(locked.Plan)</span>
+            }
+        </span>
+        <span class="muted">@ChildContent</span>
+    </span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>
+    /// The name of a CSS colour variable, without its dashes.
+    /// </summary>
+    [Parameter] public string Tone { get; set; } = "accent";
+
+    /// <summary>
+    /// The drawing: an inline SVG that draws in <c>currentColor</c>, which is the card's tone.
+    /// </summary>
+    [Parameter] public RenderFragment? Art { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [CascadingParameter] public FeatureLock? Lock { get; set; }
+}

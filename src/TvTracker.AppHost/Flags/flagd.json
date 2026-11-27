@@ -175,8 +175,9 @@
     "milestones": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked." }
+      "defaultVariant": "on",
+      "metadata": { "description": "Episode milestones: shows' 100th, 200th, 500th episodes coming up or just aired, with the user's followed shows marked.", "name": "Milestones", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "affiliates": {
       "state": "ENABLED",
@@ -254,7 +255,8 @@
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
       "defaultVariant": "on",
-      "metadata": { "description": "TV atlas: where your shows are set, on a world map, and where each show is set on its page." }
+      "metadata": { "description": "TV atlas: where your shows are set, on a world map, and where each show is set on its page.", "name": "TV atlas", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "tv-clock": {
       "state": "ENABLED",
@@ -365,8 +367,9 @@
     "network-reports": {
       "state": "ENABLED",
       "variants": { "on": true, "off": false },
-      "defaultVariant": "off",
-      "metadata": { "description": "Network report cards: how each network's and streamer's shows rate, end, come back and how long they keep you waiting." }
+      "defaultVariant": "on",
+      "metadata": { "description": "Network report cards: how each network's and streamer's shows rate, end, come back and how long they keep you waiting.", "name": "Network report cards", "plans": "plus,family" },
+      "targeting": { "if": [{ "and": [{ "var": "plan" }, { "!": { "in": [{ "var": "plan" }, ["plus", "family"]] } }] }, "off", null] }
     },
     "episode-duels": {
       "state": "ENABLED",
