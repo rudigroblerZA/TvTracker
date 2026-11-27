@@ -116,6 +116,51 @@ public sealed class SubscriptionPlanHandlersTests(IdentityDatabase database) : I
     }
 
     [Fact]
+    public async Task A_start_that_arrives_after_its_own_subscriptions_ending_is_left()
+    {
+        await ProfileAsync();
+        var subscription = Guid.NewGuid();
+        // The start waited in the outbox; the ending overtook it.
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1), subscription));
+        bus.Clear();
+
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At, subscription));
+
+        Assert.Equal(Plans.Free, await PlanAsync());
+        Assert.Empty(PlanChanges());
+    }
+
+    [Fact]
+    public async Task A_subscription_that_ended_and_came_back_counts_again()
+    {
+        await ProfileAsync();
+        var subscription = Guid.NewGuid();
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At, subscription));
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1), subscription));
+
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddHours(2), subscription));
+
+        Assert.Equal(Plans.Plus, await PlanAsync());
+    }
+
+    [Fact]
+    public async Task The_ending_of_an_old_subscription_doesnt_take_a_newer_one_to_the_same_plan()
+    {
+        await ProfileAsync();
+        var (old, renewed) = (Guid.NewGuid(), Guid.NewGuid());
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At, old));
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(1), old));
+        await HandleAsync(new SubscriptionStartedIntegrationEvent(userId, Plans.Plus, At.AddHours(2), renewed));
+        bus.Clear();
+
+        // The old one's ending again, stamped later than the new one's start.
+        await HandleAsync(new SubscriptionEndedIntegrationEvent(userId, Plans.Plus, At.AddHours(3), old));
+
+        Assert.Equal(Plans.Plus, await PlanAsync());
+        Assert.Empty(PlanChanges());
+    }
+
+    [Fact]
     public async Task A_late_start_doesnt_bring_back_a_plan_that_ended_since()
     {
         await ProfileAsync();

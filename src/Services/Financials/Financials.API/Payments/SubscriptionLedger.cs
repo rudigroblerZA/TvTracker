@@ -154,7 +154,7 @@ public sealed class SubscriptionLedger(FinancialsContext db, IIntegrationEventOu
         subscription.UpdatedAtUtc = now.UtcDateTime;
         if (!await RunningAsync(subscription.UserId, subscription.Id, ct))
         {
-            outbox.Add(new SubscriptionEndedIntegrationEvent(subscription.UserId, subscription.Plan, now));
+            outbox.Add(new SubscriptionEndedIntegrationEvent(subscription.UserId, subscription.Plan, now, subscription.Id));
         }
     }
 
@@ -228,7 +228,7 @@ public sealed class SubscriptionLedger(FinancialsContext db, IIntegrationEventOu
 
         if (starting)
         {
-            outbox.Add(new SubscriptionStartedIntegrationEvent(subscription.UserId, subscription.Plan, now));
+            outbox.Add(new SubscriptionStartedIntegrationEvent(subscription.UserId, subscription.Plan, now, subscription.Id));
         }
     }
 

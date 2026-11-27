@@ -50,6 +50,10 @@ public static class LegacyImport
                 [("affiliate_programs", "select * from affiliate_programs"), ("outbound_clicks", Clicks), ("affiliate_conversions", "select * from affiliate_conversions")],
                 "affiliates", logger, ct);
         }
+        // Settings saved before the admin's id was kept beside their name (every row copied above is one) can't be found
+        // when that admin deletes their account, so the name comes off now. Only "last saved by" is lost.
+        await db.PaymentSettings.Where(s => s.UpdatedById == null && s.UpdatedBy != null)
+            .ExecuteUpdateAsync(u => u.SetProperty(s => s.UpdatedBy, (string?)null), ct);
     }
 
     /// <summary>
@@ -58,18 +62,19 @@ public static class LegacyImport
     internal static async Task CopyAsync(FinancialsContext db, string sourceConnectionString, IReadOnlyList<(string Table, string Select)> tables,
         string what, ILogger logger, CancellationToken ct)
     {
-        // An old database that can't be reached stops the start: were the service to carry on, its first new row would
-        // make these tables look filled, and what was kept before would never be copied. One that isn't there at all
-        // (dropped since, or never made) has nothing to copy, like one without the tables.
+        // An old database that can't be opened stops the start, whatever the reason (down, restoring, a mistyped name):
+        // were the service to carry on, its first new row would make these tables look filled, and what was kept
+        // before would never be copied. A deployment whose old database is really gone says so by taking its
+        // connection string away.
         await using var source = new NpgsqlConnection(sourceConnectionString);
         try
         {
             await source.OpenAsync(ct);
         }
-        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.InvalidCatalogName)
+        catch (NpgsqlException ex)
         {
-            logger.LogInformation("No old database to copy {What} from: {Message}", what, ex.MessageText);
-            return;
+            throw new InvalidOperationException(
+                $"The old database to copy {what} from can't be opened ({ex.Message}). Fix its connection string, or remove the connection string if that database is gone for good.", ex);
         }
         foreach (var (table, _) in tables)
         {

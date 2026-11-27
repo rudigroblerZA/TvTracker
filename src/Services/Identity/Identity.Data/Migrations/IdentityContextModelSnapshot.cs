@@ -164,6 +164,12 @@ namespace Identity.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTime?>("EndedSubscriptionAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EndedSubscriptionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -178,6 +184,9 @@ namespace Identity.Data.Migrations
 
                     b.Property<DateTime?>("PlanChangedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PlanSubscriptionId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Region")
                         .IsRequired()

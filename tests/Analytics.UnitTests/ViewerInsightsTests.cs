@@ -237,6 +237,7 @@ public class ViewerInsightsTests
         // A year before their first viewing or after this one is as good as none asked for.
         Assert.Equal(latest.Shown, YearInTv.Split(watches, 0, today).Shown);
         Assert.Equal(latest.Shown, YearInTv.Split(watches, 10000, today).Shown);
+        Assert.Equal(latest.Shown, YearInTv.Split(watches, 9999, today).Shown);
         Assert.Equal(latest.Shown, YearInTv.Split(watches, today.Year + 1, today).Shown);
     }
 

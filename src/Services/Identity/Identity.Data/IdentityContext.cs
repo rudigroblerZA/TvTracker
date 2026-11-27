@@ -89,6 +89,19 @@ public class UserProfile
     public DateTime? PlanChangedAtUtc { get; set; }
 
     /// <summary>
+    /// The subscription that set <see cref="Plan"/>, so only its own ending takes the plan away; null when an admin set
+    /// it, or a subscription from before ids were sent.
+    /// </summary>
+    public Guid? PlanSubscriptionId { get; set; }
+
+    /// <summary>
+    /// The subscription last heard to have ended, and when: its own start, arriving late, is then known to be over.
+    /// </summary>
+    public Guid? EndedSubscriptionId { get; set; }
+
+    public DateTime? EndedSubscriptionAtUtc { get; set; }
+
+    /// <summary>
     /// The plan they get: their own, or "family" while they're in an active family; what other services are sent
     /// (<c>PlanState</c>).
     /// </summary>

@@ -104,14 +104,31 @@ public sealed class LegacyImportTests(PostgresServer server)
     }
 
     [Fact]
-    public async Task An_old_database_that_is_gone_has_nothing_to_copy()
+    public async Task An_old_database_that_cant_be_opened_stops_the_start()
     {
-        var gone = new Npgsql.NpgsqlConnectionStringBuilder(await server.CreateDatabaseAsync()) { Database = "dropped_since" }.ConnectionString;
+        // A mistyped name, or a database still being restored: carrying on would let new rows fill the tables, and what
+        // was kept before would never be copied.
+        var gone = new Npgsql.NpgsqlConnectionStringBuilder(await server.CreateDatabaseAsync()) { Database = "not_there" }.ConnectionString;
         var configuration = Old(gone, gone);
         await using var db = await FinancialsAsync();
 
-        await LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => LegacyImport.RunAsync(db, configuration, NullLogger.Instance, Ct));
 
-        Assert.False(await db.Subscriptions.AnyAsync(Ct));
+        Assert.Contains("remove the connection string", ex.Message);
+    }
+
+    [Fact]
+    public async Task A_name_saved_without_its_admins_id_comes_off_the_payment_settings()
+    {
+        await using var db = await FinancialsAsync();
+        db.PaymentSettings.Add(new PaymentSettings { Provider = "stripe", UpdatedAtUtc = DateTime.UtcNow, UpdatedBy = "alice" });
+        await db.SaveChangesAsync(Ct);
+
+        await LegacyImport.RunAsync(db, new ConfigurationBuilder().Build(), NullLogger.Instance, Ct);
+
+        db.ChangeTracker.Clear();
+        var settings = await db.PaymentSettings.SingleAsync(Ct);
+        Assert.Null(settings.UpdatedBy);
+        Assert.Equal("stripe", settings.Provider);
     }
 }

@@ -26,6 +26,8 @@ public static class PlanState
             return false;
         }
         profile.Plan = plan;
+        // Whoever set it before no longer did; a subscription's handler says so itself after this.
+        profile.PlanSubscriptionId = null;
         profile.PlanChangedAtUtc = now.UtcDateTime;
         profile.UpdatedAtUtc = now.UtcDateTime;
         await RecomputeAsync(db, outbox, now, [profile.UserId, .. await MembersOfAsync(db, profile.UserId, ct)], ct);
