@@ -20,6 +20,7 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
     public DbSet<UserPlanCopy> Plans => Set<UserPlanCopy>();
     public DbSet<UserService> UserServices => Set<UserService>();
     public DbSet<SeasonCall> SeasonCalls => Set<SeasonCall>();
+    public DbSet<TasteMatchRow> TasteMatches => Set<TasteMatchRow>();
 
     public DbSet<ShowInsightsRow> ShowInsights => Set<ShowInsightsRow>();
     public DbSet<PremiereRow> Premieres => Set<PremiereRow>();
@@ -193,6 +194,23 @@ public class AnalyticsContext(DbContextOptions<AnalyticsContext> options) : DbCo
             // The crowd's call per season, and the scorer's unscored calls.
             entity.HasIndex(c => new { c.ShowId, c.SeasonNumber });
             entity.HasIndex(c => c.ScoredAtUtc).HasFilter("\"ScoredAtUtc\" IS NULL");
+        });
+
+        modelBuilder.Entity<TasteMatchRow>(entity =>
+        {
+            entity.ToTable("taste_matches");
+            entity.HasKey(m => m.Token);
+            entity.Property(m => m.Token).HasMaxLength(32);
+            entity.Property(m => m.InviterUserId).HasMaxLength(64);
+            entity.Property(m => m.FriendUserId).HasMaxLength(64);
+            entity.Property(m => m.InviterDisplayName).HasMaxLength(64);
+            entity.Property(m => m.FriendDisplayName).HasMaxLength(64);
+            entity.Property(m => m.GuestKey).HasMaxLength(32);
+            entity.Property(m => m.Result).HasColumnType("jsonb");
+            // A member's matches, on either side; and the sweep of expired ones.
+            entity.HasIndex(m => m.InviterUserId);
+            entity.HasIndex(m => m.FriendUserId).HasFilter("\"FriendUserId\" IS NOT NULL");
+            entity.HasIndex(m => m.ExpiresAtUtc);
         });
 
         modelBuilder.Entity<NetworkReportRow>(entity =>

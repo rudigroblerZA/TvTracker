@@ -1,0 +1,83 @@
+@* A Taste Match's result: the number and its line, what the two share, where they differ, and what they could watch
+   together. Shown to anyone with the link, so it names only what the result carries. *@
+<section class="match-result">
+    <p class="match-names">@Inviter <span aria-hidden="true">×</span> @Friend</p>
+    <p class="match-score"><span>@Result.Score%</span> match</p>
+    <p class="match-line">@Result.Line</p>
+</section>
+
+@if (Result.BothLove.Count > 0)
+{
+    <h2>You both love</h2>
+    <div class="card-grid">
+        @foreach (var show in Result.BothLove)
+        {
+            <ShowCard @key="show.ShowId" ShowId="show.ShowId" Title="@show.Title" PosterUrl="@show.PosterUrl" />
+        }
+    </div>
+}
+
+@if (Result.BothInto.Count > 0 || Result.Differ is not null)
+{
+    <div class="panel">
+        @if (Result.BothInto.Count > 0)
+        {
+            <p><strong>You're both into</strong> @string.Join(", ", Result.BothInto.Select(g => g.ToLowerInvariant())).</p>
+        }
+        @if (Result.Differ is { } differ)
+        {
+            <p class="muted">@Brings(Inviter, differ.Inviter, first: true); @Brings(Friend, differ.Friend, first: false).</p>
+        }
+    </div>
+}
+
+@if (Result.WatchTogether.Count > 0)
+{
+    <h2>Watch together</h2>
+    @if (Result.Loose)
+    {
+        <p class="notice">Not much overlap, so these are the middle ground.</p>
+    }
+    <div class="card-grid">
+        @foreach (var pick in Result.WatchTogether)
+        {
+            <ShowCard @key="pick.ShowId" ShowId="pick.ShowId" Title="@pick.Title" PosterUrl="@pick.PosterUrl" From="@FollowSources.Match">
+                @if (Reason(pick) is { Length: > 0 } reason)
+                {
+                    <div class="muted small">@reason</div>
+                }
+            </ShowCard>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public TasteMatchResult Result { get; set; } = null!;
+
+    /// <summary>
+    /// What to call each of the two: a first name, or "You" for whoever is looking.
+    /// </summary>
+    [Parameter, EditorRequired] public string Inviter { get; set; } = "";
+
+    [Parameter, EditorRequired] public string Friend { get; set; } = "";
+
+    // "You" is whoever is looking: "You bring the comedy", "Crime from you".
+    private static bool IsYou(string who) => who == "You";
+
+    private static string Brings(string who, string genre, bool first) =>
+        $"{(first ? who : Whom(who))} {(IsYou(who) ? "bring" : "brings")} the {genre.ToLowerInvariant()}";
+
+    private static string Whom(string who) => IsYou(who) ? "you" : who;
+
+    /// <summary>
+    /// "Crime like Sam's · Comedy like yours": the genres a suggestion takes from each.
+    /// </summary>
+    private string Reason(MatchPick pick)
+    {
+        var parts = new List<string>();
+        if (pick.FromInviter.Count > 0) parts.Add($"{string.Join(", ", pick.FromInviter)} from {Whom(Inviter)}");
+        if (pick.FromFriend.Count > 0) parts.Add($"{string.Join(", ", pick.FromFriend)} from {Whom(Friend)}");
+        if (parts.Count == 0 && pick.FromBoth.Count > 0) parts.Add($"{string.Join(", ", pick.FromBoth)}, like both");
+        return string.Join(" · ", parts);
+    }
+}

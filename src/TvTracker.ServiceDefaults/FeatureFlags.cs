@@ -33,6 +33,10 @@ public static class FeatureFlags
     public const string TimeOff = "time-off";
     public const string SpoilerShield = "spoiler-shield";
     public const string Social = "social";
+    /// <summary>
+    /// Taste Match: compare TV taste with a friend through a link; the friend needs no account. Free, and off until launch.
+    /// </summary>
+    public const string TasteMatch = "taste-match";
     public const string TonightTogether = "tonight-together";
     public const string CommunityInsights = "community-insights";
     public const string Corrections = "corrections";

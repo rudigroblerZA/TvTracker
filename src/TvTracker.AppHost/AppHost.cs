@@ -349,7 +349,7 @@ if (catalogProvider == "tvdb")
 }
 
 // The sync worker's callers sign in as the internal client; the worker accepts nothing else on its internal APIs.
-foreach (var caller in new[] { catalogApi, ratingsApi, researchApi, analyticsWorker, socialApi })
+foreach (var caller in new[] { catalogApi, ratingsApi, researchApi, analyticsApi, analyticsWorker, socialApi })
 {
     caller.WithEnvironment("Internal__ClientSecret", internalClientSecret);
 }
@@ -429,6 +429,8 @@ researchApi.WithReference(catalogSync);
 
 // The ops dashboard (/ops on Catalog.API) includes Analytics' and Research's stats.
 catalogApi.WithReference(analyticsApi);
+// Taste Match: Analytics asks the catalog, which has the vectors, how alike two sets of shows are.
+analyticsApi.WithReference(catalogApi);
 catalogApi.WithReference(researchApi);
 
 // On first start (no shows yet), Analytics asks the sync worker to replay the catalog.
