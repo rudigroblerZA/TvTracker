@@ -40,6 +40,7 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     /// Social can't be reached.
     /// </summary>
     private bool socialDown;
+    private bool catalogDown;
 
     private static readonly ILoggerFactory Log = NullLoggerFactory.Instance;
 
@@ -199,6 +200,23 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     }
 
     [Fact]
+    public async Task While_the_catalog_cannot_be_asked_an_answer_is_put_off_and_the_match_stays_open()
+    {
+        var token = (await StartAsync()).Token;
+        catalogDown = true;
+
+        await using (var db = database.Context())
+        {
+            var pick = await TasteMatchApi.PickAsync(token, new MatchPicksRequest(Shows.Take(3).ToList(), null), Guest, db, Catalog(), Blocks(),
+                metrics, Log, time, Ct);
+            Assert.Equal(503, Assert.IsType<ProblemHttpResult>(pick.Result).StatusCode);
+        }
+
+        catalogDown = false;
+        Assert.Equal("done", (await PickAsync(token, Shows.Take(3).ToList(), null))!.State);
+    }
+
+    [Fact]
     public async Task Of_two_answers_arriving_together_one_wins_and_the_inviter_is_told_once()
     {
         var token = (await StartAsync()).Token;
@@ -348,8 +366,9 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     }
 
     // The catalog says the two are fairly alike and suggests the last three shows.
-    private static CatalogMatchClient Catalog(Gate? gate = null) => new(Scripted(JsonSerializer.Serialize(
-        new { alike = 0.6, seedsFirst = Shows.Take(3), seedsSecond = Shows.Skip(3).Take(3), together = Shows.Skip(9), loose = false }), gate: gate));
+    private CatalogMatchClient Catalog(Gate? gate = null) => new(Scripted(JsonSerializer.Serialize(
+        new { alike = 0.6, seedsFirst = Shows.Take(3), seedsSecond = Shows.Skip(3).Take(3), together = Shows.Skip(9), loose = false }),
+        down: catalogDown, gate: gate), NullLogger<CatalogMatchClient>.Instance);
 
     private SocialBlocksClient Blocks() => new(Scripted(JsonSerializer.Serialize(new { blocked }), down: socialDown));
 

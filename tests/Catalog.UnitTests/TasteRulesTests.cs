@@ -1,3 +1,4 @@
+using Catalog.Embeddings;
 using Catalog.Mixes;
 
 namespace Catalog.UnitTests;
@@ -34,6 +35,10 @@ public class TasteRulesTests
         // Three pairs: crime to comedy 1, and each to the crime comedy about 0.29.
         Assert.Equal(0.293, TasteRules.ReferenceDistance([Crime, Comedy, CrimeComedy]), 3);
         Assert.Equal(0, TasteRules.ReferenceDistance([Crime]));
+        // An even number of pairs: the mean of the two middle ones, as a median is everywhere else in the catalog.
+        // Four shows on two axes, two a side: the six distances are 0, 0, 1, 1, 1, 1.
+        Assert.Equal(1, TasteRules.ReferenceDistance([Crime, Crime, Comedy, Comedy]), 6);
+        Assert.Equal(0.5, Vectors.Median([0, 0, 1, 1]), 6);
     }
 
     [Fact]

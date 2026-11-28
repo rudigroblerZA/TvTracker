@@ -946,10 +946,11 @@ public sealed class NotificationsClient(IHttpClientFactory f, IAccessTokenProvid
         SendAsync(ApiClients.Notifications, HttpMethod.Delete, $"api/v1/devices/{id}", null, ct);
 
     /// <summary>
-    /// How many notifications are unread: the inbox's count, asked for with a page of one so the items aren't sent.
+    /// How many notifications are unread: the inbox's count, asked for with a page of one so the items aren't sent. The
+    /// last answer is kept for when there's no connection.
     /// </summary>
     public async Task<int> GetUnreadCountAsync(CancellationToken ct = default) =>
-        (await GetAsync<InboxPage>(ApiClients.Notifications, "api/v1/inbox?unreadOnly=true&pageSize=1", ct))?.UnreadCount ?? 0;
+        (await GetAsync<InboxPage>(ApiClients.Notifications, "api/v1/inbox?unreadOnly=true&pageSize=1", ct, cacheForOffline: true))?.UnreadCount ?? 0;
 
     public Task<InboxPage?> GetInboxAsync(bool unreadOnly = false, CancellationToken ct = default) =>
         GetAsync<InboxPage>(ApiClients.Notifications, $"api/v1/inbox?unreadOnly={unreadOnly.ToString().ToLowerInvariant()}", ct, cacheForOffline: true);

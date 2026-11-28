@@ -11,7 +11,9 @@ namespace Catalog.ImportCli;
 /// <param name="Never">No match among those may have a title that starts with one of these (a spin-off of one of the
 /// shows, say).</param>
 /// <param name="Loose">Whether the answer should say the shows have little in common; not checked when left out.</param>
-public sealed record MixCase(string[] Shows, string[]? Expect = null, string[]? Never = null, bool? Loose = null)
+/// <param name="Years">The year each of <paramref name="Shows"/> started, in the same order, for telling it from another show
+/// with the same title (The Office, Doctor Who); null for a show that needs none, or left out altogether.</param>
+public sealed record MixCase(string[] Shows, string[]? Expect = null, string[]? Never = null, bool? Loose = null, int?[]? Years = null)
 {
     public string Name => string.Join(Shows.Length == 2 ? " × " : " + ", Shows);
 }
@@ -95,10 +97,11 @@ public static class MixEval
         }
 
         var ids = new List<Guid>();
-        foreach (var title in mix.Shows)
+        for (var i = 0; i < mix.Shows.Length; i++)
         {
-            // By title alone: two shows with one title can't be told apart here, and the mix is then skipped, not guessed.
-            var (id, why) = await EvalHttp.ResolveShowAsync(http, title, null, ct);
+            var title = mix.Shows[i];
+            // Two shows with one title and no year to tell them apart: the mix is skipped, not guessed.
+            var (id, why) = await EvalHttp.ResolveShowAsync(http, title, mix.Years?.ElementAtOrDefault(i), ct);
             if (id is null)
             {
                 return new MixResult(mix.Name, [], false, [], why);
