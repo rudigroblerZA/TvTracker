@@ -1,6 +1,5 @@
 @page "/shows"
 @inject NotificationsClient Notifications
-@inject UserSession Session
 
 <PageTitle>@(Current switch { Calendar => "Calendar · ", Feed => "Feed · ", Inbox => "Inbox · ", _ => "" })My shows · @Brand.AppName</PageTitle>
 
@@ -73,6 +72,10 @@
 
     [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
 
+    // The cascading state, not the session's own flag: that one is worked out once and doesn't follow a sign-in made
+    // inside the mobile app.
+    [CascadingParameter] private Task<AuthenticationState>? Authentication { get; set; }
+
     // Shown on the Inbox button, since the inbox is no longer in the menu. The inbox view keeps it current.
     private int unread;
 
@@ -85,12 +88,7 @@
     protected override async Task OnInitializedAsync()
     {
         // The inbox view loads the inbox itself and reports the count.
-        if (Current == Inbox)
-        {
-            return;
-        }
-        await Session.EnsureLoadedAsync();
-        if (!Session.IsSignedIn)
+        if (Current == Inbox || Authentication is null || (await Authentication).User.Identity?.IsAuthenticated != true)
         {
             return;
         }

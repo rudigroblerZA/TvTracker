@@ -2,7 +2,6 @@
 @attribute [RequiresFeature(FeatureFlags.TasteMatch)]
 @inject AnalyticsClient Analytics
 @inject IPlatformServices Platform
-@inject UserSession Session
 
 <PageTitle>Taste Match · @Brand.AppName</PageTitle>
 
@@ -63,10 +62,13 @@
     private bool copied;
     private string? error;
 
+    // The cascading state, not the session's own flag: that one is worked out once and doesn't follow a sign-in made
+    // inside the mobile app.
+    [CascadingParameter] private Task<AuthenticationState>? Authentication { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-        await Session.EnsureLoadedAsync();
-        if (Session.IsSignedIn)
+        if (Authentication is not null && (await Authentication).User.Identity?.IsAuthenticated == true)
         {
             await RunAsync(async () => matches = await Analytics.GetMyMatchesAsync() ?? []);
         }

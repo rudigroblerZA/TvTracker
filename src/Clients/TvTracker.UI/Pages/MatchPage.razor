@@ -237,7 +237,12 @@ else
 
     private Task FollowPicksAsync() => RunAsync(async () =>
     {
-        await Task.WhenAll((claimed ?? []).Select(pick => Tracking.FollowAsync(pick.ShowId, from: FollowSources.Match)));
+        // One at a time: a failure stops at that show, and following a show already followed changes nothing, so trying
+        // again picks up where it stopped.
+        foreach (var pick in claimed ?? [])
+        {
+            await Tracking.FollowAsync(pick.ShowId, from: FollowSources.Match);
+        }
         followedPicks = true;
     });
 

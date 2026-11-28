@@ -16,10 +16,10 @@ public class TasteMatchTests
         [Comedy2] = new("Comedy Two", null, ["Comedy"]),
         [SciFi1] = new("Sci-Fi One", null, ["Science-Fiction", "Drama"]),
         [Reality1] = new("Reality One", null, ["Reality"]),
-        [Pick1] = new("Pick One", null, ["Crime", "Comedy"]),
-        [Pick2] = new("Pick Two", null, ["Comedy"]),
-        [Pick3] = new("Pick Three", null, ["Crime"]),
-        [Pick4] = new("Pick Four", null, ["Drama"])
+        [Pick1] = new("Pick One", "p1.jpg", ["Crime", "Comedy"]),
+        [Pick2] = new("Pick Two", "p2.jpg", ["Comedy"]),
+        [Pick3] = new("Pick Three", "p3.jpg", ["Crime"]),
+        [Pick4] = new("Pick Four", "p4.jpg", ["Drama"])
     };
 
     private static IReadOnlyList<string> GenresOf(Guid id) => Shows[id].Genres;
@@ -188,6 +188,17 @@ public class TasteMatchTests
         Assert.Equal("Watch together", togetherLabel);
         Assert.Equal([Pick1, Pick2, Pick3, Pick4], together.Select(s => s.ShowId));
         Assert.DoesNotContain(together, s => a.ContainsKey(s.ShowId));
+    }
+
+    [Fact]
+    public void A_show_with_no_poster_gives_its_place_on_the_card_to_the_next()
+    {
+        var picks = Enumerable.Range(0, 6).Select(i => new MatchPickDto(Id(50 + i), $"Pick {i}", i is 1 or 2 ? null : $"p{i}.jpg", [], [], [])).ToList();
+        var result = new TasteMatchDto(40, "line", [], [], null, picks, false);
+
+        var (shows, _) = TasteMatch.CardShows(result);
+
+        Assert.Equal([Id(50), Id(53), Id(54), Id(55)], shows.Select(s => s.ShowId));
     }
 
     private static Guid Id(int n) => new($"00000000-0000-0000-0000-{n:000000000000}");

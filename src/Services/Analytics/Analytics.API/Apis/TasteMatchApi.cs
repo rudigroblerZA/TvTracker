@@ -235,9 +235,10 @@ public static class TasteMatchApi
         }
 
         var side = TasteMatch.Picked(picks);
-        if (await ResultAsync(db, catalog, match, side, picks.ToHashSet(), ct) is not { } result)
+        var (result, unavailable) = await ResultAsync(db, catalog, match, side, picks.ToHashSet(), ct);
+        if (result is null)
         {
-            return Problem("pick-another", "One of those is too new to compare yet. Pick one more show.");
+            return unavailable ? TryAgain() : Problem("pick-another", "One of those is too new to compare yet. Pick one more show.");
         }
 
         match.GuestPicks = picks;
@@ -281,9 +282,10 @@ public static class TasteMatchApi
         }
 
         match.FriendUnnamed = (request?.Unnamed ?? []).Distinct().Take(TasteMatch.MaxScored).ToList();
-        if (await ResultAsync(db, catalog, match, side, known, ct) is not { } result)
+        var (result, unavailable) = await ResultAsync(db, catalog, match, side, known, ct);
+        if (result is null)
         {
-            return Problem("pick-another", "Too few of your shows can be compared yet. Try again in a few minutes.");
+            return unavailable ? TryAgain() : Problem("pick-another", "Too few of your shows can be compared yet. Try again in a few minutes.");
         }
 
         match.FriendUserId = userId;
@@ -435,29 +437,32 @@ public static class TasteMatchApi
     }
 
     /// <summary>
-    /// The result for a match and the friend's side; null when the catalog can't compare the two yet (a show with no
-    /// vector leaves a side with too few).
+    /// The result for a match and the friend's side. No result when the catalog can't compare the two yet (a show with
+    /// no vector leaves a side with too few), or, as <c>Unavailable</c> says, when the catalog couldn't be asked at all.
     /// </summary>
-    private static async Task<TasteMatchDto?> ResultAsync(AnalyticsContext db, CatalogMatchClient catalog, TasteMatchRow match,
+    private static async Task<(TasteMatchDto? Result, bool Unavailable)> ResultAsync(AnalyticsContext db, CatalogMatchClient catalog, TasteMatchRow match,
         IReadOnlyDictionary<Guid, double> friend, IReadOnlySet<Guid> friendKnown, CancellationToken ct)
     {
         var (inviterKnown, inviterLoved) = await ReunionsApi.LoveAsync(db, match.InviterUserId, ct);
         var inviter = TasteMatch.Side(inviterLoved);
 
-        var compared = await catalog.CompareAsync(inviter, friend, ct);
+        if (await catalog.TryCompareAsync(inviter, friend, ct) is not { } compared)
+        {
+            return (null, true);
+        }
         if (compared.Alike is not { } alike)
         {
-            return null;
+            return (null, false);
         }
 
         // What either already knows is no suggestion: the catalog was told only what they love.
-        var together = compared.Together.Where(id => !inviterKnown.Contains(id) && !friendKnown.Contains(id)).ToList();
+        var together = (compared.Together ?? []).Where(id => !inviterKnown.Contains(id) && !friendKnown.Contains(id)).ToList();
         var ids = inviter.Keys.Concat(friend.Keys).Concat(together).Distinct().ToList();
         var shows = await db.Shows.AsNoTracking().Where(s => ids.Contains(s.ShowId))
             .Select(s => new { s.ShowId, s.Title, s.PosterUrl, s.Genres })
             .ToDictionaryAsync(s => s.ShowId, s => new MatchShow(s.Title, s.PosterUrl, s.Genres), ct);
-        return TasteMatch.Of(match.Token, inviter, friend, match.InviterUnnamed.Concat(match.FriendUnnamed).ToHashSet(), alike,
-            compared.SeedsFirst, compared.SeedsSecond, together, compared.Loose, shows);
+        return (TasteMatch.Of(match.Token, inviter, friend, match.InviterUnnamed.Concat(match.FriendUnnamed).ToHashSet(), alike,
+            compared.SeedsFirst ?? [], compared.SeedsSecond ?? [], together, compared.Loose, shows), false);
     }
 
     /// <summary>

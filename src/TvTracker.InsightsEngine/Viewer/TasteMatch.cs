@@ -137,11 +137,16 @@ public static class TasteMatch
 
     /// <summary>
     /// The shows a result's share card pictures, and what it calls them: what the two both love when there is any, else
-    /// what they could watch together. Never one side's own shows.
+    /// what they could watch together. Never one side's own shows. Only shows with a poster: a card pictures them, so one
+    /// without gives its place to the next.
     /// </summary>
-    public static (IReadOnlyList<MatchShowDto> Shows, string Label) CardShows(TasteMatchDto result) => result.BothLove.Count > 0
-        ? (result.BothLove.Take(MaxCardShows).ToList(), "You both love")
-        : (result.WatchTogether.Take(MaxCardShows).Select(p => new MatchShowDto(p.ShowId, p.Title, p.PosterUrl)).ToList(), "Watch together");
+    public static (IReadOnlyList<MatchShowDto> Shows, string Label) CardShows(TasteMatchDto result)
+    {
+        var (shows, label) = result.BothLove.Count > 0
+            ? (result.BothLove, "You both love")
+            : (result.WatchTogether.Select(p => new MatchShowDto(p.ShowId, p.Title, p.PosterUrl)).ToList(), "Watch together");
+        return (shows.Where(s => !string.IsNullOrEmpty(s.PosterUrl)).Take(MaxCardShows).ToList(), label);
+    }
 
     /// <summary>
     /// Each genre's share of a side's love: a show's weight goes to each of its genres, and the shares add up to 1.
