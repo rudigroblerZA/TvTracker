@@ -1,0 +1,44 @@
+@* The caller's shows a Taste Match result could name, each with a tick to keep it out: the result only names shows both
+   love, and an unticked one still counts towards the score. *@
+@if (Shows.Count > 0)
+{
+    <p class="small">The result only names shows you both love. These are yours that it could name; untick any you'd rather it didn't. They still count towards the score.</p>
+    <ul class="match-nameable">
+        @foreach (var show in Shows)
+        {
+            <li @key="show.ShowId">
+                <label>
+                    <input type="checkbox" checked="@(!Unnamed.Contains(show.ShowId))" @onchange="e => ToggleAsync(show.ShowId, named: e.Value is true)" />
+                    @show.Title
+                </label>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MatchShow> Shows { get; set; } = [];
+
+    /// <summary>
+    /// The shows not to name; ticking and unticking changes this set.
+    /// </summary>
+    [Parameter, EditorRequired] public HashSet<Guid> Unnamed { get; set; } = null!;
+
+    /// <summary>
+    /// Told after each change, for a page that saves as it goes.
+    /// </summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private Task ToggleAsync(Guid showId, bool named)
+    {
+        if (named)
+        {
+            Unnamed.Remove(showId);
+        }
+        else
+        {
+            Unnamed.Add(showId);
+        }
+        return Changed.InvokeAsync();
+    }
+}

@@ -1,7 +1,7 @@
 @* A Taste Match's result: the number and its line, what the two share, where they differ, and what they could watch
    together. Shown to anyone with the link, so it names only what the result carries. *@
 <section class="match-result">
-    <p class="match-names">@Inviter <span aria-hidden="true">×</span> @Friend</p>
+    <p class="match-names">@Name("inviter") <span aria-hidden="true">×</span> @Name("friend")</p>
     <p class="match-score"><span>@Result.Score%</span> match</p>
     <p class="match-line">@Result.Line</p>
 </section>
@@ -26,7 +26,7 @@
         }
         @if (Result.Differ is { } differ)
         {
-            <p class="muted">@Brings(Inviter, differ.Inviter, first: true); @Brings(Friend, differ.Friend, first: false).</p>
+            <p class="muted">@Brings("inviter", differ.Inviter, first: true); @Brings("friend", differ.Friend, first: false).</p>
         }
     </div>
 }
@@ -55,19 +55,24 @@
     [Parameter, EditorRequired] public TasteMatchResult Result { get; set; } = null!;
 
     /// <summary>
-    /// What to call each of the two: a first name, or "You" for whoever is looking.
+    /// The two's first names.
     /// </summary>
     [Parameter, EditorRequired] public string Inviter { get; set; } = "";
 
     [Parameter, EditorRequired] public string Friend { get; set; } = "";
 
-    // "You" is whoever is looking: "You bring the comedy", "Crime from you".
-    private static bool IsYou(string who) => who == "You";
+    /// <summary>
+    /// Which of the two is looking, "inviter" or "friend", when that's known: they are "you" in what the page says.
+    /// </summary>
+    [Parameter] public string? You { get; set; }
 
-    private static string Brings(string who, string genre, bool first) =>
-        $"{(first ? who : Whom(who))} {(IsYou(who) ? "bring" : "brings")} the {genre.ToLowerInvariant()}";
+    /// <summary>
+    /// What to call one of the two: "You" (or "you" mid-sentence) for whoever is looking, else their first name.
+    /// </summary>
+    private string Name(string role, bool first = true) => role == You ? (first ? "You" : "you") : role == "inviter" ? Inviter : Friend;
 
-    private static string Whom(string who) => IsYou(who) ? "you" : who;
+    private string Brings(string role, string genre, bool first) =>
+        $"{Name(role, first)} {(role == You ? "bring" : "brings")} the {genre.ToLowerInvariant()}";
 
     /// <summary>
     /// "Crime like Sam's · Comedy like yours": the genres a suggestion takes from each.
@@ -75,8 +80,8 @@
     private string Reason(MatchPick pick)
     {
         var parts = new List<string>();
-        if (pick.FromInviter.Count > 0) parts.Add($"{string.Join(", ", pick.FromInviter)} from {Whom(Inviter)}");
-        if (pick.FromFriend.Count > 0) parts.Add($"{string.Join(", ", pick.FromFriend)} from {Whom(Friend)}");
+        if (pick.FromInviter.Count > 0) parts.Add($"{string.Join(", ", pick.FromInviter)} from {Name("inviter", first: false)}");
+        if (pick.FromFriend.Count > 0) parts.Add($"{string.Join(", ", pick.FromFriend)} from {Name("friend", first: false)}");
         if (parts.Count == 0 && pick.FromBoth.Count > 0) parts.Add($"{string.Join(", ", pick.FromBoth)}, like both");
         return string.Join(" · ", parts);
     }

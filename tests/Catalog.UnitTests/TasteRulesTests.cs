@@ -63,19 +63,30 @@ public class TasteRulesTests
     {
         var a = Guid.NewGuid();
         var (b1, b2, b3, b4) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        var first = new Dictionary<Guid, double> { [a] = 1 };
-        var second = new Dictionary<Guid, double> { [b1] = 1, [b2] = 0.9, [b3] = 0.8, [b4] = 0.1 };
+        var second = TasteRules.Heaviest(new Dictionary<Guid, double> { [b4] = 0.1, [b2] = 0.9, [b1] = 1, [b3] = 0.8 }, 3);
 
-        var (ids, weights) = TasteRules.Seeds(first, second, perSide: 3);
+        var (ids, weights) = TasteRules.Seeds([a], second);
 
+        // The heaviest three, heaviest first: the fourth seeds nothing.
+        Assert.Equal([b1, b2, b3], second);
         Assert.Equal([a, b1, b2, b3], ids);
         Assert.Equal(0.5, weights[0], 6);
         Assert.All(weights.Skip(1), w => Assert.Equal(0.5 / 3, w, 6));
         Assert.Equal(1, weights.Sum(), 6);
 
-        var (shared, sharedWeights) = TasteRules.Seeds(first, new Dictionary<Guid, double> { [a] = 1, [b1] = 0.5 }, perSide: 3);
+        var (shared, sharedWeights) = TasteRules.Seeds([a], [a, b1]);
         Assert.Equal([a, b1], shared);
         Assert.Equal([0.75, 0.25], sharedWeights);
+    }
+
+    [Fact]
+    public void Shows_that_weigh_the_same_are_picked_the_same_way_every_time()
+    {
+        var ids = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToList();
+        var side = ids.ToDictionary(id => id, _ => 0.5);
+
+        Assert.Equal(ids.Order().Take(3), TasteRules.Heaviest(side, 3));
+        Assert.Equal(TasteRules.Heaviest(side, 3), TasteRules.Heaviest(ids.AsEnumerable().Reverse().ToDictionary(id => id, _ => 0.5), 3));
     }
 
     private static float[] Unit(params float[] v)

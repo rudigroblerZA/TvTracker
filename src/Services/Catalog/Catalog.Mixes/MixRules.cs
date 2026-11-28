@@ -48,15 +48,7 @@ public static class MixRules
         return norm > 0 ? mix.Select(x => x / norm).ToArray() : mix;
     }
 
-    public static double Distance(float[] a, float[] b)
-    {
-        var dot = 0.0;
-        for (var i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-        }
-        return 1 - dot;
-    }
+    public static double Distance(float[] a, float[] b) => Vectors.Distance(a, b);
 
     public static double Score(IReadOnlyList<double> distances, IReadOnlyList<double> weights) =>
         distances.Select((distance, i) => distances.Count * weights[i] * distance).Max();

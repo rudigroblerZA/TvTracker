@@ -41,7 +41,7 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
     /// </summary>
     private bool socialDown;
 
-    private static readonly ILogger<MatchMetrics> Log = NullLogger<MatchMetrics>.Instance;
+    private static readonly ILoggerFactory Log = NullLoggerFactory.Instance;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -92,15 +92,16 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         Assert.Equal(("done", "Robin", null), (answered!.State, answered.FriendName, answered.You));
         Assert.NotNull(answered.GuestKey);
         Assert.InRange(answered.Result!.Score, TasteMatch.MinScore, TasteMatch.MaxScore);
-        // What both love is named; the suggestion the catalog offered is too, and nothing else of either's.
-        Assert.Equal(Shows.Skip(2).Take(4), answered.Result.BothLove.Select(s => s.ShowId).Order().ToList().OrderBy(id => Shows.IndexOf(id)));
+        // What both love is named, and the catalog's suggestions; nothing else of either's.
+        Assert.Equal(Shows.Skip(2).Take(4), answered.Result.BothLove.Select(s => s.ShowId).OrderBy(id => Shows.IndexOf(id)));
+        Assert.Equal(Shows.Skip(9), answered.Result.WatchTogether.Select(s => s.ShowId));
         // The second answer finds the match done: the link reads as gone to it, and the first result stands.
         Assert.Null(again);
         Assert.Equal("Robin", (await OpenAsync(token, Guest))!.FriendName);
 
         await using var db = database.Context();
         var sent = await db.IntegrationEventLogs.AsNoTracking().Where(e => e.Content.Contains(token)).ToListAsync(Ct);
-        var news = JsonSerializer.Deserialize<TasteMatchAnsweredIntegrationEvent>(Assert.Single(sent).Content, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var news = JsonSerializer.Deserialize<TasteMatchAnsweredIntegrationEvent>(Assert.Single(sent).Content, JsonSerializerOptions.Web)!;
         Assert.Equal((inviter, token, "Robin", answered.Result.Score), (news.InviterUserId, news.Token, news.FriendName, news.Score));
     }
 
@@ -130,7 +131,8 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
         Assert.Equal(("done", "Kenji", "friend", inviter), (accepted!.State, accepted.FriendName, accepted.You, accepted.OtherUserId));
         // Shows 3 to 5 are loved by both; the one they asked not to have named isn't.
         Assert.Equal([Shows[4], Shows[5]], accepted.Result!.BothLove.Select(s => s.ShowId).OrderBy(id => Shows.IndexOf(id)));
-        Assert.Equal(("inviter", member), ((await OpenAsync(token, User(inviter, "Ines")))!.You, (await OpenAsync(token, User(inviter, "Ines")))!.OtherUserId));
+        var asInviter = await OpenAsync(token, User(inviter, "Ines"));
+        Assert.Equal(("inviter", member), (asInviter!.You, asInviter.OtherUserId));
         // A third person with the link sees the result, and nobody's id.
         Assert.Null((await OpenAsync(token, Guest))!.OtherUserId);
     }
@@ -347,7 +349,7 @@ public sealed class TasteMatchApiTests(AnalyticsDatabase database) : IClassFixtu
 
     // The catalog says the two are fairly alike and suggests the last three shows.
     private static CatalogMatchClient Catalog(Gate? gate = null) => new(Scripted(JsonSerializer.Serialize(
-        new { alike = 0.6, usableFirst = 5, usableSecond = 3, together = Shows.Skip(9), loose = false }), gate: gate));
+        new { alike = 0.6, seedsFirst = Shows.Take(3), seedsSecond = Shows.Skip(3).Take(3), together = Shows.Skip(9), loose = false }), gate: gate));
 
     private SocialBlocksClient Blocks() => new(Scripted(JsonSerializer.Serialize(new { blocked }), down: socialDown));
 

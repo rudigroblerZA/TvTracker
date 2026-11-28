@@ -70,8 +70,8 @@ public class TasteMatchTests
         var a = new Dictionary<Guid, double> { [Crime1] = 1, [Crime2] = 0.8, [Comedy1] = 0.5 };
         var b = new Dictionary<Guid, double> { [Crime1] = 0.8, [Comedy1] = 1, [Comedy2] = 1, [SciFi1] = 0.5 };
 
-        var forwards = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.6, [], false, Shows);
-        var backwards = TasteMatch.Of("token", b, a, new HashSet<Guid>(), 0.6, [], false, Shows);
+        var forwards = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.6, [], [], [], false, Shows);
+        var backwards = TasteMatch.Of("token", b, a, new HashSet<Guid>(), 0.6, [], [], [], false, Shows);
 
         Assert.Equal(forwards.Score, backwards.Score);
         Assert.Equal(forwards.Line, backwards.Line);
@@ -86,8 +86,8 @@ public class TasteMatchTests
         var a = new Dictionary<Guid, double> { [Crime1] = 1, [Comedy1] = 1 };
         var b = new Dictionary<Guid, double> { [Crime1] = 1, [Comedy1] = 1 };
 
-        var open = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.9, [], false, Shows);
-        var hidden = TasteMatch.Of("token", a, b, new HashSet<Guid> { Crime1 }, 0.9, [], false, Shows);
+        var open = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.9, [], [], [], false, Shows);
+        var hidden = TasteMatch.Of("token", a, b, new HashSet<Guid> { Crime1 }, 0.9, [], [], [], false, Shows);
 
         Assert.Equal(open.Score, hidden.Score);
         Assert.Equal(["Comedy One", "Crime One"], open.BothLove.Select(s => s.Title).Order());
@@ -100,7 +100,7 @@ public class TasteMatchTests
         var a = new Dictionary<Guid, double> { [Crime1] = 1, [Crime2] = 1, [SciFi1] = 1 };
         var b = new Dictionary<Guid, double> { [Crime1] = 1, [Comedy1] = 1, [Reality1] = 1 };
 
-        var match = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.5, [Pick1, Pick2, Pick3], false, Shows);
+        var match = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.5, [], [], [Pick1, Pick2, Pick3], false, Shows);
 
         Assert.Equal([Crime1], match.BothLove.Select(s => s.ShowId));
         var named = match.BothLove.Select(s => s.ShowId).Concat(match.WatchTogether.Select(p => p.ShowId)).ToHashSet();
@@ -114,8 +114,8 @@ public class TasteMatchTests
         var a = new Dictionary<Guid, double> { [Crime1] = 1 };
         var b = new Dictionary<Guid, double> { [Comedy1] = 1 };
 
-        var match = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.3, [Pick1, Pick2, Pick3, Crime1], true, Shows);
-        var few = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.3, [Pick1, Pick2], true, Shows);
+        var match = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.3, [Crime1], [Comedy1], [Pick1, Pick2, Pick3, Crime1], true, Shows);
+        var few = TasteMatch.Of("token", a, b, new HashSet<Guid>(), 0.3, [Crime1], [Comedy1], [Pick1, Pick2], true, Shows);
 
         // A show one of them already loves is never a suggestion.
         Assert.Equal([Pick1, Pick2, Pick3], match.WatchTogether.Select(p => p.ShowId));
@@ -160,15 +160,34 @@ public class TasteMatchTests
     }
 
     [Fact]
-    public void A_member_sees_their_heaviest_shows_as_what_could_be_named_and_seeds_are_the_top_of_those()
+    public void A_member_sees_their_heaviest_shows_as_what_could_be_named()
     {
         var side = Enumerable.Range(1, 20).ToDictionary(Id, i => i <= 2 ? 1.0 : 0.5);
 
         var nameable = TasteMatch.Nameable(side);
 
         Assert.Equal(TasteMatch.MaxNameable, nameable.Count);
-        Assert.Equal([Id(1), Id(2)], nameable.Take(2));
-        Assert.Equal(nameable.Take(TasteMatch.SeedsPerSide), TasteMatch.Seeds(side));
+        // The heaviest first; those that weigh the same by id, so the list is the same every time.
+        Assert.Equal(Enumerable.Range(1, TasteMatch.MaxNameable).Select(Id), nameable);
+    }
+
+    [Fact]
+    public void The_card_pictures_what_both_love_or_else_what_they_could_watch_together_never_ones_own()
+    {
+        var a = new Dictionary<Guid, double> { [Crime1] = 1, [Crime2] = 1 };
+        var shared = TasteMatch.Of("token", a, new Dictionary<Guid, double> { [Crime1] = 1, [Comedy1] = 1 }, new HashSet<Guid>(), 0.5, [], [],
+            [Pick1, Pick2, Pick3], false, Shows);
+        var apart = TasteMatch.Of("token", a, new Dictionary<Guid, double> { [Comedy1] = 1, [Comedy2] = 1 }, new HashSet<Guid>(), 0.2, [], [],
+            [Pick1, Pick2, Pick3, Pick4], false, Shows);
+
+        var (both, bothLabel) = TasteMatch.CardShows(shared);
+        var (together, togetherLabel) = TasteMatch.CardShows(apart);
+
+        Assert.Equal([Crime1], both.Select(s => s.ShowId));
+        Assert.Equal("You both love", bothLabel);
+        Assert.Equal("Watch together", togetherLabel);
+        Assert.Equal([Pick1, Pick2, Pick3, Pick4], together.Select(s => s.ShowId));
+        Assert.DoesNotContain(together, s => a.ContainsKey(s.ShowId));
     }
 
     private static Guid Id(int n) => new($"00000000-0000-0000-0000-{n:000000000000}");

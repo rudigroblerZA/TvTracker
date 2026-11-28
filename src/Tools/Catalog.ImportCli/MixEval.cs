@@ -29,15 +29,11 @@ public static class MixEval
 {
     public const int Top = 10;
 
-    private static readonly JsonSerializerOptions Json = EvalHttp.Json;
-
     /// <param name="token">A member's access token, for a mix their plan decides (Mixtape is a Pro insight); none asks signed out.</param>
     public static async Task<int> RunAsync(string catalogUrl, string casesFile, string? outFile, string? baselineFile, string? token, CancellationToken ct)
     {
-        var cases = JsonSerializer.Deserialize<MixCase[]>(await File.ReadAllTextAsync(casesFile, ct), Json) ?? [];
-        var baseline = baselineFile is null
-            ? []
-            : (JsonSerializer.Deserialize<MixResult[]>(await File.ReadAllTextAsync(baselineFile, ct), Json) ?? []).ToDictionary(r => r.Name);
+        var cases = await EvalHttp.ReadAsync<MixCase>(casesFile, ct);
+        var baseline = await EvalHttp.BaselineAsync<MixResult>(baselineFile, r => r.Name, ct);
 
         using var http = EvalHttp.Client(catalogUrl, token);
         var results = new List<MixResult>();
@@ -48,10 +44,7 @@ public static class MixEval
             Console.WriteLine(Describe(result, baseline.GetValueOrDefault(result.Name)));
         }
 
-        if (outFile is not null)
-        {
-            await File.WriteAllTextAsync(outFile, JsonSerializer.Serialize(results, Json), ct);
-        }
+        await EvalHttp.SaveAsync(outFile, results, ct);
 
         var ran = results.Where(r => r.Skipped is null).ToList();
         var failed = ran.Count(r => r.Failures.Length > 0);
@@ -104,13 +97,13 @@ public static class MixEval
         var ids = new List<Guid>();
         foreach (var title in mix.Shows)
         {
-            var suggestions = await EvalHttp.GetAsync<List<Suggestion>>(http, $"api/v1/shows/suggest?q={Uri.EscapeDataString(title)}", ct)
-                ?? throw new CliException($"No catalog at {http.BaseAddress}: is the address right?");
-            if (suggestions.FirstOrDefault(s => string.Equals(s.Title, title, StringComparison.OrdinalIgnoreCase)) is not { } show)
+            // By title alone: two shows with one title can't be told apart here, and the mix is then skipped, not guessed.
+            var (id, why) = await EvalHttp.ResolveShowAsync(http, title, null, ct);
+            if (id is null)
             {
-                return new MixResult(mix.Name, [], false, [], $"{title} isn't in the catalog");
+                return new MixResult(mix.Name, [], false, [], why);
             }
-            ids.Add(show.Id);
+            ids.Add(id.Value);
         }
 
         var answer = ids.Count == 2
